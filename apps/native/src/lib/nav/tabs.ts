@@ -1,19 +1,40 @@
-import type {
-  MaterialIcon,
-  SFSymbolIcon,
-} from "expo-router/unstable-native-tabs";
 import type { TabId } from "@dragons/shared";
+import type { AppTab, AppTabsMinimizeBehavior } from "@/components/nav/AppTabs";
 
-/** SF Symbol object form expected by `<NativeTabs.Trigger.Icon sf={...} />`. */
-type SfIcon = Extract<NonNullable<SFSymbolIcon["sf"]>, object>;
-
-export interface TabConfig {
-  /** expo-router route name within the (tabs) group. */
-  name: string;
+/**
+ * A tab as declared here, i.e. an `AppTab` whose label is still a translation
+ * key — `(tabs)/_layout.tsx` resolves it against the active locale.
+ */
+export interface TabConfig extends Omit<AppTab, "label"> {
   labelKey: string;
-  sf: SfIcon;
-  md: MaterialIcon["md"];
 }
+
+/**
+ * Where the Staff standings entry point sends the user.
+ *
+ * Not `/standings`: native tabs build the navigator from the triggers that
+ * render, so `(tabs)/standings` does not exist for a user whose Officiating tab
+ * took its slot — exactly the user this shortcut is for. This route lives
+ * outside the tab group and is pushed onto the root stack instead.
+ */
+export const STANDINGS_SHORTCUT_ROUTE = "/league-tables";
+
+/**
+ * Whether the tab bar minimizes while the user scrolls (iOS 26+).
+ *
+ * Evaluated per tab root, as #216 asks: Schedule, Standings and Officiating
+ * are long lists that routinely run several screens deep, Teams runs about
+ * two, and Today's item list can. Home is the one root that usually fits, and
+ * it loses nothing by having the bar minimize on the rare long day. So the
+ * answer is the same everywhere, which is just as well — UIKit hangs
+ * `minimizeBehavior` off the tab bar *controller*, not off an individual tab,
+ * so there is one value for the whole bar regardless.
+ *
+ * "onScrollDown" — minimize while reading further into content, expand on the
+ * way back up — rather than "automatic", which resolves to no minimizing on
+ * current iOS.
+ */
+export const TAB_BAR_MINIMIZE_BEHAVIOR: AppTabsMinimizeBehavior = "onScrollDown";
 
 export const TAB_CONFIG: Record<TabId, TabConfig> = {
   home: {

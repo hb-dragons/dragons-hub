@@ -203,7 +203,7 @@ export function useBoardDrag({
 
   const handleDragStart = useCallback(
     (task: TaskCardData, layout: TaskCardLayout) => {
-      haptics.medium();
+      haptics.lift();
       const cx = layout.x + layout.width / 2;
       const cy = layout.y + layout.height / 2;
       pointerX.value = cx;
@@ -266,7 +266,7 @@ export function useBoardDrag({
       (dropTarget.columnId !== snapshot.task.columnId ||
         dropTarget.position !== snapshot.task.position)
     ) {
-      haptics.success();
+      haptics.drop();
       setRecentlyDroppedTaskId(snapshot.task.id);
       setTimeout(() => setRecentlyDroppedTaskId(null), 400);
       void moveTask(snapshot.task.id, dropTarget.columnId, dropTarget.position);
@@ -374,13 +374,13 @@ export function useBoardDrag({
           const nextIdx = idx - 1;
           activeIndexRef.current = nextIdx;
           pagerRef.current?.scrollToIndex(nextIdx, true);
-          haptics.light();
+          haptics.selection();
           lastHorizontalScrollAt.current = now;
         } else if (pageX > windowWidth - HORIZONTAL_EDGE && idx < allColumns.length - 1) {
           const nextIdx = idx + 1;
           activeIndexRef.current = nextIdx;
           pagerRef.current?.scrollToIndex(nextIdx, true);
-          haptics.light();
+          haptics.selection();
           lastHorizontalScrollAt.current = now;
         }
       }

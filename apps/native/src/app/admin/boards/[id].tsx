@@ -1,45 +1,52 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
-import { ActionSheetIOS, Platform, Pressable, Text, View, ActivityIndicator, useWindowDimensions } from "react-native";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Platform, Pressable, Text, View, ActivityIndicator, useWindowDimensions } from "react-native";
+import { Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
+// `useHeaderHeight` has no equivalent on expo-router's own surface yet, so it
+// stays on the forked React Navigation re-export the SDK 56 codemod points at.
+import { useHeaderHeight } from "expo-router/react-navigation";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useHeaderHeight } from "@react-navigation/elements";
 import { bottomSearchToolbarClearance } from "@/lib/ui/search-toolbar";
+import { searchFieldOptions } from "@/lib/nav/search-bar";
 import { useBoard } from "@/hooks/board/useBoard";
 import { useBoardTasks } from "@/hooks/board/useBoardTasks";
 import { useTaskMutations } from "@/hooks/board/useTaskMutations";
-import { useMoveTask } from "@/hooks/board/useMoveTask";
+import { useDeleteTaskWithUndo } from "@/hooks/board/useDeleteTaskWithUndo";
 import { useBoardDrag } from "@/hooks/board/useBoardDrag";
 import { BoardHeader } from "@/components/board/BoardHeader";
 import { BoardPager, type BoardPagerHandle } from "@/components/board/BoardPager";
-import { TaskDetailSheet, type TaskDetailSheetHandle } from "@/components/board/TaskDetailSheet";
-import { TaskContextMenu, type TaskContextMenuHandle, type TaskContextAction } from "@/components/board/TaskContextMenu";
-import { MoveToSheet, type MoveToSheetHandle } from "@/components/board/MoveToSheet";
-import { useBoardPickers } from "@/components/board/BoardPickersProvider";
-import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/board/QuickCreateSheet";
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
-import {
-  AssigneeFilterSheet,
-  type AssigneeFilterSheetHandle,
-} from "@/components/board/AssigneeFilterSheet";
+import { Icon } from "@/components/ui/Icon";
+import { HeaderActions } from "@/components/nav/HeaderActions";
 import { useBoardFilterPersistence } from "@/hooks/board/useBoardFilterPersistence";
-import { SortSheet, type SortSheetHandle } from "@/components/board/SortSheet";
+import { sortedColumns } from "@/lib/board/columns";
+import type { TaskActionKey } from "@/lib/board/task-actions";
+import {
+  BOARD_OVERFLOW_ACTIONS,
+  BOARD_TOOLBAR_ACTIONS,
+  type BoardActionKey,
+} from "@/lib/board/board-actions";
+import {
+  openAddColumnSheet,
+  openAssigneeFilterSheet,
+  openBoardSettingsSheet,
+  openColumnSettingsSheet,
+  openDuePickerSheet,
+  openMoveToSheet,
+  openPriorityPickerSheet,
+  openQuickCreateSheet,
+  openSortSheet,
+  openTaskDetailSheet,
+} from "@/lib/nav/board-sheets";
 import { boardTaskComparator } from "@dragons/shared";
 import { useColumnDrag } from "@/hooks/board/useColumnDrag";
 import { TaskCardSkeleton } from "@/components/board/TaskCardSkeleton";
-import { BoardSettingsSheet, type BoardSettingsSheetHandle } from "@/components/board/BoardSettingsSheet";
-import { ColumnSettingsSheet, type ColumnSettingsSheetHandle } from "@/components/board/ColumnSettingsSheet";
-import { AddColumnSheet, type AddColumnSheetHandle } from "@/components/board/AddColumnSheet";
 import type { BoardColumnHandle } from "@/components/board/BoardColumn";
 import type { BoardColumnData } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 import { i18n } from "@/lib/i18n";
-import { haptics } from "@/lib/haptics";
 import { authClient } from "@/lib/auth-client";
-import { useToast } from "@/hooks/useToast";
-import { adminBoardApi } from "@/lib/api";
 import type { TaskCardData, TaskPriority } from "@dragons/shared";
 import type { TaskListQuery } from "@dragons/api-client";
 
@@ -139,21 +146,9 @@ function BoardDetailBody() {
       isPad: (Platform as { isPad?: boolean }).isPad ?? false,
     });
   const [activeIndex, setActiveIndex] = useState(0);
-  const pickers = useBoardPickers();
   const lastPriorityRef = useRef<TaskPriority>("normal");
   const pagerRef = useRef<BoardPagerHandle | null>(null);
-  const taskSheetRef = useRef<TaskDetailSheetHandle | null>(null);
-  const contextMenuRef = useRef<TaskContextMenuHandle | null>(null);
-  const moveToSheetRef = useRef<MoveToSheetHandle | null>(null);
-  const quickCreateRef = useRef<QuickCreateSheetHandle | null>(null);
-  const settingsSheetRef = useRef<BoardSettingsSheetHandle | null>(null);
-  const columnSettingsRef = useRef<ColumnSettingsSheetHandle | null>(null);
-  const addColumnRef = useRef<AddColumnSheetHandle | null>(null);
-  const assigneeFilterRef = useRef<AssigneeFilterSheetHandle | null>(null);
-  const sortSheetRef = useRef<SortSheetHandle | null>(null);
   const taskMutations = useTaskMutations(boardId);
-  const moveTask = useMoveTask(boardId);
-  const toast = useToast();
 
   // Per-column ScrollView handles for imperatively scrolling (autoscroll).
   const columnRefsMap = useRef<Map<number, BoardColumnHandle>>(new Map());
@@ -162,18 +157,9 @@ function BoardDetailBody() {
   // Derived
   // ---------------------------------------------------------------------------
 
-  const columns = useMemo(
-    () => (board ? [...board.columns].sort((a, b) => a.position - b.position) : []),
-    [board],
-  );
+  const columns = useMemo(() => sortedColumns(board), [board]);
 
   const columnDrag = useColumnDrag(boardId, columns);
-
-  const countsByColumn = useMemo(() => {
-    const m = new Map<number, number>();
-    for (const t of tasks ?? []) m.set(t.columnId, (m.get(t.columnId) ?? 0) + 1);
-    return m;
-  }, [tasks]);
 
   // ---------------------------------------------------------------------------
   // Focus-based revalidation
@@ -213,14 +199,17 @@ function BoardDetailBody() {
   });
 
   // ---------------------------------------------------------------------------
-  // Context menu / other interactions (unchanged)
+  // Task and column interactions
   // ---------------------------------------------------------------------------
 
   // BoardPager is memoised; inline arrow props would defeat that on every
   // screen re-render (search, filters, refresh flag, drag frames).
-  const onTaskPress = useCallback((task: TaskCardData) => {
-    taskSheetRef.current?.open(task.id);
-  }, []);
+  const onTaskPress = useCallback(
+    (task: TaskCardData) => {
+      openTaskDetailSheet(boardId, task.id);
+    },
+    [boardId],
+  );
 
   const onRefreshPager = useCallback(() => {
     void onPullRefresh();
@@ -231,120 +220,57 @@ function BoardDetailBody() {
     pagerRef.current?.scrollToIndex(i, true);
   }, []);
 
-  const handleTaskDelete = useCallback(
-    (task: TaskCardData) => {
-      haptics.warning();
-      const snapshotTitle = task.title;
-      const snapshotColumnId = task.columnId;
-      const snapshotDescription = task.description ?? null;
-      const snapshotPriority = task.priority;
-      const snapshotDueDate = task.dueDate;
+  const handleTaskDelete = useDeleteTaskWithUndo(boardId);
 
-      taskMutations
-        .deleteTask(task.id)
-        .then(() => {
-        toast.show({
-          title: i18n.t("toast.taskDeleted"),
-          action: {
-            label: i18n.t("toast.undo"),
-            onPress: () => {
-              void (async () => {
-                try {
-                  await adminBoardApi.createTask(boardId, {
-                    columnId: snapshotColumnId,
-                    title: snapshotTitle,
-                    description: snapshotDescription,
-                    priority: snapshotPriority,
-                    dueDate: snapshotDueDate,
-                  });
-                  await revalidateTasks();
-                } catch {
-                  toast.show({
-                    title: i18n.t("toast.saveFailed"),
-                    variant: "error",
-                  });
-                }
-              })();
-            },
-          },
-        });
-      })
-      .catch(() => {
-        // Delete failed: useTaskMutations.deleteTask already shows an error toast.
-      });
-    },
-    [boardId, taskMutations, toast, revalidateTasks],
-  );
-
-  const handleTaskLongPress = useCallback(
-    (task: TaskCardData) => {
-      const runAction = (action: TaskContextAction) => {
-        if (action === "move") {
-          moveToSheetRef.current?.open({
-            task,
-            columns,
-            countsByColumn,
-            onMove: async (columnId, position) => {
-              await moveTask(task.id, columnId, position);
-            },
-          });
-        } else if (action === "priority") {
-          pickers.openPriority(task.priority, (p) => {
+  /**
+   * What the card's context menu picked (#220).
+   *
+   * The menu itself is declared on the card — this only runs the action, and
+   * every branch is the same call the matching control on the task sheet
+   * makes. No haptic for opening the menu: UIKit plays its own, and revealing
+   * a menu is none of the three HIG feedback categories (#218).
+   */
+  const handleTaskAction = useCallback(
+    (task: TaskCardData, action: TaskActionKey) => {
+      // A switch rather than an if/else chain ending in `else`: a fifth action
+      // added to `TASK_ACTIONS` would have fallen into the delete branch.
+      switch (action) {
+        case "move":
+          openMoveToSheet(boardId, task.id);
+          break;
+        case "priority":
+          openPriorityPickerSheet(task.priority, (p) => {
             // Mutation hook surfaces failures via toast; swallow rejection.
             taskMutations.setPriority(task.id, p).catch(() => {});
           });
-        } else if (action === "due") {
-          pickers.openDue(task.dueDate, (iso) => {
+          break;
+        case "due":
+          openDuePickerSheet(task.dueDate, (iso) => {
             taskMutations.setDueDate(task.id, iso).catch(() => {});
           });
-        } else if (action === "delete") {
+          break;
+        case "delete":
           handleTaskDelete(task);
-        }
-      };
-
-      if (Platform.OS === "ios") {
-        haptics.light();
-        const actions: TaskContextAction[] = ["move", "priority", "due", "delete"];
-        ActionSheetIOS.showActionSheetWithOptions(
-          {
-            title: task.title,
-            options: [
-              i18n.t("board.task.actions.moveTo"),
-              i18n.t("board.task.actions.setPriority"),
-              i18n.t("board.task.actions.setDue"),
-              i18n.t("board.task.actions.delete"),
-              i18n.t("common.cancel"),
-            ],
-            destructiveButtonIndex: 3,
-            cancelButtonIndex: 4,
-          },
-          (buttonIndex) => {
-            const action = actions[buttonIndex];
-            if (action) runAction(action);
-          },
-        );
-        return;
+          break;
       }
-
-      contextMenuRef.current?.open({ task, onAction: runAction });
     },
-    [columns, countsByColumn, moveTask, taskMutations, pickers, handleTaskDelete],
+    [boardId, taskMutations, handleTaskDelete],
   );
 
   const onPressPriorityChip = useCallback(() => {
     const starting = filters.priority ?? lastPriorityRef.current;
-    pickers.openPriority(starting, (p) => {
+    openPriorityPickerSheet(starting, (p) => {
       lastPriorityRef.current = p;
       setFilters((f) => ({ ...f, priority: p }));
     });
-  }, [filters.priority, pickers]);
+  }, [filters.priority]);
 
   const onClearPriorityFilter = useCallback(() => {
     setFilters((f) => ({ ...f, priority: null }));
   }, []);
 
   const onPressAssignees = useCallback(() => {
-    assigneeFilterRef.current?.open(filters.assigneeIds, (next) => {
+    openAssigneeFilterSheet(filters.assigneeIds, (next) => {
       setFilters((f) => ({ ...f, assigneeIds: next }));
     });
   }, [filters.assigneeIds]);
@@ -355,108 +281,88 @@ function BoardDetailBody() {
 
   const openQuickCreate = useCallback(
     (columnId: number) => {
-      quickCreateRef.current?.open({
-        boardId,
-        columns,
-        initialColumnId: columnId,
-      });
+      openQuickCreateSheet(boardId, columnId);
     },
-    [boardId, columns],
+    [boardId],
   );
 
   const onColumnLongPress = useCallback(
     (col: BoardColumnData) => {
-      columnSettingsRef.current?.open({ boardId, column: col });
+      openColumnSettingsSheet(boardId, col.id);
     },
     [boardId],
   );
 
   const onAddColumnPress = useCallback(() => {
-    addColumnRef.current?.open({ boardId });
+    openAddColumnSheet(boardId);
   }, [boardId]);
 
-  const openQuickCreateFab = useCallback(() => {
-    const active = columns[activeIndex] ?? columns[0];
-    if (!active) return;
-    quickCreateRef.current?.open({
-      boardId,
-      columns,
-      initialColumnId: active.id,
-    });
-  }, [activeIndex, boardId, columns]);
+  /**
+   * What the header toolbar picked (#224).
+   *
+   * Same shape as `handleTaskAction`: a switch over the vocabulary's keys, so a
+   * fifth entry in `BOARD_ACTIONS` is a compile error here rather than a button
+   * that silently does nothing. Creating a task lands in the column the pager
+   * is showing — the toolbar has no column of its own, and the visible one is
+   * the one the user is looking at.
+   */
+  const handleBoardAction = useCallback(
+    (action: BoardActionKey) => {
+      switch (action) {
+        case "create": {
+          const active = columns[activeIndex] ?? columns[0];
+          if (active) openQuickCreate(active.id);
+          break;
+        }
+        case "sort":
+          openSortSheet(sort, setSort);
+          break;
+        case "addColumn":
+          onAddColumnPress();
+          break;
+        case "settings":
+          openBoardSettingsSheet(boardId);
+          break;
+      }
+    },
+    [activeIndex, boardId, columns, openQuickCreate, onAddColumnPress, sort, setSort],
+  );
 
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
-  // NOTE: no early returns before Stack.Screen — the header options (title,
-  // search bar, right buttons) must be attached from the very first render.
-  // Attaching them only once board data arrives re-configures the native
-  // header mid push-transition, which flashes a header overlay.
+  // NOTE: no early returns before Stack.Screen and HeaderActions — the header
+  // options (title, search bar, bar button items) must be attached from the
+  // very first render. Attaching them only once board data arrives
+  // re-configures the native header mid push-transition, which flashes a
+  // header overlay.
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Stack.Screen
         options={{
           title: board?.name ?? "",
-          headerSearchBarOptions: {
+          headerSearchBarOptions: searchFieldOptions({
             placeholder: i18n.t("board.search.placeholder"),
-            hideWhenScrolling: false,
-            // Explicit "integrated" (iOS 26 bottom toolbar). With the default
-            // "automatic", UIKit reserves a stacked under-title slot during the
-            // push transition and draws its bar background over the column
-            // pills until the search bar settles into the bottom toolbar —
-            // visible as a header overlay that flashes and disappears.
+            // The iOS 26 bottom toolbar; `bottomSearchToolbarClearance` above
+            // is what keeps the columns clear of it.
             placement: "integrated",
-            onChangeText: (e) => commitSearchQuery(e.nativeEvent.text),
+            onChangeText: commitSearchQuery,
             // Clearing is a deliberate action, not a keystroke — apply at once.
-            onCancelButtonPress: () => setSearchQuery(""),
-          },
-          headerRight: () => (
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.xs,
-              }}
-            >
-              <Pressable
-                onPress={() => sortSheetRef.current?.open(sort, setSort)}
-                accessibilityRole="button"
-                accessibilityLabel={i18n.t("board.sort.open")}
-                hitSlop={12}
-                style={{
-                  width: 44,
-                  height: 44,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text
-                  style={{
-                    color: sort === "position" ? colors.foreground : colors.primary,
-                    fontSize: 18,
-                    fontWeight: "700",
-                  }}
-                >
-                  ⇅
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  if (board) settingsSheetRef.current?.open({ board });
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={i18n.t("admin.boards.settingsTitle")}
-                hitSlop={12}
-                style={{ paddingHorizontal: spacing.sm, paddingVertical: spacing.sm }}
-              >
-                <Text style={{ color: colors.primary, fontSize: 18, fontWeight: "700" }}>⋯</Text>
-              </Pressable>
-            </View>
-          ),
+            onCancel: () => setSearchQuery(""),
+          }),
         }}
       />
-      {/* Pills/chips start below the header; columns and the FAB end above
+      {/* The header's own buttons (#224). Declared beside `Stack.Screen` and
+          ahead of every state branch below, for the same reason it is: bar
+          items compose into the same native header options, and a header
+          reconfigured mid push-transition flashes. */}
+      <HeaderActions
+        items={BOARD_TOOLBAR_ACTIONS}
+        overflow={BOARD_OVERFLOW_ACTIONS}
+        onAction={handleBoardAction}
+      />
+      {/* Pills/chips start below the header; the columns end above
           the bottom search toolbar. The drag ghost stays OUTSIDE this
           container: it is positioned in window-absolute coordinates, which
           only line up with the unpadded root. */}
@@ -565,8 +471,12 @@ function BoardDetailBody() {
                     paddingVertical: spacing.md,
                     borderRadius: 8,
                     backgroundColor: colors.primary,
+                    flexDirection: "row",
+                    gap: spacing.xs,
+                    alignItems: "center",
                   }}
                 >
+                  <Icon name="add" size={15} color={colors.primaryForeground} />
                   <Text style={{ color: colors.primaryForeground, fontWeight: "700" }}>
                     {i18n.t("board.column.newColumn")}
                   </Text>
@@ -585,7 +495,7 @@ function BoardDetailBody() {
                 tasks={tasks ?? []}
                 onActiveColumnChange={setActiveIndex}
                 onTaskPress={onTaskPress}
-                onTaskLongPress={handleTaskLongPress}
+                onTaskAction={handleTaskAction}
                 onTaskDelete={handleTaskDelete}
                 onColumnLongPress={onColumnLongPress}
                 onAddTask={openQuickCreate}
@@ -606,31 +516,6 @@ function BoardDetailBody() {
               />
             )}
           </View>
-          <Pressable
-            onPress={openQuickCreateFab}
-            accessibilityRole="button"
-            accessibilityLabel={i18n.t("board.quickCreate.fab")}
-            style={{
-              position: "absolute",
-              right: spacing.lg,
-              bottom: spacing.lg,
-              width: 56,
-              height: 56,
-              borderRadius: 28,
-              backgroundColor: colors.primary,
-              alignItems: "center",
-              justifyContent: "center",
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.15,
-              shadowRadius: 6,
-              elevation: 5,
-            }}
-          >
-            <Text style={{ color: colors.primaryForeground, fontSize: 28, fontWeight: "700", marginTop: -2 }}>
-              +
-            </Text>
-          </Pressable>
         </View>
         )}
       </View>
@@ -645,16 +530,6 @@ function BoardDetailBody() {
           cardHeight={dragState.cardHeight}
         />
       ) : null}
-
-      <TaskDetailSheet ref={taskSheetRef} boardId={boardId} />
-      <TaskContextMenu ref={contextMenuRef} />
-      <MoveToSheet ref={moveToSheetRef} />
-      <QuickCreateSheet ref={quickCreateRef} />
-      <BoardSettingsSheet ref={settingsSheetRef} />
-      <ColumnSettingsSheet ref={columnSettingsRef} />
-      <AddColumnSheet ref={addColumnRef} />
-      <AssigneeFilterSheet ref={assigneeFilterRef} />
-      <SortSheet ref={sortSheetRef} />
     </View>
   );
 }

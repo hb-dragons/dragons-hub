@@ -10,7 +10,7 @@ import {
   COMPOSER_MAX,
 } from "@/lib/assistant/composer";
 import { ComposerSurface } from "./ComposerSurface";
-import { ArrowUpIcon, StopIcon } from "./icons";
+import { Icon } from "@/components/ui/Icon";
 
 export function ChatComposer({
   value,
@@ -110,7 +110,7 @@ export function ChatComposer({
               justifyContent: "center",
             }}
           >
-            {state === "stop" ? <StopIcon color={iconColor} /> : <ArrowUpIcon color={iconColor} />}
+            <Icon name={state === "stop" ? "stop" : "send"} size={20} color={iconColor} />
           </Pressable>
         </View>
       </ComposerSurface>

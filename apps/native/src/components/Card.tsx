@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { View, Pressable, type ViewStyle, type StyleProp } from "react-native";
 import { useTheme } from "@/hooks/useTheme";
-import { haptics } from "@/lib/haptics";
 
 interface CardProps {
   children: ReactNode;
@@ -21,10 +20,7 @@ export function Card({ children, onPress, style }: CardProps) {
   if (onPress) {
     return (
       <Pressable
-        onPress={() => {
-          haptics.light();
-          onPress();
-        }}
+        onPress={onPress}
         style={({ pressed }) => [
           cardStyle,
           pressed && { backgroundColor: colors.surfaceHigh },

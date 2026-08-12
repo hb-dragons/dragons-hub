@@ -13,7 +13,12 @@ export interface TodayItem {
   icon: string;
 }
 
-export function orderTodayItems(items: TodayItem[]): TodayItem[] {
+/**
+ * Generic over the item type so a platform can narrow `route` — the native app
+ * carries a typed expo-router href there — without the ordering pass widening
+ * it back to `TodayItem`.
+ */
+export function orderTodayItems<T extends TodayItem>(items: T[]): T[] {
   return [...items].sort(
     (a, b) =>
       b.urgency - a.urgency ||

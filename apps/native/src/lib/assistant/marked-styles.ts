@@ -34,7 +34,7 @@ type Styles = Partial<
 
 export function markedStyles(theme: Theme): Styles {
   const { colors, spacing, radius, textStyles } = theme;
-  const heading = (fontSize: number): TextStyle => ({
+  const heading = (fontSize: number): TextStyle & ViewStyle => ({
     color: colors.foreground,
     fontFamily: "SpaceGrotesk-Bold",
     fontSize,

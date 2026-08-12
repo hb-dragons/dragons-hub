@@ -7,14 +7,17 @@ overrides:
   # forced past a constraint it declares:
   #   react: packages/shared declares react as a peer at ^19.0.0, which pnpm
   #     auto-installs, resolving to 19.2.4 while every app pins 19.2.6.
-  #   react-native: apps/native pins 0.83.4, but the expo packages resolved a
-  #     second peer variant against 0.85.1, which forked most of the expo-*
-  #     tree into two copies of each module.
-  #   expo-glass-effect: expo-router asks for ^55.0.10 and apps/native pins
-  #     55.0.11, so one copy serves both.
+  #   react-native: apps/native pins the SDK 57 version, but the expo packages
+  #     resolved a second peer variant against a newer patch, which forked most
+  #     of the expo-* tree into two copies of each module.
+  #   expo-glass-effect: expo-router asks for ^57.0.1 and apps/native pins the
+  #     same line, so one copy serves both.
+  #   expo-constants: apps/native pins 57.0.10 while expo-linking asks for
+  #     ~57.0.9, which resolved a second copy of the module.
   react: 19.2.6
-  react-native: 0.83.4
-  expo-glass-effect: 55.0.11
+  react-native: 0.86.2
+  expo-glass-effect: 57.0.1
+  expo-constants: 57.0.10
   # Capped at 1.6.23: better-auth 1.6.24 regressed the client-plugin generics, so
   # any plugin declaring `getActions` stops being assignable to
   # `BetterAuthClientPlugin`. One bad plugin collapses inference for the whole
@@ -100,3 +103,25 @@ allowBuilds:
   # the SDK's build scripts were silently skipped. Same intent, spelled the
   # way this pnpm reads it.
   basketball-bund-sdk@https://codeload.github.com/dirkdrutschmann/basketball-bund-sdk/tar.gz/c72789068d9ec5910440f9e2b94f99b6e56d4800: true
+
+# pnpm's minimum-release-age gate holds back packages published in the last few
+# days. The Expo SDK 57 line (issue #213) is younger than that window, so each
+# package the upgrade needs is listed here by exact version. pnpm maintains this
+# list itself — entries appear when an install needs them, so do not hand-edit.
+minimumReleaseAgeExclude:
+  - '@expo/cli@57.0.14'
+  - '@expo/fingerprint@0.20.7'
+  - '@expo/inline-modules@0.1.5'
+  - '@expo/local-build-cache-provider@57.0.6'
+  - '@expo/metro-config@57.0.8'
+  - '@expo/metro-runtime@57.0.9'
+  - '@expo/prebuild-config@57.0.11'
+  - '@expo/ui@57.0.10'
+  - expo-asset@57.0.10
+  - expo-constants@57.0.10
+  - expo-notifications@57.0.10
+  - expo-router@57.0.12
+  - expo-server@57.0.2
+  - expo-splash-screen@57.0.6
+  - expo-updates@57.0.13
+  - expo@57.0.12

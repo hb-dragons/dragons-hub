@@ -3,8 +3,9 @@
 Items deferred while the app is in internal-testing phase. Work through
 this list before submitting to the public App Store / Play Store.
 
-Last reviewed: 2026-07-26 (issue #118 — this pass corrected several items
-below that had drifted from the code; see the "Resolved" note on each).
+Last reviewed: 2026-08-11 (issue #213 — the Expo SDK 57 upgrade; this pass
+corrected the items #118 had left describing an app that no longer exists).
+Before that: 2026-07-26 (issue #118).
 
 ---
 
@@ -37,31 +38,101 @@ there's nothing stripping the iOS `aps-environment` entitlement.
 
 Remaining, still-open:
 
-- [ ] Confirm the iOS Associated Domains entitlement and an Apple push
-      cert / Firebase config are set up via EAS for production push.
+- [ ] Confirm an Apple push cert / Firebase config are set up via EAS
+      for production push. (The Associated Domains entitlement this
+      item used to bundle in is a universal-links concern, not a push
+      one — it now has its own section below.)
 - [ ] Verify APNs / FCM credentials exist for the production EAS profile
       (`eas credentials`).
 
-### iOS universal links
+### iOS universal links — entitlement landed (#217), not yet active
 
-Android has an intent filter for `https://app.hbdragons.de`; iOS does
-not. Without the entitlement iOS silently opens the link in Safari.
-
-- [ ] Add to `app.json > ios`:
-  ```json
-  "associatedDomains": ["applinks:app.hbdragons.de"]
-  ```
+- [x] ~~Add `ios.associatedDomains` to `app.json`.~~ Resolved (#217):
+      `"associatedDomains": ["applinks:app.hbdragons.de"]`, the same
+      origin the Android intent filter has always auto-verified.
+      `lib/app-config.test.ts` compares the two lists and fails if a
+      host is claimed on one platform only.
 - [ ] Host `/.well-known/apple-app-site-association` on
-      `app.hbdragons.de` with the app's `TeamID.bundleId` and path
-      patterns.
+      `app.hbdragons.de`. **This is the activation step**, and it is a
+      web-property ticket, not this app's: until that file is live the
+      entitlement changes nothing user-visible, because iOS asks for the
+      file before it ever routes a link to the app. Landing the native
+      side first is deliberate — the entitlement is compiled into the
+      binary, so it has to be in a build *before* the web side goes
+      live, and it is inert until then.
 
-### Unused Expo modules — resolved (#118)
+The file must contain the app's `TeamID.de.hbdragons.app` under
+`applinks.details[].appIDs` plus the path patterns to claim. Which paths
+is the companion ticket's call, but note how the two URL spaces line up:
+
+- The web app's default locale (`de`) carries **no** URL prefix
+  (`next-intl`, `localePrefix: "as-needed"`), so `/schedule`,
+  `/standings`, `/teams`, `/team/:id`, `/game/:id` and `/h2h/:id` are
+  the same path in the browser and in the app. Universal links to those
+  land on the matching screen with no mapping layer: expo-router strips
+  the origin off an `https://` launch URL and routes the rest of the
+  path as-is (`fork/extractPathFromURL.ts`).
+- `/en/...` is the same page in English and matches **no** app route —
+  it would open `+not-found`. Either leave `/en/*` out of the claimed
+  paths (it opens in Safari, which is correct today) or add
+  `app/+native-intent.ts` with a `redirectSystemPath` that strips the
+  locale segment. Decide it in the companion ticket; do not claim
+  `/en/*` without one of the two.
+- Session-gated web surfaces (`/admin/*`, `/profile`, …) are worth
+  excluding: the app can route them, but a signed-out tap only reaches
+  the sign-in screen.
+
+Verification once the file ships (none of this can be checked from this
+repo — it needs a device build and the live origin):
+
+```bash
+# 1. Served as JSON, HTTPS, 200, no redirect, no query string.
+curl -sSI https://app.hbdragons.de/.well-known/apple-app-site-association
+# 2. What Apple's CDN actually handed to devices (it caches; expect lag).
+curl -sS https://app-site-association.cdn-apple.com/a/v1/app.hbdragons.de
+```
+
+- Install a build made **after** this entitlement landed — an OTA update
+  cannot add an entitlement, so a pre-#217 binary will keep opening
+  Safari no matter what the AASA says.
+- On device: paste a claimed link into Notes/Messages and tap it, or
+  `xcrun simctl openurl booted https://app.hbdragons.de/game/1`. Typing
+  the URL into Safari deliberately does *not* trigger a universal link.
+- Settings → Developer → Universal Links → Diagnostics reports what iOS
+  resolved for the domain. To bypass Apple's CDN cache while iterating,
+  temporarily claim `applinks:app.hbdragons.de?mode=developer` and turn
+  on Associated Domains Development in the same menu.
+- EAS: the entitlement needs the Associated Domains capability on the
+  provisioning profile. `eas build` syncs capabilities from the
+  entitlement; if a build fails with a profile that does not include
+  `com.apple.developer.associated-domains`, regenerate it via
+  `eas credentials`.
+
+### Unused Expo modules — resolved (#118), corrected (#213)
 
 `expo-camera` and `expo-web-browser` had zero imports and are removed
 from `package.json`. `expo-network` turned out to have a real caller
 (`lib/swr-native-adapters.ts`, `lib/api.ts` — network-state-aware SWR
-reconnect) and was kept. `expo-linking` also had zero imports and is
-removed too (not listed here originally, but same rationale).
+reconnect) and was kept.
+
+This section used to claim `expo-linking` was removed on the same
+"zero imports" rationale. It never was, and it must not be: zero
+imports in our source does not mean unused. `expo-router` declares
+`expo-linking` a **required** peer (not optional in
+`peerDependenciesMeta`) and calls it directly — `Linking.getLinkingURL`
+in `getInitialURL`, `Linking.addEventListener` in `subscribe`,
+`Linking.openURL` for external redirects. Dropping it was re-checked on
+SDK 57 (#213) and `expo doctor` fails immediately:
+
+```
+✖ Check that required peer dependencies are installed
+Missing peer dependency: expo-linking — Required by: expo-router
+Your app may crash outside of Expo Go without this dependency.
+```
+
+`expo-updates` is the other zero-import dependency and stays for the
+same kind of reason — it is the OTA infrastructure `RELEASES.md`
+describes, driven by the config plugin rather than by an import.
 
 ### Android adaptive icon — monochrome
 
@@ -105,7 +176,7 @@ invisible.
 
 - [ ] Pick a service (Sentry, Bugsnag, Crashlytics) and create a
       project for the org.
-- [ ] Wire it into `_layout.tsx` global handler and `ErrorBoundary`.
+- [ ] Wire it into `lib/global-error-handler.ts` and `ErrorBoundary`.
 - [ ] Upload source maps via EAS build hook (e.g. the Sentry Expo
       config plugin) so stack traces symbolicate.
 
@@ -123,8 +194,14 @@ before launch:
 
 - [ ] All `Pressable`s get an `accessibilityRole` and
       `accessibilityLabel`.
-- [ ] Segment controls + filter pills expose
-      `accessibilityState={{ selected: boolean }}`.
+- [x] Segment controls + filter pills expose
+      `accessibilityState={{ selected: boolean }}`. Done in #218: both pill
+      families (`FilterPill`, board `FilterChips`) build their props with
+      `filterPillA11y` in `src/lib/ui/a11y.ts`, and a test fails the build
+      if either stops using it. Segment controls need nothing — `Segmented`
+      wraps the platform `SegmentedControl`, which carries its own traits.
+      Still open elsewhere: the board's column pills are a pager selector,
+      not a filter, and announce no selected state.
 - [ ] Score cards read something meaningful, not just digits (e.g.
       `"Dragons 75 vs Rhein Stars 62, final"`).
 - [ ] VoiceOver + TalkBack smoke test on the top 5 screens.
@@ -134,18 +211,38 @@ before launch:
 
 ---
 
-## Testing — corrected (#118)
+## Testing — corrected (#118), corrected again (#213)
 
 This used to say "native has zero tests" and that `lint` was just
-`tsc --noEmit`. Both were stale: there are 26 `*.test.ts` files under
-`src/`, `lint` runs real ESLint (`eslint .`) separate from `typecheck`
-(`tsc --noEmit`), and `apps/native` has its own `vitest.config.ts`
-coverage gate (currently a measured floor — 48% branches / 27% functions
-/ 49% lines / 48% statements — that ratchets up over time, well below
-`apps/api`'s 90/95% bar). Coverage only instruments `src/lib/**/*.ts` —
-hooks and screens under `src/hooks` and `src/app` aren't measured, since
-there's no React-render test harness here (logic-first vitest; RN/Expo
-are mocked per test, no component rendering).
+`tsc --noEmit`. Both were stale: there are 57 `*.test.ts(x)` files under
+`src/`, and `lint` runs real ESLint (`eslint .`) separate from
+`typecheck`.
+
+`typecheck` is the one package script in the repo that is not plain
+`tsc --noEmit`: it runs `expo customize tsconfig.json` first (#217). That
+is the CLI's no-dev-server path to regenerating
+`.expo/types/router.d.ts`, which is what turns expo-router's `Href` into
+the union of this app's routes. The file is gitignored — it is generated
+from the route tree, so committing it would just be a second copy to
+keep in sync — and without it every `router.push(...)` would be checked
+against `string` and pass. `lib/nav/href.ts` carries a type-level
+assertion that fails the build if the generation ever silently no-ops,
+so the enforcement cannot quietly disappear.
+
+The coverage paragraph then went stale in turn. It quoted 48% branches /
+27% functions / 49% lines / 48% statements and said coverage only
+instruments `src/lib/**/*.ts`. Both were true until the 2026-07-26
+rescope (#109) widened `coverage.include` to all of `src/**`. The live
+floors are in `vitest.config.ts` — read them there rather than here —
+and they are much lower numbers *because they measure much more*:
+`components/`, `app/`, `hooks/` and `theme/` used to be invisible to the
+gate. They ratchet up; never lower them.
+
+There is still no React-render test harness (logic-first vitest; RN/Expo
+are mocked per test, no component rendering), so what those percentages
+buy is coverage of pure logic plus the structural tests in
+`src/lib/nav/` that assert against the route tree and source tree
+themselves.
 
 Still open:
 
@@ -172,32 +269,45 @@ board filter/sort prefs moved off SecureStore onto plain AsyncStorage
 the cold-start path for these. The auth session token is still on
 SecureStore (it's an actual secret).
 
-- [ ] Flatten `team/[id].tsx`: the nested `<FlatList scrollEnabled=
-      false>` inside `<Screen>`'s ScrollView defeats virtualization.
-      Convert to a single `<FlatList>` with `ListHeaderComponent`.
-- [ ] Pause inactive-segment SWR in `schedule.tsx` and `referee.tsx`
-      (`isPaused: segment !== "upcoming"` etc). Right now the other
-      segment's 1000-item fetch fires on mount and is thrown away.
-- [ ] Fix memoised cards: `MatchCardFull` / `MatchCardCompact` /
+- [x] ~~Flatten `team/[id].tsx`: the nested `<FlatList scrollEnabled=
+      false>` inside `<Screen>`'s ScrollView defeats virtualization.~~
+      Done — it is a single `<FlatList>` with `ListHeaderComponent`
+      inside `<Screen scroll={false}>`. #216 added a check to
+      `lib/nav/architecture.test.ts` so no screen re-nests one: besides
+      the virtualization cost, the outer ScrollView is what a native
+      large title would track instead of the list.
+- [x] ~~Pause inactive-segment SWR in `schedule/index.tsx` and
+      `officiating/index.tsx` (`isPaused: segment !== "upcoming"` etc).
+      Right now the other segment's 1000-item fetch fires on mount and
+      is thrown away.~~ Done in Schedule — each `useSWR` key is `null`
+      unless its segment is showing, so the hidden one never fetches and
+      SWR still renders the cached response on the way back. Never
+      applied to Officiating: it makes one `refereeApi.getGames` call
+      and partitions the result across all three segments.
+- [x] ~~Fix memoised cards: `MatchCardFull` / `MatchCardCompact` /
       `TeamCard` are `memo`-wrapped but callers pass inline
       `onPress={() => router.push(...)}`, defeating memo. Either
       `useCallback` the handler in the parent or change the card API to
       take an `id` + wrap `router.push` internally via a stable
-      callback.
+      callback.~~ Done — Home, Schedule, Teams, team detail and
+      head-to-head each pass a `useCallback`-stable handler.
 
 ### Polish
 
-- [ ] Extract the `SegmentedControl` component duplicated in
-      `schedule.tsx` and `referee.tsx`.
+- [x] ~~Extract the `SegmentedControl` component duplicated in
+      `schedule.tsx` and `referee.tsx`.~~ Done — both tab roots render
+      `components/ui/Segmented.tsx`, which wraps the platform control.
 - [ ] Extract `getResultBadge` + `resolveName` (duplicated in
       `MatchCardFull` and `MatchCardCompact`) into a shared match
       helper.
 - [ ] Add a `withAlpha(hex, 0.1)` helper; replace inline
       `colors.primary + "1A"` / `"0D"` / `"60"` etc. across the
       codebase.
-- [ ] Move `ErrorUtils.setGlobalHandler` in `_layout.tsx` from
+- [x] ~~Move `ErrorUtils.setGlobalHandler` in `_layout.tsx` from
       module-scope into a `useEffect(..., [])` so fast-refresh doesn't
-      chain handlers in dev.
+      chain handlers in dev.~~ Resolved (#213): it lives in
+      `lib/global-error-handler.ts`, installing returns the restore
+      function, and the effect's cleanup runs it.
 - [ ] Fix pluralisation in `home.countdown.inDays` — `"In 1 Tagen"` is
       wrong German. Use i18n-js plural rules or handle 1 vs n
       explicitly.
@@ -208,14 +318,24 @@ SecureStore (it's an actual secret).
 
 ### Tech debt to watch
 
-- [ ] `expo-router/unstable-native-tabs` is unstable API. Abstract into
-      a local `<AppTabs>` component so the eventual migration touches
-      one file.
+- [x] ~~`expo-router/unstable-native-tabs` is unstable API. Abstract
+      into a local `<AppTabs>` component so the eventual migration
+      touches one file.~~ Resolved (#213):
+      `components/nav/AppTabs.tsx` is the wrapper, and
+      `lib/nav/architecture.test.ts` fails the build if a second file
+      imports the module.
 - [ ] This is a managed-workflow Expo project (no `ios/`/`android/`
       directories checked in — native config lives entirely in
       `app.json` and is applied by `expo prebuild`/EAS build). If a
       future need forces a bare-workflow eject, re-audit any Podfile /
       Gradle patches added at that point; there's nothing to watch yet.
+      Both directories are in `.gitignore`, so a local `apps/native/ios`
+      left behind by an `expo prebuild` / `expo run:ios` is invisible to
+      the repo *and* to everyone else's checkout — but it is not
+      invisible to your build, which will use the stale copy instead of
+      re-applying `app.json`. Delete it by hand (`rm -rf
+      apps/native/ios apps/native/android`) after any change to
+      `app.json` native keys or the plugin list.
 
 ---
 

@@ -33,6 +33,7 @@
     "upcomingGames": "Upcoming Games",
     "vs": "vs",
     "noUpcoming": "No upcoming games",
+    "viewStandings": "View league tables",
     "countdown": {
       "today": "Today",
       "tomorrow": "Tomorrow",
@@ -232,6 +233,7 @@
     "delete": "Delete",
     "clear": "Clear",
     "edit": "Edit",
+    "more": "More",
     "apply": "Apply",
     "loading": "Loading…",
     "vs": "vs",
@@ -265,6 +267,8 @@
       "idLabel": "#%{id}",
       "priority": "Priority",
       "due": "Due",
+      "column": "Column",
+      "noColumn": "No column",
       "noDue": "No due date",
       "dueOverdue": "Overdue",
       "dueToday": "Today",
@@ -299,7 +303,7 @@
       "count": "%{count} assignees"
     },
     "column": {
-      "addCard": "+ Add card",
+      "addCard": "Add card",
       "empty": "Drop tasks here",
       "addTitle": "Add column",
       "namePlaceholder": "Column name",
@@ -309,7 +313,7 @@
       "deleteConfirmTitle": "Delete column?",
       "deleteConfirmMessage": "All tasks in this column will be deleted. This cannot be undone.",
       "markAsDone": "Mark as done column",
-      "newColumn": "+ New column",
+      "newColumn": "New column",
       "reorderHint": "Long-press a column header to drag-reorder."
     },
     "filters": {
@@ -369,7 +373,7 @@
       "titlePlaceholder": "Task title",
       "descriptionPlaceholder": "Add a description (optional)",
       "submit": "Create",
-      "fab": "New task"
+      "open": "New task"
     }
   },
   "error": {

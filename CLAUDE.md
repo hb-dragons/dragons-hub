@@ -86,7 +86,7 @@ Write direct, specific prose. Avoid filler words and vague adjectives. Add `ai-s
 
 ## Linting
 
-- `lint` and `typecheck` are **distinct** tasks. `pnpm lint` runs real ESLint (shared flat config in `eslint.config.base.mjs`); `pnpm typecheck` runs `tsc --noEmit`. Both run in CI.
+- `lint` and `typecheck` are **distinct** tasks. `pnpm lint` runs real ESLint (shared flat config in `eslint.config.base.mjs`); `pnpm typecheck` runs `tsc --noEmit`. Both run in CI. The one deviation is `apps/native`, whose `typecheck` runs `expo customize tsconfig.json` first (issue #217): that regenerates the gitignored `.expo/types/router.d.ts`, without which expo-router's `Href` is `string` and every route href typechecks vacuously. `src/lib/nav/href.ts` asserts at the type level that those declarations are in scope, so the generation step cannot silently stop working.
 - Bug-class rules are **errors** (CI fails): `no-floating-promises`, `no-misused-promises`, `no-unused-vars` (`^_`-prefixed args/vars are ignored), `consistent-type-imports`. `no-explicit-any` is a warning (and `any` is still disallowed by convention).
 
 ## Code Conventions

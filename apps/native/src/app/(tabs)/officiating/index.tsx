@@ -1,0 +1,367 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  SectionList,
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  Alert,
+} from "react-native";
+import { useRouter } from "expo-router";
+import useSWR from "swr";
+import { APIError } from "@dragons/api-client";
+import { can, isReferee, type RefereeGameListItem } from "@dragons/shared";
+import { Segmented } from "@/components/ui/Segmented";
+import { useTheme } from "@/hooks/useTheme";
+import { useRefresh } from "@/hooks/useRefresh";
+import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
+import { RefereeGameCard } from "@/components/RefereeGameCard";
+import { openAssignRefereeSheet } from "@/lib/nav/referee-sheets";
+import { authClient } from "@/lib/auth-client";
+import { refereeApi } from "@/lib/api";
+import { i18n } from "@/lib/i18n";
+import { kickoffLong, kickoffToday } from "@/lib/format/kickoff";
+import { haptics } from "@/lib/haptics";
+import { fontFamilies } from "@/theme/typography";
+
+type Segment = "mine" | "open" | "past";
+
+interface Section {
+  title: string;
+  formattedTitle: string;
+  data: RefereeGameListItem[];
+}
+
+function groupByDate(
+  games: RefereeGameListItem[],
+  order: "asc" | "desc" = "asc",
+): Section[] {
+  const grouped = new Map<string, RefereeGameListItem[]>();
+  for (const game of games) {
+    const key = game.kickoffDate;
+    const list = grouped.get(key);
+    if (list) list.push(game);
+    else grouped.set(key, [game]);
+  }
+  const entries = Array.from(grouped.entries()).sort(([a], [b]) =>
+    order === "asc" ? a.localeCompare(b) : b.localeCompare(a),
+  );
+  return entries.map(([date, items]): Section => ({
+    title: date,
+    formattedTitle: kickoffLong(date),
+    data: items,
+  }));
+}
+
+function hasAvailableSlot(g: RefereeGameListItem): boolean {
+  return (
+    (g.sr1OurClub && g.sr1Status !== "assigned") ||
+    (g.sr2OurClub && g.sr2Status !== "assigned") ||
+    g.sr1Status === "offered" ||
+    g.sr2Status === "offered"
+  );
+}
+
+function partitionGames(
+  items: RefereeGameListItem[],
+  today: string,
+): {
+  mine: RefereeGameListItem[];
+  open: RefereeGameListItem[];
+  past: RefereeGameListItem[];
+} {
+  const mine: RefereeGameListItem[] = [];
+  const open: RefereeGameListItem[] = [];
+  const past: RefereeGameListItem[] = [];
+  for (const g of items) {
+    const isPast = g.kickoffDate < today;
+    if (isPast) {
+      if (g.mySlot !== null) past.push(g);
+      continue;
+    }
+    if (g.mySlot !== null) mine.push(g);
+    else if (hasAvailableSlot(g) && !g.isCancelled && !g.isForfeited) open.push(g);
+  }
+  return { mine, open, past };
+}
+
+export default function OfficiatingScreen() {
+  const { colors, textStyles, spacing, radius } = useTheme();
+  const router = useRouter();
+
+  const { data: session } = authClient.useSession();
+  const user = (session?.user ?? null) as {
+    role?: string | null;
+    refereeId?: number | null;
+  } | null;
+  const isAdmin = can(user, "assignment", "view");
+  // Admins who are not themselves referees have no "Mine" games. Referees —
+  // including referee-admins — keep the Mine segment.
+  const showMine = isReferee(user) || !isAdmin;
+
+  const [segment, setSegment] = useState<Segment>(showMine ? "mine" : "open");
+
+  // Session resolves async: if the user turns out to have no Mine segment,
+  // leave "mine" for "open".
+  useEffect(() => {
+    if (!showMine && segment === "mine") setSegment("open");
+  }, [showMine, segment]);
+
+  const { data, error, isLoading, mutate } = useSWR(
+    "referee:games",
+    () => refereeApi.getGames({ status: "active", limit: 500 }),
+  );
+
+  async function handleUnassign(
+    game: RefereeGameListItem,
+    slotNumber: 1 | 2,
+    refereeName: string,
+  ) {
+    Alert.alert(
+      i18n.t("refereeGame.admin.removeConfirmTitle"),
+      i18n.t("refereeGame.admin.removeConfirmMessage", { name: refereeName }),
+      [
+        { text: i18n.t("refereeGame.admin.cancel"), style: "cancel" },
+        {
+          text: i18n.t("refereeGame.admin.remove"),
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              try {
+                await refereeApi.unassignReferee(game.apiMatchId, slotNumber);
+                await mutate();
+                haptics.success();
+                Alert.alert(i18n.t("refereeGame.admin.removeSuccess"));
+              } catch (e) {
+                haptics.error();
+                const message =
+                  e instanceof APIError
+                    ? e.message
+                    : i18n.t("refereeGame.admin.removeFailed");
+                Alert.alert(
+                  i18n.t("refereeGame.admin.removeFailed"),
+                  message,
+                );
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }
+
+  const { refreshing, onRefresh } = useRefresh(() => mutate());
+
+  const refreshControl = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={() => {
+          void onRefresh();
+        }}
+        tintColor={colors.primary}
+      />
+    ),
+    [refreshing, onRefresh, colors.primary],
+  );
+
+  const listContentStyle = useMemo(
+    () => ({ paddingTop: spacing.sm, paddingBottom: 100 }),
+    [spacing.sm],
+  );
+
+  const {
+    mineSections,
+    openSections,
+    pastSections,
+    mineCount,
+    openCount,
+    pastCount,
+  } = useMemo(() => {
+    if (!data) {
+      return {
+        mineSections: [],
+        openSections: [],
+        pastSections: [],
+        mineCount: 0,
+        openCount: 0,
+        pastCount: 0,
+      };
+    }
+    const { mine, open, past } = partitionGames(data.items, kickoffToday());
+    return {
+      mineSections: groupByDate(mine, "asc"),
+      openSections: groupByDate(open, "asc"),
+      pastSections: groupByDate(past, "desc"),
+      mineCount: mine.length,
+      openCount: open.length,
+      pastCount: past.length,
+    };
+  }, [data]);
+
+  const sections =
+    segment === "mine"
+      ? mineSections
+      : segment === "open"
+        ? openSections
+        : pastSections;
+  const emptyKey =
+    segment === "mine"
+      ? "refereeTab.emptyMine"
+      : segment === "open"
+        ? "refereeTab.emptyOpen"
+        : "refereeTab.emptyPast";
+
+  const segments: { key: Segment; label: string }[] = [
+    ...(showMine
+      ? [
+          {
+            key: "mine" as const,
+            label: `${i18n.t("refereeTab.segmentMine")}${mineCount > 0 ? ` (${mineCount})` : ""}`,
+          },
+        ]
+      : []),
+    {
+      key: "open",
+      label: `${i18n.t("refereeTab.segmentOpen")}${openCount > 0 ? ` (${openCount})` : ""}`,
+    },
+    {
+      key: "past",
+      label: `${i18n.t("refereeTab.segmentPast")}${pastCount > 0 ? ` (${pastCount})` : ""}`,
+    },
+  ];
+
+  if (isLoading) {
+    return (
+      <Screen edges={UNDER_NATIVE_HEADER} scroll={false}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingTop: spacing.xl,
+          }}
+        >
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (error) {
+    return (
+      <Screen edges={UNDER_NATIVE_HEADER} scroll={false}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingHorizontal: spacing.xl,
+            gap: spacing.md,
+          }}
+        >
+          <Text
+            style={[
+              textStyles.body,
+              { color: colors.mutedForeground, textAlign: "center" },
+            ]}
+          >
+            {i18n.t("refereeTab.error")}
+          </Text>
+          <Pressable
+            onPress={() => {
+              void mutate();
+            }}
+            style={{
+              backgroundColor: colors.primary,
+              borderRadius: radius.md,
+              paddingHorizontal: spacing.xl,
+              paddingVertical: spacing.md,
+            }}
+          >
+            <Text style={[textStyles.button, { color: colors.primaryForeground }]}>
+              {i18n.t("refereeTab.retry")}
+            </Text>
+          </Pressable>
+        </View>
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen edges={UNDER_NATIVE_HEADER} scroll={false}>
+      <SectionList
+        sections={sections}
+        // This list is the screen's scroll view, so it is the one the native
+        // header insets and the large title collapses against. The segment
+        // switcher rides inside it for the same reason.
+        contentInsetAdjustmentBehavior="automatic"
+        ListHeaderComponent={
+          <Segmented segments={segments} selected={segment} onSelect={setSegment} />
+        }
+        ListEmptyComponent={
+          <View style={{ alignItems: "center", paddingTop: spacing["2xl"] }}>
+            <Text style={[textStyles.body, { color: colors.mutedForeground }]}>
+              {i18n.t(emptyKey)}
+            </Text>
+          </View>
+        }
+        keyExtractor={(item) => String(item.id)}
+        renderSectionHeader={({ section }) => (
+          <View
+            style={{
+              backgroundColor: colors.background,
+              paddingVertical: spacing.xs,
+              paddingTop: spacing.md,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 13,
+                fontFamily: fontFamilies.bodySemiBold,
+                color: colors.mutedForeground,
+              }}
+            >
+              {section.formattedTitle}
+            </Text>
+          </View>
+        )}
+        renderItem={({ item }) => (
+          <View style={{ marginBottom: spacing.sm }}>
+            <RefereeGameCard
+              game={item}
+              isAdmin={isAdmin}
+              onAdminAssign={
+                isAdmin
+                  ? // The sheet revalidates this screen's key itself once an
+                    // assignment lands (#223).
+                    (slotNumber) => openAssignRefereeSheet(item.apiMatchId, slotNumber)
+                  : undefined
+              }
+              onAdminUnassign={
+                isAdmin
+                  ? (slotNumber, name) => {
+                      void handleUnassign(item, slotNumber, name);
+                    }
+                  : undefined
+              }
+              onPress={() => {
+                const isOwnClubGame = item.isHomeGame || item.isGuestGame;
+                if (isOwnClubGame && item.matchId !== null) {
+                  router.push(`/game/${String(item.matchId)}`);
+                } else {
+                  router.push(`/referee-game/${String(item.id)}`);
+                }
+              }}
+            />
+          </View>
+        )}
+        refreshControl={refreshControl}
+        contentContainerStyle={listContentStyle}
+        showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled={false}
+      />
+    </Screen>
+  );
+}

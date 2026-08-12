@@ -8,14 +8,23 @@ import { contentInsetBehaviorForEdges } from "@/lib/ui/scroll-inset";
 
 const DEFAULT_EDGES: readonly Edge[] = ["top"];
 
+/**
+ * `edges` for a screen that sits under a native stack header.
+ *
+ * The header reserves the top safe area itself and insets the screen's first
+ * scroll view for whatever it occupies, large title included — so the screen
+ * must not reserve that space a second time. `Screen` reads this and opts the
+ * scroll view into the native inset (see `lib/ui/scroll-inset.ts`), which is
+ * what these screens used to approximate with a fixed 44pt of top padding.
+ */
+export const UNDER_NATIVE_HEADER: readonly Edge[] = [];
+
 interface ScreenProps {
   children: ReactNode;
   /** Wrap children in a ScrollView (default: true) */
   scroll?: boolean;
-  /** SafeAreaView edges. Defaults to ["top"]. Use [] for screens with a native Stack header. */
+  /** SafeAreaView edges. Defaults to ["top"]; pass `UNDER_NATIVE_HEADER` under a native Stack header. */
   edges?: readonly Edge[];
-  /** Extra top padding to clear a transparent header (e.g. 44 for back button) */
-  headerOffset?: number;
   /**
    * Pull-to-refresh handler. When provided and `scroll` is true, a
    * RefreshControl is wired into the internal ScrollView. Pass a single
@@ -31,7 +40,6 @@ export function Screen({
   children,
   scroll = true,
   edges = DEFAULT_EDGES,
-  headerOffset,
   onRefresh,
 }: ScreenProps) {
   const { colors, spacing } = useTheme();
@@ -52,9 +60,8 @@ export function Screen({
     () => ({
       paddingHorizontal: spacing.lg,
       paddingBottom: spacing.xl,
-      ...(headerOffset ? { paddingTop: headerOffset + 8 } : {}),
     }),
-    [spacing.lg, spacing.xl, headerOffset],
+    [spacing.lg, spacing.xl],
   );
 
   const refreshControl = useMemo(() => {

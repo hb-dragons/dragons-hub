@@ -1,14 +1,25 @@
-import { useEffect, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Pressable, Text, TextInput, View } from "react-native";
+import { router } from "expo-router";
 import type { TaskDetail, TaskPriority } from "@dragons/shared";
 import { useAssigneeMutations } from "@/hooks/board/useAssigneeMutations";
+import { useBoard } from "@/hooks/board/useBoard";
+import { useDeleteTaskWithUndo } from "@/hooks/board/useDeleteTaskWithUndo";
 import { useTaskMutations } from "@/hooks/board/useTaskMutations";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
-import { useBoardPickers } from "./BoardPickersProvider";
+import { diffAssignees } from "@/lib/board/assignee-diff";
+import { taskAction } from "@/lib/board/task-actions";
+import { Icon } from "@/components/ui/Icon";
+import {
+  openAssigneePickerSheet,
+  openDuePickerSheet,
+  openMoveToSheet,
+  openPriorityPickerSheet,
+} from "@/lib/nav/board-sheets";
 import { ChecklistSection } from "./ChecklistSection";
 import { CommentsSection } from "./CommentsSection";
+import { PropertyList } from "./PropertyList";
 import { formatDueShort } from "./TaskCard";
 import { SaveIndicator, type SaveState } from "./SaveIndicator";
 import { multilineInput } from "@/components/ui/inputStyles";
@@ -34,6 +45,27 @@ function priorityBadge(
   }
 }
 
+/** Accessibility label for a save indicator; idle has nothing to announce. */
+function saveLabel(state: SaveState): string | undefined {
+  switch (state) {
+    case "saving":
+      return i18n.t("board.task.savingTitle");
+    case "saved":
+      return i18n.t("board.task.savedTitle");
+    default:
+      return undefined;
+  }
+}
+
+/** One assignee is named; several are counted. */
+function assigneeSummary(assignees: TaskDetail["assignees"]): string {
+  if (assignees.length === 0) return i18n.t("board.assignees.none");
+  if (assignees.length === 1) {
+    return assignees[0]?.name ?? i18n.t("board.task.unnamedUser");
+  }
+  return i18n.t("board.assignees.count", { count: assignees.length });
+}
+
 function dueState(iso: string | null): "overdue" | "soon" | "later" | null {
   if (!iso) return null;
   const due = new Date(iso).getTime();
@@ -44,12 +76,31 @@ function dueState(iso: string | null): "overdue" | "soon" | "later" | null {
   return "later";
 }
 
+/**
+ * The body of the task-detail sheet route (`app/admin/boards/sheets/
+ * task-detail.tsx`), which supplies the scroll container and the padding.
+ * Sections here carry no horizontal padding of their own.
+ *
+ * This is also the visible half of the card's context menu (#220): every menu
+ * action has a control here — the column row moves, the priority and due rows
+ * pick, the button at the bottom deletes — because a menu that only opens on a
+ * long press is a menu some people never find.
+ */
 export function TaskDetailBody({ task, boardId }: Props) {
   const theme = useTheme();
   const { colors, spacing, radius } = theme;
   const mutations = useTaskMutations(boardId);
   const assigneeMutations = useAssigneeMutations(boardId);
-  const pickers = useBoardPickers();
+  const deleteTask = useDeleteTaskWithUndo(boardId);
+  const deleteLabel = i18n.t(taskAction("delete").labelKey);
+  // The board is in the cache the screen underneath filled, so the column name
+  // is there on first render; `undefined` only while a deep link opens the
+  // sheet cold.
+  const { data: board } = useBoard(boardId);
+  const columnName = useMemo(
+    () => board?.columns.find((column) => column.id === task.columnId)?.name ?? null,
+    [board, task.columnId],
+  );
 
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
@@ -107,71 +158,10 @@ export function TaskDetailBody({ task, boardId }: Props) {
         ? colors.heat
         : colors.foreground;
 
-  const propertyRow = ({
-    label,
-    value,
-    valueColor,
-    onPress,
-  }: {
-    label: string;
-    value: string;
-    valueColor?: string;
-    onPress: () => void;
-  }) => (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityHint={i18n.t("a11y.doubleTapToEdit")}
-      style={({ pressed }) => ({
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm + 2,
-        opacity: pressed ? 0.7 : 1,
-        backgroundColor: pressed ? colors.surfaceHigh : "transparent",
-      })}
-    >
-      <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>
-        {label}
-      </Text>
-      <Text
-        style={{
-          color: valueColor ?? colors.foreground,
-          fontSize: 14,
-          fontWeight: "600",
-        }}
-      >
-        {value}
-      </Text>
-    </Pressable>
-  );
-
-  const divider = (
-    <View
-      style={{
-        height: 1,
-        backgroundColor: colors.border,
-        marginHorizontal: spacing.md,
-      }}
-    />
-  );
-
   return (
-    <BottomSheetScrollView
-      contentContainerStyle={{
-        paddingBottom: spacing["3xl"],
-      }}
-    >
+    <>
       {/* Header: title + meta */}
-      <View
-        style={{
-          paddingHorizontal: spacing.lg,
-          paddingTop: spacing.sm,
-          paddingBottom: spacing.md,
-          gap: spacing.sm,
-        }}
-      >
+      <View style={{ gap: spacing.sm }}>
         <View
           style={{
             flexDirection: "row",
@@ -217,7 +207,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
             gap: spacing.sm,
           }}
         >
-          <BottomSheetTextInput
+          <TextInput
             value={title}
             onChangeText={setTitle}
             onBlur={() => { void saveTitle(); }}
@@ -236,16 +226,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
             multiline
           />
           <View style={{ paddingTop: 6 }}>
-            <SaveIndicator
-              state={titleSave}
-              label={
-                titleSave === "saving"
-                  ? i18n.t("board.task.savingTitle")
-                  : titleSave === "saved"
-                    ? i18n.t("board.task.savedTitle")
-                    : undefined
-              }
-            />
+            <SaveIndicator state={titleSave} label={saveLabel(titleSave)} />
           </View>
         </View>
         {title.length >= 270 ? (
@@ -263,120 +244,108 @@ export function TaskDetailBody({ task, boardId }: Props) {
       </View>
 
       {/* Description */}
-      <View
-        style={{
-          paddingHorizontal: spacing.lg,
-          paddingBottom: spacing.md,
-        }}
-      >
-        <View style={{ position: "relative" }}>
-          <BottomSheetTextInput
-            value={description}
-            onChangeText={setDescription}
-            onBlur={() => { void saveDescription(); }}
-            multiline
-            // Reserve room on the right for the absolute SaveIndicator
-            // overlay (22pt icon + 8pt gap).
-            style={[
-              multilineInput(theme, { fontSize: 15 }),
-              { paddingRight: spacing.md + 22 },
-            ]}
-            placeholder={i18n.t("board.task.descriptionPlaceholder")}
-            placeholderTextColor={colors.mutedForeground}
-          />
-          <View
-            pointerEvents="none"
-            style={{ position: "absolute", top: 8, right: 8 }}
-          >
-            <SaveIndicator
-              state={descriptionSave}
-              label={
-                descriptionSave === "saving"
-                  ? i18n.t("board.task.savingTitle")
-                  : descriptionSave === "saved"
-                    ? i18n.t("board.task.savedTitle")
-                    : undefined
-              }
-            />
-          </View>
+      <View style={{ position: "relative" }}>
+        <TextInput
+          value={description}
+          onChangeText={setDescription}
+          onBlur={() => { void saveDescription(); }}
+          multiline
+          // Reserve room on the right for the absolute SaveIndicator
+          // overlay (22pt icon + 8pt gap).
+          style={[
+            multilineInput(theme, { fontSize: 15 }),
+            { paddingRight: spacing.md + 22 },
+          ]}
+          placeholder={i18n.t("board.task.descriptionPlaceholder")}
+          placeholderTextColor={colors.mutedForeground}
+        />
+        <View
+          pointerEvents="none"
+          style={{ position: "absolute", top: 8, right: 8 }}
+        >
+          <SaveIndicator state={descriptionSave} label={saveLabel(descriptionSave)} />
         </View>
       </View>
 
-      {/* Properties card */}
-      <View
+      <PropertyList
+        rows={[
+          {
+            label: i18n.t("board.task.column"),
+            value: columnName ?? i18n.t("board.task.noColumn"),
+            valueColor: columnName ? colors.foreground : undefined,
+            onPress: () => openMoveToSheet(boardId, task.id),
+          },
+          {
+            label: i18n.t("board.assignees.title"),
+            value: assigneeSummary(task.assignees),
+            valueColor: task.assignees.length === 0 ? undefined : colors.foreground,
+            onPress: () =>
+              openAssigneePickerSheet(
+                task.assignees.map((a) => a.userId),
+                async (selected) => {
+                  // Errors surface as toasts via the mutation hook; rejections
+                  // are swallowed here so a partial failure doesn't bubble as
+                  // an unhandled rejection.
+                  const { added, removed } = diffAssignees(
+                    task.assignees.map((a) => a.userId),
+                    selected,
+                  );
+                  await Promise.allSettled([
+                    ...added.map((id) => assigneeMutations.add(task.id, id)),
+                    ...removed.map((id) => assigneeMutations.remove(task.id, id)),
+                  ]);
+                },
+              ),
+          },
+          {
+            label: i18n.t("board.task.priority"),
+            value: i18n.t(`board.priority.${task.priority}`),
+            valueColor: colors.foreground,
+            onPress: () =>
+              openPriorityPickerSheet(task.priority, (p) => {
+                // Mutation hook surfaces failures via toast; swallow rejection.
+                mutations.setPriority(task.id, p).catch(() => {});
+              }),
+          },
+          {
+            label: i18n.t("board.task.due"),
+            value: task.dueDate ? formatDueShort(task.dueDate) : i18n.t("board.task.noDue"),
+            valueColor: task.dueDate ? dueColor : undefined,
+            onPress: () =>
+              openDuePickerSheet(task.dueDate, (iso) => {
+                mutations.setDueDate(task.id, iso).catch(() => {});
+              }),
+          },
+        ]}
+      />
+
+      <ChecklistSection task={task} boardId={boardId} />
+      <CommentsSection task={task} />
+
+      {/* Last, and the only red thing on the sheet — the same placement the
+          menu gives it. Dismiss first: the toast that offers undo belongs over
+          the board, not under a sheet showing a task that no longer exists. */}
+      <Pressable
+        onPress={() => {
+          router.back();
+          deleteTask(task);
+        }}
+        accessibilityRole="button"
         style={{
-          marginHorizontal: spacing.lg,
-          marginBottom: spacing.lg,
-          backgroundColor: colors.surfaceLow,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: spacing.xs,
+          padding: spacing.md,
           borderRadius: radius.md,
-          borderWidth: 1,
-          borderColor: colors.border,
-          overflow: "hidden",
+          backgroundColor: `${colors.destructive}14`,
         }}
       >
-        {propertyRow({
-          label: i18n.t("board.assignees.title"),
-          value:
-            task.assignees.length === 0
-              ? i18n.t("board.assignees.none")
-              : task.assignees.length === 1
-                ? task.assignees[0]?.name ?? i18n.t("board.task.unnamedUser")
-                : i18n.t("board.assignees.count", {
-                    count: task.assignees.length,
-                  }),
-          valueColor:
-            task.assignees.length === 0 ? colors.mutedForeground : undefined,
-          onPress: () =>
-            pickers.openAssignees(
-              task.id,
-              task.assignees,
-              async (selected) => {
-                // Diff against the original set: anything new is added,
-                // anything missing is removed. Errors surface as toasts via
-                // the mutation hook; rejections are swallowed here so a
-                // partial failure doesn't bubble as an unhandled rejection.
-                const initial = new Set(task.assignees.map((a) => a.userId));
-                const added: string[] = [];
-                const removed: string[] = [];
-                selected.forEach((id) => {
-                  if (!initial.has(id)) added.push(id);
-                });
-                initial.forEach((id) => {
-                  if (!selected.has(id)) removed.push(id);
-                });
-                await Promise.allSettled([
-                  ...added.map((id) => assigneeMutations.add(task.id, id)),
-                  ...removed.map((id) => assigneeMutations.remove(task.id, id)),
-                ]);
-              },
-            ),
-        })}
-        {divider}
-        {propertyRow({
-          label: i18n.t("board.task.priority"),
-          value: i18n.t(`board.priority.${task.priority}`),
-          onPress: () =>
-            pickers.openPriority(task.priority, (p) => {
-              // Mutation hook surfaces failures via toast; swallow rejection.
-              mutations.setPriority(task.id, p).catch(() => {});
-            }),
-        })}
-        {divider}
-        {propertyRow({
-          label: i18n.t("board.task.due"),
-          value: task.dueDate ? formatDueShort(task.dueDate) : i18n.t("board.task.noDue"),
-          valueColor: task.dueDate ? dueColor : colors.mutedForeground,
-          onPress: () =>
-            pickers.openDue(task.dueDate, (iso) => {
-              mutations.setDueDate(task.id, iso).catch(() => {});
-            }),
-        })}
-      </View>
-
-      <View style={{ paddingHorizontal: spacing.lg, gap: spacing.lg }}>
-        <ChecklistSection task={task} boardId={boardId} />
-        <CommentsSection task={task} />
-      </View>
-    </BottomSheetScrollView>
+        <Icon name="delete" size={16} color={colors.destructive} />
+        <Text style={{ color: colors.destructive, fontSize: 15, fontWeight: "600" }}>
+          {deleteLabel}
+        </Text>
+      </Pressable>
+    </>
   );
 }

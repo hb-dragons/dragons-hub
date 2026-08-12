@@ -1,5 +1,6 @@
 import * as Notifications from "expo-notifications";
-import { router, type Href } from "expo-router";
+import { router } from "expo-router";
+import { NOT_FOUND_ROUTE, linkSegments, resolveDeepLink } from "@/lib/nav/href";
 
 /**
  * Install the foreground-presentation handler. Call ONCE at module scope
@@ -50,12 +51,7 @@ const PUBLIC_ROOT_SEGMENTS = new Set([
 ]);
 
 export function isPublicDeepLink(link: string): boolean {
-  const segments = link
-    .split("?")[0]!
-    .split("#")[0]!
-    .split("/")
-    .filter((s) => s.length > 0 && !/^\(.+\)$/.test(s));
-  return PUBLIC_ROOT_SEGMENTS.has(segments[0] ?? "");
+  return PUBLIC_ROOT_SEGMENTS.has(linkSegments(link)[0] ?? "");
 }
 
 let authState: PushAuthState = "unknown";
@@ -67,20 +63,32 @@ let coldStartProcessed = false;
  *
  * A link that needs a session is held rather than followed; `setPushAuthState`
  * replays it once the session resolves, or drops the user on a valid public
- * route when they turn out to be signed out. Only absolute in-app paths are
- * followed — a notification payload is remote input, and an unmatched path
- * lands on `app/+not-found.tsx` rather than anywhere useful.
+ * route when they turn out to be signed out.
+ *
+ * A notification payload is remote input, so the path is resolved against the
+ * app's route table (`nav/href.ts`) before it is followed: what reaches the
+ * router is a route this build declares, never the raw string. A path no
+ * screen backs goes straight to `+not-found` — the screen the router would
+ * have landed on anyway, and not worth holding behind a sign-in. A payload
+ * that is not an absolute path at all is not a link into the app, so it is
+ * ignored outright rather than routed anywhere.
  */
 export function followDeepLink(link: string): void {
   if (typeof link !== "string" || !link.startsWith("/")) return;
 
+  const href = resolveDeepLink(link);
+  if (href === null) {
+    router.push(NOT_FOUND_ROUTE);
+    return;
+  }
+
   if (authState === "signed-in" || isPublicDeepLink(link)) {
-    router.push(link as Href);
+    router.push(href);
     return;
   }
 
   pendingDeepLink = link;
-  if (authState === "signed-out") router.push(SIGNED_OUT_FALLBACK as Href);
+  if (authState === "signed-out") router.push(SIGNED_OUT_FALLBACK);
 }
 
 /**

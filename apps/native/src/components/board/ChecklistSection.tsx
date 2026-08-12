@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
+import { Pressable, Text, TextInput, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -16,6 +15,7 @@ import { i18n } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
 import { adminBoardApi } from "@/lib/api";
 import { singleLineInput } from "@/components/ui/inputStyles";
+import { Icon } from "@/components/ui/Icon";
 
 interface Props {
   task: TaskDetail;
@@ -86,11 +86,7 @@ function ChecklistRow({
           animStyle,
         ]}
       >
-        {isChecked ? (
-          <Text style={{ color: colors.primaryForeground, fontSize: 14, fontWeight: "700" }}>
-            ✓
-          </Text>
-        ) : null}
+        {isChecked ? <Icon name="check" size={14} color={colors.primaryForeground} /> : null}
       </Animated.View>
       <Text
         style={{
@@ -145,6 +141,9 @@ export function ChecklistSection({ task, boardId }: Props) {
   const animatedGlowStyle = useAnimatedStyle(() => ({
     opacity: glowSV.value * 0.5,
   }));
+
+  /** The add button is live only with a non-empty draft and no add in flight. */
+  const canAdd = draft.trim().length > 0 && !adding;
 
   const submit = async () => {
     const label = draft.trim();
@@ -285,7 +284,7 @@ export function ChecklistSection({ task, boardId }: Props) {
           alignItems: "center",
         }}
       >
-        <BottomSheetTextInput
+        <TextInput
           value={draft}
           onChangeText={setDraft}
           onSubmitEditing={() => { void submit(); }}
@@ -296,27 +295,21 @@ export function ChecklistSection({ task, boardId }: Props) {
         />
         <Pressable
           onPress={() => { void submit(); }}
-          disabled={!draft.trim() || adding}
+          disabled={!canAdd}
           accessibilityRole="button"
           accessibilityLabel={i18n.t("board.checklist.add")}
           style={{
             paddingHorizontal: spacing.md,
             paddingVertical: spacing.sm,
             borderRadius: radius.md,
-            backgroundColor:
-              draft.trim() && !adding ? colors.primary : colors.surfaceHigh,
+            backgroundColor: canAdd ? colors.primary : colors.surfaceHigh,
           }}
         >
-          <Text
-            style={{
-              color:
-                draft.trim() && !adding ? colors.primaryForeground : colors.mutedForeground,
-              fontSize: 14,
-              fontWeight: "700",
-            }}
-          >
-            +
-          </Text>
+          <Icon
+            name="add"
+            size={14}
+            color={canAdd ? colors.primaryForeground : colors.mutedForeground}
+          />
         </Pressable>
       </View>
     </View>

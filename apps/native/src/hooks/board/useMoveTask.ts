@@ -7,10 +7,9 @@ import { adminBoardApi } from "@/lib/api";
 import { applyTaskMove } from "@dragons/shared";
 import type { TaskCardData } from "@dragons/shared";
 import { haptics } from "@/lib/haptics";
+import { boardTasksKeyPrefix, isBoardTasksKey } from "@/lib/board/task-keys";
 import { useToast } from "@/hooks/useToast";
 import { i18n } from "@/lib/i18n";
-
-const tasksPrefix = (boardId: number) => `admin/boards/${boardId}/tasks`;
 
 export function useMoveTask(boardId: number) {
   const { cache, mutate } = useSWRConfig();
@@ -21,7 +20,8 @@ export function useMoveTask(boardId: number) {
     targetColumnId: number,
     targetPosition: number,
   ): Promise<void> {
-    const prefix = tasksPrefix(boardId);
+    const prefix = boardTasksKeyPrefix(boardId);
+    const isTasksKey = isBoardTasksKey(boardId);
 
     // Snapshot every cache entry we're about to mutate so we can restore them on error.
     const snapshots = new Map<Arguments, TaskCardData[] | undefined>();
@@ -35,7 +35,7 @@ export function useMoveTask(boardId: number) {
 
     // Optimistic local apply across every filter variant of the tasks cache.
     await mutate(
-      (key) => Array.isArray(key) && key[0] === prefix,
+      isTasksKey,
       (prev: TaskCardData[] | undefined) =>
         prev ? applyTaskMove(prev, taskId, targetColumnId, targetPosition) : prev,
       { revalidate: false },
@@ -47,15 +47,15 @@ export function useMoveTask(boardId: number) {
         position: targetPosition,
       });
       // On success, reconcile with server truth.
-      await mutate((key) => Array.isArray(key) && key[0] === prefix);
+      await mutate(isTasksKey);
     } catch (error) {
       // Roll back to the snapshot we captured before the optimistic apply.
       for (const [key, value] of snapshots) {
         await mutate(key, value, { revalidate: false });
       }
       // Also try to revalidate so we eventually get server truth.
-      void mutate((key) => Array.isArray(key) && key[0] === prefix);
-      haptics.warning();
+      void mutate(isTasksKey);
+      haptics.error();
       toast.show({ title: i18n.t("toast.moveFailed"), variant: "error" });
       throw error;
     }

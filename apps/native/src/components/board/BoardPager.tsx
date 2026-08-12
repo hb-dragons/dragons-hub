@@ -7,6 +7,7 @@ import {
   type NativeSyntheticEvent,
 } from "react-native";
 import type { BoardColumnData, TaskCardData, TaskContentRect, PagerLayout } from "@dragons/shared";
+import type { TaskActionKey } from "@/lib/board/task-actions";
 import { BoardColumn, type BoardColumnHandle, type TaskDragCallbacks } from "./BoardColumn";
 
 export interface BoardPagerHandle {
@@ -18,7 +19,8 @@ interface BoardPagerProps {
   tasks: TaskCardData[];
   onActiveColumnChange: (i: number) => void;
   onTaskPress: (task: TaskCardData) => void;
-  onTaskLongPress?: (task: TaskCardData) => void;
+  /** Runs an action picked from a card's context menu. */
+  onTaskAction: (task: TaskCardData, action: TaskActionKey) => void;
   onColumnLongPress?: (column: BoardColumnData) => void;
   onAddTask: (columnId: number) => void;
   /** ID of the task being dragged — fades out its placeholder. */
@@ -60,7 +62,7 @@ const BoardPagerImpl = forwardRef<BoardPagerHandle, BoardPagerProps>(
       tasks,
       onActiveColumnChange,
       onTaskPress,
-      onTaskLongPress,
+      onTaskAction,
       onColumnLongPress,
       onAddTask,
       draggingTaskId,
@@ -182,7 +184,7 @@ const BoardPagerImpl = forwardRef<BoardPagerHandle, BoardPagerProps>(
             tasks={tasks}
             width={columnWidth}
             onTaskPress={onTaskPress}
-            onTaskLongPress={onTaskLongPress}
+            onTaskAction={onTaskAction}
             onColumnLongPress={onColumnLongPress}
             onAddTask={onAddTask}
             draggingTaskId={draggingTaskId}

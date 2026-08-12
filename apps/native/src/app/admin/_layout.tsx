@@ -2,6 +2,11 @@ import { Stack, Redirect } from "expo-router";
 import { can } from "@dragons/shared";
 import { authClient } from "@/lib/auth-client";
 import { useTheme } from "@/hooks/useTheme";
+import {
+  BOARD_SHEET_ROUTES,
+  formSheetOptions,
+  sheetScreenName,
+} from "@/lib/nav/sheet-routes";
 
 export default function AdminLayout() {
   const { data: session } = authClient.useSession();
@@ -27,6 +32,16 @@ export default function AdminLayout() {
     >
       <Stack.Screen name="boards/index" options={{ title: "Boards" }} />
       <Stack.Screen name="boards/[id]" options={{ title: "" }} />
+      {/* The board's utility sheets (issue #219). Declared from the table so
+          the presentation each one gets is stated once, next to the reasoning
+          for it, rather than nine times here. */}
+      {BOARD_SHEET_ROUTES.map((sheet) => (
+        <Stack.Screen
+          key={sheet.name}
+          name={sheetScreenName(sheet)}
+          options={formSheetOptions(sheet)}
+        />
+      ))}
     </Stack>
   );
 }

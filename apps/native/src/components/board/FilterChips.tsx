@@ -2,6 +2,8 @@ import { ScrollView, Pressable, Text, View } from "react-native";
 import type { TaskPriority } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { filterPillA11y } from "@/lib/ui/a11y";
+import { Icon } from "@/components/ui/Icon";
 
 export interface BoardFilters {
   mine: boolean;
@@ -73,18 +75,16 @@ export function FilterChips({
       }}
     >
       <Pressable
+        {...filterPillA11y(i18n.t("board.filters.mine"), filters.mine)}
         onPress={onToggleMine}
-        accessibilityRole="button"
-        accessibilityLabel={i18n.t("board.filters.mine")}
         style={chipStyle(filters.mine)}
       >
         <Text style={textStyle(filters.mine)}>{i18n.t("board.filters.mine")}</Text>
       </Pressable>
 
       <Pressable
+        {...filterPillA11y(i18n.t("board.filters.assignees"), assigneeActive)}
         onPress={onPressAssignees}
-        accessibilityRole="button"
-        accessibilityLabel={i18n.t("board.filters.assignees")}
         style={chipStyle(assigneeActive)}
       >
         <Text style={textStyle(assigneeActive)}>{i18n.t("board.filters.assignees")}</Text>
@@ -129,15 +129,14 @@ export function FilterChips({
               justifyContent: "center",
             }}
           >
-            <Text style={{ ...textStyle(true), fontSize: 16, lineHeight: 16 }}>×</Text>
+            <Icon name="clear" size={16} color={colors.secondaryForeground} />
           </Pressable>
         ) : null}
       </Pressable>
 
       <Pressable
+        {...filterPillA11y(i18n.t("board.filters.priority"), filters.priority != null)}
         onPress={onPressPriority}
-        accessibilityRole="button"
-        accessibilityLabel={i18n.t("board.filters.priority")}
         style={chipStyle(filters.priority != null)}
       >
         <Text style={textStyle(filters.priority != null)}>
@@ -162,24 +161,22 @@ export function FilterChips({
               justifyContent: "center",
             }}
           >
-            <Text style={{ ...textStyle(true), fontSize: 16, lineHeight: 16 }}>×</Text>
+            <Icon name="clear" size={16} color={colors.secondaryForeground} />
           </Pressable>
         ) : null}
       </Pressable>
 
       <Pressable
+        {...filterPillA11y(i18n.t("board.filters.dueSoon"), filters.dueSoon)}
         onPress={onToggleDueSoon}
-        accessibilityRole="button"
-        accessibilityLabel={i18n.t("board.filters.dueSoon")}
         style={chipStyle(filters.dueSoon)}
       >
         <Text style={textStyle(filters.dueSoon)}>{i18n.t("board.filters.dueSoon")}</Text>
       </Pressable>
 
       <Pressable
+        {...filterPillA11y(i18n.t("board.filters.unassigned"), filters.unassigned)}
         onPress={onToggleUnassigned}
-        accessibilityRole="button"
-        accessibilityLabel={i18n.t("board.filters.unassigned")}
         style={chipStyle(filters.unassigned)}
       >
         <Text style={textStyle(filters.unassigned)}>{i18n.t("board.filters.unassigned")}</Text>

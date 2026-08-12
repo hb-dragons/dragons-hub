@@ -15,6 +15,7 @@ export type {
   MatchQueryParams,
   PublicTeam,
   RefereeGamesQueryParams,
+  TaskCreateBody,
   TaskUpdateBody,
   TaskListQuery,
   BoardCreateBody,

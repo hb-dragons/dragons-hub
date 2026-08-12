@@ -2,7 +2,6 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { ComponentRef } from "react";
 import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import type { LayoutChangeEvent } from "react-native";
-import Svg, { Path, Rect } from "react-native-svg";
 import type {
   TaskCardData,
   TaskAssignee,
@@ -12,6 +11,7 @@ import type {
 import { dueDateBucket, type DueDateBucket } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { Icon } from "@/components/ui/Icon";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import Animated, {
@@ -40,7 +40,6 @@ export interface TaskDragCallbacks {
 interface TaskCardProps {
   task: TaskCardData;
   onPress: (task: TaskCardData) => void;
-  onLongPress?: (task: TaskCardData) => void;
   onDrag?: TaskDragCallbacks;
   isBeingDragged?: boolean;
   /** When true, fire a brief 1 → 1.05 → 1 pulse (consumes the flag once). */
@@ -51,6 +50,16 @@ interface TaskCardProps {
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/**
+ * How long the finger has to stay down before a drag is allowed to start.
+ *
+ * Short enough that the pan wins over the column list's scroll, and shorter
+ * than the system's context-menu hold so a drag that has begun moving is
+ * already the gesture in progress when the menu would otherwise consider
+ * itself triggered.
+ */
+const LIFT_HOLD_MS = 300;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -127,49 +136,6 @@ export function dueColorFor(
     default:
       return colors.mutedForeground;
   }
-}
-
-// ---------------------------------------------------------------------------
-// Inline SVG icons (no icon lib in native)
-// ---------------------------------------------------------------------------
-
-function CalendarIcon({ size = 12, color }: { size?: number; color: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Rect
-        x={3}
-        y={5}
-        width={18}
-        height={16}
-        rx={2}
-        stroke={color}
-        strokeWidth={2}
-      />
-      <Path d="M3 10h18" stroke={color} strokeWidth={2} />
-      <Path d="M8 3v4M16 3v4" stroke={color} strokeWidth={2} strokeLinecap="round" />
-    </Svg>
-  );
-}
-
-function CheckSquareIcon({ size = 12, color }: { size?: number; color: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M9 11l3 3L22 4"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Path
-        d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -323,7 +289,6 @@ function AvatarStack({
 function TaskCardImpl({
   task,
   onPress,
-  onLongPress,
   onDrag,
   isBeingDragged = false,
   recentlyDropped = false,
@@ -358,6 +323,19 @@ function TaskCardImpl({
   // a latent break rather than a hypothetical one.
   const cardRef = useAnimatedRef<ComponentRef<typeof AnimatedPressable>>();
 
+  /**
+   * Whether this touch has actually picked the card up.
+   *
+   * The card is now also the trigger for a native context menu (#220), and
+   * both gestures start with the same hold: the pan recogniser activates after
+   * `LIFT_HOLD_MS` whether the finger moved or not, while UIKit opens the menu
+   * at around half a second of holding *still*. Lifting on the first movement
+   * instead of on activation is what separates them — hold and drag gets the
+   * ghost, hold and wait gets the menu, and neither shows the other's
+   * animation first.
+   */
+  const lifted = useSharedValue(false);
+
   // Built once per (onDrag, task) rather than on every render: `Gesture.Pan()`
   // constructs a new gesture object and, when its identity changes,
   // GestureDetector tears down and re-attaches the native recogniser — which
@@ -366,33 +344,36 @@ function TaskCardImpl({
     if (!onDrag) return null;
     const { start: safeStart, move: safeMove, end: safeEnd } = onDrag;
     return Gesture.Pan()
-      .activateAfterLongPress(300)
+      .activateAfterLongPress(LIFT_HOLD_MS)
       .onStart(() => {
         "worklet";
-        const m = measure(cardRef);
-        if (!m) return;
-        runOnJS(safeStart)(task, {
-          x: m.pageX,
-          y: m.pageY,
-          width: m.width,
-          height: m.height,
-        });
+        lifted.value = false;
       })
       .onUpdate((e) => {
         "worklet";
+        if (!lifted.value) {
+          const m = measure(cardRef);
+          if (!m) return;
+          lifted.value = true;
+          runOnJS(safeStart)(task, {
+            x: m.pageX,
+            y: m.pageY,
+            width: m.width,
+            height: m.height,
+          });
+        }
         runOnJS(safeMove)(e.absoluteX, e.absoluteY);
       })
-      .onEnd(() => {
+      .onFinalize(() => {
         "worklet";
+        // One exit for every ending — released, cancelled by the menu opening,
+        // or failed. `end` on a card that never lifted would announce a
+        // cancelled drop to VoiceOver for an ordinary hold.
+        if (!lifted.value) return;
+        lifted.value = false;
         runOnJS(safeEnd)();
-      })
-      .onFinalize((_e, success) => {
-        "worklet";
-        if (!success) {
-          runOnJS(safeEnd)();
-        }
       });
-  }, [onDrag, task, cardRef]);
+  }, [onDrag, task, cardRef, lifted]);
 
   const handleLayout = useCallback(
     (e: LayoutChangeEvent) => {
@@ -415,10 +396,8 @@ function TaskCardImpl({
     <AnimatedPressable
       ref={cardRef}
       onPress={() => onPress(task)}
-      onLongPress={onLongPress ? () => onLongPress(task) : undefined}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
-      delayLongPress={350}
       accessibilityRole="button"
       accessibilityLabel={task.title}
       accessibilityHint={i18n.t("a11y.doubleTapToOpen")}
@@ -530,7 +509,7 @@ function TaskCardImpl({
                   gap: 4,
                 }}
               >
-                <CalendarIcon size={12} color={dueColour} />
+                <Icon name="due" size={12} color={dueColour} />
                 <Text
                   style={{
                     color: dueColour,
@@ -552,7 +531,7 @@ function TaskCardImpl({
                 gap: 4,
               }}
             >
-              <CheckSquareIcon size={12} color={colors.mutedForeground} />
+              <Icon name="checklist" size={12} color={colors.mutedForeground} />
               <Text
                 style={{
                   color: colors.mutedForeground,

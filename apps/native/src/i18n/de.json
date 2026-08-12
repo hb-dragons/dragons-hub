@@ -33,6 +33,7 @@
     "upcomingGames": "Kommende Spiele",
     "vs": "vs",
     "noUpcoming": "Keine anstehenden Spiele",
+    "viewStandings": "Tabellen ansehen",
     "countdown": {
       "today": "Heute",
       "tomorrow": "Morgen",
@@ -232,6 +233,7 @@
     "delete": "Löschen",
     "clear": "Entfernen",
     "edit": "Bearbeiten",
+    "more": "Mehr",
     "apply": "Anwenden",
     "loading": "Laden…",
     "vs": "vs",
@@ -265,6 +267,8 @@
       "idLabel": "#%{id}",
       "priority": "Priorität",
       "due": "Fällig",
+      "column": "Spalte",
+      "noColumn": "Keine Spalte",
       "noDue": "Kein Fälligkeitsdatum",
       "dueOverdue": "Überfällig",
       "dueToday": "Heute",
@@ -299,7 +303,7 @@
       "count": "%{count} zugewiesen"
     },
     "column": {
-      "addCard": "+ Karte",
+      "addCard": "Karte hinzufügen",
       "empty": "Aufgaben hier ablegen",
       "addTitle": "Spalte hinzufügen",
       "namePlaceholder": "Spaltenname",
@@ -309,7 +313,7 @@
       "deleteConfirmTitle": "Spalte löschen?",
       "deleteConfirmMessage": "Alle Aufgaben in dieser Spalte werden gelöscht. Dies kann nicht rückgängig gemacht werden.",
       "markAsDone": "Als Erledigt-Spalte markieren",
-      "newColumn": "+ Neue Spalte",
+      "newColumn": "Neue Spalte",
       "reorderHint": "Spaltenkopf lange drücken, um neu anzuordnen."
     },
     "filters": {
@@ -369,7 +373,7 @@
       "titlePlaceholder": "Aufgabentitel",
       "descriptionPlaceholder": "Beschreibung hinzufügen (optional)",
       "submit": "Erstellen",
-      "fab": "Neue Aufgabe"
+      "open": "Neue Aufgabe"
     }
   },
   "error": {

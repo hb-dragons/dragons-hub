@@ -12,6 +12,8 @@ vi.mock("expo-notifications", () => ({
 }));
 
 import { SIGNED_OUT_FALLBACK, isPublicDeepLink } from "@/lib/push/handler";
+import { STANDINGS_SHORTCUT_ROUTE } from "@/lib/nav/tabs";
+import { APP_ROUTES } from "@/lib/nav/href";
 
 /**
  * Keeps the deep-link gate honest against the real expo-router file tree:
@@ -45,9 +47,26 @@ const ROUTE_PATHS = new Set(
     .map((segments) => "/" + segments.filter((s) => !isGroup(s)).join("/")),
 );
 
+/**
+ * The same route paths, spelled the way expo-router names them: layouts are
+ * not routes, `index` is its directory, and a dynamic segment keeps its
+ * brackets (`/game/[id]`).
+ */
+const ROUTE_PATTERNS = FILES.filter((segments) => segments.at(-1) !== "_layout")
+  .map((segments) => (segments.at(-1) === "index" ? segments.slice(0, -1) : segments))
+  .map((segments) => "/" + segments.filter((s) => !isGroup(s)).join("/"));
+
 describe("expo-router route tree", () => {
   it("was actually found", () => {
     expect(FILES.length).toBeGreaterThan(5);
+  });
+
+  // `APP_ROUTES` is what turns a runtime path into a typed href, so a screen
+  // missing from it is a screen no deep link can reach, and an entry with no
+  // file behind it is a link that resolves to `+not-found` at runtime while
+  // typechecking clean. Both directions, one assertion.
+  it("matches the typed-href route table one for one", () => {
+    expect(Object.keys(APP_ROUTES).sort()).toEqual([...ROUTE_PATTERNS].sort());
   });
 
   it("declares a +not-found route so unmatched deep links degrade gracefully", () => {
@@ -75,8 +94,18 @@ describe("expo-router route tree", () => {
     }
   });
 
+  it("backs the Staff standings shortcut with a route outside the tab group", () => {
+    const file = FILES.find(
+      (segments) => "/" + segments.filter((s) => !isGroup(s)).join("/") === STANDINGS_SHORTCUT_ROUTE,
+    );
+    expect(file, `no route file backs ${STANDINGS_SHORTCUT_ROUTE}`).toBeDefined();
+    // A route inside (tabs) is mounted only while its own trigger renders, so
+    // it would be missing for the very users the shortcut exists for.
+    expect(file).not.toContain("(tabs)");
+  });
+
   it("treats every session-gated screen as non-public", () => {
-    for (const link of ["/officiating", "/today", "/referee-game/1", "/profile", "/admin/boards", "/assistant"]) {
+    for (const link of ["/officiating", "/today", "/referee-game/1", "/profile", "/admin/boards", "/assistant", "/referee-assign"]) {
       expect(isPublicDeepLink(link), `${link} must require a session`).toBe(false);
     }
   });

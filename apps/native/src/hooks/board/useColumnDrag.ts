@@ -42,7 +42,7 @@ export function useColumnDrag(
   }, [columns, state.liftedId]);
 
   const start = useCallback((column: BoardColumnData) => {
-    haptics.medium();
+    haptics.lift();
     const idx = columns.findIndex((c) => c.id === column.id);
     if (idx < 0) return;
     setState({ liftedId: column.id, targetIndex: idx });
@@ -85,7 +85,7 @@ export function useColumnDrag(
     // wire payload is unambiguous and matches the server's convention.
     const order = reordered.map((c, i) => ({ id: c.id, position: i }));
 
-    haptics.success();
+    haptics.drop();
     cancel();
     try {
       await mutations.reorder(order);

@@ -1,10 +1,9 @@
 import { useSWRConfig } from "swr";
 import { adminBoardApi } from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
+import { isBoardTasksKey } from "@/lib/board/task-keys";
 import { withErrorToast } from "@/lib/board/with-error-toast";
 import { taskKey } from "./useTaskDetail";
-
-const tasksPrefix = (boardId: number) => `admin/boards/${boardId}/tasks`;
 
 export function useAssigneeMutations(boardId: number) {
   const { mutate } = useSWRConfig();
@@ -13,7 +12,7 @@ export function useAssigneeMutations(boardId: number) {
   async function reconcile(taskId: number) {
     await Promise.all([
       mutate(taskKey(taskId)),
-      mutate((key) => Array.isArray(key) && key[0] === tasksPrefix(boardId)),
+      mutate(isBoardTasksKey(boardId)),
     ]);
   }
 
