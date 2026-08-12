@@ -271,3 +271,17 @@ Note: Club and league tracking configuration is managed via the admin UI (`/admi
 4. **New UI component**: Add to `packages/ui/src/components/`, export from index
 5. **New env var**: Add to Zod schema in `config/env.ts`, add to `.env.example`, document here. All three must agree — `docs-drift.test.ts` checks the schema against both files in both directions, so a var added to the schema alone, or left in a file after removal from the schema, fails the build
 6. **Any change**: Write/update tests to maintain coverage above thresholds
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `hb-dragons/dragons-hub`, worked via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles use their default label strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), all of which already exist in the repo. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` glossary and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
