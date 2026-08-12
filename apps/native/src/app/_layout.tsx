@@ -13,7 +13,6 @@ import { useFonts } from "expo-font";
 import { SWRConfig } from "swr";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { swrConfig } from "@/lib/swr-config";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { LocaleProvider } from "@/hooks/useLocale";
@@ -208,13 +207,11 @@ export default function RootLayout() {
             <LocaleProvider>
               <ThemeProvider>
                 <ToastProvider>
-                  {/* The board's task-detail and quick-create sheets are the
-                      last JS bottom sheets left; the utility sheets became
-                      routes in #219, and #222/#225 finish the job. */}
-                  <BottomSheetModalProvider>
-                    <RootNavigator />
-                    <ToastHost />
-                  </BottomSheetModalProvider>
+                  {/* No sheet provider: every sheet in the app is a route with
+                      a native presentation, so the system owns the sheet layer
+                      (#219, #222, #223, #225). */}
+                  <RootNavigator />
+                  <ToastHost />
                 </ToastProvider>
               </ThemeProvider>
             </LocaleProvider>

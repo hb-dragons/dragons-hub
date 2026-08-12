@@ -139,3 +139,15 @@ export function openBoardSettingsSheet(boardId: number): void {
 export function openColumnSettingsSheet(boardId: number, columnId: number): void {
   openSheet({ pathname: "/admin/boards/sheets/column-settings", params: { boardId, columnId } });
 }
+
+/**
+ * The board list's create sheet (#225) — the one opener with no board to scope
+ * itself to, since it is what makes the board.
+ *
+ * It owns the create *and* the navigation that follows it: the sheet replaces
+ * itself with the new board's screen, so the list never has to be handed an id
+ * it would only push with.
+ */
+export function openCreateBoardSheet(): void {
+  openSheet("/admin/boards/sheets/create-board");
+}

@@ -65,6 +65,8 @@ export const APP_ROUTES: Record<string, (...params: string[]) => RouteHref> = {
   // The board's two complex sheets (#222).
   "/admin/boards/sheets/task-detail": () => "/admin/boards/sheets/task-detail",
   "/admin/boards/sheets/quick-create": () => "/admin/boards/sheets/quick-create",
+  // The board list's own sheet, which replaced the last JS bottom sheet (#225).
+  "/admin/boards/sheets/create-board": () => "/admin/boards/sheets/create-board",
   "/game/[id]": (id: string) => `/game/${id}`,
   "/team/[id]": (id: string) => `/team/${id}`,
   "/h2h/[teamApiId]": (teamApiId: string) => `/h2h/${teamApiId}`,

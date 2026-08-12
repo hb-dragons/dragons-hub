@@ -89,7 +89,12 @@ export default defineConfig({
         // when the two long-press sheets became one native context menu.
         // Measured 16.69/10.95/20.53/16.24 — statements, branches and
         // functions hold, none having cleared the next whole point.
-        branches: 10,
+        // Ratcheted 2026-08-12 (#225): branches 10 -> 11. The last JS bottom
+        // sheet became a route, which took an untested 125-line component out
+        // of the scope and put its submit gate in a tested lib module.
+        // Measured 16.94/11.12/20.87/16.47 — statements, functions and lines
+        // have not cleared the next whole point.
+        branches: 11,
         functions: 20,
         lines: 16,
         statements: 16,
