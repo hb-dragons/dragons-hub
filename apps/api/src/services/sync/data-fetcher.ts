@@ -18,6 +18,9 @@ export interface LeagueFetchedData {
   leagueApiId: number;
   leagueDbId: number | null;
   leagueName: string | null;
+  seasonRefId: number | null;
+  seasonStatus: "active" | "upcoming" | null;
+  vorabliga: boolean;
   spielplan: SdkSpielplanMatch[];
   tabelle: SdkTabelleEntry[];
   gameDetails: Map<number, SdkGetGameResponse>;
@@ -55,6 +58,9 @@ async function fetchLeagueData(
   leagueApiId: number,
   leagueDbId: number | null,
   leagueName: string | null,
+  seasonRefId: number | null,
+  seasonStatus: "active" | "upcoming" | null,
+  vorabliga: boolean,
 ): Promise<LeagueFetchedData> {
   log.info({ leagueApiId }, "Fetching data for league");
 
@@ -75,12 +81,29 @@ async function fetchLeagueData(
     "Fetched league data",
   );
 
-  return { leagueApiId, leagueDbId, leagueName, spielplan, tabelle, gameDetails };
+  return {
+    leagueApiId,
+    leagueDbId,
+    leagueName,
+    seasonRefId,
+    seasonStatus,
+    vorabliga,
+    spielplan,
+    tabelle,
+    gameDetails,
+  };
 }
 
 export async function fetchAllSyncData(): Promise<CollectedSyncData> {
   const trackedLeagues = await getDb()
-    .select({ id: leagues.id, apiLigaId: leagues.apiLigaId, name: leagues.name })
+    .select({
+      id: leagues.id,
+      apiLigaId: leagues.apiLigaId,
+      name: leagues.name,
+      seasonRefId: leagues.seasonRefId,
+      seasonStatus: seasons.status,
+      vorabliga: leagues.vorabliga,
+    })
     .from(leagues)
     .innerJoin(seasons, eq(leagues.seasonRefId, seasons.id))
     .where(and(eq(leagues.isTracked, true), inArray(seasons.status, ["active", "upcoming"])));
@@ -102,7 +125,18 @@ export async function fetchAllSyncData(): Promise<CollectedSyncData> {
 
   const limit = pLimit(3);
   const leagueData = await Promise.all(
-    trackedLeagues.map((l) => limit(() => fetchLeagueData(l.apiLigaId, l.id, l.name))),
+    trackedLeagues.map((l) =>
+      limit(() =>
+        fetchLeagueData(
+          l.apiLigaId,
+          l.id,
+          l.name,
+          l.seasonRefId,
+          l.seasonStatus as "active" | "upcoming",
+          l.vorabliga,
+        ),
+      ),
+    ),
   );
 
   const teams = collectUniqueTeams(leagueData);
@@ -117,9 +151,17 @@ export async function fetchAllSyncData(): Promise<CollectedSyncData> {
   return { leagueData, teams, venues, referees, refereeRoles };
 }
 
-function collectUniqueTeams(allData: LeagueFetchedData[]): Map<number, SdkTeamRef> {
+const SEASON_RANK: Record<string, number> = { active: 0, upcoming: 1 };
+
+export function collectUniqueTeams(allData: LeagueFetchedData[]): Map<number, SdkTeamRef> {
   const teams = new Map<number, SdkTeamRef>();
-  for (const data of allData) {
+  // Last write wins, so order oldest season first: the newest season's data
+  // overwrites, never the reverse. This is the wrong-name fix from the
+  // 2026-08-12 team-entries spec.
+  const ordered = [...allData].sort(
+    (a, b) => (SEASON_RANK[a.seasonStatus ?? "active"] ?? 0) - (SEASON_RANK[b.seasonStatus ?? "active"] ?? 0),
+  );
+  for (const data of ordered) {
     for (const match of data.spielplan) {
       if (match.homeTeam?.teamPermanentId) {
         teams.set(match.homeTeam.teamPermanentId, match.homeTeam);

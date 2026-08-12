@@ -259,6 +259,11 @@ Step 3: Parallel upserts (Promise.all)
     standings.teamApiId has a non-deferrable FK on teams.apiTeamPermanentId, so
     running it concurrently with the teams upsert dropped the whole batch on a
     league's first sync (issue #47). Keep it sequential.
+  then:
+  - syncTeamEntriesFromData(leagueData)
+    Reconciles per-season team entries (team_entries) from federation
+    evidence: creates missing entries, moves links (committed beats
+    vorabliga), supersedes manual links and logs the supersession
 
 Step 4: buildVenueIdLookup() -> syncMatchesFromData(leagueData, venueIdLookup, syncRunId)
   - buildVenueIdLookup gives the venue FK lookup (apiId -> dbId) first

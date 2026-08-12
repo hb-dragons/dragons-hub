@@ -50,7 +50,7 @@ vi.mock("./sdk-client", () => ({
   },
 }));
 
-import { fetchAllSyncData, extractRefereeAssignments } from "./data-fetcher";
+import { fetchAllSyncData, extractRefereeAssignments, collectUniqueTeams } from "./data-fetcher";
 import type { LeagueFetchedData } from "./data-fetcher";
 import { leagues, seasons } from "@dragons/db/schema";
 import {
@@ -503,6 +503,21 @@ describe("fetchAllSyncData", () => {
   });
 });
 
+describe("collectUniqueTeams", () => {
+  it("keeps the upcoming season's team ref when the same squad appears in both seasons", () => {
+    const refActive = { teamPermanentId: 77, teamname: "Dragons U14", teamnameSmall: "U14", seasonTeamId: 1, teamCompetitionId: 1, clubId: 100, verzicht: false };
+    const refUpcoming = { ...refActive, teamname: "Dragons U16", teamnameSmall: "U16" };
+    const mk = (status: "active" | "upcoming", team: typeof refActive): LeagueFetchedData => ({
+      leagueApiId: status === "active" ? 1 : 2, leagueDbId: 1, leagueName: "L",
+      seasonRefId: 1, seasonStatus: status, vorabliga: false,
+      spielplan: [], tabelle: [{ team } as never], gameDetails: new Map(),
+    });
+    // Upcoming listed FIRST — the sort must win, not array order.
+    const teams = collectUniqueTeams([mk("upcoming", refUpcoming), mk("active", refActive)]);
+    expect(teams.get(77)!.teamname).toBe("Dragons U16");
+  });
+});
+
 describe("extractRefereeAssignments", () => {
   it("returns empty for no data", () => {
     const result = extractRefereeAssignments([]);
@@ -533,6 +548,9 @@ describe("extractRefereeAssignments", () => {
       leagueApiId: 1,
       leagueDbId: 1,
       leagueName: "Test Liga",
+      seasonRefId: null,
+      seasonStatus: "active",
+      vorabliga: false,
       spielplan: [],
       tabelle: [],
       gameDetails: new Map([[1000, {
@@ -559,6 +577,9 @@ describe("extractRefereeAssignments", () => {
       leagueApiId: 1,
       leagueDbId: 1,
       leagueName: "Test Liga",
+      seasonRefId: null,
+      seasonStatus: "active",
+      vorabliga: false,
       spielplan: [],
       tabelle: [],
       gameDetails: new Map([[1000, {
