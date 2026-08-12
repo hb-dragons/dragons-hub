@@ -664,15 +664,13 @@ describe("reconcileBookingsForMatches", () => {
     expect(links[0]!.match_id).toBe(m2);
   });
 
-  it("uses the team entry's estimatedGameDuration, not the stale teams-row value", async () => {
+  it("uses the team entry's estimatedGameDuration", async () => {
     const leagueId = await insertLeague();
     const homeTeamId = await insertTeam({
       api_team_permanent_id: 1000,
       name: "Dragons U12",
       club_id: 4121,
       is_own_club: true,
-      // Stale/frozen value — must not be read once entries exist.
-      estimated_game_duration: 999,
     });
     await insertTeamEntry(homeTeamId, { estimated_game_duration: 50 });
     await insertTeam({
@@ -1096,15 +1094,13 @@ describe("previewReconciliation", () => {
     expect(item.matches[0]!.isCancelled).toBe(false);
   });
 
-  it("previews the team entry's customName/badgeColor, not the stale teams-row value", async () => {
+  it("previews the team entry's customName/badgeColor", async () => {
     const leagueId = await insertLeague();
     const homeTeamId = await insertTeam({
       api_team_permanent_id: 1000,
       name: "Dragons Herren 1",
       club_id: 4121,
       is_own_club: true,
-      custom_name: "Stale Custom",
-      badge_color: "#111111",
     });
     await insertTeamEntry(homeTeamId, { custom_name: "Fresh Custom", badge_color: "#00FF00" });
     await insertTeam({

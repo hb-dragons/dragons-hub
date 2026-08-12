@@ -144,9 +144,6 @@ async function seedTeamPair(): Promise<{ homeApi: number; guestApi: number }> {
       seasonTeamId: 200 + seq,
       teamCompetitionId: 300 + seq,
       name: "Dragons",
-      // Stale/frozen value — the team_entries row below is what the query
-      // must actually read.
-      customName: "Stale Custom",
       clubId: 1,
       isOwnClub: true,
     })

@@ -2,15 +2,15 @@ import { describe, expect, it, vi, beforeAll, beforeEach, afterAll, afterEach } 
 import { eq } from "drizzle-orm";
 import type { SdkTeamRef } from "@dragons/sdk";
 
-// Real Postgres (pglite) with real migrations, the real `sql`/`and`/`eq`/`ne`/`inArray`
+// Real Postgres (pglite) with real migrations, the real `sql`/`and`/`eq`/`ne`
 // operators and the real `computeEntityHash`. The previous mocked-ORM version stubbed
 // every operator to an identity function and hand-choreographed four `select()` return
 // values in call order, so the corrective pass's predicates
 // (`and(eq(clubId, ownClubId), eq(isOwnClub, false))` / `and(ne(clubId, ownClubId),
 // eq(isOwnClub, true))`) never ran. Swapping `and` for `or` left all 19 tests green.
 //
-// displayOrder mechanics have their own pglite suite in teams.sync.display-order.test.ts;
-// this file covers counting, column mapping, the isOwnClub corrective pass and errors.
+// This file covers counting, column mapping, the isOwnClub corrective pass and errors.
+// displayOrder is entry-owned (team_entries) and covered by the reorder tests instead.
 const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 
 vi.mock("../../config/database", () => ({
@@ -336,7 +336,6 @@ describe("syncTeamsFromData", () => {
       name: "Forgotten own team",
       clubId: OWN_CLUB_ID,
       isOwnClub: false,
-      displayOrder: 0,
     });
 
     await syncTeamsFromData(teamMap(makeTeamRef({ teamPermanentId: 1 })));
@@ -376,10 +375,8 @@ describe("syncTeamsFromData", () => {
 
     expect(result.skipped).toBe(1); // upsert really did skip it
     expect((await teamRow(1)).isOwnClub).toBe(true);
-    // The row is counted once by toMarkOwn and once by flippedViaUpsert, so the
-    // log's `marked` is 2 for a single corrected row. Only the UPDATE is deduped.
     expect(mockLogInfo).toHaveBeenCalledWith(
-      expect.objectContaining({ marked: 2, unmarked: 0 }),
+      expect.objectContaining({ marked: 1, unmarked: 0 }),
       "Corrected isOwnClub",
     );
   });
@@ -393,7 +390,6 @@ describe("syncTeamsFromData", () => {
         name: "Stale own A",
         clubId: 9999,
         isOwnClub: true,
-        displayOrder: 4,
       },
       {
         apiTeamPermanentId: 7,
@@ -402,14 +398,12 @@ describe("syncTeamsFromData", () => {
         name: "Stale own B",
         clubId: 8888,
         isOwnClub: true,
-        displayOrder: 5,
       },
     ]);
 
     await syncTeamsFromData(teamMap(makeTeamRef()));
 
     expect((await teamRow(3)).isOwnClub).toBe(false);
-    expect((await teamRow(3)).displayOrder).toBe(0);
     expect((await teamRow(7)).isOwnClub).toBe(false);
     // The freshly synced own-club team is untouched by the unmark pass.
     expect((await teamRow(1)).isOwnClub).toBe(true);

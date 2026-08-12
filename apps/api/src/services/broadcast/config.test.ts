@@ -251,13 +251,12 @@ it("loadJoinedMatch falls back to default colors when teams have none", async ()
     expect(out!.guest.color).toBe("#dc2626");
   });
 
-  it("loadJoinedMatch uses the season entry's name/color, not the stale teams-row value", async () => {
+  it("loadJoinedMatch uses the season entry's name/color", async () => {
     const { matchId } = await seed();
     const [homeTeamRow] = await ctx.db
       .select({ id: teams.id })
       .from(teams)
       .where(eq(teams.apiTeamPermanentId, 1));
-    await ctx.db.update(teams).set({ customName: "Stale Custom", badgeColor: "#111111" }).where(eq(teams.apiTeamPermanentId, 1));
     await ctx.db.insert(teamEntries).values({
       teamId: homeTeamRow!.id,
       seasonId: activeSeasonId,

@@ -325,15 +325,13 @@ describe("getStandings", () => {
     expect(result[0]!.leagueId).toBe(activeLeague);
   });
 
-  it("uses the team entry's displayOrder over the stale teams-row value", async () => {
+  it("uses the team entry's displayOrder to order leagues", async () => {
     const ligaX = await insertLeague({ api_liga_id: 1, name: "Liga X" });
     const ligaY = await insertLeague({ api_liga_id: 2, liga_nr: 4103, name: "Liga Y" });
 
-    // teams.display_order is stale/frozen (Task 5 moved writes to entries);
-    // the entry's value must win, even though it points the opposite way.
-    const teamX = await insertTeam({ api_team_permanent_id: 1000, name: "Own X", is_own_club: true, display_order: 5 });
+    const teamX = await insertTeam({ api_team_permanent_id: 1000, name: "Own X", is_own_club: true });
     await insertTeamEntry(teamX, { display_order: 0 });
-    const teamY = await insertTeam({ api_team_permanent_id: 2000, name: "Own Y", is_own_club: true, display_order: 0, season_team_id: 2, team_competition_id: 2 });
+    const teamY = await insertTeam({ api_team_permanent_id: 2000, name: "Own Y", is_own_club: true, season_team_id: 2, team_competition_id: 2 });
     await insertTeamEntry(teamY, { display_order: 5 });
 
     await insertStanding(ligaX, 1000, { position: 1 });

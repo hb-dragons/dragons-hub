@@ -131,7 +131,7 @@ describe("verifySlot", () => {
     expect(res.conflicts.map((c) => c.type)).not.toContain("venue-busy");
   });
 
-  it("uses the home team's season entry duration, not the stale teams-row value", async () => {
+  it("uses the home team's season entry duration", async () => {
     await seedVenue(1);
     await seedLeague(1);
     const [home] = await ctx.db
@@ -143,8 +143,6 @@ describe("verifySlot", () => {
         name: "T100",
         clubId: 1,
         isOwnClub: true,
-        // Stale backfill value — must NOT be read once entries exist.
-        estimatedGameDuration: 40,
       })
       .returning();
     await seedOwnTeam(200);
@@ -156,8 +154,8 @@ describe("verifySlot", () => {
     await seedMatch({ id: 1, apiMatchId: 11, home: 100, guest: 200, date: "2026-02-14", time: "18:00:00", venueId: 1, leagueId: 1, matchDay: 5 });
     await seedMatch({ id: 2, apiMatchId: 12, home: 200, guest: 100, date: "2026-02-12", time: "10:00:00", venueId: 1, leagueId: 1, matchDay: 4 });
     // This booking's window only overlaps the proposed 18:00 slot if the home
-    // team's game duration is the entry's 120 minutes (window ends 21:00), not
-    // the teams row's stale 40 (window would end 19:40, no overlap).
+    // team's game duration is the entry's 120 minutes (window ends 21:00); with
+    // no duration at all the default would leave no overlap.
     const [b] = await ctx.db
       .insert(venueBookings)
       .values({

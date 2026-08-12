@@ -73,10 +73,6 @@ beforeEach(async () => {
       teamCompetitionId: 1,
       name: "SG Dragons Hannover 1",
       nameShort: "Dragons H1",
-      // Deliberately stale/divergent from the team_entries row seeded below —
-      // this column must never be read by getWeekendMatches anymore. If a
-      // regression re-reads it, every label test below fails loudly.
-      customName: "STALE teams-row Herren 1",
       clubId: 1,
       isOwnClub: true,
     },
@@ -95,8 +91,6 @@ beforeEach(async () => {
       teamCompetitionId: 3,
       name: "SG Dragons Hannover Damen 1",
       nameShort: "Dragons D1",
-      // Same deliberate staleness as OWN_HOME above.
-      customName: "STALE teams-row Damen 1",
       clubId: 1,
       isOwnClub: true,
     },
@@ -111,9 +105,7 @@ beforeEach(async () => {
     },
   ]);
   defaultLeagueId = await seedLeague();
-  // The season-scoped team_entries rows are the actual source of truth for
-  // customName. Their values differ from the stale teams-row values above on
-  // purpose (see comments there).
+  // customName lives only on the season-scoped team_entries row.
   await seedEntry(OWN_HOME, { customName: "Herren 1" });
   await seedEntry(OWN_GUEST, { customName: "Damen 1" });
 });

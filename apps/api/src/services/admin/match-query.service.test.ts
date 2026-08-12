@@ -101,7 +101,6 @@ async function seedTeams(): Promise<void> {
       nameShort: "DRG1",
       clubId: 500,
       isOwnClub: true,
-      badgeColor: "#FF0000",
     },
     {
       apiTeamPermanentId: OWN_B,
@@ -120,7 +119,6 @@ async function seedTeams(): Promise<void> {
       nameShort: "TIG",
       clubId: 600,
       isOwnClub: false,
-      badgeColor: "#0000FF",
     },
     {
       apiTeamPermanentId: FOREIGN_Y,
@@ -488,10 +486,8 @@ describe("row mappers", () => {
   it("rowToListItem maps a real joined row", async () => {
     const leagueId = await seedLeague("Bezirksliga");
     const venueId = await seedVenue("Sporthalle Nord");
-    // customName/badgeColor come from the season entry, not the (stale)
-    // teams-row columns seeded by seedTeams() — OWN_A's teams row has
-    // badgeColor "#FF0000" with no customName; the entry below carries
-    // different values that must win.
+    // customName/badgeColor live only on the season entry now — teams carries
+    // no club-facing columns at all.
     const [ownATeam] = await ctx.db
       .select({ id: teams.id })
       .from(teams)
@@ -528,8 +524,8 @@ describe("row mappers", () => {
       homeIsOwnClub: true,
       guestIsOwnClub: false,
       homeBadgeColor: "#00FF00",
-      // FOREIGN_X is not own-club — it never gets a team_entries row, so its
-      // teams-row badgeColor ("#0000FF") is no longer read at all.
+      // FOREIGN_X is not own-club — it never gets a team_entries row, so
+      // there is no badgeColor to read for it at all.
       guestBadgeColor: null,
       homeScore: 78,
       guestScore: 65,

@@ -708,13 +708,8 @@ describe("updateMatchLocal", () => {
     expect(push!.body).toContain("15.03.2025 18:00");
   });
 
-  it("uses the season entry's customName for event payloads, not the stale teams-row value", async () => {
+  it("uses the season entry's customName for event payloads", async () => {
     const { leagueId } = await seedBasicData();
-    // teams.custom_name holds a value frozen at backfill time; team_entries
-    // owns it now and must win.
-    await ctx.client.query(
-      `UPDATE teams SET custom_name = 'Stale Custom' WHERE api_team_permanent_id = 1000`,
-    );
     const homeTeamRow = await ctx.client.query<{ id: number }>(
       `SELECT id FROM teams WHERE api_team_permanent_id = 1000`,
     );
