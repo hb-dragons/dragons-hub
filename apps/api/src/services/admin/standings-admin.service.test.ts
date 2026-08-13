@@ -303,6 +303,31 @@ describe("getStandings", () => {
     expect(result.map((r) => r.leagueName)).toEqual(["Own Liga", "Bar Liga", "Foo Liga"]);
   });
 
+  it("does not let an own-club squad with no team_entries row jump to the front of the ordering", async () => {
+    const ownLiga = await insertLeague({ api_liga_id: 1, name: "Own Liga" });
+    const entrylessLiga = await insertLeague({ api_liga_id: 2, liga_nr: 4103, name: "Entryless Liga" });
+    const fooLiga = await insertLeague({ api_liga_id: 3, liga_nr: 4104, name: "Foo Liga" });
+
+    const ownTeamId = await insertTeam({ api_team_permanent_id: 1000, name: "Own Team", is_own_club: true });
+    await insertTeamEntry(ownTeamId, { display_order: 5 });
+    // Own-club squad with standings but NO team_entries row for this season —
+    // the state finding #1's migration fallback makes reachable. Its league
+    // must fall to the end alongside the leagues with no own-club team at
+    // all, not jump ahead because a null displayOrder is mistaken for 0.
+    await insertTeam({ api_team_permanent_id: 2000, name: "Entryless Own", is_own_club: true, season_team_id: 2, team_competition_id: 2 });
+    await insertTeam({ api_team_permanent_id: 3000, name: "Foreign", is_own_club: false, season_team_id: 3, team_competition_id: 3 });
+
+    await insertStanding(ownLiga, 1000, { position: 1 });
+    await insertStanding(entrylessLiga, 2000, { position: 1 });
+    await insertStanding(fooLiga, 3000, { position: 1 });
+
+    const result = await getStandings();
+
+    // Own Liga (displayOrder 5) first; the other two, having no recorded
+    // order, fall in alphabetical order after it.
+    expect(result.map((r) => r.leagueName)).toEqual(["Own Liga", "Entryless Liga", "Foo Liga"]);
+  });
+
   it("only returns standings from the active season", async () => {
     // The active season (id = activeSeasonId) is already seeded in beforeEach.
     const upcomingResult = await ctx.client.query<{ id: number }>(

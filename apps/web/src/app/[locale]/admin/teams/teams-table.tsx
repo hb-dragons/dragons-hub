@@ -298,7 +298,12 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
     const estimatedGameDuration =
       durDraft.trim() === "" ? null : parseInt(durDraft.trim(), 10);
     const badgeColor = getColorDraft(team);
-    const leagueId = getLeagueDraft(team);
+    const leagueDraft = getLeagueDraft(team);
+    // Only send leagueId when it actually changed: the API treats any
+    // defined leagueId as a league write and flips link_source to "manual",
+    // so sending the unchanged value on a name/color/duration-only save would
+    // wrongly mark a federation-seeded link as manually set.
+    const leagueId = leagueDraft !== team.leagueId ? leagueDraft : undefined;
 
     setSaving((prev) => ({ ...prev, [team.id]: true }));
     try {
@@ -306,7 +311,7 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
         customName,
         estimatedGameDuration,
         badgeColor,
-        leagueId,
+        ...(leagueId !== undefined ? { leagueId } : {}),
       });
       await mutate(
         SWR_KEYS.teams(seasonId),

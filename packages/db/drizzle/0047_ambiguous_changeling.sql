@@ -44,6 +44,18 @@ JOIN "leagues" l ON l.id = m.league_id
 WHERE t.is_own_club = true
 ORDER BY t.id, l.season_ref_id, l.vorabliga ASC, l.id ASC
 ON CONFLICT ("team_id", "season_id") DO NOTHING;--> statement-breakpoint
+-- Fallback: an own-club squad can have neither a standings row nor a played
+-- match in the active/upcoming season (new squad, league not started yet).
+-- Without this, such a squad gets no entry at all, and 0048 then drops its
+-- teams.* fields with nowhere to land -- the squad silently disappears from
+-- every entry-scoped admin/list endpoint. Seed it with a NULL league so the
+-- field-copy UPDATEs below still reach it; an admin resolves the league link
+-- once federation evidence appears.
+INSERT INTO "team_entries" ("team_id", "season_id", "league_id", "link_source")
+SELECT t.id, se.id, NULL, 'seeded'
+FROM "teams" t CROSS JOIN "seasons" se
+WHERE t.is_own_club = true AND se.status IN ('active','upcoming')
+ON CONFLICT ("team_id", "season_id") DO NOTHING;--> statement-breakpoint
 UPDATE "team_entries" te
 SET "custom_name" = t.custom_name,
     "badge_color" = t.badge_color,

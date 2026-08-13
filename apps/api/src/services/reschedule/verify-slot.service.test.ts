@@ -153,16 +153,18 @@ describe("verifySlot", () => {
     });
     await seedMatch({ id: 1, apiMatchId: 11, home: 100, guest: 200, date: "2026-02-14", time: "18:00:00", venueId: 1, leagueId: 1, matchDay: 5 });
     await seedMatch({ id: 2, apiMatchId: 12, home: 200, guest: 100, date: "2026-02-12", time: "10:00:00", venueId: 1, leagueId: 1, matchDay: 4 });
-    // This booking's window only overlaps the proposed 18:00 slot if the home
-    // team's game duration is the entry's 120 minutes (window ends 21:00); with
-    // no duration at all the default would leave no overlap.
+    // Window math (kickoff 18:00, default buffers 60/60): with the entry's 120
+    // minute duration the proposed window is 17:00-21:00; with no entry at all
+    // (default duration 90) it is only 17:00-20:30. This booking sits at
+    // 20:35-20:45 — strictly after 20:30 — so it overlaps ONLY the 120-minute
+    // window. If the code stopped reading the entry, this assertion would fail.
     const [b] = await ctx.db
       .insert(venueBookings)
       .values({
         venueId: 1,
         date: "2026-02-16",
-        calculatedStartTime: "19:50:00",
-        calculatedEndTime: "20:10:00",
+        calculatedStartTime: "20:35:00",
+        calculatedEndTime: "20:45:00",
         status: "confirmed",
       })
       .returning();

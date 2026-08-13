@@ -20,9 +20,9 @@ const ref = (teamPermanentId: number, teamname: string, clubId: number) => ({
   teamCompetitionId: 8, clubId, verzicht: false,
 });
 
-async function seedSeason(name: string, status: string): Promise<number> {
+async function seedSeason(name: string, status: string, startDate: string | null = null): Promise<number> {
   const r = await ctx.client.query<{ id: number }>(
-    `INSERT INTO seasons (name, status) VALUES ($1, $2) RETURNING id`, [name, status]);
+    `INSERT INTO seasons (name, status, start_date) VALUES ($1, $2, $3) RETURNING id`, [name, status, startDate]);
   return r.rows[0]!.id;
 }
 
@@ -95,6 +95,59 @@ describe("seedSeasonTeamEntries", () => {
     expect(entry.rows[0]).toEqual({
       custom_name: null, badge_color: "red", estimated_game_duration: 80, display_order: 4, league_id: newLeague,
     });
+  });
+
+  it("carries forward from the chronologically later of two dated previous seasons", async () => {
+    await seedClubConfig(100);
+    const older = await seedSeason("2024/25", "archived", "2024-09-01");
+    const newer = await seedSeason("2025/26", "active", "2025-09-01");
+    const next = await seedSeason("2026/27", "upcoming");
+    const olderLeague = await seedLeague(40, "U14 old", older);
+    const newerLeague = await seedLeague(41, "U14 newer", newer);
+    const nextLeague = await seedLeague(42, "U16", next);
+    const squad = await seedTeam(9500, "Dragons U16");
+    await ctx.client.query(
+      `INSERT INTO team_entries (team_id, season_id, league_id, badge_color, estimated_game_duration, display_order)
+       VALUES ($1, $2, $3, 'blue', 70, 1)`, [squad, older, olderLeague]);
+    await ctx.client.query(
+      `INSERT INTO team_entries (team_id, season_id, league_id, badge_color, estimated_game_duration, display_order)
+       VALUES ($1, $2, $3, 'green', 90, 2)`, [squad, newer, newerLeague]);
+    vi.mocked(fetchLeagueRoster).mockResolvedValue([ref(9500, "Dragons U16", 100)]);
+
+    await seedSeasonTeamEntries(next, [42]);
+
+    const entry = await ctx.client.query<{ badge_color: string; estimated_game_duration: number; league_id: number }>(
+      `SELECT badge_color, estimated_game_duration, league_id FROM team_entries WHERE team_id = $1 AND season_id = $2`,
+      [squad, next]);
+    expect(entry.rows[0]).toEqual({ badge_color: "green", estimated_game_duration: 90, league_id: nextLeague });
+  });
+
+  it("does not let an undated previous season outrank a dated one", async () => {
+    await seedClubConfig(100);
+    const dated = await seedSeason("2025/26", "active", "2025-09-01");
+    // Undated season created AFTER the dated one, so a naive createdAt-only
+    // sort (or SQL `ORDER BY start_date DESC`, which is NULLS FIRST) would
+    // wrongly pick this one.
+    const undated = await seedSeason("2025/26 friendlies", "archived", null);
+    const next = await seedSeason("2026/27", "upcoming");
+    const datedLeague = await seedLeague(43, "U14 dated", dated);
+    const undatedLeague = await seedLeague(44, "U14 undated", undated);
+    const nextLeague = await seedLeague(45, "U16", next);
+    const squad = await seedTeam(9600, "Dragons U16");
+    await ctx.client.query(
+      `INSERT INTO team_entries (team_id, season_id, league_id, badge_color, estimated_game_duration, display_order)
+       VALUES ($1, $2, $3, 'blue', 70, 1)`, [squad, dated, datedLeague]);
+    await ctx.client.query(
+      `INSERT INTO team_entries (team_id, season_id, league_id, badge_color, estimated_game_duration, display_order)
+       VALUES ($1, $2, $3, 'green', 90, 2)`, [squad, undated, undatedLeague]);
+    vi.mocked(fetchLeagueRoster).mockResolvedValue([ref(9600, "Dragons U16", 100)]);
+
+    await seedSeasonTeamEntries(next, [45]);
+
+    const entry = await ctx.client.query<{ badge_color: string; estimated_game_duration: number; league_id: number }>(
+      `SELECT badge_color, estimated_game_duration, league_id FROM team_entries WHERE team_id = $1 AND season_id = $2`,
+      [squad, next]);
+    expect(entry.rows[0]).toEqual({ badge_color: "blue", estimated_game_duration: 70, league_id: nextLeague });
   });
 
   it("does not clobber an existing entry's fields, only refreshes the seeded link", async () => {

@@ -107,6 +107,22 @@ describe("team_entries backfill", () => {
     ]);
   });
 
+  it("falls back to a NULL-league entry for an own-club squad with no standings and no matches", async () => {
+    const active = await seedSeason("2026/27", "active");
+    await seedSeason("2025/26", "archived");
+    // A brand-new squad: no standings row, no fixture, in any league.
+    await seedTeam(5000, "Dragons U8");
+
+    for (const sql of backfillInsertStatements()) await ctx.client.exec(sql);
+
+    const rows = await ctx.client.query<{ season_id: number; league_id: number | null }>(
+      `SELECT season_id, league_id FROM team_entries te
+       JOIN teams t ON t.id = te.team_id WHERE t.api_team_permanent_id = 5000`);
+    // Only the active season gets a fallback entry (archived is excluded by
+    // the fallback's status filter, and there is no upcoming season here).
+    expect(rows.rows).toEqual([{ season_id: active, league_id: null }]);
+  });
+
   it("creates no entries for non-own-club teams", async () => {
     const active = await seedSeason("2026/27", "active");
     const league = await seedLeague(6, "U12", active);

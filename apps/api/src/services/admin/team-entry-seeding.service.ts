@@ -1,6 +1,6 @@
 import { getDb } from "../../config/database";
 import { teams, teamEntries, leagues } from "@dragons/db/schema";
-import { and, eq, desc, sql, inArray } from "drizzle-orm";
+import { and, eq, sql, inArray } from "drizzle-orm";
 import { seasons } from "@dragons/db/schema";
 import { fetchLeagueRoster } from "./league-roster";
 import { getClubConfig } from "./settings.service";
@@ -56,22 +56,32 @@ export async function upsertEntryFromEvidence(
   if (!existing) {
     // Carry-forward from the squad's latest previous entry (color, duration,
     // order — deliberately never the custom name; see ADR 0004).
-    const [previous] = await db
+    // `startDate` is the chronological key — seasons are not guaranteed to be
+    // created in chronological order, so ordering by insertion time
+    // (createdAt alone) could carry forward the wrong squad's fields when
+    // backfilling an older season. createdAt only breaks ties, including for
+    // rows whose startDate is null. This is sorted in application code, not
+    // SQL: Postgres `ORDER BY ... DESC` is NULLS FIRST, so a season with no
+    // start_date (nullable, optional at creation) would otherwise outrank
+    // every dated season and win forever. Treat a null startDate as the
+    // oldest possible value instead.
+    const candidates = await db
       .select({
         badgeColor: teamEntries.badgeColor,
         estimatedGameDuration: teamEntries.estimatedGameDuration,
         displayOrder: teamEntries.displayOrder,
+        startDate: seasons.startDate,
+        createdAt: teamEntries.createdAt,
       })
       .from(teamEntries)
       .innerJoin(seasons, eq(teamEntries.seasonId, seasons.id))
-      .where(eq(teamEntries.teamId, teamId))
-      // `startDate` is the chronological key — seasons are not guaranteed to
-      // be created in chronological order, so ordering by insertion time
-      // (createdAt alone) could carry forward the wrong squad's fields when
-      // backfilling an older season. createdAt only breaks ties, including
-      // for rows whose startDate is null.
-      .orderBy(desc(seasons.startDate), desc(seasons.createdAt))
-      .limit(1);
+      .where(eq(teamEntries.teamId, teamId));
+
+    const previous = candidates.sort(
+      (a, b) =>
+        (b.startDate ?? "").localeCompare(a.startDate ?? "") ||
+        b.createdAt.getTime() - a.createdAt.getTime(),
+    )[0];
 
     const displayOrder =
       previous?.displayOrder ??

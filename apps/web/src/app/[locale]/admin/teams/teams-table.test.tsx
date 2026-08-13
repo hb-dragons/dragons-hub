@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { OwnClubTeam } from "@dragons/shared";
 
@@ -23,6 +23,7 @@ vi.mock("swr", () => ({
 vi.mock("@/lib/api", () => ({ api: { teams: { update: vi.fn(), reorder: vi.fn() }, seasons: { getLeagues: vi.fn() } } }));
 
 import { TeamsTable } from "./teams-table";
+import { api } from "@/lib/api";
 import en from "@/messages/en.json";
 
 afterEach(() => cleanup());
@@ -46,5 +47,22 @@ describe("TeamsTable league column", () => {
     // The select trigger renders the current value; options render on open —
     // assert the trigger shows the connected (untracked) league name.
     expect(screen.getByText("U16 Vorab")).toBeInTheDocument();
+  });
+});
+
+describe("TeamsTable save", () => {
+  it("does not send leagueId when only the custom name changed, so link_source is not touched", async () => {
+    vi.mocked(api.teams.update).mockResolvedValue({ ...entry, customName: "New Name" });
+    renderTable();
+
+    fireEvent.change(screen.getByPlaceholderText("Enter custom name..."), {
+      target: { value: "New Name" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(api.teams.update).toHaveBeenCalledTimes(1));
+    const [, body] = vi.mocked(api.teams.update).mock.calls[0]!;
+    expect(body).not.toHaveProperty("leagueId");
+    expect(body).toMatchObject({ customName: "New Name" });
   });
 });

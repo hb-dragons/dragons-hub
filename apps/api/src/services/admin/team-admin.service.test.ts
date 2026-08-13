@@ -372,6 +372,21 @@ describe("updateTeamEntry", () => {
     expect(updated?.estimatedGameDuration).toBe(90);
     expect(updated?.badgeColor).toBe("red");
   });
+
+  it("does not touch link_source when leagueId is omitted from the update", async () => {
+    const season = await seedSeason("2026/27", "active");
+    const league = await seedLeague(43, "U10 Kreisliga", season);
+    const squad = await seedTeam(5005, "Dragons U10");
+    const entry = await ctx.client.query<{ id: number }>(
+      `INSERT INTO team_entries (team_id, season_id, league_id, link_source) VALUES ($1, $2, $3, 'seeded') RETURNING id`,
+      [squad, season, league]);
+
+    const updated = await updateTeamEntry(entry.rows[0]!.id, { customName: "U10" });
+
+    expect(updated?.customName).toBe("U10");
+    expect(updated?.leagueId).toBe(league);
+    expect(updated?.linkSource).toBe("seeded");
+  });
 });
 
 describe("reorderTeamEntries", () => {
