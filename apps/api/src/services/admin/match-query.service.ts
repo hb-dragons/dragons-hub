@@ -14,6 +14,7 @@ import {
   refereeRoles,
   refereeAssignmentIntents,
   matchChanges,
+  teamEntries,
 } from "@dragons/db/schema";
 import { eq, sql, and, or, inArray, gte, lte, asc, desc, isNull, isNotNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -87,6 +88,11 @@ export interface MatchUpdateData {
 
 const homeTeam = alias(teams, "homeTeam");
 const guestTeam = alias(teams, "guestTeam");
+// customName/badgeColor live on team_entries now, scoped to each match's own
+// season (matches.leagueId -> leagues.seasonRefId). One aliased entry per
+// side, joined after leagues so the ON clause can reference its seasonRefId.
+const homeEntry = alias(teamEntries, "homeEntry");
+const guestEntry = alias(teamEntries, "guestEntry");
 
 /**
  * Build the standard match-with-joins select query.
@@ -104,17 +110,17 @@ export function queryMatchWithJoins(client: Database | TransactionClient = getDb
       homeTeamApiId: matches.homeTeamApiId,
       homeTeamName: homeTeam.name,
       homeTeamNameShort: homeTeam.nameShort,
-      homeTeamCustomName: homeTeam.customName,
+      homeTeamCustomName: homeEntry.customName,
       homeClubId: homeTeam.clubId,
       guestTeamApiId: matches.guestTeamApiId,
       guestTeamName: guestTeam.name,
       guestTeamNameShort: guestTeam.nameShort,
-      guestTeamCustomName: guestTeam.customName,
+      guestTeamCustomName: guestEntry.customName,
       guestClubId: guestTeam.clubId,
       homeIsOwnClub: homeTeam.isOwnClub,
       guestIsOwnClub: guestTeam.isOwnClub,
-      homeBadgeColor: homeTeam.badgeColor,
-      guestBadgeColor: guestTeam.badgeColor,
+      homeBadgeColor: homeEntry.badgeColor,
+      guestBadgeColor: guestEntry.badgeColor,
       homeScore: matches.homeScore,
       guestScore: matches.guestScore,
       leagueId: matches.leagueId,
@@ -169,6 +175,14 @@ export function queryMatchWithJoins(client: Database | TransactionClient = getDb
     .innerJoin(homeTeam, eq(matches.homeTeamApiId, homeTeam.apiTeamPermanentId))
     .innerJoin(guestTeam, eq(matches.guestTeamApiId, guestTeam.apiTeamPermanentId))
     .leftJoin(leagues, eq(matches.leagueId, leagues.id))
+    .leftJoin(
+      homeEntry,
+      and(eq(homeEntry.teamId, homeTeam.id), eq(homeEntry.seasonId, leagues.seasonRefId)),
+    )
+    .leftJoin(
+      guestEntry,
+      and(eq(guestEntry.teamId, guestTeam.id), eq(guestEntry.seasonId, leagues.seasonRefId)),
+    )
     .leftJoin(venues, eq(matches.venueId, venues.id));
 }
 

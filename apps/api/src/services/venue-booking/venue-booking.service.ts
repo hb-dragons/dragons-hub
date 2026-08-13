@@ -5,9 +5,12 @@ import {
   venueBookingMatches,
   matches,
   teams,
+  teamEntries,
+  leagues,
   venues,
 } from "@dragons/db/schema";
 import { eq, and, or, inArray, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { readSettings, readIntSetting } from "../settings/app-settings.reader";
 import { type BookingConfig } from "./booking-calculator";
 import { planReconciliation } from "./booking-planner";
@@ -72,6 +75,10 @@ interface MatchWithTeam {
 async function queryHomeMatches(matchIds: number[]): Promise<MatchWithTeam[]> {
   if (matchIds.length === 0) return [];
 
+  // estimatedGameDuration lives on team_entries now, scoped to each match's
+  // own season (matches.leagueId -> leagues.seasonRefId). A leagueless match
+  // (leagues leftJoin misses) or a season without an entry both resolve to
+  // null, same as the default-duration fallback already below in the callers.
   const rows = await getDb()
     .select({
       matchId: matches.id,
@@ -81,10 +88,15 @@ async function queryHomeMatches(matchIds: number[]): Promise<MatchWithTeam[]> {
       isOwnClub: teams.isOwnClub,
       isForfeited: matches.isForfeited,
       isCancelled: matches.isCancelled,
-      estimatedGameDuration: teams.estimatedGameDuration,
+      estimatedGameDuration: teamEntries.estimatedGameDuration,
     })
     .from(matches)
     .innerJoin(teams, eq(teams.apiTeamPermanentId, matches.homeTeamApiId))
+    .leftJoin(leagues, eq(leagues.id, matches.leagueId))
+    .leftJoin(
+      teamEntries,
+      and(eq(teamEntries.teamId, teams.id), eq(teamEntries.seasonId, leagues.seasonRefId)),
+    )
     .where(and(inArray(matches.id, matchIds), sql`${matches.venueId} IS NOT NULL`));
 
   return rows
@@ -115,19 +127,12 @@ function sortMatchesByKickoff(matches: ReconcilePreviewMatch[]): ReconcilePrevie
 async function fetchMatchDisplayInfo(matchIds: number[]): Promise<Map<number, ReconcilePreviewMatch>> {
   if (matchIds.length === 0) return new Map();
 
-  const homeTeam = getDb()
-    .select({
-      apiTeamPermanentId: teams.apiTeamPermanentId,
-      name: teams.name,
-      customName: teams.customName,
-      badgeColor: teams.badgeColor,
-    })
-    .from(teams)
-    .as("home_team");
-  const guestTeam = getDb()
-    .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name })
-    .from(teams)
-    .as("guest_team");
+  // customName/badgeColor live on team_entries now, scoped to each match's own
+  // season. leagues must be joined before homeEntry so the entry join can
+  // reference leagues.seasonRefId.
+  const homeTeam = alias(teams, "home_team");
+  const guestTeam = alias(teams, "guest_team");
+  const homeEntry = alias(teamEntries, "home_entry");
 
   const rows = await getDb()
     .select({
@@ -136,13 +141,18 @@ async function fetchMatchDisplayInfo(matchIds: number[]): Promise<Map<number, Re
       isForfeited: matches.isForfeited,
       isCancelled: matches.isCancelled,
       homeTeam: homeTeam.name,
-      homeTeamCustomName: homeTeam.customName,
-      homeBadgeColor: homeTeam.badgeColor,
+      homeTeamCustomName: homeEntry.customName,
+      homeBadgeColor: homeEntry.badgeColor,
       guestTeam: guestTeam.name,
     })
     .from(matches)
     .innerJoin(homeTeam, eq(homeTeam.apiTeamPermanentId, matches.homeTeamApiId))
     .innerJoin(guestTeam, eq(guestTeam.apiTeamPermanentId, matches.guestTeamApiId))
+    .leftJoin(leagues, eq(leagues.id, matches.leagueId))
+    .leftJoin(
+      homeEntry,
+      and(eq(homeEntry.teamId, homeTeam.id), eq(homeEntry.seasonId, leagues.seasonRefId)),
+    )
     .where(inArray(matches.id, matchIds));
 
   const map = new Map<number, ReconcilePreviewMatch>();

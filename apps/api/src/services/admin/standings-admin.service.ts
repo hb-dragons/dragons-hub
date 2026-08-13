@@ -1,5 +1,5 @@
 import { getDb } from "../../config/database";
-import { standings, leagues, teams } from "@dragons/db/schema";
+import { standings, leagues, teams, teamEntries } from "@dragons/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import type { LeagueStandings } from "@dragons/shared";
 import { withActiveSeason } from "../season-scope";
@@ -30,7 +30,12 @@ async function standingsForSeason(seasonId: number): Promise<LeagueStandings[]> 
       teamNameShort: teams.nameShort,
       isOwnClub: teams.isOwnClub,
       verzicht: teams.verzicht,
-      displayOrder: teams.displayOrder,
+      // displayOrder now lives on team_entries, scoped to this function's
+      // season (the query is already `standingsForSeason`-scoped, so the join
+      // uses that season id directly). A squad without an entry for this
+      // season yields null here — handled below by simply not recording an
+      // order for it, the same as "no own-club team in this league" today.
+      displayOrder: teamEntries.displayOrder,
       played: standings.played,
       won: standings.won,
       lost: standings.lost,
@@ -42,6 +47,10 @@ async function standingsForSeason(seasonId: number): Promise<LeagueStandings[]> 
     .from(standings)
     .innerJoin(leagues, eq(standings.leagueId, leagues.id))
     .innerJoin(teams, eq(standings.teamApiId, teams.apiTeamPermanentId))
+    .leftJoin(
+      teamEntries,
+      and(eq(teamEntries.teamId, teams.id), eq(teamEntries.seasonId, seasonId)),
+    )
     .where(and(eq(leagues.isTracked, true), eq(leagues.seasonRefId, seasonId)))
     .orderBy(asc(leagues.name), asc(standings.position));
 
@@ -76,7 +85,10 @@ async function standingsForSeason(seasonId: number): Promise<LeagueStandings[]> 
       leaguePoints: row.leaguePoints,
     });
 
-    if (row.isOwnClub) {
+    // A null displayOrder means this own-club squad has no team_entries row
+    // for the season being queried (e.g. an old season predating entries) —
+    // treated the same as "no own-club team in this league" below, not as 0.
+    if (row.isOwnClub && row.displayOrder !== null) {
       const current = leagueOrder.get(row.leagueId);
       if (current === undefined || row.displayOrder < current) {
         leagueOrder.set(row.leagueId, row.displayOrder);

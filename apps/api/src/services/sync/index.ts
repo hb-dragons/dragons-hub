@@ -6,6 +6,7 @@ import { syncLeagues } from "./leagues.sync";
 import { syncTeamsFromData } from "./teams.sync";
 import { syncMatchesFromData } from "./matches.sync";
 import { syncStandingsFromData } from "./standings.sync";
+import { syncTeamEntriesFromData } from "./team-entries.sync";
 import { syncVenuesFromData, buildVenueIdLookup } from "./venues.sync";
 import {
   syncRefereesFromData,
@@ -133,6 +134,12 @@ export async function fullSync(
     // Await teams before standings so every referenced team is committed. (issue #47)
     const standingsRes = await syncStandingsFromData(syncData.leagueData, syncLogger);
     committedAny = true;
+
+    const teamEntriesRes = await syncTeamEntriesFromData(syncData.leagueData, syncLogger);
+    allErrors.push(...teamEntriesRes.errors);
+    if (teamEntriesRes.supersededManual > 0) {
+      await logStep(`Superseded ${teamEntriesRes.supersededManual} manual league links with federation evidence`);
+    }
 
     allErrors.push(...teamsRes.errors);
     allErrors.push(...venuesRes.errors);

@@ -55,6 +55,7 @@ import {
   leagues,
   matches,
   teams,
+  teamEntries,
   venueBookingMatches,
   venueBookings,
   venues,
@@ -143,11 +144,10 @@ async function seedTeamPair(): Promise<{ homeApi: number; guestApi: number }> {
       seasonTeamId: 200 + seq,
       teamCompetitionId: 300 + seq,
       name: "Dragons",
-      customName: "Dragons Custom",
       clubId: 1,
       isOwnClub: true,
     })
-    .returning({ api: teams.apiTeamPermanentId });
+    .returning({ id: teams.id, api: teams.apiTeamPermanentId });
   const [guest] = await ctx.db
     .insert(teams)
     .values({
@@ -158,6 +158,11 @@ async function seedTeamPair(): Promise<{ homeApi: number; guestApi: number }> {
       clubId: 2,
     })
     .returning({ api: teams.apiTeamPermanentId });
+  await ctx.db.insert(teamEntries).values({
+    teamId: home!.id,
+    seasonId: activeSeasonId,
+    customName: "Dragons Custom",
+  });
   return { homeApi: home!.api, guestApi: guest!.api };
 }
 

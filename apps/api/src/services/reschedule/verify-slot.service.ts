@@ -1,8 +1,9 @@
 import { and, eq, inArray, ne, or } from "drizzle-orm";
 import { getDb } from "../../config/database";
-import { matches, teams, venues, venueBookings, venueBookingMatches } from "@dragons/db/schema";
+import { matches, teams, teamEntries, leagues, venues, venueBookings, venueBookingMatches } from "@dragons/db/schema";
 import { calculateTimeWindow } from "../venue-booking/booking-calculator";
 import { getBookingConfig } from "../venue-booking/venue-booking.service";
+import { NO_SEASON } from "../season-scope";
 import type { SlotConflict, VerifySlotInput, VerifySlotResult } from "./reschedule.types";
 
 function windowsOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
@@ -51,9 +52,18 @@ export async function verifySlot(input: VerifySlotInput): Promise<VerifySlotResu
     // and that venue's bookings for the day.
     const [config, [homeTeam], bookingsThatDay] = await Promise.all([
       getBookingConfig(),
+      // team_entries owns estimatedGameDuration, scoped to this match's season
+      // (matches.leagueId -> leagues.seasonRefId). The literal-id join keeps
+      // this a single round trip; NO_SEASON never matches a real leagues.id, so
+      // a leagueless match resolves to "no entry" rather than an unscoped read.
       getDb()
-        .select({ duration: teams.estimatedGameDuration })
+        .select({ duration: teamEntries.estimatedGameDuration })
         .from(teams)
+        .leftJoin(leagues, eq(leagues.id, match.leagueId ?? NO_SEASON))
+        .leftJoin(
+          teamEntries,
+          and(eq(teamEntries.teamId, teams.id), eq(teamEntries.seasonId, leagues.seasonRefId)),
+        )
         .where(eq(teams.apiTeamPermanentId, match.homeTeamApiId))
         .limit(1),
       getDb()

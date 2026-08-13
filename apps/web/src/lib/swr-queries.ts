@@ -73,7 +73,10 @@ export function makeQueries(api: Api) {
       fetcher: () => api.matches.history(id, { limit: limit ?? 50, offset: offset ?? 0 }),
     }),
     // teams / standings / venues
-    teams: () => ({ key: SWR_KEYS.teams, fetcher: () => api.teams.list() }),
+    teams: (seasonId?: number) => ({
+      key: SWR_KEYS.teams(seasonId),
+      fetcher: () => api.teams.list(seasonId === undefined ? undefined : { seasonId }),
+    }),
     standings: (seasonId?: number) => ({
       key: SWR_KEYS.standings(seasonId),
       fetcher: () => api.standings.list(seasonId === undefined ? {} : { seasonId }),

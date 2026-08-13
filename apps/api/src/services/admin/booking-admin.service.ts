@@ -5,9 +5,11 @@ import {
   venues,
   matches,
   teams,
+  teamEntries,
   leagues,
 } from "@dragons/db/schema";
 import { eq, and, gte, lte, sql, count, asc } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type {
   BookingListItem,
   BookingDetail,
@@ -130,20 +132,14 @@ export async function getBookingDetail(
 
   if (!booking) return null;
 
-  // Fetch linked matches
-  const homeTeam = getDb()
-    .select({
-      apiTeamPermanentId: teams.apiTeamPermanentId,
-      name: teams.name,
-      customName: teams.customName,
-      badgeColor: teams.badgeColor,
-    })
-    .from(teams)
-    .as("home_team");
-  const guestTeam = getDb()
-    .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name })
-    .from(teams)
-    .as("guest_team");
+  // Fetch linked matches. customName/badgeColor live on team_entries now,
+  // scoped to each match's own season (matches.leagueId -> leagues.seasonRefId)
+  // — not a single season for the whole query, since matches here can span
+  // seasons. leagues must be joined before homeEntry so the entry join can
+  // reference leagues.seasonRefId.
+  const homeTeam = alias(teams, "home_team");
+  const guestTeam = alias(teams, "guest_team");
+  const homeEntry = alias(teamEntries, "home_entry");
 
   const linkedMatches = await getDb()
     .select({
@@ -152,8 +148,8 @@ export async function getBookingDetail(
       kickoffDate: matches.kickoffDate,
       kickoffTime: matches.kickoffTime,
       homeTeam: homeTeam.name,
-      homeTeamCustomName: homeTeam.customName,
-      homeBadgeColor: homeTeam.badgeColor,
+      homeTeamCustomName: homeEntry.customName,
+      homeBadgeColor: homeEntry.badgeColor,
       guestTeam: guestTeam.name,
       leagueName: leagues.name,
     })
@@ -168,6 +164,10 @@ export async function getBookingDetail(
       eq(guestTeam.apiTeamPermanentId, matches.guestTeamApiId),
     )
     .leftJoin(leagues, eq(leagues.id, matches.leagueId))
+    .leftJoin(
+      homeEntry,
+      and(eq(homeEntry.teamId, homeTeam.id), eq(homeEntry.seasonId, leagues.seasonRefId)),
+    )
     .where(eq(venueBookingMatches.venueBookingId, id))
     .orderBy(asc(matches.kickoffTime));
 

@@ -20,6 +20,7 @@ vi.mock("../../config/database", () => ({
   )),
 }));
 
+import { eq } from "drizzle-orm";
 import {
   setupTestDb,
   resetTestDb,
@@ -31,6 +32,7 @@ import {
   matches,
   seasons,
   teams,
+  teamEntries,
 } from "@dragons/db/schema";
 import {
   getBroadcastConfig,
@@ -247,6 +249,31 @@ it("loadJoinedMatch falls back to default colors when teams have none", async ()
     // Defaults from config.ts.
     expect(out!.home.color).toBe("#1e90ff");
     expect(out!.guest.color).toBe("#dc2626");
+  });
+
+  it("loadJoinedMatch uses the season entry's name/color", async () => {
+    const { matchId } = await seed();
+    const [homeTeamRow] = await ctx.db
+      .select({ id: teams.id })
+      .from(teams)
+      .where(eq(teams.apiTeamPermanentId, 1));
+    await ctx.db.insert(teamEntries).values({
+      teamId: homeTeamRow!.id,
+      seasonId: activeSeasonId,
+      customName: "Fresh Custom",
+      badgeColor: "#00FF00",
+    });
+
+    const m = await loadJoinedMatch({
+      matchId,
+      homeAbbr: null,
+      guestAbbr: null,
+      homeColorOverride: null,
+      guestColorOverride: null,
+    });
+
+    expect(m!.home.name).toBe("Fresh Custom");
+    expect(m!.home.color).toBe("#00FF00");
   });
 
   it("setBroadcastLive(false) on a never-started config returns null", async () => {

@@ -8,7 +8,7 @@ vi.mock("../../config/database", () => ({
 // --- Imports (after mocks) ---
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 import { traceQueries, type QueryTrace } from "../../test/trace-queries";
-import { matches, teams, venues, leagues, seasons, venueBookings, venueBookingMatches } from "@dragons/db/schema";
+import { matches, teams, teamEntries, venues, leagues, seasons, venueBookings, venueBookingMatches } from "@dragons/db/schema";
 import { verifySlot } from "./verify-slot.service";
 
 let ctx: TestDbContext;
@@ -129,6 +129,50 @@ describe("verifySlot", () => {
     await ctx.db.insert(venueBookingMatches).values({ venueBookingId: b!.id, matchId: 2 });
     const res = await verifySlot({ matchId: 1, date: "2026-02-16", time: "18:00:00", venueId: 1 });
     expect(res.conflicts.map((c) => c.type)).not.toContain("venue-busy");
+  });
+
+  it("uses the home team's season entry duration", async () => {
+    await seedVenue(1);
+    await seedLeague(1);
+    const [home] = await ctx.db
+      .insert(teams)
+      .values({
+        apiTeamPermanentId: 100,
+        seasonTeamId: 100,
+        teamCompetitionId: 100,
+        name: "T100",
+        clubId: 1,
+        isOwnClub: true,
+      })
+      .returning();
+    await seedOwnTeam(200);
+    await ctx.db.insert(teamEntries).values({
+      teamId: home!.id,
+      seasonId: activeSeasonId,
+      estimatedGameDuration: 120,
+    });
+    await seedMatch({ id: 1, apiMatchId: 11, home: 100, guest: 200, date: "2026-02-14", time: "18:00:00", venueId: 1, leagueId: 1, matchDay: 5 });
+    await seedMatch({ id: 2, apiMatchId: 12, home: 200, guest: 100, date: "2026-02-12", time: "10:00:00", venueId: 1, leagueId: 1, matchDay: 4 });
+    // Window math (kickoff 18:00, default buffers 60/60): with the entry's 120
+    // minute duration the proposed window is 17:00-21:00; with no entry at all
+    // (default duration 90) it is only 17:00-20:30. This booking sits at
+    // 20:35-20:45 — strictly after 20:30 — so it overlaps ONLY the 120-minute
+    // window. If the code stopped reading the entry, this assertion would fail.
+    const [b] = await ctx.db
+      .insert(venueBookings)
+      .values({
+        venueId: 1,
+        date: "2026-02-16",
+        calculatedStartTime: "20:35:00",
+        calculatedEndTime: "20:45:00",
+        status: "confirmed",
+      })
+      .returning();
+    await ctx.db.insert(venueBookingMatches).values({ venueBookingId: b!.id, matchId: 2 });
+
+    const res = await verifySlot({ matchId: 1, date: "2026-02-16", time: "18:00:00", venueId: 1 });
+
+    expect(res.conflicts.map((c) => c.type)).toContain("venue-busy");
   });
 
   it("uses override time window when overrideStartTime/overrideEndTime are set and overlap occurs", async () => {

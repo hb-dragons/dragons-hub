@@ -608,7 +608,9 @@
     "placeholder": "Eigenen Namen eingeben...",
     "gameDuration": "Spieldauer (min)",
     "gameDurationPlaceholder": "Standard",
-    "badgeColor": "Badge-Farbe"
+    "badgeColor": "Badge-Farbe",
+    "leagueNotConnected": "Nicht verknüpft",
+    "leagueUntracked": "Liga wird nicht mehr verfolgt"
   },
   "users": {
     "title": "Benutzer",

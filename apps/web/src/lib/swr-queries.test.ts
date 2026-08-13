@@ -200,9 +200,18 @@ describe("makeQueries", () => {
   it("teams: key + dispatch to teams.list()", async () => {
     const { api, calls } = mockApi();
     const q = makeQueries(api).teams();
-    expect(q.key).toBe(SWR_KEYS.teams);
+    expect(q.key).toBe(SWR_KEYS.teams());
     await q.fetcher();
-    expect(calls[0]).toEqual({ method: "teams.list", args: [] });
+    expect(calls[0]).toEqual({ method: "teams.list", args: [undefined] });
+  });
+
+  it("teams(seasonId): keys and filters by the named season", async () => {
+    const { api, calls } = mockApi();
+    const q = makeQueries(api).teams(4);
+    expect(q.key).toBe(SWR_KEYS.teams(4));
+    expect(q.key).not.toBe(SWR_KEYS.teams());
+    await q.fetcher();
+    expect(calls[0]).toEqual({ method: "teams.list", args: [{ seasonId: 4 }] });
   });
 
   it("venues: key + dispatch to venues.list()", async () => {

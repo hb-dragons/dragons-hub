@@ -5,6 +5,7 @@ import {
   closeTestDb,
   type TestDbContext,
 } from "../../test/setup-test-db";
+import { seedActiveSeason } from "../../test/seed-season";
 
 // --- Mocks (hoisted before imports) ---
 //
@@ -33,7 +34,8 @@ vi.mock("../../config/database", () => ({
 // --- Imports (after mocks) ---
 
 import { getWeekendMatches } from "./match-social.service";
-import { matches, teams } from "@dragons/db/schema";
+import { matches, teams, leagues, teamEntries } from "@dragons/db/schema";
+import { eq } from "drizzle-orm";
 
 // ISO week 10 of 2026 runs Monday 2026-03-02 .. Sunday 2026-03-08.
 const WEEK = { week: 10, year: 2026 } as const;
@@ -49,6 +51,9 @@ const FOREIGN = 4;
 
 let ctx: TestDbContext;
 let nextApiMatchId = 1;
+let nextApiLigaId = 1;
+let activeSeasonId: number;
+let defaultLeagueId: number;
 
 beforeAll(async () => {
   ctx = await setupTestDb();
@@ -59,6 +64,8 @@ beforeEach(async () => {
   await resetTestDb(ctx);
   vi.clearAllMocks();
   nextApiMatchId = 1;
+  nextApiLigaId = 1;
+  activeSeasonId = await seedActiveSeason(ctx);
   await ctx.db.insert(teams).values([
     {
       apiTeamPermanentId: OWN_HOME,
@@ -66,7 +73,6 @@ beforeEach(async () => {
       teamCompetitionId: 1,
       name: "SG Dragons Hannover 1",
       nameShort: "Dragons H1",
-      customName: "Herren 1",
       clubId: 1,
       isOwnClub: true,
     },
@@ -85,7 +91,6 @@ beforeEach(async () => {
       teamCompetitionId: 3,
       name: "SG Dragons Hannover Damen 1",
       nameShort: "Dragons D1",
-      customName: "Damen 1",
       clubId: 1,
       isOwnClub: true,
     },
@@ -99,6 +104,10 @@ beforeEach(async () => {
       isOwnClub: false,
     },
   ]);
+  defaultLeagueId = await seedLeague();
+  // customName lives only on the season-scoped team_entries row.
+  await seedEntry(OWN_HOME, { customName: "Herren 1" });
+  await seedEntry(OWN_GUEST, { customName: "Damen 1" });
 });
 
 afterAll(async () => {
@@ -112,6 +121,7 @@ interface MatchSpec {
   time?: string;
   homeScore?: number | null;
   guestScore?: number | null;
+  leagueId?: number | null;
 }
 
 async function seedMatch(spec: MatchSpec = {}): Promise<number> {
@@ -128,6 +138,7 @@ async function seedMatch(spec: MatchSpec = {}): Promise<number> {
       guestTeamApiId: spec.guest ?? OPPONENT,
       homeScore: spec.homeScore ?? null,
       guestScore: spec.guestScore ?? null,
+      leagueId: spec.leagueId === undefined ? defaultLeagueId : spec.leagueId,
     })
     .returning({ id: matches.id });
   return row!.id;
@@ -136,6 +147,39 @@ async function seedMatch(spec: MatchSpec = {}): Promise<number> {
 /** A finished own-club home match inside the target week. */
 function seedResult(spec: MatchSpec = {}) {
   return seedMatch({ homeScore: 96, guestScore: 52, ...spec });
+}
+
+/** Insert a league belonging to the active season and return its id. */
+async function seedLeague(): Promise<number> {
+  const n = nextApiLigaId++;
+  const [row] = await ctx.db
+    .insert(leagues)
+    .values({
+      apiLigaId: 90000 + n,
+      ligaNr: 9000 + n,
+      name: `Liga ${n}`,
+      seasonId: 2025,
+      seasonName: "2025/26",
+      seasonRefId: activeSeasonId,
+    })
+    .returning({ id: leagues.id });
+  return row!.id;
+}
+
+/** Insert a season-scoped team_entries row for the given apiTeamPermanentId. */
+async function seedEntry(
+  apiTeamPermanentId: number,
+  fields: { customName?: string | null } = {},
+): Promise<void> {
+  const [team] = await ctx.db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.apiTeamPermanentId, apiTeamPermanentId));
+  await ctx.db.insert(teamEntries).values({
+    teamId: team!.id,
+    seasonId: activeSeasonId,
+    customName: fields.customName ?? null,
+  });
 }
 
 describe("getWeekendMatches — row mapping", () => {
@@ -188,9 +232,24 @@ describe("getWeekendMatches — team label fallback chain", () => {
     expect(item!.teamLabel).toBe("Herren 1");
   });
 
-  it("falls back to nameShort when customName is null", async () => {
+  it("resolves the label from the season team_entries row, not the stale teams row", async () => {
+    // beforeEach already seeds a teams.custom_name that diverges from the
+    // team_entries.custom_name for OWN_HOME (see comments there). This
+    // assertion is the one that actually distinguishes the two sources: it
+    // fails today (reads "STALE teams-row Herren 1") and passes once the
+    // query is ported to join team_entries.
+    await seedResult();
+
+    const [item] = await getWeekendMatches({ type: "results", ...WEEK });
+
+    expect(item!.teamLabel).toBe("Herren 1");
+    expect(item!.teamLabel).not.toBe("STALE teams-row Herren 1");
+  });
+
+  it("falls back to nameShort when the entry's customName is null", async () => {
     await ctx.client.query(
-      "UPDATE teams SET custom_name = NULL WHERE api_team_permanent_id = $1",
+      `UPDATE team_entries SET custom_name = NULL
+       WHERE team_id = (SELECT id FROM teams WHERE api_team_permanent_id = $1)`,
       [OWN_HOME],
     );
     await seedResult();
@@ -200,9 +259,14 @@ describe("getWeekendMatches — team label fallback chain", () => {
     expect(item!.teamLabel).toBe("Dragons H1");
   });
 
-  it("falls back to name when customName and nameShort are both null", async () => {
+  it("falls back to name when the entry's customName and teams' nameShort are both null", async () => {
     await ctx.client.query(
-      "UPDATE teams SET custom_name = NULL, name_short = NULL WHERE api_team_permanent_id = $1",
+      `UPDATE team_entries SET custom_name = NULL
+       WHERE team_id = (SELECT id FROM teams WHERE api_team_permanent_id = $1)`,
+      [OWN_HOME],
+    );
+    await ctx.client.query(
+      "UPDATE teams SET name_short = NULL WHERE api_team_permanent_id = $1",
       [OWN_HOME],
     );
     await seedResult();
@@ -215,8 +279,22 @@ describe("getWeekendMatches — team label fallback chain", () => {
   it("applies the same chain to the opponent label", async () => {
     await seedResult();
     const [item] = await getWeekendMatches({ type: "results", ...WEEK });
-    // Opponent has no customName, so nameShort wins.
+    // Opponent has no team_entries row at all, so nameShort wins.
     expect(item!.opponent).toBe("TV Bergkrug");
+  });
+
+  it("returns a leagueless match, falling back to nameShort since no entry can resolve without a season", async () => {
+    // No league on the match means no leagues.seasonRefId to scope the entry
+    // join by, so the LEFT JOIN produces no entry row even though one exists
+    // for this team. This pins that leagueless matches are still returned
+    // (not silently dropped by an accidental INNER JOIN on leagues).
+    const id = await seedResult({ leagueId: null });
+
+    const result = await getWeekendMatches({ type: "results", ...WEEK });
+    const item = result.find((m) => m.id === id);
+
+    expect(item).toBeDefined();
+    expect(item!.teamLabel).toBe("Dragons H1");
   });
 });
 

@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { setupTestDb, resetTestDb, type TestDbContext } from "../../test/setup-test-db";
 
-const { dbHolder, getAllLigen, getClubMatches, getTabelle, getSpielplan } = vi.hoisted(() => ({
+const { dbHolder, getAllLigen, getClubMatches, getTabelle, getSpielplan, fetchLeagueRoster } = vi.hoisted(() => ({
   dbHolder: { ref: null as unknown },
   getAllLigen: vi.fn(),
   getClubMatches: vi.fn(),
   getTabelle: vi.fn(),
   getSpielplan: vi.fn(),
+  fetchLeagueRoster: vi.fn(),
 }));
 vi.mock("../../config/database", () => ({
   getDb: () =>
@@ -15,6 +16,7 @@ vi.mock("../../config/database", () => ({
 vi.mock("../sync/sdk-client", () => ({
   sdkClient: { getAllLigen, getClubMatches, getTabelle, getSpielplan },
 }));
+vi.mock("./league-roster", () => ({ fetchLeagueRoster }));
 
 const mockGetActiveSeasonId = vi.fn();
 vi.mock("./season.service", () => ({
@@ -50,6 +52,7 @@ beforeEach(async () => {
   mockGetActiveSeasonId.mockResolvedValue(null);
   mockGetClubConfig.mockResolvedValue({ clubId: 4121, clubName: "Dragons" });
   getClubMatches.mockResolvedValue({ club: { vereinId: 4121, vereinsname: "Dragons" }, matches: [] });
+  fetchLeagueRoster.mockResolvedValue([]);
 });
 
 function liga(
@@ -168,6 +171,8 @@ describe("setSeasonLeagues", () => {
     getAllLigen.mockResolvedValue([liga(54136, true), liga(54137, true)]);
     const first = await setSeasonLeagues(seasonId, [54136, 54137]);
     expect(first.tracked).toBe(2);
+    expect(first.entriesSeeded).toBe(0);
+    expect(first.rosterFailures).toEqual([]);
     const second = await setSeasonLeagues(seasonId, [54136]); // drop 54137
     expect(second.untracked).toBe(1);
     const tracked = await getTrackedLeagues(seasonId);
@@ -339,33 +344,19 @@ describe("getLeagueTeams", () => {
     return { seasonTeamId: 0, teamCompetitionId: 0, teamPermanentId, teamname, teamnameSmall: "", clubId, verzicht: false };
   }
 
-  it("lists teams from the standings table and marks our club", async () => {
-    getTabelle.mockResolvedValue([
-      { team: teamRef(1, "Opponents", 9999) },
-      { team: teamRef(2, "Hanover Dragons I", 4121) },
-    ]);
+  it("lists teams from the roster and marks our club", async () => {
+    fetchLeagueRoster.mockResolvedValue([teamRef(1, "Opponents", 9999), teamRef(2, "Hanover Dragons I", 4121)]);
     const res = await getLeagueTeams(54141);
-    expect(getSpielplan).not.toHaveBeenCalled();
+    expect(fetchLeagueRoster).toHaveBeenCalledWith(54141);
     expect(res.teams).toEqual([
       { teamPermanentId: 1, name: "Opponents", clubId: 9999, isOwnClub: false },
       { teamPermanentId: 2, name: "Hanover Dragons I", clubId: 4121, isOwnClub: true },
     ]);
   });
 
-  it("falls back to the schedule when the table is empty, deduping by teamPermanentId", async () => {
-    getTabelle.mockResolvedValue([]);
-    getSpielplan.mockResolvedValue([
-      { homeTeam: teamRef(1, "A", 4121), guestTeam: teamRef(2, "B", 10) },
-      { homeTeam: teamRef(1, "A", 4121), guestTeam: null },
-    ]);
-    const res = await getLeagueTeams(54141);
-    expect(res.teams.map((t) => t.teamPermanentId)).toEqual([1, 2]);
-    expect(res.teams[0]).toMatchObject({ isOwnClub: true });
-  });
-
   it("keeps placeholder slots (clubId null) and never marks them own-club", async () => {
     mockGetClubConfig.mockResolvedValue(null); // no club configured
-    getTabelle.mockResolvedValue([{ team: teamRef(5, "Platzhalter 6", null) }]);
+    fetchLeagueRoster.mockResolvedValue([teamRef(5, "Platzhalter 6", null)]);
     const res = await getLeagueTeams(54144);
     expect(res.teams).toEqual([
       { teamPermanentId: 5, name: "Platzhalter 6", clubId: null, isOwnClub: false },

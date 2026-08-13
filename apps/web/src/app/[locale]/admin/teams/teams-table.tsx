@@ -26,6 +26,7 @@ import { GripVertical } from "lucide-react";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { queries } from "@/lib/swr-queries";
 import { api } from "@/lib/api";
+import { SeasonContextSelect } from "@/components/admin/seasons/season-context-select";
 import { COLOR_PRESET_KEYS, getColorPreset } from "@dragons/shared";
 import type { OwnClubTeam } from "@dragons/shared";
 import { Button } from "@dragons/ui/components/button";
@@ -39,6 +40,13 @@ import {
   TableHeader,
   TableRow,
 } from "@dragons/ui/components/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@dragons/ui/components/select";
 
 interface TeamRowProps {
   team: OwnClubTeam;
@@ -47,11 +55,14 @@ interface TeamRowProps {
   draft: string;
   durationDraft: string;
   colorDraft: string | null | undefined;
+  leagueDraft: number | null;
+  trackedLeagues: { id: number; name: string }[];
   saving: boolean;
   isDirty: boolean;
   onDraftChange: (id: number, value: string) => void;
   onDurationChange: (id: number, value: string) => void;
   onColorChange: (id: number, value: string) => void;
+  onLeagueChange: (id: number, value: number | null) => void;
   onSave: (team: OwnClubTeam) => void;
 }
 
@@ -96,11 +107,14 @@ function TeamRowContent(props: TeamRowProps & TeamRowContentExtras) {
     draft,
     durationDraft,
     colorDraft,
+    leagueDraft,
+    trackedLeagues,
     saving,
     isDirty,
     onDraftChange,
     onDurationChange,
     onColorChange,
+    onLeagueChange,
     onSave,
     rowRef,
     rowStyle,
@@ -128,8 +142,33 @@ function TeamRowContent(props: TeamRowProps & TeamRowContentExtras) {
         </TableCell>
       ) : null}
       <TableCell className="font-medium">{team.name}</TableCell>
-      <TableCell className="text-muted-foreground">
-        {team.leagueName ?? "—"}
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <Select
+            value={leagueDraft === null ? "none" : String(leagueDraft)}
+            onValueChange={(v) => onLeagueChange(team.id, v === "none" ? null : Number(v))}
+            disabled={interactiveDisabled}
+          >
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder={t("teams.leagueNotConnected")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">{t("teams.leagueNotConnected")}</SelectItem>
+              {trackedLeagues.map((l) => (
+                <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+              ))}
+              {/* An untracked-but-connected league must stay selectable-as-current */}
+              {team.leagueId !== null && !team.leagueTracked ? (
+                <SelectItem value={String(team.leagueId)}>{team.leagueName}</SelectItem>
+              ) : null}
+            </SelectContent>
+          </Select>
+          {!team.leagueTracked ? (
+            <span className="text-xs text-destructive" title={t("teams.leagueUntracked")}>
+              ⚠ {t("teams.leagueUntracked")}
+            </span>
+          ) : null}
+        </div>
       </TableCell>
       <TableCell>
         <Input
@@ -198,13 +237,23 @@ interface TeamsTableProps {
 
 export function TeamsTable({ canManage }: TeamsTableProps) {
   const t = useTranslations();
-  const teamsQ = queries.teams();
+  const [seasonId, setSeasonId] = useState<number | undefined>(undefined);
+  const teamsQ = queries.teams(seasonId);
   const { data: teams } = useSWR(teamsQ.key, teamsQ.fetcher);
+  const seasonsQ = queries.seasons();
+  const { data: seasons } = useSWR(seasonsQ.key, seasonsQ.fetcher);
+  const resolvedSeasonId = seasonId ?? seasons?.find((s) => s.status === "active")?.id;
+  const leaguesQ = resolvedSeasonId !== undefined ? {
+    key: `/admin/seasons/${resolvedSeasonId}/leagues`,
+    fetcher: () => api.seasons.getLeagues(resolvedSeasonId),
+  } : null;
+  const { data: trackedLeagues } = useSWR(leaguesQ?.key ?? null, leaguesQ?.fetcher ?? null);
   const { mutate } = useSWRConfig();
   const teamsList = teams ?? [];
   const [drafts, setDrafts] = useState<Record<number, string>>({});
   const [durationDrafts, setDurationDrafts] = useState<Record<number, string>>({});
   const [colorDrafts, setColorDrafts] = useState<Record<number, string | null>>({});
+  const [leagueDrafts, setLeagueDrafts] = useState<Record<number, number | null>>({});
   const [saving, setSaving] = useState<Record<number, boolean>>({});
   const [reorderMode, setReorderMode] = useState(false);
 
@@ -225,14 +274,20 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
     return team.id in colorDrafts ? colorDrafts[team.id] : team.badgeColor;
   }
 
+  function getLeagueDraft(team: OwnClubTeam): number | null {
+    return team.id in leagueDrafts ? (leagueDrafts[team.id] ?? null) : team.leagueId;
+  }
+
   function isDirty(team: OwnClubTeam) {
     const nameDraft = getDraft(team);
     const durDraft = getDurationDraft(team);
     const colorDraft = getColorDraft(team);
+    const leagueDraft = getLeagueDraft(team);
     return (
       nameDraft !== (team.customName ?? "") ||
       durDraft !== (team.estimatedGameDuration?.toString() ?? "") ||
-      colorDraft !== team.badgeColor
+      colorDraft !== team.badgeColor ||
+      leagueDraft !== team.leagueId
     );
   }
 
@@ -243,6 +298,12 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
     const estimatedGameDuration =
       durDraft.trim() === "" ? null : parseInt(durDraft.trim(), 10);
     const badgeColor = getColorDraft(team);
+    const leagueDraft = getLeagueDraft(team);
+    // Only send leagueId when it actually changed: the API treats any
+    // defined leagueId as a league write and flips link_source to "manual",
+    // so sending the unchanged value on a name/color/duration-only save would
+    // wrongly mark a federation-seeded link as manually set.
+    const leagueId = leagueDraft !== team.leagueId ? leagueDraft : undefined;
 
     setSaving((prev) => ({ ...prev, [team.id]: true }));
     try {
@@ -250,9 +311,10 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
         customName,
         estimatedGameDuration,
         badgeColor,
+        ...(leagueId !== undefined ? { leagueId } : {}),
       });
       await mutate(
-        SWR_KEYS.teams,
+        SWR_KEYS.teams(seasonId),
         (current: OwnClubTeam[] | undefined) =>
           (current ?? []).map((t) => (t.id === team.id ? updated : t)),
         { revalidate: false },
@@ -268,6 +330,11 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
         return next;
       });
       setColorDrafts((prev) => {
+        const next = { ...prev };
+        delete next[team.id];
+        return next;
+      });
+      setLeagueDrafts((prev) => {
         const next = { ...prev };
         delete next[team.id];
         return next;
@@ -290,13 +357,13 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
 
     const reordered = arrayMove(teamsList, oldIndex, newIndex);
 
-    await mutate(SWR_KEYS.teams, reordered, { revalidate: false });
+    await mutate(SWR_KEYS.teams(seasonId), reordered, { revalidate: false });
 
     try {
-      await api.teams.reorder({ teamIds: reordered.map((t) => t.id) });
-      await mutate(SWR_KEYS.teams);
+      await api.teams.reorder({ seasonId, entryIds: reordered.map((t) => t.id) });
+      await mutate(SWR_KEYS.teams(seasonId));
     } catch {
-      await mutate(SWR_KEYS.teams);
+      await mutate(SWR_KEYS.teams(seasonId));
     }
   }
 
@@ -311,6 +378,8 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
     draft: getDraft(team),
     durationDraft: getDurationDraft(team),
     colorDraft: getColorDraft(team),
+    leagueDraft: getLeagueDraft(team),
+    trackedLeagues: trackedLeagues?.leagues ?? [],
     saving: saving[team.id] ?? false,
     isDirty: isDirty(team),
     onDraftChange: (id: number, value: string) =>
@@ -319,6 +388,8 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
       setDurationDrafts((prev) => ({ ...prev, [id]: value })),
     onColorChange: (id: number, value: string) =>
       setColorDrafts((prev) => ({ ...prev, [id]: value })),
+    onLeagueChange: (id: number, value: number | null) =>
+      setLeagueDrafts((prev) => ({ ...prev, [id]: value })),
     onSave: save,
   }));
 
@@ -338,7 +409,8 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-2">
+        <SeasonContextSelect value={seasonId} onChange={setSeasonId} />
         <Button
           type="button"
           size="sm"

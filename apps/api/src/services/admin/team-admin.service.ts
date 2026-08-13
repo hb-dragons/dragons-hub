@@ -1,121 +1,127 @@
 import { getDb } from "../../config/database";
-import { teams, standings, leagues } from "@dragons/db/schema";
+import { teams, teamEntries, leagues } from "@dragons/db/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import type { OwnClubTeam, TeamReorderItem } from "@dragons/shared";
-import { TeamReorderError } from "./team-admin.errors";
+import { TeamReorderError, TeamLeagueMismatchError } from "./team-admin.errors";
+import { getActiveSeasonId } from "./season.service";
 
 export type { OwnClubTeam, TeamReorderItem } from "@dragons/shared";
 
-export async function getOwnClubTeams(): Promise<OwnClubTeam[]> {
+export async function getOwnClubTeams(seasonId?: number): Promise<OwnClubTeam[]> {
+  const scopeId = seasonId !== undefined ? seasonId : await getActiveSeasonId();
+  // No season to scope to means no entries; answering with an unscoped read is
+  // exactly the bug this table replaced.
+  if (scopeId === null) return [];
+
   const rows = await getDb()
-    .selectDistinctOn([teams.id], {
-      id: teams.id,
+    .select({
+      id: teamEntries.id,
+      teamId: teams.id,
       name: teams.name,
       nameShort: teams.nameShort,
-      customName: teams.customName,
+      customName: teamEntries.customName,
+      leagueId: teamEntries.leagueId,
       leagueName: leagues.name,
-      estimatedGameDuration: teams.estimatedGameDuration,
-      badgeColor: teams.badgeColor,
-      displayOrder: teams.displayOrder,
+      leagueTracked: leagues.isTracked,
+      linkSource: teamEntries.linkSource,
+      estimatedGameDuration: teamEntries.estimatedGameDuration,
+      badgeColor: teamEntries.badgeColor,
+      displayOrder: teamEntries.displayOrder,
     })
-    .from(teams)
-    .leftJoin(standings, eq(standings.teamApiId, teams.apiTeamPermanentId))
-    .leftJoin(leagues, eq(leagues.id, standings.leagueId))
-    .where(eq(teams.isOwnClub, true))
-    .orderBy(teams.id, sql`${leagues.name} ASC NULLS LAST`);
+    .from(teamEntries)
+    .innerJoin(teams, eq(teamEntries.teamId, teams.id))
+    .leftJoin(leagues, eq(teamEntries.leagueId, leagues.id))
+    .where(and(eq(teamEntries.seasonId, scopeId), eq(teams.isOwnClub, true)));
 
-  return rows.sort(
-    (a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name),
-  );
+  return rows
+    .map((r) => ({
+      ...r,
+      linkSource: (r.linkSource === "manual" ? "manual" : "seeded") as "seeded" | "manual",
+      leagueTracked: r.leagueId === null ? true : (r.leagueTracked ?? false),
+    }))
+    .sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name));
 }
 
-export async function updateTeam(
-  id: number,
-  data: { customName?: string | null; estimatedGameDuration?: number | null; badgeColor?: string | null },
+export async function updateTeamEntry(
+  entryId: number,
+  data: {
+    customName?: string | null;
+    estimatedGameDuration?: number | null;
+    badgeColor?: string | null;
+    leagueId?: number | null;
+  },
 ): Promise<OwnClubTeam | null> {
+  const db = getDb();
+  const [entry] = await db
+    .select({ id: teamEntries.id, seasonId: teamEntries.seasonId })
+    .from(teamEntries)
+    .innerJoin(teams, eq(teamEntries.teamId, teams.id))
+    .where(and(eq(teamEntries.id, entryId), eq(teams.isOwnClub, true)));
+  if (!entry) return null;
+
   const set: Record<string, unknown> = { updatedAt: new Date() };
   if (data.customName !== undefined) set.customName = data.customName;
-  if (data.estimatedGameDuration !== undefined)
-    set.estimatedGameDuration = data.estimatedGameDuration;
+  if (data.estimatedGameDuration !== undefined) set.estimatedGameDuration = data.estimatedGameDuration;
   if (data.badgeColor !== undefined) set.badgeColor = data.badgeColor;
-
-  const [updated] = await getDb()
-    .update(teams)
-    .set(set)
-    .where(and(eq(teams.id, id), eq(teams.isOwnClub, true)))
-    .returning({
-      id: teams.id,
-      name: teams.name,
-      nameShort: teams.nameShort,
-      customName: teams.customName,
-      estimatedGameDuration: teams.estimatedGameDuration,
-      badgeColor: teams.badgeColor,
-      displayOrder: teams.displayOrder,
-    });
-
-  if (!updated) return null;
-
-  // Fetch league name for the updated team
-  const [standing] = await getDb()
-    .select({ leagueName: leagues.name })
-    .from(standings)
-    .innerJoin(leagues, eq(leagues.id, standings.leagueId))
-    .where(eq(standings.teamApiId, sql`(SELECT api_team_permanent_id FROM teams WHERE id = ${id})`))
-    .limit(1);
-
-  return { ...updated, leagueName: standing?.leagueName ?? null };
-}
-
-export async function reorderOwnClubTeams(
-  teamIds: number[],
-): Promise<TeamReorderItem[]> {
-  // Reject duplicates
-  const unique = new Set(teamIds);
-  if (unique.size !== teamIds.length) {
-    throw TeamReorderError.duplicateTeamId();
+  if (data.leagueId !== undefined) {
+    if (data.leagueId !== null) {
+      const [league] = await db
+        .select({ id: leagues.id })
+        .from(leagues)
+        .where(and(eq(leagues.id, data.leagueId), eq(leagues.seasonRefId, entry.seasonId)));
+      if (!league) throw new TeamLeagueMismatchError(entryId, data.leagueId);
+    }
+    set.leagueId = data.leagueId;
+    set.linkSource = "manual";
   }
 
+  await db.update(teamEntries).set(set).where(eq(teamEntries.id, entryId));
+  const [row] = await getOwnClubTeamsById(entryId, entry.seasonId);
+  return row ?? null;
+}
+
+/** One entry, in the exact OwnClubTeam shape the list uses. */
+async function getOwnClubTeamsById(entryId: number, seasonId: number): Promise<OwnClubTeam[]> {
+  const all = await getOwnClubTeams(seasonId);
+  return all.filter((t) => t.id === entryId);
+}
+
+export async function reorderTeamEntries(
+  entryIds: number[],
+  seasonId?: number,
+): Promise<TeamReorderItem[]> {
+  const unique = new Set(entryIds);
+  if (unique.size !== entryIds.length) throw TeamReorderError.duplicateTeamId();
+
+  const scopeId = seasonId !== undefined ? seasonId : await getActiveSeasonId();
+  if (scopeId === null) throw TeamReorderError.invalidTeamSet();
+
   return await getDb().transaction(async (tx) => {
-    // Load current own-club team IDs
-    const ownClub = await tx
-      .select({ id: teams.id })
-      .from(teams)
-      .where(eq(teams.isOwnClub, true));
-
-    const ownClubIds = new Set(ownClub.map((t) => t.id));
-
-    // Validate exact set match
-    if (
-      ownClubIds.size !== teamIds.length ||
-      teamIds.some((id) => !ownClubIds.has(id))
-    ) {
+    const own = await tx
+      .select({ id: teamEntries.id })
+      .from(teamEntries)
+      .innerJoin(teams, eq(teamEntries.teamId, teams.id))
+      .where(and(eq(teamEntries.seasonId, scopeId), eq(teams.isOwnClub, true)));
+    const ownIds = new Set(own.map((t) => t.id));
+    if (ownIds.size !== entryIds.length || entryIds.some((id) => !ownIds.has(id))) {
       throw TeamReorderError.invalidTeamSet();
     }
 
     // ::integer cast forces the bound parameter type — without it, node-postgres sends
     // the index as text and Postgres can't infer the column type inside CASE.
-    const cases = teamIds
+    const cases = entryIds
       .map((id, idx) => sql`WHEN ${id} THEN ${idx}::integer`)
       .reduce((acc, frag) => sql`${acc} ${frag}`);
-
     await tx
-      .update(teams)
-      .set({
-        displayOrder: sql`CASE ${teams.id} ${cases} END`,
-        updatedAt: new Date(),
-      })
-      .where(inArray(teams.id, teamIds));
+      .update(teamEntries)
+      .set({ displayOrder: sql`CASE ${teamEntries.id} ${cases} END`, updatedAt: new Date() })
+      .where(inArray(teamEntries.id, entryIds));
 
-    // Return the new ordered list
     const updated = await tx
-      .select({
-        id: teams.id,
-        name: teams.name,
-        displayOrder: teams.displayOrder,
-      })
-      .from(teams)
-      .where(inArray(teams.id, teamIds));
-
+      .select({ id: teamEntries.id, name: teams.name, displayOrder: teamEntries.displayOrder })
+      .from(teamEntries)
+      .innerJoin(teams, eq(teamEntries.teamId, teams.id))
+      .where(inArray(teamEntries.id, entryIds));
     return updated.sort((a, b) => a.displayOrder - b.displayOrder);
   });
 }

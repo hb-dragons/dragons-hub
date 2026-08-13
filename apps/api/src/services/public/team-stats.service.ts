@@ -1,7 +1,7 @@
 import { eq, and, or, desc, isNotNull } from "drizzle-orm";
 import type { TeamStats, FormEntry } from "@dragons/shared";
 import { getDb } from "../../config/database";
-import { teams, standings, leagues, matches } from "@dragons/db/schema";
+import { teams, standings, leagues, matches, teamEntries } from "@dragons/db/schema";
 import { withActiveSeason } from "../season-scope";
 
 export async function getTeamStats(teamId: number): Promise<TeamStats | null> {
@@ -19,22 +19,68 @@ export async function getTeamStats(teamId: number): Promise<TeamStats | null> {
   const apiId = team.apiTeamPermanentId;
 
   return withActiveSeason(async (seasonId) => {
-    // Get standing joined with league for this team in the active season
-    const [standing] = await getDb()
-      .select({
-        position: standings.position,
-        played: standings.played,
-        won: standings.won,
-        lost: standings.lost,
-        pointsFor: standings.pointsFor,
-        pointsAgainst: standings.pointsAgainst,
-        pointsDiff: standings.pointsDiff,
-        leagueName: leagues.name,
-      })
-      .from(standings)
-      .innerJoin(leagues, eq(standings.leagueId, leagues.id))
-      .where(and(eq(standings.teamApiId, apiId), eq(leagues.seasonRefId, seasonId)))
+    // Resolve this team's season entry first — it owns the league link. A
+    // non-own-club team has no entry, so it falls back to the previous
+    // season-scoped standings join verbatim (rivals' stats pages keep
+    // working without ever getting an entry).
+    const [entry] = await getDb()
+      .select({ leagueId: teamEntries.leagueId, leagueName: leagues.name })
+      .from(teamEntries)
+      .innerJoin(teams, eq(teamEntries.teamId, teams.id))
+      .leftJoin(leagues, eq(teamEntries.leagueId, leagues.id))
+      .where(and(eq(teams.apiTeamPermanentId, apiId), eq(teamEntries.seasonId, seasonId)))
       .limit(1);
+
+    let standing:
+      | {
+          position: number | null;
+          played: number | null;
+          won: number | null;
+          lost: number | null;
+          pointsFor: number | null;
+          pointsAgainst: number | null;
+          pointsDiff: number | null;
+        }
+      | undefined;
+    let leagueName: string | null;
+
+    if (entry) {
+      leagueName = entry.leagueName;
+      [standing] = entry.leagueId
+        ? await getDb()
+            .select({
+              position: standings.position,
+              played: standings.played,
+              won: standings.won,
+              lost: standings.lost,
+              pointsFor: standings.pointsFor,
+              pointsAgainst: standings.pointsAgainst,
+              pointsDiff: standings.pointsDiff,
+            })
+            .from(standings)
+            .where(and(eq(standings.teamApiId, apiId), eq(standings.leagueId, entry.leagueId)))
+            .limit(1)
+        : [];
+    } else {
+      // Get standing joined with league for this team in the active season
+      const [row] = await getDb()
+        .select({
+          position: standings.position,
+          played: standings.played,
+          won: standings.won,
+          lost: standings.lost,
+          pointsFor: standings.pointsFor,
+          pointsAgainst: standings.pointsAgainst,
+          pointsDiff: standings.pointsDiff,
+          leagueName: leagues.name,
+        })
+        .from(standings)
+        .innerJoin(leagues, eq(standings.leagueId, leagues.id))
+        .where(and(eq(standings.teamApiId, apiId), eq(leagues.seasonRefId, seasonId)))
+        .limit(1);
+      standing = row;
+      leagueName = row?.leagueName ?? "";
+    }
 
     // Get last 5 completed matches (both scores present) in the active season
     const recentMatches = await getDb()
@@ -73,7 +119,7 @@ export async function getTeamStats(teamId: number): Promise<TeamStats | null> {
 
     return {
       teamId,
-      leagueName: standing?.leagueName ?? "",
+      leagueName: leagueName ?? "",
       position: standing?.position ?? null,
       played: standing?.played ?? 0,
       wins: standing?.won ?? 0,

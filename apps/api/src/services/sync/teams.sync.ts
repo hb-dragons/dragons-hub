@@ -1,6 +1,6 @@
 import { getDb } from "../../config/database";
 import { teams } from "@dragons/db/schema";
-import { sql, and, eq, ne, inArray } from "drizzle-orm";
+import { sql, and, eq, ne } from "drizzle-orm";
 import { computeEntityHash } from "./hash";
 import { getClubConfig } from "../admin/settings.service";
 import type { SdkTeamRef } from "@dragons/sdk";
@@ -31,14 +31,6 @@ function teamHashData(teamRef: SdkTeamRef): Record<string, unknown> {
   };
 }
 
-async function getMaxOwnDisplayOrder(): Promise<number> {
-  const [row] = await getDb()
-    .select({ maxOrder: sql<number | null>`MAX(${teams.displayOrder})` })
-    .from(teams)
-    .where(eq(teams.isOwnClub, true));
-  return row?.maxOrder ?? -1;
-}
-
 export async function syncTeamsFromData(
   teamsMap: Map<number, SdkTeamRef>,
   logger?: SyncLogger,
@@ -64,30 +56,8 @@ export async function syncTeamsFromData(
   const ownClubId = clubConfig?.clubId ?? 0;
   const now = new Date();
 
-  // Find which teamPermanentIds are already in the DB so we know which inserts are new
-  // and whether isOwnClub is about to flip
-  const refIds = Array.from(teamsMap.keys());
-  const existing = await getDb()
-    .select({ apiTeamPermanentId: teams.apiTeamPermanentId, isOwnClub: teams.isOwnClub })
-    .from(teams)
-    .where(inArray(teams.apiTeamPermanentId, refIds));
-  const existingMap = new Map(existing.map((e) => [e.apiTeamPermanentId, e.isOwnClub]));
-
-  // Compute next available displayOrder for own-club inserts
-  let nextOrder = (await getMaxOwnDisplayOrder()) + 1;
-
-  // Track which existing rows are flipping from false → true (need max+1 post-upsert)
-  const flippingToOwnIds = new Set<number>();
-
   const teamRecords = Array.from(teamsMap.entries()).map(([permanentId, teamRef]) => {
     const isOwn = teamRef.clubId === ownClubId;
-    const wasInDb = existingMap.has(permanentId);
-    const wasOwn = existingMap.get(permanentId) ?? false;
-    const isNew = !wasInDb;
-    const displayOrder = isNew && isOwn ? nextOrder++ : 0;
-    if (!isNew && isOwn && !wasOwn) {
-      flippingToOwnIds.add(permanentId);
-    }
     return {
       apiTeamPermanentId: permanentId,
       seasonTeamId: teamRef.seasonTeamId,
@@ -97,7 +67,6 @@ export async function syncTeamsFromData(
       clubId: teamRef.clubId,
       isOwnClub: isOwn,
       verzicht: teamRef.verzicht,
-      displayOrder,
       dataHash: computeEntityHash(teamHashData(teamRef)),
       createdAt: now,
       updatedAt: now,
@@ -118,12 +87,6 @@ export async function syncTeamsFromData(
           clubId: sql`excluded.club_id`,
           isOwnClub: sql`excluded.is_own_club`,
           verzicht: sql`excluded.verzicht`,
-          // Spec says federation never owns display_order — but we still write here in
-          // exactly one case: when a team flips from own to non-own (clubId moved away
-          // from us, so the row's hash changed and the upsert fires). All other paths
-          // hit the ELSE arm and preserve the column. Flip-to-true via the upsert path
-          // emerges with display_order=0 and is corrected below by `flippedViaUpsert`.
-          displayOrder: sql`CASE WHEN excluded.is_own_club = false AND ${teams.isOwnClub} = true THEN 0 ELSE ${teams.displayOrder} END`,
           dataHash: sql`excluded.data_hash`,
           updatedAt: now,
         },
@@ -163,70 +126,18 @@ export async function syncTeamsFromData(
 
   // Corrective pass: fix isOwnClub for teams whose hash didn't change (upsert skipped them)
   if (ownClubId > 0) {
-    // Flip-to-true (hash-skipped rows): find own-club rows still marked as non-own
-    const toMarkOwn = await getDb()
-      .select({ id: teams.id })
-      .from(teams)
-      .where(and(eq(teams.clubId, ownClubId), eq(teams.isOwnClub, false)));
-
-    // Also assign max+1 to rows that were flipped to own via the upsert (hash changed)
-    // These are rows in flippingToOwnIds — their isOwnClub is now true but displayOrder is still 0
-    const flippedViaUpsert = flippingToOwnIds.size > 0
-      ? await getDb()
-          .select({ id: teams.id })
-          .from(teams)
-          .where(inArray(teams.apiTeamPermanentId, Array.from(flippingToOwnIds)))
-      : [];
-
-    let nextCorrectionOrder = (await getMaxOwnDisplayOrder()) + 1;
-    const markedByToMarkOwn = new Set<number>();
-
-    // Precompute the displayOrder each corrected row gets, preserving the
-    // sequential assignment, then apply them as parallel UPDATEs inside one
-    // transaction. Was N sequential round-trips, each its own auto-commit; now
-    // the corrective pass is atomic and the round-trips overlap.
-    const markOwnUpdates = toMarkOwn.map((row) => {
-      markedByToMarkOwn.add(row.id);
-      return { id: row.id, displayOrder: nextCorrectionOrder++ };
-    });
-
-    // Upsert-flipped-to-true rows (isOwnClub already true, just set displayOrder).
-    // Skip any row already handled by toMarkOwn — flippingToOwnIds is built from the
-    // pre-upsert state and can overlap with toMarkOwn when the row's hash didn't change.
-    const orderOnlyUpdates = flippedViaUpsert
-      .filter((row) => !markedByToMarkOwn.has(row.id))
-      .map((row) => ({ id: row.id, displayOrder: nextCorrectionOrder++ }));
-
-    if (markOwnUpdates.length > 0 || orderOnlyUpdates.length > 0) {
-      await getDb().transaction(async (tx) => {
-        await Promise.all([
-          ...markOwnUpdates.map((u) =>
-            tx
-              .update(teams)
-              .set({ isOwnClub: true, displayOrder: u.displayOrder, updatedAt: now })
-              .where(eq(teams.id, u.id)),
-          ),
-          ...orderOnlyUpdates.map((u) =>
-            tx
-              .update(teams)
-              .set({ displayOrder: u.displayOrder, updatedAt: now })
-              .where(eq(teams.id, u.id)),
-          ),
-        ]);
-      });
-    }
-
-    // Flip-to-false: reset displayOrder to 0 in a single bulk UPDATE (hash-skipped rows only;
-    // upsert already reset displayOrder via the CASE expression for hash-changed rows)
-    const unmarkOwn = await getDb()
+    const marked = await getDb()
       .update(teams)
-      .set({ isOwnClub: false, displayOrder: 0, updatedAt: now })
+      .set({ isOwnClub: true, updatedAt: now })
+      .where(and(eq(teams.clubId, ownClubId), eq(teams.isOwnClub, false)))
+      .returning({ id: teams.id });
+    const unmarked = await getDb()
+      .update(teams)
+      .set({ isOwnClub: false, updatedAt: now })
       .where(and(ne(teams.clubId, ownClubId), eq(teams.isOwnClub, true)))
       .returning({ id: teams.id });
-
-    const totalMarked = toMarkOwn.length + flippedViaUpsert.length;
-    if (totalMarked > 0 || unmarkOwn.length > 0) {
-      log.info({ marked: totalMarked, unmarked: unmarkOwn.length }, "Corrected isOwnClub");
+    if (marked.length > 0 || unmarked.length > 0) {
+      log.info({ marked: marked.length, unmarked: unmarked.length }, "Corrected isOwnClub");
     }
   }
 

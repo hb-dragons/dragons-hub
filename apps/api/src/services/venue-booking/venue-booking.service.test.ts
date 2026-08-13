@@ -40,6 +40,7 @@ import {
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
 let ctx: TestDbContext;
+let activeSeasonId: number;
 
 beforeAll(async () => {
   ctx = await setupTestDb();
@@ -48,6 +49,10 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await resetTestDb(ctx);
+  const result = await ctx.client.query<{ id: number }>(
+    `INSERT INTO seasons (name, status) VALUES ('2025/26', 'active') RETURNING id`,
+  );
+  activeSeasonId = result.rows[0]!.id;
   vi.clearAllMocks();
 });
 
@@ -75,6 +80,41 @@ async function insertTeam(overrides: Record<string, unknown> = {}) {
     vals,
   );
   return (result.rows[0] as { id: number }).id;
+}
+
+async function insertLeague(overrides: Record<string, unknown> = {}) {
+  const defaults = {
+    api_liga_id: 100,
+    liga_nr: 1,
+    name: "Test League",
+    season_id: 2025,
+    season_name: "2025/26",
+    season_ref_id: activeSeasonId,
+  };
+  const data = { ...defaults, ...overrides };
+  const cols = Object.keys(data);
+  const vals = Object.values(data);
+  const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
+  const result = await ctx.client.query(
+    `INSERT INTO leagues (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
+    vals,
+  );
+  return (result.rows[0] as { id: number }).id;
+}
+
+async function insertTeamEntry(teamId: number, overrides: Record<string, unknown> = {}) {
+  const defaults = {
+    team_id: teamId,
+    season_id: activeSeasonId,
+  };
+  const data = { ...defaults, ...overrides };
+  const cols = Object.keys(data);
+  const vals = Object.values(data);
+  const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
+  await ctx.client.query(
+    `INSERT INTO team_entries (${cols.join(", ")}) VALUES (${placeholders})`,
+    vals,
+  );
 }
 
 async function insertVenue(overrides: Record<string, unknown> = {}) {
@@ -624,14 +664,15 @@ describe("reconcileBookingsForMatches", () => {
     expect(links[0]!.match_id).toBe(m2);
   });
 
-  it("uses team estimatedGameDuration when available", async () => {
-    await insertTeam({
+  it("uses the team entry's estimatedGameDuration", async () => {
+    const leagueId = await insertLeague();
+    const homeTeamId = await insertTeam({
       api_team_permanent_id: 1000,
       name: "Dragons U12",
       club_id: 4121,
       is_own_club: true,
-      estimated_game_duration: 50,
     });
+    await insertTeamEntry(homeTeamId, { estimated_game_duration: 50 });
     await insertTeam({
       api_team_permanent_id: 2000,
       name: "Opponents",
@@ -642,6 +683,7 @@ describe("reconcileBookingsForMatches", () => {
     const matchId = await insertMatch({
       venue_id: venueId,
       kickoff_time: "14:00:00",
+      league_id: leagueId,
     });
 
     await reconcileBookingsForMatches([matchId]);
@@ -1050,6 +1092,32 @@ describe("previewReconciliation", () => {
     expect(item.matches[0]!.kickoffTime).toBe("18:00:00");
     expect(item.matches[0]!.isForfeited).toBe(false);
     expect(item.matches[0]!.isCancelled).toBe(false);
+  });
+
+  it("previews the team entry's customName/badgeColor", async () => {
+    const leagueId = await insertLeague();
+    const homeTeamId = await insertTeam({
+      api_team_permanent_id: 1000,
+      name: "Dragons Herren 1",
+      club_id: 4121,
+      is_own_club: true,
+    });
+    await insertTeamEntry(homeTeamId, { custom_name: "Fresh Custom", badge_color: "#00FF00" });
+    await insertTeam({
+      api_team_permanent_id: 2000,
+      name: "Opponents",
+      club_id: 9999,
+      is_own_club: false,
+    });
+    const venueId = await insertVenue();
+    await insertMatch({ venue_id: venueId, league_id: leagueId });
+
+    const preview = await previewReconciliation();
+
+    expect(preview.toCreate[0]!.matches[0]).toMatchObject({
+      homeTeamCustomName: "Fresh Custom",
+      homeBadgeColor: "#00FF00",
+    });
   });
 
   it("returns toUpdate when time window changed for existing booking", async () => {

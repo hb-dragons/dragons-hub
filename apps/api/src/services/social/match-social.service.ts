@@ -1,5 +1,5 @@
 import { getDb } from "../../config/database";
-import { matches, teams } from "@dragons/db/schema";
+import { matches, teams, leagues, teamEntries } from "@dragons/db/schema";
 import { and, eq, gte, lte, isNotNull, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { startOfISOWeek, endOfISOWeek, setISOWeek, setYear, format } from "date-fns";
@@ -31,6 +31,11 @@ function resolveTeamLabel(team: {
 
 const homeTeam = alias(teams, "home_team");
 const guestTeam = alias(teams, "guest_team");
+// customName lives on team_entries now, scoped to each match's own season
+// (matches.leagueId -> leagues.seasonRefId). One aliased entry per side,
+// joined after leagues so the ON clause can reference its seasonRefId.
+const homeEntry = alias(teamEntries, "home_entry");
+const guestEntry = alias(teamEntries, "guest_entry");
 
 export async function getWeekendMatches(
   params: WeekendMatchesParams,
@@ -66,14 +71,14 @@ export async function getWeekendMatches(
       },
       homeTeam: {
         apiTeamPermanentId: homeTeam.apiTeamPermanentId,
-        customName: homeTeam.customName,
+        customName: homeEntry.customName,
         nameShort: homeTeam.nameShort,
         name: homeTeam.name,
         isOwnClub: homeTeam.isOwnClub,
       },
       guestTeam: {
         apiTeamPermanentId: guestTeam.apiTeamPermanentId,
-        customName: guestTeam.customName,
+        customName: guestEntry.customName,
         nameShort: guestTeam.nameShort,
         name: guestTeam.name,
         isOwnClub: guestTeam.isOwnClub,
@@ -84,6 +89,15 @@ export async function getWeekendMatches(
     .innerJoin(
       guestTeam,
       eq(matches.guestTeamApiId, guestTeam.apiTeamPermanentId),
+    )
+    .leftJoin(leagues, eq(matches.leagueId, leagues.id))
+    .leftJoin(
+      homeEntry,
+      and(eq(homeEntry.teamId, homeTeam.id), eq(homeEntry.seasonId, leagues.seasonRefId)),
+    )
+    .leftJoin(
+      guestEntry,
+      and(eq(guestEntry.teamId, guestTeam.id), eq(guestEntry.seasonId, leagues.seasonRefId)),
     )
     .where(
       and(

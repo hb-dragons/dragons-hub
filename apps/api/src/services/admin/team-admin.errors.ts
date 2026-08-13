@@ -37,3 +37,19 @@ export class TeamReorderError extends AppError {
     );
   }
 }
+
+/**
+ * Raised when a `leagueId` passed to `updateTeamEntry` names a league that
+ * does not belong to the entry's season.
+ */
+export class TeamLeagueMismatchError extends AppError {
+  declare readonly code: "LEAGUE_SEASON_MISMATCH";
+
+  constructor(entryId: number, leagueId: number) {
+    super(
+      `League ${leagueId} does not belong to the season of entry ${entryId}`,
+      "LEAGUE_SEASON_MISMATCH",
+      400,
+    );
+  }
+}

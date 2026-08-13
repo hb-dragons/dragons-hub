@@ -138,8 +138,10 @@ export {
   teamIdParamSchema,
   teamUpdateBodySchema,
   teamReorderBodySchema,
+  teamsListQuerySchema,
   type TeamUpdateBody,
   type TeamReorderBody,
+  type TeamsListQuery,
 } from "./team";
 
 export {

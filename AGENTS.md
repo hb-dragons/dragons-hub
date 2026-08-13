@@ -97,7 +97,7 @@ Match (0..1) ──── (N) BroadcastConfig (PK deviceId — one row per score
 
 ### Database Tables
 
-46 tables, all exported from `packages/db/src/schema/index.ts`. The list below is
+48 tables, all exported from `packages/db/src/schema/index.ts`. The list below is
 verified against those exports by `apps/api/src/test/docs-drift.test.ts` in both
 directions — adding a `pgTable` without a row here fails the build.
 
@@ -112,7 +112,8 @@ tables (`user`, `session`, `account`, `verification`) use text ids,
 | `appSettings` | `packages/db/src/schema/app-settings.ts` | key (unique), value — stores club_id, club_name |
 | `seasons` | `packages/db/src/schema/seasons.ts` | id, name, sdkSeasonId (nullable int), status (`upcoming`\|`active`\|`archived`), startDate, endDate, createdAt, updatedAt — partial-unique index enforces at most one `active` row at a time; `activateSeason()` archives the current active in the same transaction |
 | `leagues` | `packages/db/src/schema/leagues.ts` | apiLigaId (unique), ligaNr, name, seasonId (legacy SDK int), seasonRefId (FK → seasons.id, NOT NULL), vorabliga (boolean), isTracked, discoveredAt, dataHash — season scoping for matches/standings flows through `leagues.seasonRefId`; sync gates to active+upcoming seasons; public reads are active-season-only; admin reads accept an optional `seasonId` query param (defaulting to the active season) |
-| `teams` | `packages/db/src/schema/teams.ts` | apiTeamPermanentId (unique), name, clubId, isOwnClub, dataHash |
+| `teams` | `packages/db/src/schema/teams.ts` | apiTeamPermanentId (unique), name, clubId, isOwnClub, dataHash — the Squad (federation identity); club-facing fields live on `teamEntries` |
+| `teamEntries` | `packages/db/src/schema/team-entries.ts` | teamId FK + seasonId FK (unique pair), leagueId FK (nullable = not connected), linkSource (`seeded`\|`manual`), customName, badgeColor, estimatedGameDuration, displayOrder — the per-season Team entry; source of truth for team↔league (ADR 0004) |
 | `venues` | `packages/db/src/schema/venues.ts` | apiId (unique), name, street, postalCode, city, lat/lng, dataHash |
 | `matches` | `packages/db/src/schema/matches.ts` | apiMatchId (unique), leagueId FK, venueId FK, scores, sr1Open, sr2Open, sr3Open, JSONB fields, versioning |
 | `standings` | `packages/db/src/schema/standings.ts` | leagueId FK + teamApiId (unique), position, won, lost, points |
@@ -258,6 +259,11 @@ Step 3: Parallel upserts (Promise.all)
     standings.teamApiId has a non-deferrable FK on teams.apiTeamPermanentId, so
     running it concurrently with the teams upsert dropped the whole batch on a
     league's first sync (issue #47). Keep it sequential.
+  then:
+  - syncTeamEntriesFromData(leagueData)
+    Reconciles per-season team entries (team_entries) from federation
+    evidence: creates missing entries, moves links (committed beats
+    vorabliga), supersedes manual links and logs the supersession
 
 Step 4: buildVenueIdLookup() -> syncMatchesFromData(leagueData, venueIdLookup, syncRunId)
   - buildVenueIdLookup gives the venue FK lookup (apiId -> dbId) first
@@ -647,9 +653,9 @@ nested under their task.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/teams` | List own club teams |
-| PATCH | `/admin/teams/:id` | Update team (e.g. isOwnClub) |
-| PUT | `/admin/teams/order` | Reorder own club teams (display order) |
+| GET | `/admin/teams` | List own club team entries for a season (`?seasonId=`, defaults to active) |
+| PATCH | `/admin/teams/:id` | Update a team entry (custom name, color, duration, connected league) |
+| PUT | `/admin/teams/order` | Reorder a season's team entries (`seasonId` optional, defaults to active) |
 
 ### Admin - Venues
 

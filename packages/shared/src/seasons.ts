@@ -37,6 +37,8 @@ export interface BrowsableLeague {
 export interface SetSeasonLeaguesResult {
   tracked: number;
   untracked: number;
+  entriesSeeded: number;
+  rosterFailures: number[];
 }
 
 export interface SeasonSummary {
