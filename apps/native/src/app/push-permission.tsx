@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import { router } from "expo-router";
 import { SheetScreen } from "@/components/sheets/SheetScreen";
@@ -11,18 +11,22 @@ const POINTS = ["push.point1", "push.point2", "push.point3", "push.point4"] as c
 
 /**
  * Push pre-permission sheet (#237). Opens from `usePushRegistration` after
- * sign-in when the OS has not been asked yet, and from Profile. "Aktivieren"
- * is the only path to the OS prompt; "Später" and a swipe-dismiss both defer,
- * so the sheet never nags on the next launch.
+ * sign-in when the OS has not been asked yet, and from Profile. Every way
+ * out — "Aktivieren" completing (grant or deny), "Später", swipe, back —
+ * writes the per-device deferral on unmount, and the sheet closes on any
+ * outcome of the OS prompt so a rejected/thrown call cannot strand the user
+ * in it. A deferral written right after a grant is inert: `decidePushFlow`
+ * (`lib/push/pre-prompt.ts`) checks the OS status before it ever reads the
+ * deferred flag, so a granted status short-circuits to "register" and the
+ * deferral is never consulted. Profile's "Mitteilungen" row is the way back
+ * in — it clears the deferral before reopening the sheet.
  */
 export default function PushPermissionSheet() {
   const { colors, spacing, radius, textStyles } = useTheme();
-  // Anything but an explicit enable — Später, swipe, back — counts as deferral.
-  const enabled = useRef(false);
 
   useEffect(() => {
     return () => {
-      if (!enabled.current) void deferPushPrompt();
+      void deferPushPrompt();
     };
   }, []);
 
@@ -32,9 +36,11 @@ export default function PushPermissionSheet() {
   };
 
   const enable = async () => {
-    enabled.current = true;
-    await requestPushPermissionAndRegister();
-    close();
+    try {
+      await requestPushPermissionAndRegister();
+    } finally {
+      close();
+    }
   };
 
   return (

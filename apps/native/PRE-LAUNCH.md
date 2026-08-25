@@ -43,8 +43,11 @@ Since #237 the OS prompt is no longer fired from `registerForPush`. Sign-in
 opens `app/push-permission.tsx` — a form sheet explaining what the club
 sends, that Expo delivers it to Apple/Google, that the token dies on
 sign-out and how to switch it off — and only its "Aktivieren" button calls
-`requestPushPermissionAndRegister`. "Später" and swipe-dismiss defer per
-device (`push_prompt_deferred`); Profile's "Mitteilungen" row reopens the
+`requestPushPermissionAndRegister`. Every way out of the sheet — "Später",
+swipe, back, or "Aktivieren" itself completing — writes the per-device
+deferral (`push_prompt_deferred`); a deferral written right after a grant is
+inert, since `decidePushFlow` checks the OS status first. Profile's
+"Mitteilungen" row reopens the
 sheet or, once the OS has answered, opens the system settings. § 25(1)
 TDDDG is the reason; the decision table is `lib/push/pre-prompt.ts`.
 
