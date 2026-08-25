@@ -13,7 +13,9 @@
       "appleTeamId": "2ZDTV3KLV2",
       "supportsTablet": true,
       "deploymentTarget": "16.4",
-      "associatedDomains": ["applinks:app.hbdragons.de"],
+      "associatedDomains": [
+        "applinks:app.hbdragons.de"
+      ],
       "infoPlist": {
         "NSFaceIDUsageDescription": "Use Face ID to unlock the Dragons app",
         "ITSAppUsesNonExemptEncryption": false
@@ -71,7 +73,8 @@
           }
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-image"
     ],
     "runtimeVersion": {
       "policy": "appVersion"

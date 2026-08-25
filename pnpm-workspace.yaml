@@ -17,7 +17,7 @@ overrides:
   react: 19.2.6
   react-native: 0.86.2
   expo-glass-effect: 57.0.1
-  expo-constants: 57.0.10
+  expo-constants: 57.0.14
   # Capped at 1.6.23: better-auth 1.6.24 regressed the client-plugin generics, so
   # any plugin declaring `getActions` stops being assignable to
   # `BetterAuthClientPlugin`. One bad plugin collapses inference for the whole
@@ -125,10 +125,3 @@ minimumReleaseAgeExclude:
   - expo-splash-screen@57.0.6
   - expo-updates@57.0.13
   - expo@57.0.12
-
-# Qualifies one `abs(...)` call as `Swift.abs(...)` so the package compiles under
-# Xcode 26.2+ (C++ interop makes the bare call ambiguous). Upstream fix is
-# expo/expo#48261, unreleased as of 2026-08-12; remove with issue #226 when a
-# release contains it.
-patchedDependencies:
-  expo-modules-jsi@57.0.4: patches/expo-modules-jsi@57.0.4.patch
