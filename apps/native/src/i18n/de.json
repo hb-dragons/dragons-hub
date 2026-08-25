@@ -97,6 +97,14 @@
     "roleCoach": "Trainer",
     "roleReferee": "Schiri"
   },
+  "legal": {
+    "title": "Rechtliches",
+    "privacy": "Datenschutz",
+    "imprint": "Impressum",
+    "support": "Support kontaktieren",
+    "version": "Version %{version}",
+    "openFailed": "Der Link konnte nicht geöffnet werden."
+  },
   "teamDetail": {
     "league": "Liga",
     "lastGame": "Letztes Spiel",

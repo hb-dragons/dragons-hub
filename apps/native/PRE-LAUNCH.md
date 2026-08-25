@@ -181,12 +181,14 @@ Android 13+ themed icons look bad without a monochrome layer.
 - [x] `ITSAppUsesNonExemptEncryption: false` — verified 2026-08-25: HTTPS,
       Keychain and the OS Face ID prompt only. Flips if any crypto beyond
       HTTPS is added.
-- [ ] What the store forms and DE/EU law ask for beyond this file — the
-      in-app Impressum / Datenschutz / support entry, an account-deletion
-      request, the chatbot's AI disclosure (AI Act Art. 50(1)), the push
-      pre-permission text, EU DSA trader status (non-trader), the age
-      rating, the Gemini paid tier — lives in the audit (§1.2, §2, §3)
-      and is not duplicated here.
+- [ ] What the store forms and DE/EU law ask for beyond this file —
+      ~~the in-app Impressum / Datenschutz / support entry~~ (done, #233:
+      `components/LegalSection.tsx` on Profile signed in and out, plus the
+      sign-in footer; `lib/nav/architecture.test.ts` pins both), an
+      account-deletion request, the chatbot's AI disclosure (AI Act Art.
+      50(1)), the push pre-permission text, EU DSA trader status
+      (non-trader), the age rating, the Gemini paid tier — lives in the
+      audit (§1.2, §2, §3) and is not duplicated here.
 
 ---
 

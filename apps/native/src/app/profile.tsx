@@ -12,6 +12,7 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { Segmented } from "@/components/ui/Segmented";
 import { Logo } from "@/components/brand/Logo";
+import { LegalSection } from "@/components/LegalSection";
 import { i18n } from "@/lib/i18n";
 import {
   LOCALE_SEGMENTS,
@@ -81,6 +82,10 @@ export default function ProfileScreen() {
             selected={localePref}
             onSelect={setLocalePref}
           />
+        </View>
+
+        <View style={{ marginTop: spacing.xl }}>
+          <LegalSection />
         </View>
       </Screen>
     );
@@ -200,6 +205,9 @@ export default function ProfileScreen() {
             onSelect={setLocalePref}
           />
         </View>
+
+        {/* Rechtliches (#233) */}
+        <LegalSection />
 
         {/* Sign Out */}
         <Pressable

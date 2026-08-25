@@ -97,6 +97,14 @@
     "roleCoach": "Coach",
     "roleReferee": "Referee"
   },
+  "legal": {
+    "title": "Legal",
+    "privacy": "Privacy policy",
+    "imprint": "Imprint",
+    "support": "Contact support",
+    "version": "Version %{version}",
+    "openFailed": "The link could not be opened."
+  },
   "teamDetail": {
     "league": "League",
     "lastGame": "Last Game",

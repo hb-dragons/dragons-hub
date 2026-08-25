@@ -220,6 +220,20 @@ describe("navigation architecture", () => {
     expect(sites.sort()).toEqual(["src/hooks/useSheetResult.ts", "src/lib/nav/board-sheets.ts"]);
   });
 
+  // Apple 5.1.1(i), § 5 DDG, § 18 MStV (#233): the Impressum, the
+  // Datenschutzerklärung and a support contact must be reachable signed out.
+  // Without a render harness the guarantee is structural: the two screens a
+  // Fan meets first — Profile (one tap from Home) and the sign-in form — are
+  // the only importers of the legal section and its link table.
+  it("reaches the legal links from Profile and the sign-in screen", () => {
+    expect(importSites("@/components/LegalSection")).toEqual(["src/app/profile.tsx"]);
+    const linkSites = SOURCE_FILES.filter((file) =>
+      importsOf(file).some((spec) => /(^|\/)legal\/links$/.test(spec)),
+    ).map(rel);
+    expect(linkSites).toContain("src/app/(auth)/sign-in.tsx");
+    expect(linkSites).toContain("src/components/LegalSection.tsx");
+  });
+
   it("does not declare @react-navigation/* as a dependency", () => {
     expect(declaredPackages().filter((name) => name.startsWith("@react-navigation/"))).toEqual([]);
   });
