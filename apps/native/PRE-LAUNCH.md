@@ -163,13 +163,16 @@ Android 13+ themed icons look bad without a monochrome layer.
 
 ### Privacy / compliance
 
-- [ ] Add the app-level `ios.privacyManifests` key to `app.json`. Prebuild
-      already generates a default `PrivacyInfo.xcprivacy`, so "does one
-      exist" was the wrong question. What is missing is the app's own
-      declaration of the required-reason APIs its dependencies use
-      (UserDefaults `CA92.1`, FileTimestamp `C617.1`, SystemBootTime
-      `35F9.1`, `NSPrivacyTracking: false`) and the matching App Store
-      Connect privacy label. Audit §1.1 and §2.2.
+- [x] ~~Add the app-level `ios.privacyManifests` key to `app.json`.~~ Done
+      (#232): the manifest declares UserDefaults `CA92.1`, FileTimestamp
+      `C617.1` and SystemBootTime `35F9.1` with `NSPrivacyTracking: false`,
+      and `lib/app-config.test.ts` pins all four. Still open: read the
+      ITMS-91053 mail after the first upload of a new build and add any
+      API Apple flags; keep the App Store Connect privacy label in step
+      (audit §2.2).
+- [x] `locales` declares de + en with a translated Face ID prompt and
+      `CFBundleAllowMixedLocalizations` is on (#232), so the binary is no
+      longer English-only to iOS Settings and the store.
 - [ ] Privacy policy URL — App Store Connect requires a live URL at
       submit time. Decided 2026-08-25: the app links to
       hbdragons.de/datenschutz, and that page needs a "Dragons App"
