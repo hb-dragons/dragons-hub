@@ -220,6 +220,32 @@ describe("navigation architecture", () => {
     expect(sites.sort()).toEqual(["src/hooks/useSheetResult.ts", "src/lib/nav/board-sheets.ts"]);
   });
 
+  // Apple 5.1.1(i), § 5 DDG, § 18 MStV (#233): the Impressum, the
+  // Datenschutzerklärung and a support contact must be reachable signed out.
+  // Without a render harness the guarantee is structural: the two screens a
+  // Fan meets first — Profile (one tap from Home) and the sign-in form — are
+  // the only importers of the legal section and its link table.
+  it("reaches the legal links from Profile and the sign-in screen", () => {
+    expect(importSites("@/components/LegalSection")).toEqual(["src/app/profile.tsx"]);
+    const linkSites = SOURCE_FILES.filter((file) =>
+      importsOf(file).some((spec) => /(^|\/)legal\/links$/.test(spec)),
+    ).map(rel);
+    expect(linkSites).toContain("src/app/(auth)/sign-in.tsx");
+    expect(linkSites).toContain("src/components/LegalSection.tsx");
+  });
+
+  // Every external open goes through one helper, so the failure mode (a URL
+  // the OS cannot handle) has one place to be reported. A second call site is
+  // what this test exists to catch — today there is only the helper.
+  it("routes every Linking.openURL through lib/legal/open-external", () => {
+    const sites = SOURCE_FILES.filter(
+      (file) =>
+        reactNativeImports(readFileSync(file, "utf8")).includes("Linking") &&
+        readFileSync(file, "utf8").includes("Linking.openURL("),
+    ).map(rel);
+    expect(sites).toEqual(["src/lib/legal/open-external.ts"]);
+  });
+
   it("does not declare @react-navigation/* as a dependency", () => {
     expect(declaredPackages().filter((name) => name.startsWith("@react-navigation/"))).toEqual([]);
   });

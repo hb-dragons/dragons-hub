@@ -20,10 +20,16 @@ export function clampComposerHeight(
 export type ComposerButtonState = "send" | "stop" | "disabled";
 
 /**
- * Map (busy, input value) to the morphing send-button variant.
- * busy wins over text (stop while generating); empty trimmed input is disabled.
+ * Map (busy, input value, gated) to the morphing send-button variant.
+ * A gate (the AI notice, #235) wins over everything; busy wins over text
+ * (stop while generating); empty trimmed input is disabled.
  */
-export function composerButtonState(busy: boolean, value: string): ComposerButtonState {
+export function composerButtonState(
+  busy: boolean,
+  value: string,
+  disabled = false,
+): ComposerButtonState {
+  if (disabled) return "disabled";
   if (busy) return "stop";
   if (value.trim().length === 0) return "disabled";
   return "send";

@@ -8,6 +8,7 @@ import { DefaultChatTransport } from "ai";
 import { fetch as expoFetch } from "expo/fetch";
 import * as Clipboard from "expo-clipboard";
 import { useTheme } from "@/hooks/useTheme";
+import { useAiNotice } from "@/hooks/useAiNotice";
 import { resolveApiUrl, authClient } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
 import { buildAssistantTransportConfig } from "@/lib/assistant/transport";
@@ -25,6 +26,7 @@ import { resetChat, shouldOfferReset } from "@/lib/assistant/reset";
 import { AssistantMarkdown } from "@/components/assistant/AssistantMarkdown";
 import { ActivityChip } from "@/components/assistant/ActivityChip";
 import { ChatComposer } from "@/components/assistant/ChatComposer";
+import { AiNoticeCard } from "@/components/assistant/AiNoticeCard";
 
 /** Throttle streamed text to ~100ms so react-native-marked doesn't re-parse on every token. */
 function useThrottledText(full: string, isStreaming: boolean): string {
@@ -107,13 +109,14 @@ function EmptyState({ onPick }: { onPick: (q: string) => void }) {
 }
 
 export default function AssistantScreen() {
-  const { colors, spacing } = useTheme();
+  const { colors, spacing, textStyles } = useTheme();
   const [input, setInput] = useState("");
   const [composerH, setComposerH] = useState(0);
   const listRef = useRef<FlatList>(null);
   const autoFollow = useRef(true);
   const contentH = useRef(0);
   const lastUserCount = useRef(0);
+  const notice = useAiNotice();
 
   // Built once. A fresh DefaultChatTransport used to be constructed on every
   // render — including every streamed token — and the auth cookie was
@@ -197,7 +200,13 @@ export default function AssistantScreen() {
         data={messages as unknown as UiMessageLike[]}
         keyExtractor={(msg) => msg.id}
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: composerH + spacing.sm }}
-        ListEmptyComponent={<EmptyState onPick={send} />}
+        ListEmptyComponent={
+          notice.state === "hidden" ? (
+            <EmptyState onPick={send} />
+          ) : notice.state === "show" ? (
+            <AiNoticeCard onAcknowledge={notice.acknowledge} />
+          ) : null
+        }
         renderItem={({ item, index }) => (
           <MessageItem
             message={item}
@@ -242,12 +251,21 @@ export default function AssistantScreen() {
               </Pressable>
             </View>
           ) : null}
+          <Text
+            style={[
+              textStyles.caption,
+              { color: colors.mutedForeground, textAlign: "center", paddingHorizontal: spacing.lg, paddingBottom: spacing.xs },
+            ]}
+          >
+            {i18n.t("assistant.hint")}
+          </Text>
           <ChatComposer
             value={input}
             onChangeText={setInput}
             onSend={() => send(input)}
             busy={busy}
             onStop={() => void stop()}
+            disabled={notice.state !== "hidden"}
           />
         </View>
       </KeyboardStickyView>

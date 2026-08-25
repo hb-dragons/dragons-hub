@@ -18,17 +18,19 @@ export function ChatComposer({
   onSend,
   busy,
   onStop,
+  disabled = false,
 }: {
   value: string;
   onChangeText: (text: string) => void;
   onSend: () => void;
   busy: boolean;
   onStop: () => void;
+  disabled?: boolean;
 }) {
   const { colors, spacing, radius } = useTheme();
   const insets = useSafeAreaInsets();
   const [height, setHeight] = useState(COMPOSER_MIN);
-  const state = composerButtonState(busy, value);
+  const state = composerButtonState(busy, value, disabled);
 
   // Clearing the text (incl. after send) does not reliably refire
   // onContentSizeChange, so reset the grown height explicitly.
@@ -82,6 +84,7 @@ export function ChatComposer({
               }
               placeholder={i18n.t("assistant.placeholder")}
               placeholderTextColor={colors.mutedForeground}
+              editable={!disabled}
               style={{
                 height,
                 color: colors.foreground,

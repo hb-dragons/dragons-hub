@@ -84,7 +84,7 @@ Google's processor DPA, crash reporting, AASA/assetlinks hosting.
 | `owner: eshamounskerto` | personal account | §4.4. |
 | Android monochrome icon layer | optional | Android 16 QPR2 auto-themes icons without one. |
 | Local `apps/native/ios/` | stale prebuild (2026-08-12) | Gitignored, ignored by EAS, but `expo run:ios` would use it. `rm -rf apps/native/ios apps/native/android` before any local native build. |
-| `#226` expo-modules-jsi patch | reaches EAS | `pnpm-workspace.yaml` `patchedDependencies` → `patches/expo-modules-jsi@57.0.4.patch` is tracked; EAS runs `pnpm install`. |
+| `#226` expo-modules-jsi patch | reaches EAS | ~~`pnpm-workspace.yaml` `patchedDependencies` → `patches/expo-modules-jsi@57.0.4.patch` is tracked; EAS runs `pnpm install`.~~ (removed in #231 — expo-modules-jsi 57.0.5 ships the upstream fix) |
 
 ### 1.2 Code changes required before submission
 

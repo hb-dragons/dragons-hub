@@ -19,6 +19,12 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Universal links (#248). Extension-less public files are served as
+        // application/octet-stream by default; Apple's CDN needs JSON.
+        source: "/.well-known/apple-app-site-association",
+        headers: [{ key: "Content-Type", value: "application/json" }],
+      },
     ];
   },
 };

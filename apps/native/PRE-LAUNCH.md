@@ -39,6 +39,18 @@ true: `lib/push/registration.ts` calls `Notifications.getPermissionsAsync`
 and notification-tap deep-linking. Both have test coverage
 (`registration.test.ts`, `handler.test.ts`).
 
+Since #237 the OS prompt is no longer fired from `registerForPush`. Sign-in
+opens `app/push-permission.tsx` — a form sheet explaining what the club
+sends, that Expo delivers it to Apple/Google, that the token dies on
+sign-out and how to switch it off — and only its "Aktivieren" button calls
+`requestPushPermissionAndRegister`. Every way out of the sheet — "Später",
+swipe, back, or "Aktivieren" itself completing — writes the per-device
+deferral (`push_prompt_deferred`); a deferral written right after a grant is
+inert, since `decidePushFlow` checks the OS status first. Profile's
+"Mitteilungen" row reopens the
+sheet or, once the OS has answered, opens the system settings. § 25(1)
+TDDDG is the reason; the decision table is `lib/push/pre-prompt.ts`.
+
 The `plugins/remove-push-entitlement.js` this section used to reference
 does not exist — there is no `apps/native/plugins/` directory at all, so
 there's nothing stripping the iOS `aps-environment` entitlement.
@@ -63,8 +75,13 @@ Remaining, still-open:
       origin the Android intent filter has always auto-verified.
       `lib/app-config.test.ts` compares the two lists and fails if a
       host is claimed on one platform only.
-- [ ] Host `/.well-known/apple-app-site-association` on
-      `app.hbdragons.de`. `app.hbdragons.de` is the Next.js web service,
+- [x] ~~Host `/.well-known/apple-app-site-association` on
+      `app.hbdragons.de`.~~ Shipped in `apps/web/public/.well-known/` with a
+      JSON content-type rule in `next.config.ts` (#248);
+      `apps/web/src/aasa.test.ts` reads the team and bundle id from
+      `app.json`. Still to verify after the next web deploy — the curl
+      checks below, Apple's CDN, and a tapped link on a post-#217 device
+      build. `app.hbdragons.de` is the Next.js web service,
       so the file goes in `apps/web/public/.well-known/` with a
       `headers()` rule serving `application/json`; `assetlinks.json` sits
       next to it (Android's `autoVerify: true` is already declared and
@@ -163,13 +180,17 @@ Android 13+ themed icons look bad without a monochrome layer.
 
 ### Privacy / compliance
 
-- [ ] Add the app-level `ios.privacyManifests` key to `app.json`. Prebuild
-      already generates a default `PrivacyInfo.xcprivacy`, so "does one
-      exist" was the wrong question. What is missing is the app's own
-      declaration of the required-reason APIs its dependencies use
-      (UserDefaults `CA92.1`, FileTimestamp `C617.1`, SystemBootTime
-      `35F9.1`, `NSPrivacyTracking: false`) and the matching App Store
-      Connect privacy label. Audit §1.1 and §2.2.
+- [x] ~~Add the app-level `ios.privacyManifests` key to `app.json`.~~ Done
+      (#232): the manifest declares UserDefaults `CA92.1`, FileTimestamp
+      `C617.1`, SystemBootTime `35F9.1` and DiskSpace `85F4.1`/`E174.1`
+      (expo-file-system) with `NSPrivacyTracking: false`, and
+      `lib/app-config.test.ts` pins all five. Still open: read the
+      ITMS-91053 mail after the first upload of a new build and add any
+      API Apple flags; keep the App Store Connect privacy label in step
+      (audit §2.2).
+- [x] `locales` declares de + en with a translated Face ID prompt and
+      `CFBundleAllowMixedLocalizations` is on (#232), so the binary is no
+      longer English-only to iOS Settings and the store.
 - [ ] Privacy policy URL — App Store Connect requires a live URL at
       submit time. Decided 2026-08-25: the app links to
       hbdragons.de/datenschutz, and that page needs a "Dragons App"
@@ -178,10 +199,14 @@ Android 13+ themed icons look bad without a monochrome layer.
 - [x] `ITSAppUsesNonExemptEncryption: false` — verified 2026-08-25: HTTPS,
       Keychain and the OS Face ID prompt only. Flips if any crypto beyond
       HTTPS is added.
-- [ ] What the store forms and DE/EU law ask for beyond this file — the
-      in-app Impressum / Datenschutz / support entry, an account-deletion
-      request, the chatbot's AI disclosure (AI Act Art. 50(1)), the push
-      pre-permission text, EU DSA trader status (non-trader), the age
+- [ ] What the store forms and DE/EU law ask for beyond this file —
+      ~~the in-app Impressum / Datenschutz / support entry~~ (done, #233:
+      `components/LegalSection.tsx` on Profile signed in and out, plus the
+      sign-in footer; `lib/nav/architecture.test.ts` pins both), ~~an
+      account-deletion request~~ (done, #234: Profile row +
+      hbdragons.de/konto-loeschen + review notes in `STORE-LISTING.md`),
+      ~~the chatbot's AI disclosure (AI Act Art. 50(1))~~ (done, #235, ADR 0005), ~~the push
+      pre-permission text~~ (done, #237), EU DSA trader status (non-trader), the age
       rating, the Gemini paid tier — lives in the audit (§1.2, §2, §3)
       and is not duplicated here.
 

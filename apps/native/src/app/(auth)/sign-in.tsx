@@ -17,6 +17,8 @@ import { authClient } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Icon } from "@/components/ui/Icon";
+import { LEGAL_LINKS } from "@/lib/legal/links";
+import { openExternal } from "@/lib/legal/open-external";
 
 export default function SignInScreen() {
   const { colors, textStyles, spacing, radius } = useTheme();
@@ -205,6 +207,29 @@ export default function SignInScreen() {
         >
           {i18n.t("auth.noAccountHint")}
         </Text>
+
+        {/* Legal links reachable before sign-in (#233). */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: spacing.md,
+            marginTop: spacing.lg,
+          }}
+        >
+          <Pressable accessibilityRole="link" onPress={() => openExternal(LEGAL_LINKS.privacy)}>
+            <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
+              {i18n.t("legal.privacy")}
+            </Text>
+          </Pressable>
+          <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>·</Text>
+          <Pressable accessibilityRole="link" onPress={() => openExternal(LEGAL_LINKS.imprint)}>
+            <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
+              {i18n.t("legal.imprint")}
+            </Text>
+          </Pressable>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );

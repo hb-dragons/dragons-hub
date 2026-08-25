@@ -29,7 +29,7 @@ import {
   detailHeaderOptions,
   tabRootHeaderOptions,
 } from "@/lib/nav/headers";
-import { searchSheetOptions } from "@/lib/nav/sheet-routes";
+import { formSheetOptions, searchSheetOptions } from "@/lib/nav/sheet-routes";
 import { installGlobalErrorHandler } from "@/lib/global-error-handler";
 import { usePushRegistration } from "@/hooks/usePushRegistration";
 import { ToastProvider } from "@/hooks/useToast";
@@ -102,6 +102,12 @@ function RootNavigator() {
             headerTitle: i18n.t("assistant.title"),
             headerTintColor: colors.foreground,
           }}
+        />
+        {/* Push pre-permission (#237): a form sheet the sign-in flow opens once
+            when the OS has not been asked yet; Profile can reopen it. */}
+        <Stack.Screen
+          name="push-permission"
+          options={formSheetOptions({ name: "push-permission", detents: [0.5, 1] })}
         />
       </Stack>
     </>

@@ -32,10 +32,8 @@ Assumes `cd apps/native` unless stated otherwise.
 
 ## Current state (as of 2026-08-25)
 
-- Expo SDK 57 (`expo` / `expo-router` 57.0.12, react-native 0.86.2),
+- Expo SDK 57 (`expo` / `expo-router` 57.0.16, react-native 0.86.2),
   since #213. `ios.deploymentTarget` is pinned to `16.4` in `app.json`.
-  Eight `expo-*` packages sit behind the SDK 57 pins, so `check:doctor`
-  is at 19/20 — see "`expo doctor` gates the build" below.
 - `eas update:configure` has been run. `app.json` has
   `updates.url = https://u.expo.dev/7b7481e3-ca0a-42dd-ba38-6a9169d6492d`
   and the EAS project is bound.
@@ -305,14 +303,13 @@ pnpm --filter @dragons/native check:doctor
 
 (It was 19 checks on SDK 55; SDK 57 added one.)
 
-As of #213 all 20 passed, with nothing skipped. On 2026-08-25 it is
-19/20: eight packages (`expo` 57.0.12 → ~57.0.16, `expo-router`,
-`expo-updates`, `expo-notifications`, `expo-constants`, `expo-image`,
-`expo-linking`, `expo-splash-screen`) sit behind the SDK 57 pins. The fix
-is `npx expo install --check` in `apps/native` and committing the lockfile
-(audit B1); until then EAS fails every build and CI's `native-doctor` job
-is red. Three checks needed structural fixes to reach 20 in the first
-place:
+As of #213 all 20 pass, with nothing skipped. The check "Packages match
+versions required by installed Expo SDK" slipped to 19/20 once in August
+2026, when eight `expo-*` packages fell behind the SDK 57 pins; #231 moved
+them back with `npx expo install --fix`. When that happens again, remember
+that `pnpm-workspace.yaml` pins `expo-constants` in its `overrides` block —
+bump it to the same version, or the duplicate-native-modules check fails
+next. Three checks needed structural fixes to reach 20 in the first place:
 
 - **Duplicate native modules.** A native build may contain only one copy
   of a given native module, and pnpm's isolated store produced several.

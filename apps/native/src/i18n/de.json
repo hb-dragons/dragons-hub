@@ -97,6 +97,15 @@
     "roleCoach": "Trainer",
     "roleReferee": "Schiri"
   },
+  "legal": {
+    "title": "Rechtliches",
+    "privacy": "Datenschutz",
+    "imprint": "Impressum",
+    "support": "Support kontaktieren",
+    "deleteAccount": "Konto löschen beantragen",
+    "version": "Version %{version}",
+    "openFailed": "Der Link konnte nicht geöffnet werden."
+  },
   "teamDetail": {
     "league": "Liga",
     "lastGame": "Letztes Spiel",
@@ -403,7 +412,7 @@
     "columnDeleted": "Spalte gelöscht"
   },
   "assistant": {
-    "title": "Vereins-Assistent",
+    "title": "KI-Assistent",
     "placeholder": "Frag nach Spielen, Tabellen, Ergebnissen",
     "send": "Senden",
     "stop": "Stopp",
@@ -412,7 +421,13 @@
     "copy": "Kopieren",
     "copied": "Kopiert",
     "empty": "Frag mich nach Spielen, Tabellen oder Ergebnissen des Vereins.",
-    "open": "Den Vereins-Assistenten fragen",
+    "open": "Den KI-Assistenten fragen",
+    "hint": "Antworten erzeugt Google Gemini – sie können Fehler enthalten.",
+    "notice": {
+      "title": "Du chattest mit einer KI",
+      "body": "Die Antworten erzeugt Googles Gemini-Modell aus den Vereinsdaten. Sie können falsch sein – prüfe Spieltermine im Zweifel im offiziellen Spielplan. Gib keine personenbezogenen Daten anderer Personen ein.",
+      "acknowledge": "Verstanden"
+    },
     "greetingTitle": "Hallo! Frag mich zum Verein.",
     "greetingSubtitle": "Spiele, Tabellen und letzte Ergebnisse — direkt aus der Verbands-Synchronisierung.",
     "examplesLabel": "Zum Beispiel",
@@ -433,6 +448,20 @@
       "list_matches": "Spiele",
       "fallback": "Vereinsdaten"
     }
+  },
+  "push": {
+    "title": "Mitteilungen vom Verein",
+    "point1": "Wir schicken nur, was dich betrifft: Spielverlegungen, Schiedsrichter-Einsätze und Erinnerungen an Aufgaben.",
+    "point2": "Die Zustellung läuft über den Push-Dienst von Expo an Apple bzw. Google. Auf dem Vereinsserver liegt nur dein Geräte-Token.",
+    "point3": "Beim Abmelden wird das Token gelöscht.",
+    "point4": "Abschalten kannst du Mitteilungen jederzeit in den Systemeinstellungen.",
+    "enable": "Mitteilungen aktivieren",
+    "later": "Später",
+    "sectionTitle": "Benachrichtigungen",
+    "settingsRow": "Mitteilungen",
+    "statusGranted": "Aktiv",
+    "statusDenied": "Aus – in den Einstellungen aktivieren",
+    "statusUndetermined": "Noch nicht eingerichtet"
   },
   "a11y": {
     "doubleTapToEdit": "Doppeltippen zum Bearbeiten",

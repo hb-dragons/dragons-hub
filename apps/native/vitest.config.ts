@@ -100,10 +100,17 @@ export default defineConfig({
         // became data — the board action vocabulary and the preference segment
         // specs — and the untested JSX they replaced left the scope with them.
         // Measured 17.17/11.14/21.24/16.7 — branches and lines hold.
-        branches: 11,
+        //
+        // Ratcheted 2026-08-25 after #230's code track: statements 17 -> 18,
+        // branches 11 -> 12, lines 16 -> 17, on the store-readiness lib
+        // modules (legal links and the mailto builder, the push pre-prompt
+        // decision, the privacy-manifest and nav-architecture guards).
+        // Measured 18.19/12.18/21.97/17.61 — functions holds at 21, not
+        // having cleared the next whole point.
+        branches: 12,
         functions: 21,
-        lines: 16,
-        statements: 17,
+        lines: 17,
+        statements: 18,
       },
     },
   },

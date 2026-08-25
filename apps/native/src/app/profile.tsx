@@ -9,10 +9,15 @@ import { performSignOut } from "@/lib/auth/sign-out";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { SectionHeader } from "@/components/SectionHeader";
+import { PushSettingsRow } from "@/components/PushSettingsRow";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { Segmented } from "@/components/ui/Segmented";
 import { Logo } from "@/components/brand/Logo";
+import { LegalRow, LegalSection } from "@/components/LegalSection";
 import { i18n } from "@/lib/i18n";
+import { appVersionLabel, buildDeletionMailto } from "@/lib/legal/links";
+import { readAppVersion } from "@/lib/legal/app-version";
+import { openExternal } from "@/lib/legal/open-external";
 import {
   LOCALE_SEGMENTS,
   THEME_SEGMENTS,
@@ -81,6 +86,10 @@ export default function ProfileScreen() {
             selected={localePref}
             onSelect={setLocalePref}
           />
+        </View>
+
+        <View style={{ marginTop: spacing.xl }}>
+          <LegalSection />
         </View>
       </Screen>
     );
@@ -157,6 +166,12 @@ export default function ProfileScreen() {
           })()}
         </Card>
 
+        {/* Notifications (#237) */}
+        <View>
+          <SectionHeader title={i18n.t("push.sectionTitle")} />
+          <PushSettingsRow />
+        </View>
+
         {/* Biometric lock section */}
         {isSupported && (
           <View>
@@ -200,6 +215,22 @@ export default function ProfileScreen() {
             onSelect={setLocalePref}
           />
         </View>
+
+        {/* Rechtliches (#233) + deletion request (#234) */}
+        <LegalSection>
+          <LegalRow
+            destructive
+            label={i18n.t("legal.deleteAccount")}
+            onPress={() =>
+              openExternal(
+                buildDeletionMailto({
+                  email: session.user.email,
+                  version: appVersionLabel(readAppVersion()),
+                }),
+              )
+            }
+          />
+        </LegalSection>
 
         {/* Sign Out */}
         <Pressable

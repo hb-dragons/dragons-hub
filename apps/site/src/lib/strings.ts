@@ -146,6 +146,9 @@ export const strings = {
   datenschutz: {
     heading: "Datenschutzerklärung",
   },
+  kontoLoeschen: {
+    heading: "Konto löschen",
+  },
   probetraining: {
     fallbackHeading: "Probetraining",
     stepOneIntro:
@@ -248,6 +251,8 @@ export const strings = {
     impressum: "Impressum der HB Dragons e.V. mit allen Anbieterangaben gemäß § 5 TMG.",
     datenschutz:
       "Datenschutzerklärung der HB Dragons e.V.: Informationen zur Verarbeitung personenbezogener Daten auf dieser Website.",
+    kontoLoeschen:
+      "So beantragen Mitglieder die Löschung ihres Kontos in der Dragons App: per Mail an die Datenschutz-Adresse oder direkt aus der App.",
     notFound:
       "Diese Seite gibt es bei den HB Dragons nicht (mehr). Zurück zur Startseite des Basketballvereins aus Hannover.",
     probetraining:
