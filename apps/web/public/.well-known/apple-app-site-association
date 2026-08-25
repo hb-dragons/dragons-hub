@@ -4,7 +4,7 @@
       {
         "appIDs": ["2ZDTV3KLV2.de.hbdragons.app"],
         "components": [
-          { "/": "/en/*", "exclude": true, "comment": "English pages have no native route; Safari" },
+          { "/": "/en/*", "exclude": true, "comment": "English pages have no native route; Safari handles them" },
           { "/": "/admin/*", "exclude": true, "comment": "session-gated web surface" },
           { "/": "/profile", "exclude": true, "comment": "session-gated web surface" },
           { "/": "/schedule*" },
