@@ -38,4 +38,14 @@ describe("composerButtonState", () => {
   it("is send when not busy and there is text", () => {
     expect(composerButtonState(false, "hi")).toBe("send");
   });
+
+  it("is disabled while the AI notice gates the composer, whatever the text", () => {
+    expect(composerButtonState(false, "hallo", true)).toBe("disabled");
+    expect(composerButtonState(true, "hallo", true)).toBe("disabled");
+  });
+
+  it("keeps its old behaviour when not gated", () => {
+    expect(composerButtonState(false, "hallo", false)).toBe("send");
+    expect(composerButtonState(false, "hallo")).toBe("send");
+  });
 });

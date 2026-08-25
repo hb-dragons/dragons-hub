@@ -412,7 +412,7 @@
     "columnDeleted": "Spalte gelöscht"
   },
   "assistant": {
-    "title": "Vereins-Assistent",
+    "title": "KI-Assistent",
     "placeholder": "Frag nach Spielen, Tabellen, Ergebnissen",
     "send": "Senden",
     "stop": "Stopp",
@@ -421,7 +421,13 @@
     "copy": "Kopieren",
     "copied": "Kopiert",
     "empty": "Frag mich nach Spielen, Tabellen oder Ergebnissen des Vereins.",
-    "open": "Den Vereins-Assistenten fragen",
+    "open": "Den KI-Assistenten fragen",
+    "hint": "Antworten erzeugt Google Gemini – sie können Fehler enthalten.",
+    "notice": {
+      "title": "Du chattest mit einer KI",
+      "body": "Die Antworten erzeugt Googles Gemini-Modell aus den Vereinsdaten. Sie können falsch sein – prüfe Spieltermine im Zweifel im offiziellen Spielplan. Gib keine personenbezogenen Daten anderer Personen ein.",
+      "acknowledge": "Verstanden"
+    },
     "greetingTitle": "Hallo! Frag mich zum Verein.",
     "greetingSubtitle": "Spiele, Tabellen und letzte Ergebnisse — direkt aus der Verbands-Synchronisierung.",
     "examplesLabel": "Zum Beispiel",
