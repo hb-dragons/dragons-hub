@@ -16,7 +16,27 @@ vi.mock("../api", () => ({ deviceApi: { register: vi.fn(), unregister: vi.fn() }
 import * as Notifications from "expo-notifications";
 import { getLocales } from "expo-localization";
 import { deviceApi } from "../api";
-import { registerForPush, unregisterForPush } from "@/lib/push/registration";
+import {
+  getPushPermissionStatus,
+  registerForPush,
+  requestPushPermissionAndRegister,
+  unregisterForPush,
+} from "@/lib/push/registration";
+
+describe("getPushPermissionStatus", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it.each([
+    [{ status: "granted", canAskAgain: true }, "granted"],
+    [{ status: "undetermined", canAskAgain: true }, "undetermined"],
+    [{ status: "denied", canAskAgain: false }, "denied"],
+    // iOS reports "undetermined" with canAskAgain=false after a hard deny.
+    [{ status: "undetermined", canAskAgain: false }, "denied"],
+  ])("maps %o to %s", async (permission, expected) => {
+    vi.mocked(Notifications.getPermissionsAsync).mockResolvedValue(permission as never);
+    expect(await getPushPermissionStatus()).toBe(expected);
+  });
+});
 
 describe("registerForPush", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -28,11 +48,10 @@ describe("registerForPush", () => {
     expect(deviceApi.register).toHaveBeenCalledWith("tok-1", "ios", "de-DE");
   });
 
-  it("requests permission when not yet granted, then bails if denied", async () => {
-    vi.mocked(Notifications.getPermissionsAsync).mockResolvedValue({ status: "undetermined" } as never);
-    vi.mocked(Notifications.requestPermissionsAsync).mockResolvedValue({ status: "denied" } as never);
+  it("never triggers the OS prompt itself (the pre-permission sheet does, #237)", async () => {
+    vi.mocked(Notifications.getPermissionsAsync).mockResolvedValue({ status: "undetermined", canAskAgain: true } as never);
     await registerForPush();
-    expect(Notifications.requestPermissionsAsync).toHaveBeenCalled();
+    expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
     expect(deviceApi.register).not.toHaveBeenCalled();
   });
 
@@ -42,6 +61,33 @@ describe("registerForPush", () => {
     vi.mocked(Notifications.getExpoPushTokenAsync).mockResolvedValue({ data: "tok-2" } as never);
     await registerForPush();
     expect(deviceApi.register).toHaveBeenCalledWith("tok-2", "ios", undefined);
+  });
+
+  it("swallows a token failure with a warning (a build without FCM keeps working)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(Notifications.getPermissionsAsync).mockResolvedValue({ status: "granted" } as never);
+    vi.mocked(Notifications.getExpoPushTokenAsync).mockRejectedValue(new Error("no FCM"));
+    await registerForPush();
+    expect(deviceApi.register).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
+describe("requestPushPermissionAndRegister", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("prompts, and registers on grant", async () => {
+    vi.mocked(Notifications.requestPermissionsAsync).mockResolvedValue({ status: "granted" } as never);
+    vi.mocked(Notifications.getExpoPushTokenAsync).mockResolvedValue({ data: "tok-3" } as never);
+    expect(await requestPushPermissionAndRegister()).toBe("granted");
+    expect(deviceApi.register).toHaveBeenCalledWith("tok-3", "ios", "de-DE");
+  });
+
+  it("prompts, and does not register on denial", async () => {
+    vi.mocked(Notifications.requestPermissionsAsync).mockResolvedValue({ status: "denied" } as never);
+    expect(await requestPushPermissionAndRegister()).toBe("denied");
+    expect(deviceApi.register).not.toHaveBeenCalled();
   });
 });
 
