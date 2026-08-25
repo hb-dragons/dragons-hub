@@ -182,8 +182,9 @@ Android 13+ themed icons look bad without a monochrome layer.
 
 - [x] ~~Add the app-level `ios.privacyManifests` key to `app.json`.~~ Done
       (#232): the manifest declares UserDefaults `CA92.1`, FileTimestamp
-      `C617.1` and SystemBootTime `35F9.1` with `NSPrivacyTracking: false`,
-      and `lib/app-config.test.ts` pins all four. Still open: read the
+      `C617.1`, SystemBootTime `35F9.1` and DiskSpace `85F4.1`/`E174.1`
+      (expo-file-system) with `NSPrivacyTracking: false`, and
+      `lib/app-config.test.ts` pins all five. Still open: read the
       ITMS-91053 mail after the first upload of a new build and add any
       API Apple flags; keep the App Store Connect privacy label in step
       (audit §2.2).

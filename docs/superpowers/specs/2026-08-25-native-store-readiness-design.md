@@ -68,7 +68,8 @@ gates the build" loses its 19/20 paragraph.
     "NSPrivacyAccessedAPITypes": [
       { "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults", "NSPrivacyAccessedAPITypeReasons": ["CA92.1"] },
       { "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp", "NSPrivacyAccessedAPITypeReasons": ["C617.1"] },
-      { "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime", "NSPrivacyAccessedAPITypeReasons": ["35F9.1"] }
+      { "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime", "NSPrivacyAccessedAPITypeReasons": ["35F9.1"] },
+      { "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace", "NSPrivacyAccessedAPITypeReasons": ["85F4.1", "E174.1"] }
     ]
   }
 },
@@ -76,13 +77,14 @@ gates the build" loses its 19/20 paragraph.
 ```
 
 `apps/native/locales/{de,en}.json` each hold `NSFaceIDUsageDescription`
-(German: "Mit Face ID die Dragons-App entsperren"). The three API
-categories are the union of what react-native, expo-constants,
-expo-localization, expo-notifications, expo-device and async-storage
-declare in their own manifests (verified in `node_modules` on 2026-08-25).
+(German: "Mit Face ID die Dragons-App entsperren"). The four API
+categories are the union of what react-native, async-storage,
+expo-constants, expo-device, expo-localization, expo-notifications,
+expo-file-system and expo-application declare in their own manifests
+(verified in `node_modules` on 2026-08-25).
 
-Tests (`lib/app-config.test.ts`): tracking is `false`; each of the three
-categories is present with its reason code; `locales` names `de` and `en`;
+Tests (`lib/app-config.test.ts`): tracking is `false`; each of the four
+categories is present with its reason codes; `locales` names `de` and `en`;
 each named file exists and carries a non-empty `NSFaceIDUsageDescription`;
 mixed localizations are on. PRE-LAUNCH: the privacy item becomes "done,
 read the ITMS-91053 mail after the first upload".

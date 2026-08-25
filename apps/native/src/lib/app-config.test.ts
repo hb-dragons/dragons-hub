@@ -87,16 +87,19 @@ describe("app.json universal links", () => {
 /**
  * Apple's required-reason APIs (App Store review since May 2024). The prebuild
  * template writes no app-level manifest, and Apple mis-parses manifests inside
- * static pods, so the app declares the union of what its dependencies use:
- * react-native, expo-constants/-localization/-notifications/-device and
- * async-storage — verified in node_modules on 2026-08-25. Re-check the union
- * after adding a native dependency, and read the ITMS-91053 mail after every
- * first upload of a new build.
+ * static pods, so the app declares the union of what its dependencies use.
+ * The installed manifests are react-native, async-storage, expo-constants,
+ * expo-device, expo-localization, expo-notifications, expo-file-system
+ * (DiskSpace + FileTimestamp) and expo-application (whose categories are
+ * already covered) — verified in node_modules on 2026-08-25. Re-check the
+ * union after adding a native dependency, and read the ITMS-91053 mail after
+ * every first upload of a new build.
  */
-const REQUIRED_REASON_APIS: [type: string, reason: string][] = [
-  ["NSPrivacyAccessedAPICategoryUserDefaults", "CA92.1"],
-  ["NSPrivacyAccessedAPICategoryFileTimestamp", "C617.1"],
-  ["NSPrivacyAccessedAPICategorySystemBootTime", "35F9.1"],
+const REQUIRED_REASON_APIS: [type: string, reasons: string[]][] = [
+  ["NSPrivacyAccessedAPICategoryUserDefaults", ["CA92.1"]],
+  ["NSPrivacyAccessedAPICategoryFileTimestamp", ["C617.1"]],
+  ["NSPrivacyAccessedAPICategorySystemBootTime", ["35F9.1"]],
+  ["NSPrivacyAccessedAPICategoryDiskSpace", ["85F4.1", "E174.1"]],
 ];
 
 describe("app.json privacy manifest", () => {
@@ -106,12 +109,15 @@ describe("app.json privacy manifest", () => {
     expect(manifest?.NSPrivacyTracking).toBe(false);
   });
 
-  it.each(REQUIRED_REASON_APIS)("declares %s with reason %s", (type, reason) => {
-    const entry = manifest?.NSPrivacyAccessedAPITypes?.find(
-      (candidate) => candidate.NSPrivacyAccessedAPIType === type,
-    );
-    expect(entry?.NSPrivacyAccessedAPITypeReasons).toEqual([reason]);
-  });
+  it.each(REQUIRED_REASON_APIS)(
+    "declares %s with reasons %s",
+    (type, reasons) => {
+      const entry = manifest?.NSPrivacyAccessedAPITypes?.find(
+        (candidate) => candidate.NSPrivacyAccessedAPIType === type,
+      );
+      expect(entry?.NSPrivacyAccessedAPITypeReasons).toEqual(reasons);
+    },
+  );
 });
 
 /**
