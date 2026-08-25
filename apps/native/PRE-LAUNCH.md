@@ -39,6 +39,15 @@ true: `lib/push/registration.ts` calls `Notifications.getPermissionsAsync`
 and notification-tap deep-linking. Both have test coverage
 (`registration.test.ts`, `handler.test.ts`).
 
+Since #237 the OS prompt is no longer fired from `registerForPush`. Sign-in
+opens `app/push-permission.tsx` — a form sheet explaining what the club
+sends, that Expo delivers it to Apple/Google, that the token dies on
+sign-out and how to switch it off — and only its "Aktivieren" button calls
+`requestPushPermissionAndRegister`. "Später" and swipe-dismiss defer per
+device (`push_prompt_deferred`); Profile's "Mitteilungen" row reopens the
+sheet or, once the OS has answered, opens the system settings. § 25(1)
+TDDDG is the reason; the decision table is `lib/push/pre-prompt.ts`.
+
 The `plugins/remove-push-entitlement.js` this section used to reference
 does not exist — there is no `apps/native/plugins/` directory at all, so
 there's nothing stripping the iOS `aps-environment` entitlement.
@@ -187,8 +196,8 @@ Android 13+ themed icons look bad without a monochrome layer.
       sign-in footer; `lib/nav/architecture.test.ts` pins both), ~~an
       account-deletion request~~ (done, #234: Profile row +
       hbdragons.de/konto-loeschen + review notes in `STORE-LISTING.md`),
-      ~~the chatbot's AI disclosure (AI Act Art. 50(1))~~ (done, #235, ADR 0005), the push
-      pre-permission text, EU DSA trader status (non-trader), the age
+      ~~the chatbot's AI disclosure (AI Act Art. 50(1))~~ (done, #235, ADR 0005), ~~the push
+      pre-permission text~~ (done, #237), EU DSA trader status (non-trader), the age
       rating, the Gemini paid tier — lives in the audit (§1.2, §2, §3)
       and is not duplicated here.
 

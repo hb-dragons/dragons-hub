@@ -449,6 +449,19 @@
       "fallback": "Vereinsdaten"
     }
   },
+  "push": {
+    "title": "Mitteilungen vom Verein",
+    "point1": "Wir schicken nur, was dich betrifft: Spielverlegungen, Schiedsrichter-Einsätze und Erinnerungen an Aufgaben.",
+    "point2": "Die Zustellung läuft über den Push-Dienst von Expo an Apple bzw. Google. Auf dem Vereinsserver liegt nur dein Geräte-Token.",
+    "point3": "Beim Abmelden wird das Token gelöscht.",
+    "point4": "Abschalten kannst du Mitteilungen jederzeit in den Systemeinstellungen.",
+    "enable": "Mitteilungen aktivieren",
+    "later": "Später",
+    "settingsRow": "Mitteilungen",
+    "statusGranted": "Aktiv",
+    "statusDenied": "Aus – in den Einstellungen aktivieren",
+    "statusUndetermined": "Noch nicht eingerichtet"
+  },
   "a11y": {
     "doubleTapToEdit": "Doppeltippen zum Bearbeiten",
     "doubleTapToOpen": "Doppeltippen zum Öffnen",

@@ -46,6 +46,7 @@ export const APP_ROUTES: Record<string, (...params: string[]) => RouteHref> = {
   "/league-tables": () => "/league-tables",
   "/profile": () => "/profile",
   "/assistant": () => "/assistant",
+  "/push-permission": () => "/push-permission",
   "/sign-in": () => "/sign-in",
   "/admin/boards": () => "/admin/boards",
   "/referee-assign": () => "/referee-assign",

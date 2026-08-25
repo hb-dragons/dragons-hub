@@ -9,6 +9,7 @@ import { performSignOut } from "@/lib/auth/sign-out";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { SectionHeader } from "@/components/SectionHeader";
+import { PushSettingsRow } from "@/components/PushSettingsRow";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { Segmented } from "@/components/ui/Segmented";
 import { Logo } from "@/components/brand/Logo";
@@ -164,6 +165,12 @@ export default function ProfileScreen() {
             );
           })()}
         </Card>
+
+        {/* Notifications (#237) */}
+        <View>
+          <SectionHeader title={i18n.t("push.settingsRow")} />
+          <PushSettingsRow />
+        </View>
 
         {/* Biometric lock section */}
         {isSupported && (

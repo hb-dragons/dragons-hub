@@ -449,6 +449,19 @@
       "fallback": "club data"
     }
   },
+  "push": {
+    "title": "Notifications from the club",
+    "point1": "We only send what concerns you: rescheduled games, referee assignments and task reminders.",
+    "point2": "Delivery runs through Expo's push service to Apple or Google. The club server stores only your device token.",
+    "point3": "The token is deleted when you sign out.",
+    "point4": "You can switch notifications off at any time in the system settings.",
+    "enable": "Enable notifications",
+    "later": "Later",
+    "settingsRow": "Notifications",
+    "statusGranted": "On",
+    "statusDenied": "Off – enable in Settings",
+    "statusUndetermined": "Not set up yet"
+  },
   "a11y": {
     "doubleTapToEdit": "Double tap to edit",
     "doubleTapToOpen": "Double tap to open",
