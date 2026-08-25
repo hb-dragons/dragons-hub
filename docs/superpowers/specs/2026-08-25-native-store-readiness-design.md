@@ -238,7 +238,7 @@ Profile (signed in): a "Benachrichtigungen" row under the biometric
 section showing the status; tap → `undetermined`: open the sheet (and clear
 the deferral); `denied`: `Linking.openSettings()`; `granted`:
 `Linking.openSettings()` too, since that is where it is switched off.
-The status text comes from `pushStatusLabel(status)` in `pre-prompt.ts`.
+The status text comes from `pushStatusLabelKey(status)` in `pre-prompt.ts`.
 
 Route bookkeeping: `Stack.Screen name="push-permission"` in
 `app/_layout.tsx` using `formSheetOptions({ name: "push-permission",
@@ -312,9 +312,9 @@ commit passes `pnpm --filter @dragons/native typecheck`, `lint`,
 
 ## Error handling
 
-- `Linking.openURL` / `openSettings` rejections are caught and surfaced
-  through the existing toast (`useToast`) with `error.generic`; nothing
-  crashes because a device has no mail client.
+- `Linking.openURL` rejections are caught in one `openExternal` helper and
+  surfaced with a system `Alert` (`legal.openFailed`); nothing crashes
+  because a device has no mail client.
 - Push: every Expo call keeps its existing try/catch; the sheet closes on
   any outcome so a permission failure cannot strand the user in it.
 - AI notice: a failed storage read counts as "not acknowledged" (the
