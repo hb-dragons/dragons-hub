@@ -75,8 +75,13 @@ Remaining, still-open:
       origin the Android intent filter has always auto-verified.
       `lib/app-config.test.ts` compares the two lists and fails if a
       host is claimed on one platform only.
-- [ ] Host `/.well-known/apple-app-site-association` on
-      `app.hbdragons.de`. `app.hbdragons.de` is the Next.js web service,
+- [x] ~~Host `/.well-known/apple-app-site-association` on
+      `app.hbdragons.de`.~~ Shipped in `apps/web/public/.well-known/` with a
+      JSON content-type rule in `next.config.ts` (#248);
+      `apps/web/src/aasa.test.ts` reads the team and bundle id from
+      `app.json`. Still to verify after the next web deploy — the curl
+      checks below, Apple's CDN, and a tapped link on a post-#217 device
+      build. `app.hbdragons.de` is the Next.js web service,
       so the file goes in `apps/web/public/.well-known/` with a
       `headers()` rule serving `application/json`; `assetlinks.json` sits
       next to it (Android's `autoVerify: true` is already declared and
