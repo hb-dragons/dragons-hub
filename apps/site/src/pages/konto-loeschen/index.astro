@@ -1,0 +1,46 @@
+---
+// Account-deletion page for the Dragons App (issue #234). Both stores ask for
+// a URL that explains how an account is deleted; accounts are created by club
+// admins, so deletion is a request to the club.
+import PageContainer from "../../components/PageContainer.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import SafeMail from "../../components/SafeMail.astro";
+import Layout from "../../layouts/Layout.astro";
+import { strings } from "../../lib/strings";
+---
+
+<Layout title={strings.kontoLoeschen.heading} description={strings.seo.kontoLoeschen}>
+  <PageHeader title={strings.kontoLoeschen.heading} />
+
+  <PageContainer>
+    <header class="mb-10">
+      <h1 class="text-3xl font-bold tracking-tight">Konto in der Dragons App löschen</h1>
+      <p class="mt-2 text-sm text-muted-foreground">Stand: 25. August 2026</p>
+    </header>
+
+    <section class="space-y-4">
+      <p>
+        Konten in der Dragons App werden vom Verein für Schiedsrichter, Trainerinnen und
+        Trainer, Team-Manager und Vorstand angelegt. Fans brauchen kein Konto. Wer sein
+        Konto nicht mehr braucht, beantragt die Löschung auf einem von zwei Wegen:
+      </p>
+      <ol class="list-decimal space-y-2 pl-6">
+        <li>
+          In der App: <strong>Profil → Rechtliches → Konto löschen beantragen</strong>. Die
+          App öffnet eine vorbereitete E-Mail an uns.
+        </li>
+        <li>
+          Per E-Mail an <SafeMail email="datenschutz@hbdragons.de" /> mit der
+          E-Mail-Adresse, mit der das Konto angemeldet ist.
+        </li>
+      </ol>
+      <p>
+        Wir löschen das Konto, die zugehörigen Rollen und die auf dem Vereinsserver
+        gespeicherten Push-Tokens innerhalb von 30 Tagen und bestätigen die Löschung per
+        E-Mail. Daten, die der Verein aus rechtlichen Gründen aufbewahren muss (zum
+        Beispiel Schiedsrichter-Abrechnungen), bleiben davon unberührt; Näheres steht in
+        der <a href="/datenschutz/" class="underline">Datenschutzerklärung</a>.
+      </p>
+    </section>
+  </PageContainer>
+</Layout>

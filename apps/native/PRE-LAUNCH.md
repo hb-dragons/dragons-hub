@@ -184,11 +184,13 @@ Android 13+ themed icons look bad without a monochrome layer.
 - [ ] What the store forms and DE/EU law ask for beyond this file —
       ~~the in-app Impressum / Datenschutz / support entry~~ (done, #233:
       `components/LegalSection.tsx` on Profile signed in and out, plus the
-      sign-in footer; `lib/nav/architecture.test.ts` pins both), an
-      account-deletion request, the chatbot's AI disclosure (AI Act Art.
-      50(1)), the push pre-permission text, EU DSA trader status
-      (non-trader), the age rating, the Gemini paid tier — lives in the
-      audit (§1.2, §2, §3) and is not duplicated here.
+      sign-in footer; `lib/nav/architecture.test.ts` pins both), ~~an
+      account-deletion request~~ (done, #234: Profile row +
+      hbdragons.de/konto-loeschen + review notes in `STORE-LISTING.md`),
+      the chatbot's AI disclosure (AI Act Art. 50(1)), the push
+      pre-permission text, EU DSA trader status (non-trader), the age
+      rating, the Gemini paid tier — lives in the audit (§1.2, §2, §3)
+      and is not duplicated here.
 
 ---
 

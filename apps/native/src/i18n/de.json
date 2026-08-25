@@ -102,6 +102,7 @@
     "privacy": "Datenschutz",
     "imprint": "Impressum",
     "support": "Support kontaktieren",
+    "deleteAccount": "Konto löschen beantragen",
     "version": "Version %{version}",
     "openFailed": "Der Link konnte nicht geöffnet werden."
   },

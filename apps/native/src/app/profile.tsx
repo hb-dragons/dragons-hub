@@ -12,8 +12,11 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { Segmented } from "@/components/ui/Segmented";
 import { Logo } from "@/components/brand/Logo";
-import { LegalSection } from "@/components/LegalSection";
+import { LegalRow, LegalSection } from "@/components/LegalSection";
 import { i18n } from "@/lib/i18n";
+import { appVersionLabel, buildDeletionMailto } from "@/lib/legal/links";
+import { readAppVersion } from "@/lib/legal/app-version";
+import { openExternal } from "@/lib/legal/open-external";
 import {
   LOCALE_SEGMENTS,
   THEME_SEGMENTS,
@@ -206,8 +209,21 @@ export default function ProfileScreen() {
           />
         </View>
 
-        {/* Rechtliches (#233) */}
-        <LegalSection />
+        {/* Rechtliches (#233) + deletion request (#234) */}
+        <LegalSection>
+          <LegalRow
+            destructive
+            label={i18n.t("legal.deleteAccount")}
+            onPress={() =>
+              openExternal(
+                buildDeletionMailto({
+                  email: session.user.email,
+                  version: appVersionLabel(readAppVersion()),
+                }),
+              )
+            }
+          />
+        </LegalSection>
 
         {/* Sign Out */}
         <Pressable

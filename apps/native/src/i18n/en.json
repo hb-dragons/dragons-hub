@@ -102,6 +102,7 @@
     "privacy": "Privacy policy",
     "imprint": "Imprint",
     "support": "Contact support",
+    "deleteAccount": "Request account deletion",
     "version": "Version %{version}",
     "openFailed": "The link could not be opened."
   },
