@@ -20,10 +20,17 @@ export type PushPermissionStatus = "granted" | "denied" | "undetermined";
  * that is a denial for our purposes — the prompt would be a no-op.
  */
 export async function getPushPermissionStatus(): Promise<PushPermissionStatus> {
-  const { status, canAskAgain } = await Notifications.getPermissionsAsync();
-  if (status === "granted") return "granted";
-  if (status === "undetermined" && canAskAgain !== false) return "undetermined";
-  return "denied";
+  try {
+    const { status, canAskAgain } = await Notifications.getPermissionsAsync();
+    if (status === "granted") return "granted";
+    if (status === "undetermined" && canAskAgain !== false) return "undetermined";
+    return "denied";
+  } catch (err) {
+    // A read that throws must not abort the caller: the settings row stays
+    // tappable to Settings, and the boot-time Promise.all keeps resolving.
+    console.warn("[push] permission read failed", err);
+    return "denied";
+  }
 }
 
 async function registerToken(projectId: string): Promise<void> {
@@ -69,7 +76,13 @@ export async function requestPushPermissionAndRegister(): Promise<PushPermission
     return "denied";
   }
 
-  const { status } = await Notifications.requestPermissionsAsync();
+  let status: string;
+  try {
+    ({ status } = await Notifications.requestPermissionsAsync());
+  } catch (err) {
+    console.warn("[push] prompt failed", err);
+    return "denied";
+  }
   if (status !== "granted") return "denied";
   await registerToken(projectId);
   return "granted";

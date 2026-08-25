@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AppState, Linking, Pressable, Text, View } from "react-native";
+import { Alert, AppState, Linking, Pressable, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
@@ -34,7 +34,9 @@ export function PushSettingsRow() {
       router.push("/push-permission");
       return;
     }
-    void Linking.openSettings();
+    // Same failure shape as `openExternal`, different API — a rejected open
+    // must say so instead of leaving the row looking dead.
+    void Linking.openSettings().catch(() => Alert.alert(i18n.t("legal.openFailed")));
   };
 
   return (

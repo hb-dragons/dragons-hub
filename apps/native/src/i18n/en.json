@@ -457,6 +457,7 @@
     "point4": "You can switch notifications off at any time in the system settings.",
     "enable": "Enable notifications",
     "later": "Later",
+    "sectionTitle": "Notifications",
     "settingsRow": "Notifications",
     "statusGranted": "On",
     "statusDenied": "Off – enable in Settings",

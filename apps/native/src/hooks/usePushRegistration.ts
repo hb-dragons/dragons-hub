@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import * as Device from "expo-device";
 import { router } from "expo-router";
+import { AppState } from "react-native";
 import { authClient } from "@/lib/auth-client";
 import { getPushPermissionStatus, registerForPush } from "@/lib/push/registration";
 import { decidePushFlow, readPushPromptDeferred } from "@/lib/push/pre-prompt";
@@ -13,7 +14,9 @@ import {
 /**
  * Mounts the push tap subscription and, whenever an authenticated session
  * exists, either registers the device's push token (permission already
- * granted) or opens the pre-permission sheet once (#237).
+ * granted) or opens the pre-permission sheet once (#237). Also re-checks on
+ * every foreground, so permission granted in iOS Settings registers the
+ * device in the same session instead of waiting for the next cold start.
  *
  * Must be mounted INSIDE the auth tree (so the session is available)
  * and above any screen that expects taps to deep-link.
@@ -62,6 +65,19 @@ export function usePushRegistration(): void {
       cancelled = true;
     };
   }, [session?.user?.id]);
+
+  // Re-register when the app returns from Settings with permission newly
+  // granted (#237 review): registerForPush is a no-op unless the OS says
+  // granted, so this can never prompt — the sheet is the sign-in effect's
+  // job alone.
+  const userId = session?.user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") void registerForPush();
+    });
+    return () => sub.remove();
+  }, [userId]);
 
   // Tap subscription + cold-start tap check. Subscribe once.
   useEffect(() => {

@@ -168,7 +168,7 @@ export default function ProfileScreen() {
 
         {/* Notifications (#237) */}
         <View>
-          <SectionHeader title={i18n.t("push.settingsRow")} />
+          <SectionHeader title={i18n.t("push.sectionTitle")} />
           <PushSettingsRow />
         </View>
 

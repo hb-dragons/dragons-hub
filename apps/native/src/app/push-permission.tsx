@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Pressable, Text, View } from "react-native";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { SheetScreen } from "@/components/sheets/SheetScreen";
+import { authClient } from "@/lib/auth-client";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { requestPushPermissionAndRegister } from "@/lib/push/registration";
@@ -23,14 +24,23 @@ const POINTS = ["push.point1", "push.point2", "push.point3", "push.point4"] as c
  */
 export default function PushPermissionSheet() {
   const { colors, spacing, radius, textStyles } = useTheme();
+  const { data: session, isPending } = authClient.useSession();
+  // The OS prompt is one-shot per install, and registering needs a session.
+  // A `dragons://push-permission` link opened signed out would burn it on a
+  // request the API answers with a 401.
+  const mounted = useRef(true);
 
   useEffect(() => {
     return () => {
+      mounted.current = false;
       void deferPushPrompt();
     };
   }, []);
 
+  // Swiping the sheet away mid-registration unmounts it before the network
+  // call settles; without this, `close` would pop whatever is on top instead.
   const close = () => {
+    if (!mounted.current) return;
     if (router.canGoBack()) router.back();
     else router.replace("/");
   };
@@ -42,6 +52,11 @@ export default function PushPermissionSheet() {
       close();
     }
   };
+
+  // Checked after all hooks so the hook call order stays fixed across renders.
+  if (!isPending && !session) {
+    return <Redirect href="/" />;
+  }
 
   return (
     <SheetScreen title={i18n.t("push.title")} layout="scroll" testID="push-permission-sheet">
