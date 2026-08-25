@@ -12,8 +12,8 @@ overrides:
   #     of the expo-* tree into two copies of each module.
   #   expo-glass-effect: expo-router asks for ^57.0.1 and apps/native pins the
   #     same line, so one copy serves both.
-  #   expo-constants: apps/native pins 57.0.10 while expo-linking asks for
-  #     ~57.0.9, which resolved a second copy of the module.
+  #   expo-constants: apps/native pins 57.0.14 while expo-linking asks for
+  #     ~57.0.13, which resolved a second copy of the module.
   react: 19.2.6
   react-native: 0.86.2
   expo-glass-effect: 57.0.1
@@ -108,20 +108,6 @@ allowBuilds:
 # days. The Expo SDK 57 line (issue #213) is younger than that window, so each
 # package the upgrade needs is listed here by exact version. pnpm maintains this
 # list itself — entries appear when an install needs them, so do not hand-edit.
-minimumReleaseAgeExclude:
-  - '@expo/cli@57.0.14'
-  - '@expo/fingerprint@0.20.7'
-  - '@expo/inline-modules@0.1.5'
-  - '@expo/local-build-cache-provider@57.0.6'
-  - '@expo/metro-config@57.0.8'
-  - '@expo/metro-runtime@57.0.9'
-  - '@expo/prebuild-config@57.0.11'
-  - '@expo/ui@57.0.10'
-  - expo-asset@57.0.10
-  - expo-constants@57.0.10
-  - expo-notifications@57.0.10
-  - expo-router@57.0.12
-  - expo-server@57.0.2
-  - expo-splash-screen@57.0.6
-  - expo-updates@57.0.13
-  - expo@57.0.12
+# Prune an entry once the lockfile no longer resolves that exact version (#231
+# dropped the SDK-57.0.12-era set).
+minimumReleaseAgeExclude: []
