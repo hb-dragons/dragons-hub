@@ -58,7 +58,12 @@ const HALF_THEN_FULL = [0.5, 1] as const;
 const FULL = [1] as const;
 
 export interface SheetRouteSpec {
-  /** File name under the sheet directory, without extension. */
+  /**
+   * File name under the sheet directory, without extension. Root-level
+   * sheets (`push-permission`) pass their own file name here purely as
+   * documentation: `formSheetOptions` reads only `detents`, and
+   * `sheetScreenName` is for the board sheets.
+   */
   name: string;
   detents: SheetDetents;
 }
