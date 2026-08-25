@@ -30,10 +30,12 @@ Assumes `cd apps/native` unless stated otherwise.
 
 ---
 
-## Current state (as of 2026-08-11)
+## Current state (as of 2026-08-25)
 
 - Expo SDK 57 (`expo` / `expo-router` 57.0.12, react-native 0.86.2),
   since #213. `ios.deploymentTarget` is pinned to `16.4` in `app.json`.
+  Eight `expo-*` packages sit behind the SDK 57 pins, so `check:doctor`
+  is at 19/20 — see "`expo doctor` gates the build" below.
 - `eas update:configure` has been run. `app.json` has
   `updates.url = https://u.expo.dev/7b7481e3-ca0a-42dd-ba38-6a9169d6492d`
   and the EAS project is bound.
@@ -44,20 +46,27 @@ Assumes `cd apps/native` unless stated otherwise.
   - `development` → `http://localhost:3001`
   - `preview` → `https://api.app.hbdragons.de`
   - `production` → `https://api.app.hbdragons.de`
-- EAS account: `eshamounskerto` (personal; migrate before public launch).
+- EAS account: `eshamounskerto` (personal; migrate before public launch —
+  and the Apple team has the same problem, see `PRE-LAUNCH.md` § Account /
+  ownership).
 
-**Builds:** four exist, all iOS, all from April 2026 — three on the
-`preview` profile and one on `production`. **No Android build has ever
-been made.** Two of them reached TestFlight as version 1.0.0 builds 1
-and 2; both have since **expired** (see the 90-day rule below), so no
-tester currently has an installable binary.
+**Builds:** six exist, all iOS, all on **SDK 55** (`eas build:list`,
+2026-08-25). April 2026: one `production` and three `preview` builds
+(`internal` distribution, numbered 1, 1 and 2). 2026-08-10: two `preview`
+builds with `store` distribution — build 3 errored, build 4 finished and
+is the newest binary. **No Android build has ever been made**, and the
+SDK 57 code has never been built at all. The two April TestFlight uploads
+(version 1.0.0 builds 1 and 2) have **expired** (see the 90-day rule
+below), so no tester currently has an installable binary.
 
 **Updates:** none. No `eas update` has ever been published on any
 branch, so `development` and `preview` both show an empty update group,
-and there is no `production` channel yet.
+and there is no `production` channel yet (`eas channel:list`).
 
-**Consequence for the next release:** the April binaries are not just
-expired, they are fingerprint-incompatible with today's JS —
+**Consequence for the next release:** every existing binary is SDK 55 and
+the project moved to SDK 57 in #213 on 2026-08-11, which is a rebuild on
+its own. The April binaries are worse off: they are also
+fingerprint-incompatible with today's JS —
 `react-native-reanimated` + `react-native-worklets`, gesture-handler,
 keyboard-controller, glass-effect, datetimepicker, segmented-control,
 haptics, clipboard and device all landed after the last build, and
@@ -65,9 +74,8 @@ camera / web-browser were removed. `@gorhom/bottom-sheet` is on neither
 list any more: it arrived after that build and left again in #225, once
 every sheet had become a native form-sheet route. (An earlier revision
 of this line also listed `linking` as removed; it never was — see
-`PRE-LAUNCH.md`, expo-router requires it.) On top of that the whole
-project moved from SDK 55 to SDK 57 in #213, which is a rebuild on its
-own. OTA cannot bridge any of it. Verify before assuming otherwise:
+`PRE-LAUNCH.md`, expo-router requires it.) OTA cannot bridge any of it.
+Verify before assuming otherwise:
 
 ```bash
 eas fingerprint:compare --build-id <id>   # from `eas build:list`
@@ -160,14 +168,17 @@ build:
 - **The build number must exceed every number already uploaded for that
   `version`.** App Store Connect has consumed 1 and 2 at 1.0.0, so the
   next upload needs ≥ 3. `autoIncrement` reads EAS's own remote
-  counter, which tracks its builds and not App Store Connect's — check
-  the number it picked rather than assuming the two agree.
+  counter, which tracks its builds and not App Store Connect's — it
+  stood at 4 on 2026-08-25, so the next build gets 5. Check the number
+  it picked rather than assuming the two agree (`eas build:version:get`,
+  `eas build:version:set`).
 
 For internal testers (up to 100, added by Apple ID under TestFlight →
 Internal Testing) there is **no Beta App Review** — the build is
 installable minutes after processing. External testing needs review,
-and review needs a live privacy policy URL, which `PRE-LAUNCH.md` still
-lists as unwritten.
+and review needs a live privacy policy URL, which does not exist yet:
+the website policy needs its "Dragons App" section first
+(`PRE-LAUNCH.md` § Privacy / compliance).
 
 ### Android → Play Internal Testing
 
@@ -294,8 +305,14 @@ pnpm --filter @dragons/native check:doctor
 
 (It was 19 checks on SDK 55; SDK 57 added one.)
 
-As of #213 all 20 pass, with nothing skipped. Three of them needed
-structural fixes to get there:
+As of #213 all 20 passed, with nothing skipped. On 2026-08-25 it is
+19/20: eight packages (`expo` 57.0.12 → ~57.0.16, `expo-router`,
+`expo-updates`, `expo-notifications`, `expo-constants`, `expo-image`,
+`expo-linking`, `expo-splash-screen`) sit behind the SDK 57 pins. The fix
+is `npx expo install --check` in `apps/native` and committing the lockfile
+(audit B1); until then EAS fails every build and CI's `native-doctor` job
+is red. Three checks needed structural fixes to reach 20 in the first
+place:
 
 - **Duplicate native modules.** A native build may contain only one copy
   of a given native module, and pnpm's isolated store produced several.

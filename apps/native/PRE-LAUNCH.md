@@ -3,9 +3,13 @@
 Items deferred while the app is in internal-testing phase. Work through
 this list before submitting to the public App Store / Play Store.
 
-Last reviewed: 2026-08-11 (issue #213 — the Expo SDK 57 upgrade; this pass
-corrected the items #118 had left describing an app that no longer exists).
-Before that: 2026-07-26 (issue #118).
+Last reviewed: 2026-08-25 — the release-readiness audit in
+`docs/2026-08-25-app-store-release-readiness.md` (technical, App Store
+Connect, DE/EU legal, accounts). Its §6 corrections are applied below. The
+audit, not this file, tracks the store forms and the legal texts; this file
+stays the engineering checklist. Before that: 2026-08-11 (issue #213 — the
+Expo SDK 57 upgrade; this pass corrected the items #118 had left describing
+an app that no longer exists) and 2026-07-26 (issue #118).
 
 ---
 
@@ -20,8 +24,11 @@ plugin entry, `android.permission.CAMERA`, and
 the `expo-camera` dependency is gone from `package.json`.
 
 `android.permission.USE_FINGERPRINT` is still declared alongside
-`USE_BIOMETRIC` — unverified whether it's still needed for pre-API-28
-support; left as-is pending a decision.
+`USE_BIOMETRIC` in `app.json`. Whether it is needed is moot: the
+`expo-local-authentication` config plugin adds both permissions at prebuild
+regardless (`plugin/build/withLocalAuthentication.js`), and the module's
+own `AndroidManifest.xml` declares them too. The two `app.json` lines are
+redundant, not a decision.
 
 ### Push notifications — already committed, live in code
 
@@ -43,7 +50,11 @@ Remaining, still-open:
       item used to bundle in is a universal-links concern, not a push
       one — it now has its own section below.)
 - [ ] Verify APNs / FCM credentials exist for the production EAS profile
-      (`eas credentials`).
+      (`eas credentials`). Known on 2026-08-25: there is no
+      `google-services.json` and no FCM V1 key has been uploaded, so
+      Android push is not wired at all. A build without it still runs —
+      `lib/push/registration.ts` catches the token failure and logs a
+      warning — but no Android device will ever register.
 
 ### iOS universal links — entitlement landed (#217), not yet active
 
@@ -53,8 +64,13 @@ Remaining, still-open:
       `lib/app-config.test.ts` compares the two lists and fails if a
       host is claimed on one platform only.
 - [ ] Host `/.well-known/apple-app-site-association` on
-      `app.hbdragons.de`. **This is the activation step**, and it is a
-      web-property ticket, not this app's: until that file is live the
+      `app.hbdragons.de`. `app.hbdragons.de` is the Next.js web service,
+      so the file goes in `apps/web/public/.well-known/` with a
+      `headers()` rule serving `application/json`; `assetlinks.json` sits
+      next to it (Android's `autoVerify: true` is already declared and
+      silently fails without it — its SHA-256 must be Play's app signing
+      key, not the upload key). **This is the activation step**, and it
+      is a web-property ticket, not this app's: until that file is live the
       entitlement changes nothing user-visible, because iOS asks for the
       file before it ever routes a link to the app. Landing the native
       side first is deliberate — the entitlement is compiled into the
@@ -147,12 +163,27 @@ Android 13+ themed icons look bad without a monochrome layer.
 
 ### Privacy / compliance
 
-- [ ] Verify `PrivacyInfo.xcprivacy` covers every SDK you use (Better
-      Auth client, any analytics you add, etc.). Apple requires this.
-- [ ] Draft privacy policy URL — App Store Connect requires a live URL
-      at submit time.
-- [ ] Confirm `ITSAppUsesNonExemptEncryption: false` is still true; if
-      you add any crypto beyond HTTPS, this flips.
+- [ ] Add the app-level `ios.privacyManifests` key to `app.json`. Prebuild
+      already generates a default `PrivacyInfo.xcprivacy`, so "does one
+      exist" was the wrong question. What is missing is the app's own
+      declaration of the required-reason APIs its dependencies use
+      (UserDefaults `CA92.1`, FileTimestamp `C617.1`, SystemBootTime
+      `35F9.1`, `NSPrivacyTracking: false`) and the matching App Store
+      Connect privacy label. Audit §1.1 and §2.2.
+- [ ] Privacy policy URL — App Store Connect requires a live URL at
+      submit time. Decided 2026-08-25: the app links to
+      hbdragons.de/datenschutz, and that page needs a "Dragons App"
+      section first (audit §3.2 lists the 13 items). Today it describes
+      the website only.
+- [x] `ITSAppUsesNonExemptEncryption: false` — verified 2026-08-25: HTTPS,
+      Keychain and the OS Face ID prompt only. Flips if any crypto beyond
+      HTTPS is added.
+- [ ] What the store forms and DE/EU law ask for beyond this file — the
+      in-app Impressum / Datenschutz / support entry, an account-deletion
+      request, the chatbot's AI disclosure (AI Act Art. 50(1)), the push
+      pre-permission text, EU DSA trader status (non-trader), the age
+      rating, the Gemini paid tier — lives in the audit (§1.2, §2, §3)
+      and is not duplicated here.
 
 ---
 
@@ -161,9 +192,21 @@ Android 13+ themed icons look bad without a monochrome layer.
 - [ ] EAS account: migrate from `eshamounskerto` (personal) to a club-
       owned org account. Transfer the project before first public
       release — ownership transfers post-launch are painful.
-- [ ] App Store Connect: create the app under the club's Apple
-      Developer Program account, not a personal one.
-- [ ] Google Play Console: same — club-owned developer account.
+- [ ] Apple: the harder half, which this list used to skip. Team
+      `2ZDTV3KLV2` (the `appleTeamId` in `app.json`) is the maintainer's
+      personal membership, and the bundle id `de.hbdragons.app` has been
+      locked to it since the April 2026 TestFlight uploads; with no
+      released version, Apple's app-transfer path is closed. Decided
+      2026-08-25: ask Apple Developer Support to convert the membership
+      into an organization membership for the e.V. — keeps the Team ID,
+      the bundle id and the App Store Connect record, so `appleTeamId`
+      stays correct. Needs the club's D-U-N-S number (requested
+      2026-08-25). Fallback: a fresh organization enrollment plus a new
+      bundle id. Do not ship v1.0 under a personal name. Audit §4.2.
+- [ ] App Store Connect: create the app under that organization team,
+      not a personal one.
+- [ ] Google Play Console: club-owned organization account. It needs the
+      same D-U-N-S number.
 
 ---
 
@@ -214,8 +257,8 @@ before launch:
 ## Testing — corrected (#118), corrected again (#213)
 
 This used to say "native has zero tests" and that `lint` was just
-`tsc --noEmit`. Both were stale: there are 57 `*.test.ts(x)` files under
-`src/`, and `lint` runs real ESLint (`eslint .`) separate from
+`tsc --noEmit`. Both were stale: there are 60 `*.test.ts(x)` files under
+`src/` (counted 2026-08-25), and `lint` runs real ESLint (`eslint .`) separate from
 `typecheck`.
 
 `typecheck` is the one package script in the repo that is not plain
@@ -297,9 +340,10 @@ SecureStore (it's an actual secret).
 - [x] ~~Extract the `SegmentedControl` component duplicated in
       `schedule.tsx` and `referee.tsx`.~~ Done — both tab roots render
       `components/ui/Segmented.tsx`, which wraps the platform control.
-- [ ] Extract `getResultBadge` + `resolveName` (duplicated in
-      `MatchCardFull` and `MatchCardCompact`) into a shared match
-      helper.
+- [ ] Extract `getResultBadge` + `resolveName` into a shared match
+      helper. Both are duplicated in `MatchCardFull` and
+      `MatchCardCompact`, and `ResultChip.tsx:19` carries a third
+      `getResultBadge` with a different return shape.
 - [ ] Add a `withAlpha(hex, 0.1)` helper; replace inline
       `colors.primary + "1A"` / `"0D"` / `"60"` etc. across the
       codebase.
@@ -308,13 +352,15 @@ SecureStore (it's an actual secret).
       chain handlers in dev.~~ Resolved (#213): it lives in
       `lib/global-error-handler.ts`, installing returns the restore
       function, and the effect's cleanup runs it.
-- [ ] Fix pluralisation in `home.countdown.inDays` — `"In 1 Tagen"` is
-      wrong German. Use i18n-js plural rules or handle 1 vs n
-      explicitly.
-- [ ] `LocaleProvider` currently remounts the entire subtree on locale
-      change (`Fragment key={locale}`). Works but clobbers scroll
-      position and dismisses modals. Replace with a per-render i18n
-      reader via context value.
+- [x] ~~Fix pluralisation in `home.countdown.inDays` — `"In 1 Tagen"` is
+      wrong German.~~ Done — `getCountdown` in `(tabs)/index.tsx` returns
+      `home.countdown.today` / `.tomorrow` for 0 and 1 day, so `inDays`
+      only ever renders with n ≥ 2.
+- [x] ~~`LocaleProvider` currently remounts the entire subtree on locale
+      change (`Fragment key={locale}`).~~ Done — `useLocale.ts` no longer
+      wraps children in `key={locale}`; the comment in `useTheme.tsx`
+      (`useTheme()`) records why a context subscription replaces the
+      remount.
 
 ### Tech debt to watch
 

@@ -10,6 +10,7 @@
     "ios": {
       "bundleIdentifier": "de.hbdragons.app",
       "icon": "./assets/dragons.icon",
+      "appleTeamId": "2ZDTV3KLV2",
       "supportsTablet": true,
       "deploymentTarget": "16.4",
       "associatedDomains": ["applinks:app.hbdragons.de"],
