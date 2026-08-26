@@ -126,15 +126,15 @@ const team = z.object({
 
 export const collections = {
   posts: defineCollection({
-    loader: payloadLoader("posts", { sort: "-publishedDate" }),
+    loader: payloadLoader("posts", { sort: "-publishedDate", required: true }),
     schema: post,
   }),
   pages: defineCollection({
-    loader: payloadLoader("pages"),
+    loader: payloadLoader("pages", { required: true }),
     schema: page,
   }),
   teams: defineCollection({
-    loader: payloadLoader("teams", { depth: 3, sort: "orderIndex" }),
+    loader: payloadLoader("teams", { depth: 3, sort: "orderIndex", required: true }),
     schema: team,
   }),
   partners: defineCollection({
@@ -205,7 +205,7 @@ export const collections = {
   }),
   vorstand: defineCollection({
     // depth 2: vorstand → person → person.image populated.
-    loader: payloadLoader("vorstand", { depth: 2, sort: "orderIndex" }),
+    loader: payloadLoader("vorstand", { depth: 2, sort: "orderIndex", required: true }),
     schema: z.object({
       id: z.number(),
       role: z.string(),

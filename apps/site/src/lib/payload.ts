@@ -66,6 +66,15 @@ export interface PayloadLoaderOptions {
   depth?: number;
   /** Payload `sort` query param, e.g. `-publishedDate` or `orderIndex`. */
   sort?: string;
+  /**
+   * Fail the build when the CMS is configured and this collection comes back
+   * with zero documents. A revoked or expired `CMS_API_TOKEN` does not 403 —
+   * `apps/cms/src/lib/access.ts` degrades it to an anonymous read — so the
+   * build would otherwise succeed with drafts, or everything, missing and
+   * publish an empty site (#269). Set on the collections the site cannot be
+   * itself without.
+   */
+  required?: boolean;
 }
 
 /**
@@ -86,6 +95,7 @@ export function payloadLoader(collection: string, opts: PayloadLoaderOptions = {
         return;
       }
       store.clear();
+      let stored = 0;
       for (let page = 1; ; page++) {
         const params = new URLSearchParams({
           limit: "100",
@@ -103,8 +113,15 @@ export function payloadLoader(collection: string, opts: PayloadLoaderOptions = {
         for (const doc of parsed.data.docs) {
           const id = String((doc as { id: string | number }).id);
           store.set({ id, data: await parseData({ id, data: doc as Record<string, unknown> }) });
+          stored += 1;
         }
         if (!parsed.data.hasNextPage) break;
+      }
+      if (opts.required === true && stored === 0) {
+        throw new Error(
+          `payload ${collection}: the CMS is configured but "${collection}" came back empty. ` +
+            "Refusing to publish a site without it — check CMS_API_TOKEN and that the documents are published.",
+        );
       }
     },
   };
