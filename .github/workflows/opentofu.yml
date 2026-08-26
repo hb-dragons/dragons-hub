@@ -98,6 +98,7 @@ jobs:
       TF_VAR_smtp_user: ${{ vars.SMTP_USER }}
       TF_VAR_smtp_from: ${{ vars.SMTP_FROM }}
       TF_VAR_smtp_password: ${{ secrets.SMTP_PASSWORD }}
+      TF_VAR_probetraining_notify_to: ${{ vars.PROBETRAINING_NOTIFY_TO }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6

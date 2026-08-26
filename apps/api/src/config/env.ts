@@ -117,6 +117,7 @@ export const envSchema = z
 
     SYNC_RUN_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
     DOMAIN_EVENT_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
+    PROBETRAINING_RETENTION_DAYS: z.coerce.number().int().positive().default(180),
     VERBOSE_ERRORS: booleanFlag(),
   })
   .superRefine((env, ctx) => {

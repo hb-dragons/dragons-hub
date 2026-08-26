@@ -157,6 +157,7 @@ import {
   shutdownWorkers,
   cleanupOldSyncRuns,
   cleanupOldDomainEvents,
+  cleanupOldProbetrainingSubmissions,
   initializeScheduledDigests,
 } from "./index";
 import { logger } from "../config/logger";
@@ -266,6 +267,23 @@ async function seedDomainEvent(id: string, occurredDaysAgo: number): Promise<str
     [id, new Date(Date.now() - occurredDaysAgo * DAY_MS)],
   );
   return id;
+}
+
+async function seedProbetraining(mail: string, createdDaysAgo: number): Promise<string> {
+  await ctx.client.query(
+    `INSERT INTO probetraining_submissions
+       (month, year, did_play, gender, mail, message, accepted_privacy, created_at)
+     VALUES ('Januar', 2014, false, 'divers', $1, 'hallo', true, $2)`,
+    [mail, new Date(Date.now() - createdDaysAgo * DAY_MS)],
+  );
+  return mail;
+}
+
+async function probetrainingMails(): Promise<string[]> {
+  const r = await ctx.client.query<{ mail: string }>(
+    `SELECT mail FROM probetraining_submissions ORDER BY mail`,
+  );
+  return r.rows.map((row) => row.mail);
 }
 
 async function countRows(table: string): Promise<number> {
@@ -424,6 +442,16 @@ describe("initializeWorkers", () => {
     expect(logger.info).toHaveBeenCalledWith({ count: 2 }, "Cleaned up old sync runs");
   });
 
+  it("runs cleanup of old probetraining submissions", async () => {
+    await seedProbetraining("stale@example.org", 200);
+    await seedProbetraining("fresh@example.org", 1);
+
+    await initializeWorkers();
+
+    expect(await probetrainingMails()).toEqual(["fresh@example.org"]);
+    expect(logger.info).toHaveBeenCalledWith({ count: 1 }, "Cleaned up old probetraining submissions");
+  });
+
   it("continues if cleanup fails", async () => {
     const realDb = ctx.db as unknown as Record<string, unknown>;
     let selectCalls = 0;
@@ -574,6 +602,35 @@ describe("cleanupOldDomainEvents", () => {
 
     expect(result.events).toBe(1);
     expect(await eventIds()).toEqual(["evt-new"]);
+  });
+});
+
+// Issue #273: /datenschutz/ promises Probetraining requests are gone at the
+// latest 6 months after they arrive. Before this job that was a promise with
+// nothing behind it — the rows sat in the table forever.
+describe("cleanupOldProbetrainingSubmissions", () => {
+  it("returns 0 and deletes nothing when every request is inside the window", async () => {
+    await seedProbetraining("recent@example.org", 10);
+
+    expect(await cleanupOldProbetrainingSubmissions()).toBe(0);
+    expect(await probetrainingMails()).toEqual(["recent@example.org"]);
+  });
+
+  it("deletes requests past the default six-month window, sparing the rest", async () => {
+    await seedProbetraining("old-a@example.org", 200);
+    await seedProbetraining("old-b@example.org", 181);
+    await seedProbetraining("keep@example.org", 179);
+
+    expect(await cleanupOldProbetrainingSubmissions()).toBe(2);
+    expect(await probetrainingMails()).toEqual(["keep@example.org"]);
+  });
+
+  it("honours a custom retention window", async () => {
+    await seedProbetraining("beyond@example.org", 40);
+    await seedProbetraining("within@example.org", 20);
+
+    expect(await cleanupOldProbetrainingSubmissions(30)).toBe(1);
+    expect(await probetrainingMails()).toEqual(["within@example.org"]);
   });
 });
 

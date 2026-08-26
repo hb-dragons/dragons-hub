@@ -165,6 +165,12 @@ variable "smtp_password" {
   default     = ""
 }
 
+variable "probetraining_notify_to" {
+  description = "Club inbox that receives public Probetraining submissions (PROBETRAINING_NOTIFY_TO), e.g. \"training@hbdragons.de\". Not a credential — an address the site's Datenschutzerklärung names anyway. Independent of smtp_host only in principle: without an SMTP relay the notification is a logged skip, and without this address it is skipped too. Empty omits the key, which the API env schema treats as \"no notification recipient\"."
+  type        = string
+  default     = ""
+}
+
 variable "expo_access_token" {
   description = "Expo access token (EXPO_ACCESS_TOKEN). Upgrades Expo Push to the authenticated send tier (higher rate limits, better receipt SLA). Credential, so it is stored in Secret Manager. Optional: empty means the secret is not created and push stays on the unauthenticated tier."
   type        = string

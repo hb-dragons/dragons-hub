@@ -163,6 +163,14 @@ locals {
     SMTP_FROM = var.smtp_from
   } : {}
 
+  # The Probetraining recipient is switched separately from the relay: it is an
+  # address, not a credential, and `env.ts` rejects "" for it. Without it the
+  # submission is still stored and the mail is a logged skip, which is exactly
+  # what production did before this was wired at all.
+  probetraining_env_vars = var.probetraining_notify_to != "" ? {
+    PROBETRAINING_NOTIFY_TO = var.probetraining_notify_to
+  } : {}
+
   # Only the password is a credential; the rest are relay coordinates.
   smtp_secrets = local.smtp_enabled ? {
     SMTP_PASSWORD = {
@@ -340,7 +348,9 @@ module "api" {
     # Email delivery. The API needs these for the same reason it needs WAHA:
     # the admin test-send and "retry failed notification" routes dispatch
     # through the same pipeline. Gated as one set on smtp_host — see locals.
-  }, local.smtp_env_vars)
+    # The Probetraining recipient rides along: the public submit route is served
+    # by the API, and it is the one that sends that mail.
+  }, local.smtp_env_vars, local.probetraining_env_vars)
 
   secrets = merge({
     DATABASE_URL = {

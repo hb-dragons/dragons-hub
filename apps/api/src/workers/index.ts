@@ -18,6 +18,7 @@ import {
   notificationLog,
   digestBuffer,
   channelConfigs,
+  probetrainingSubmissions,
 } from "@dragons/db/schema";
 import { eq, lt, and, inArray } from "drizzle-orm";
 import {
@@ -80,6 +81,17 @@ export async function initializeWorkers() {
     }
   } catch (error) {
     logger.warn({ err: error }, "Failed to cleanup old domain events");
+  }
+
+  try {
+    const cleaned = await cleanupOldProbetrainingSubmissions(
+      env.PROBETRAINING_RETENTION_DAYS,
+    );
+    if (cleaned > 0) {
+      logger.info({ count: cleaned }, "Cleaned up old probetraining submissions");
+    }
+  } catch (error) {
+    logger.warn({ err: error }, "Failed to cleanup old probetraining submissions");
   }
 
   await initializeScheduledJobs();
@@ -149,6 +161,26 @@ export async function cleanupOldSyncRuns(retentionDays: number = 90): Promise<nu
   await getDb().delete(syncRuns).where(inArray(syncRuns.id, oldRunIds));
 
   return oldRuns.length;
+}
+
+/**
+ * Enforces the retention the Datenschutzerklärung promises for Probetraining
+ * requests ("spätestens 6 Monate nach Eingang", #273). Unlike sync runs and
+ * domain events these rows have no FK dependents, so one delete does it; the
+ * volume is a handful of rows a month, so it needs no batching either.
+ */
+export async function cleanupOldProbetrainingSubmissions(
+  retentionDays: number = 180,
+): Promise<number> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - retentionDays);
+
+  const deleted = await getDb()
+    .delete(probetrainingSubmissions)
+    .where(lt(probetrainingSubmissions.createdAt, cutoff))
+    .returning({ id: probetrainingSubmissions.id });
+
+  return deleted.length;
 }
 
 const CLEANUP_BATCH_SIZE = 500;
