@@ -122,7 +122,7 @@ export const strings = {
       heading: "Projekte",
       heroTitle: "Unsere Projekte",
       heroDescription:
-        "Wir engagieren uns in verschiedenen Projekten, die über den Sport hinausgehen. Unsere Initiativen fördern Integration, Bildung und soziales Engagement in der Gemeinschaft. Entdecken Sie unsere aktuellen Projekte und werden Sie Teil unserer Mission.",
+        "Wir engagieren uns in verschiedenen Projekten, die über den Sport hinausgehen. Unsere Initiativen fördern Integration, Bildung und soziales Engagement in der Gemeinschaft. Entdecke unsere aktuellen Projekte und werde Teil unserer Mission.",
       listTitle: "Aktuelle Projekte",
       buttonLabel: "Zum Projektpartner",
     },
@@ -138,9 +138,9 @@ export const strings = {
     },
   },
   comingSoon: {
-    title: "Coming soon",
+    title: "Bald verfügbar",
     description:
-      "Wir sind noch dabei, diese Seite zu erstellen. Bitte schauen Sie später noch einmal vorbei.",
+      "Wir sind noch dabei, diese Seite zu erstellen. Schau später noch einmal vorbei.",
     backHome: "Zur Startseite",
   },
   impressum: {
