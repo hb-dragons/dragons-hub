@@ -2,8 +2,7 @@
 /**
  * Download card, ported from the legacy downloads page's UCard: type/size
  * badge, title, date, soft download button. Classes lifted from prod markup;
- * the Nuxt "info" blue maps to Tailwind's blue-400 (no info token in the
- * site theme — identical resolved color).
+ * the Nuxt "info" blue is the theme's `--info` token (issue #266).
  */
 import type { CollectionEntry } from "astro:content";
 
@@ -26,7 +25,7 @@ const href = mediaUrl(file?.url, cmsBaseUrl());
     <div>
       <div class="mb-2">
         <span
-          class="font-medium inline-flex items-center text-xs px-2 py-1 gap-1 rounded-md bg-blue-400/10 text-blue-400 ring ring-inset ring-blue-400/25"
+          class="font-medium inline-flex items-center text-xs px-2 py-1 gap-1 rounded-md bg-info/10 text-info ring ring-inset ring-info/25"
         >
           {file?.mimeType != null && <span>{formatMimeType(file.mimeType)}</span>}
           <span>/</span>

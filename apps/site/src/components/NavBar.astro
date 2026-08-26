@@ -60,8 +60,8 @@ const links = [
 ];
 
 const itemClasses = (active: boolean, hasChildren: boolean) => [
-  "relative group py-4 px-6 lg:px-8 text-white hover:text-black hover:bg-green-500 transition-all duration-300 ease-in-out flex items-center justify-between gap-3",
-  active ? "bg-green-500 !text-black" : "text-white",
+  "relative group py-4 px-6 lg:px-8 text-white hover:text-primary-foreground hover:bg-primary transition-all duration-300 ease-in-out flex items-center justify-between gap-3",
+  active ? "bg-primary !text-primary-foreground" : "text-white",
   hasChildren && "hover:underline",
 ];
 

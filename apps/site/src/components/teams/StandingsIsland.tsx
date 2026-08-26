@@ -105,7 +105,7 @@ export default function StandingsIsland({ teamApiId }: { teamApiId: number | nul
       </div>
       <div className="px-4 py-1 md:py-2 lg:py-3.5 border-t text-xs md:text-sm lg:text-base text-muted-foreground w-full flex justify-between items-center">
         {failed ? (
-          <span className="text-red-500">{strings.teams.standingsError}</span>
+          <span className="text-destructive">{strings.teams.standingsError}</span>
         ) : (
           <span>
             {standings.length} {strings.teams.teamsCount}

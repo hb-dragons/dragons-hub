@@ -60,6 +60,11 @@
   --heat-foreground: #ffffff;
   --heat-subtle: #ffb692;
 
+  /* Info accent (blue) — file-type badges, body links */
+  --info: #1447e6;
+  --info-foreground: #ffffff;
+  --info-subtle: #8ec5ff;
+
   /* Brand depth */
   --brand: #006631;
   --brand-foreground: #8be19f;
@@ -129,6 +134,11 @@
   --heat-foreground: #4c1a00;
   --heat-subtle: #ffb695;
 
+  /* Info accent (blue) */
+  --info: #51a2ff;
+  --info-foreground: #052f6b;
+  --info-subtle: #8ec5ff;
+
   /* Brand depth */
   --brand: #006631;
   --brand-foreground: #8be19f;
@@ -194,6 +204,11 @@
   --color-heat: var(--heat);
   --color-heat-foreground: var(--heat-foreground);
   --color-heat-subtle: var(--heat-subtle);
+
+  /* Info accent */
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-subtle: var(--info-subtle);
 
   /* Brand depth */
   --color-brand: var(--brand);
