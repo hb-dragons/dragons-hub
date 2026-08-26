@@ -14,12 +14,13 @@ Signed-in Staff additionally see Today, the board tools and the
 "KI-Assistent", a members-only Q&A over club data powered by Google
 Gemini (a first-use notice explains this in-app); users with
 referee-assignment duties see an Officiating tab in place of Standings.
-Face ID lock is optional and off by default. Account deletion: Profile → Rechtliches → "Konto löschen beantragen" opens a
-prefilled mail to datenschutz@hbdragons.de; the club deletes the account
-within 30 days (https://hbdragons.de/konto-loeschen/). Universal links
-are claimed for https://app.hbdragons.de. Push notifications are
-operational only (schedule changes, referee assignments, task reminders)
-and are explained before the system prompt.
+Face ID lock is optional and off by default. Account deletion: Profile →
+Rechtliches → "Konto löschen beantragen" opens a prefilled mail to
+datenschutz@hbdragons.de; the club deletes the account within 30 days
+(https://hbdragons.de/konto-loeschen/). Universal links are claimed for
+https://app.hbdragons.de. Push notifications are operational only
+(schedule changes, referee assignments, task reminders) and are explained
+before the system prompt.
 
 Demo accounts (production API): filled in by #250 before submission.
 

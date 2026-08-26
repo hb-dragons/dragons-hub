@@ -238,11 +238,12 @@ describe("navigation architecture", () => {
   // the OS cannot handle) has one place to be reported. A second call site is
   // what this test exists to catch — today there is only the helper.
   it("routes every Linking.openURL through lib/legal/open-external", () => {
-    const sites = SOURCE_FILES.filter(
-      (file) =>
-        reactNativeImports(readFileSync(file, "utf8")).includes("Linking") &&
-        readFileSync(file, "utf8").includes("Linking.openURL("),
-    ).map(rel);
+    const sites = SOURCE_FILES.filter((file) => {
+      const source = readFileSync(file, "utf8");
+      return (
+        reactNativeImports(source).includes("Linking") && source.includes("Linking.openURL(")
+      );
+    }).map(rel);
     expect(sites).toEqual(["src/lib/legal/open-external.ts"]);
   });
 

@@ -25,9 +25,6 @@ const POINTS = ["push.point1", "push.point2", "push.point3", "push.point4"] as c
 export default function PushPermissionSheet() {
   const { colors, spacing, radius, textStyles } = useTheme();
   const { data: session, isPending } = authClient.useSession();
-  // The OS prompt is one-shot per install, and registering needs a session.
-  // A `dragons://push-permission` link opened signed out would burn it on a
-  // request the API answers with a 401.
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -53,6 +50,9 @@ export default function PushPermissionSheet() {
     }
   };
 
+  // The OS prompt is one-shot per install, and registering needs a session.
+  // A `dragons://push-permission` link opened signed out would burn it on a
+  // request the API answers with a 401.
   // Checked after all hooks so the hook call order stays fixed across renders.
   if (!isPending && !session) {
     return <Redirect href="/" />;
