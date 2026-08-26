@@ -53,7 +53,10 @@ describe("sync request bodies satisfy @dragons/contracts schemas", () => {
     const { api, calls } = recordingClient();
     const controller = new AbortController();
     await api.logEntries(7, { limit: 50, offset: 0 }, { signal: controller.signal });
-    expect(calls[0]!.signal).toBe(controller.signal);
+    // The client composes the caller's signal with its own deadline (#271), so
+    // the request carries a derived signal rather than the caller's own; that
+    // the derived one follows the caller is covered in timeout.test.ts.
+    expect(calls[0]!.signal).toBeInstanceOf(AbortSignal);
   });
 
   it("updateSchedule (cron variant) body parses against syncUpdateScheduleBodySchema", async () => {

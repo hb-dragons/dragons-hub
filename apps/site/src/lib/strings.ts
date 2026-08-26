@@ -217,6 +217,7 @@ export const strings = {
     colBaskets: "Körbe",
     teamsCount: "Teams",
     standingsError: "Fehler beim Laden",
+    gamesLoadError: "Konnte nicht geladen werden. Bitte versuche es später erneut.",
   },
   scoreboard: {
     sectionLabel: "Live-Spielstand",

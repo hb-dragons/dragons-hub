@@ -15,6 +15,20 @@ export interface BlobResponse {
   headers: Headers;
 }
 
+/**
+ * Default request deadline. Without one a hung connection — a stalled Cloud Run
+ * cold start, a captive portal — leaves callers spinning forever: the fetch
+ * never settles, so nothing catches and no error state is ever reached (#271).
+ * Long jobs are queued by the API rather than awaited, so 30s is generous.
+ */
+export const DEFAULT_TIMEOUT_MS = 30_000;
+
+/**
+ * Deadline for binary endpoints. Exports and generated images are produced
+ * on the request, not queued, so they are legitimately slower than a JSON read.
+ */
+export const BLOB_TIMEOUT_MS = 120_000;
+
 export interface ApiClientOptions {
   baseUrl: string;
   auth?: AuthStrategy;
@@ -26,6 +40,12 @@ export interface ApiClientOptions {
    * Errors thrown from the hook are not caught — keep it defensive.
    */
   onResponse?: (response: Response) => void | Promise<void>;
+  /**
+   * Deadline in milliseconds for every request this client makes. Defaults to
+   * `DEFAULT_TIMEOUT_MS`; `0` disables it (for a genuinely long-running call,
+   * prefer a per-request `timeoutMs`).
+   */
+  timeoutMs?: number;
 }
 
 export class ApiClient {
@@ -40,6 +60,7 @@ export class ApiClient {
   private readonly credentials?: RequestCredentials;
   private readonly cache?: RequestCache;
   private readonly onResponse?: (response: Response) => void | Promise<void>;
+  private readonly timeoutMs: number;
 
   constructor(options: ApiClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
@@ -48,18 +69,23 @@ export class ApiClient {
     this.credentials = options.credentials;
     this.cache = options.cache;
     this.onResponse = options.onResponse;
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
   async get<T>(
     path: string,
     params?: Record<string, string | number | boolean | undefined>,
-    opts?: { signal?: AbortSignal },
+    opts?: { signal?: AbortSignal; timeoutMs?: number },
   ): Promise<T> {
     return this.request<T>("GET", path, params, undefined, opts);
   }
 
-  async post<T>(path: string, body?: unknown): Promise<T> {
-    return this.request<T>("POST", path, undefined, body);
+  async post<T>(
+    path: string,
+    body?: unknown,
+    opts?: { signal?: AbortSignal; timeoutMs?: number },
+  ): Promise<T> {
+    return this.request<T>("POST", path, undefined, body, opts);
   }
 
   /**
@@ -116,6 +142,7 @@ export class ApiClient {
     body?: unknown,
     opts?: {
       signal?: AbortSignal;
+      timeoutMs?: number;
       isForm?: boolean;
       responseType?: "blob" | "blobWithHeaders";
     },
@@ -154,11 +181,27 @@ export class ApiClient {
     if (this.cache) {
       init.cache = this.cache;
     }
-    if (opts?.signal) {
-      init.signal = opts.signal;
+    const deadline = this.deadline(
+      opts?.timeoutMs ?? (opts?.responseType ? BLOB_TIMEOUT_MS : undefined),
+      opts?.signal,
+    );
+    if (deadline.signal) {
+      init.signal = deadline.signal;
     }
     const fetchFn = this.fetchFn ?? globalThis.fetch;
-    const response = await fetchFn(url, init);
+    let response: Response;
+    try {
+      response = await fetchFn(url, init);
+    } catch (error) {
+      // A deadline abort surfaces as the same honest failure as any other
+      // network error, distinguishable by its code.
+      if (deadline.expired) {
+        throw new APIError(408, "TIMEOUT", `Request timed out after ${deadline.ms}ms`);
+      }
+      throw error;
+    } finally {
+      deadline.clear();
+    }
 
     if (this.onResponse) {
       await this.onResponse(response);
@@ -188,5 +231,43 @@ export class ApiClient {
     }
 
     return (await response.json()) as T;
+  }
+
+  /**
+   * Composes the caller's signal (if any) with this request's deadline.
+   * Written with a plain controller rather than `AbortSignal.any` so it holds
+   * on React Native, where that static is not guaranteed.
+   */
+  private deadline(
+    override: number | undefined,
+    callerSignal: AbortSignal | undefined,
+  ): { signal: AbortSignal | undefined; clear: () => void; expired: boolean; ms: number } {
+    const ms = override ?? this.timeoutMs;
+    if (ms <= 0) {
+      return { signal: callerSignal, clear: () => {}, expired: false, ms };
+    }
+
+    const controller = new AbortController();
+    const state = { signal: controller.signal, expired: false, ms, clear: () => {} };
+
+    const timer = setTimeout(() => {
+      state.expired = true;
+      controller.abort(new Error(`Request timed out after ${ms}ms`));
+    }, ms);
+
+    const onCallerAbort = () => controller.abort(callerSignal?.reason);
+    if (callerSignal) {
+      if (callerSignal.aborted) {
+        onCallerAbort();
+      } else {
+        callerSignal.addEventListener("abort", onCallerAbort);
+      }
+    }
+
+    state.clear = () => {
+      clearTimeout(timer);
+      callerSignal?.removeEventListener("abort", onCallerAbort);
+    };
+    return state;
   }
 }

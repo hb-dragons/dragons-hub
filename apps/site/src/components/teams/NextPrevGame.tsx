@@ -4,7 +4,8 @@
  * Nuxt endpoints (`/api/games/{prev,next}-team?team=<name>`) are replaced by
  * two `/public/matches` queries keyed on the CMS team's `apiTeamPermanentId`
  * (plan Task C5 Step 4 — no dedicated endpoint). Renders the shared GameCard
- * family; a missing game shows the legacy "Kein Spiel gefunden" empty card.
+ * family; a missing game shows the legacy "Kein Spiel gefunden" empty card,
+ * while a failed fetch says so instead (#271).
  */
 import { useEffect, useState } from "react";
 import type { MatchListItem } from "@dragons/shared";
@@ -15,8 +16,13 @@ import { nextGameParams, prevGameParams } from "../../lib/team-games";
 import { strings } from "../../lib/strings";
 import { GameCard, GameDate } from "../game/GameCard";
 
-/** undefined = still loading, null = no game (or the fetch failed). */
-type SlotState = MatchListItem | null | undefined;
+/**
+ * undefined = still loading, null = the API has no such game, "error" = the
+ * fetch failed or timed out. The last two used to be the same value, so an
+ * outage rendered "Kein Spiel gefunden" and read as a team with no fixture
+ * (#271).
+ */
+type SlotState = MatchListItem | null | undefined | "error";
 
 function GameSlot({ heading, game }: { heading: string; game: SlotState }) {
   return (
@@ -30,6 +36,10 @@ function GameSlot({ heading, game }: { heading: string; game: SlotState }) {
             <Skeleton className="h-6 w-32 mx-auto rounded-lg" />
             <Skeleton className="h-24 md:h-32 lg:h-38 xl:h-42 w-full rounded-md" />
           </>
+        ) : game === "error" ? (
+          <p className="text-center text-muted-foreground py-8">
+            {strings.teams.gamesLoadError}
+          </p>
         ) : (
           <>
             <GameDate date={game?.kickoffDate ?? ""} />
@@ -59,7 +69,7 @@ export default function NextPrevGame({ teamApiId }: { teamApiId: number | null }
           if (!cancelled) setSlot(page.items[0] ?? null);
         })
         .catch(() => {
-          if (!cancelled) setSlot(null);
+          if (!cancelled) setSlot("error");
         });
     };
     loadSlot(prevGameParams(teamApiId, today), setPrevGame);

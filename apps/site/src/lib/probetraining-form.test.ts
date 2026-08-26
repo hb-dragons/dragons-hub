@@ -206,6 +206,40 @@ describe("submitProbetraining", () => {
   const body = buildRequestBody(validState());
   if (body === null) throw new Error("fixture must satisfy the contract");
 
+  // Without a deadline a hung connection left the submit button stuck in its
+  // submitting state with no feedback and no way out (#271).
+  it("gives up on a hanging request and reports an error", async () => {
+    vi.useFakeTimers();
+    const fetchImpl = vi.fn<typeof fetch>(
+      (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+    );
+
+    const pending = submitProbetraining(body, {
+      baseUrl: "https://api.example",
+      fetchImpl,
+      timeoutMs: 5_000,
+    });
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    await expect(pending).resolves.toBe("error");
+    vi.useRealTimers();
+  });
+
+  it("clears its deadline once the request settles", async () => {
+    vi.useFakeTimers();
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response("{}", { status: 201 }));
+
+    await submitProbetraining(body, { baseUrl: "https://api.example", fetchImpl });
+
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
+  });
+
   it("POSTs the JSON body to /public/probetraining and reports success on 201", async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()

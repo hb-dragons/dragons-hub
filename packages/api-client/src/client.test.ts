@@ -289,13 +289,17 @@ describe("ApiClient AbortSignal support", () => {
     expect(fetchFn.mock.calls[0]![1]).toMatchObject({ signal: controller.signal });
   });
 
-  it("does not set signal when none provided", async () => {
+  // Every request carries the client's own deadline signal now (#271), so an
+  // unset caller signal no longer means an unset request signal.
+  it("still sends a live signal when the caller provides none", async () => {
     const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(
       new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } }),
     );
     const client = new ApiClient({ baseUrl: "https://x.test", fetchFn });
     await client.get("/x");
-    expect(fetchFn.mock.calls[0]![1]?.signal).toBeUndefined();
+    const signal = fetchFn.mock.calls[0]![1]?.signal;
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal?.aborted).toBe(false);
   });
 });
 
