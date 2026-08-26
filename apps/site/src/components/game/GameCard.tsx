@@ -118,7 +118,12 @@ function CardTeam({ game, isAway = false }: { game: GameCardMatch; isAway?: bool
 
         {!isAway && score ? <ScoreDisplay score={score} className="ml-4" /> : null}
       </div>
-      <div className="absolute bottom-5 md:bottom-0.5">
+      {/* Clears the venue strip below (#261/#272): that strip is pinned at
+          bottom-0 and its text grows xs -> sm -> base, so it stands roughly
+          18/22/26px tall and a badge nearer the floor than that overprints
+          the venue name wherever the card is narrow enough for the two to
+          meet horizontally — which on the Spielplan grid is most of them. */}
+      <div className="absolute bottom-5 md:bottom-6 lg:bottom-7">
         <TeamBadge
           teamName={badgeName}
           isDragonsTeam={isOwn}
