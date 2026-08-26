@@ -35,6 +35,18 @@ const {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- The page forces `class="dark"` below, so the browser has to be told
+         too, or scrollbars, autofill and form popups render in light chrome
+         against a dark page (#262). -->
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#18181b" />
+    <!-- Square crops of public/img/logo.svg, which is 3:4 and would be
+         letterboxed by the browser. SVG first for the tab, PNG for the
+         browsers that still refuse SVG icons, and the 180px apple-touch-icon
+         for an iOS home-screen bookmark. -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
     <Seo {title} {description} {image} {jsonLd} {noindex} {ogType} />
     <Font cssVariable="--font-archivo" preload />
     <Font cssVariable="--font-jetbrains-mono" />

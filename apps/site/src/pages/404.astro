@@ -4,7 +4,7 @@ import { strings } from "../lib/strings";
 ---
 
 <Layout title={strings.notFound.heading} description={strings.seo.notFound} noindex>
-  <main class="min-h-svh flex flex-col items-center justify-center gap-6 px-4 text-center">
+  <div class="min-h-svh flex flex-col items-center justify-center gap-6 px-4 text-center">
     <img src="/img/logo.svg" alt={strings.site.logoAlt} class="h-24 md:h-32 opacity-90" />
     <p class="font-mono font-black text-7xl md:text-8xl tracking-tight" aria-hidden="true">
       <span class="text-primary">4</span><span class="text-heat">0</span><span class="text-primary">4</span>
@@ -19,5 +19,5 @@ import { strings } from "../lib/strings";
     >
       {strings.notFound.backHome}
     </a>
-  </main>
+  </div>
 </Layout>
