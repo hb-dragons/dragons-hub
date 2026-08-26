@@ -35,4 +35,10 @@ describe("AssistantComposer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(onSend).not.toHaveBeenCalled();
   });
+
+  it("disables the field and the send button while the AI notice is unacknowledged", () => {
+    render(wrap(<AssistantComposer status="ready" onSend={vi.fn()} onStop={vi.fn()} disabled />));
+    expect(screen.getByPlaceholderText("Ask…")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+  });
 });

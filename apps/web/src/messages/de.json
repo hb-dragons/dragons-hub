@@ -1620,8 +1620,14 @@
     }
   },
   "qa": {
-    "trigger": "Den Vereins-Assistenten fragen",
-    "title": "Vereins-Assistent",
+    "trigger": "Den KI-Assistenten fragen",
+    "title": "KI-Assistent",
+    "hint": "Antworten erzeugt Google Gemini – sie können Fehler enthalten.",
+    "notice": {
+      "title": "Du chattest mit einer KI",
+      "body": "Die Antworten erzeugt Googles Gemini-Modell aus den Vereinsdaten. Sie können falsch sein – prüfe Spieltermine im Zweifel im offiziellen Spielplan. Gib keine personenbezogenen Daten anderer Personen ein.",
+      "acknowledge": "Verstanden"
+    },
     "description": "Frag nach Spielen, Tabellen und letzten Ergebnissen.",
     "placeholder": "z. B. wer spielt am Wochenende? auf welchem Platz steht Herren 1?",
     "send": "Senden",

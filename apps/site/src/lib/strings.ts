@@ -248,7 +248,7 @@ export const strings = {
       "Die Geschichte der HB Dragons: von der Gründung bis heute – alle Meilensteine unseres Vereins im Zeitstrahl.",
     kontakt:
       "Kontakt zu den HB Dragons: Vorstand, Ansprechpartner und Coaches des Basketballvereins aus Hannover.",
-    impressum: "Impressum der HB Dragons e.V. mit allen Anbieterangaben gemäß § 5 TMG.",
+    impressum: "Impressum der HB Dragons e.V. mit allen Anbieterangaben gemäß § 5 DDG.",
     datenschutz:
       "Datenschutzerklärung der HB Dragons e.V.: Informationen zur Verarbeitung personenbezogener Daten auf dieser Website.",
     kontoLoeschen:

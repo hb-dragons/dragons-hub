@@ -5,13 +5,17 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useLocale, useTranslations } from "next-intl";
 import { AssistantMessage, type ChatMessage } from "./assistant-message";
+import { AssistantAiNotice } from "./assistant-ai-notice";
 import { AssistantComposer } from "./assistant-composer";
 import { AssistantEmptyState } from "./assistant-empty-state";
+import { useAiNotice } from "./use-ai-notice";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
+// Disabled controls are skipped: while the AI notice locks the composer, the
+// trap's "last" element must be the acknowledge button, or Tab leaks out.
 const FOCUSABLE_SELECTOR =
-  'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 interface AssistantPanelProps {
   onClose: () => void;
@@ -20,6 +24,7 @@ interface AssistantPanelProps {
 export function AssistantPanel({ onClose }: AssistantPanelProps) {
   const t = useTranslations("qa");
   const locale = useLocale();
+  const notice = useAiNotice();
   const { messages, sendMessage, status, error, stop, regenerate, setMessages, clearError } = useChat({
     transport: new DefaultChatTransport({
       api: `${API_BASE}/qa/chat`,
@@ -112,7 +117,11 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
 
       <div ref={scrollRef} className="flex flex-1 flex-col gap-4 overflow-y-auto px-4">
         {messages.length === 0 ? (
-          <AssistantEmptyState onPick={send} />
+          notice.state === "hidden" ? (
+            <AssistantEmptyState onPick={send} />
+          ) : notice.state === "show" ? (
+            <AssistantAiNotice onAcknowledge={notice.acknowledge} />
+          ) : null
         ) : (
           messages.map((m, i) => (
             <AssistantMessage
@@ -140,7 +149,13 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
       ) : null}
 
       <div className="px-4 py-3">
-        <AssistantComposer status={status} onSend={send} onStop={() => void stop()} />
+        <AssistantComposer
+          status={status}
+          onSend={send}
+          onStop={() => void stop()}
+          disabled={notice.state !== "hidden"}
+        />
+        <p className="mt-2 text-center text-xs text-muted-foreground">{t("hint")}</p>
       </div>
     </div>
   );
