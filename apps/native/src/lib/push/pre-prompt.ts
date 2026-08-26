@@ -36,8 +36,21 @@ export async function readPushPromptDeferred(): Promise<boolean> {
   }
 }
 
-export async function deferPushPrompt(): Promise<void> {
+async function deferPushPrompt(): Promise<void> {
   await localStorage.setItem(PUSH_PROMPT_DEFERRED_KEY, "1");
+}
+
+/**
+ * Record that the pre-permission sheet closed without a decision reaching the
+ * OS. Only a dismissal a signed-in user actually saw counts (#252): the sheet
+ * also unmounts when its `Redirect` bounces a `dragons://push-permission`
+ * link opened signed out, and deferring there would suppress the automatic
+ * sheet after the next sign-in — a state only Profile's "Mitteilungen" row
+ * can clear.
+ */
+export async function recordPushSheetDismissal(sawSession: boolean): Promise<void> {
+  if (!sawSession) return;
+  await deferPushPrompt();
 }
 
 /** `localStorage` has no remove; "0" reads back as not deferred. */

@@ -6,15 +6,16 @@ import { authClient } from "@/lib/auth-client";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { requestPushPermissionAndRegister } from "@/lib/push/registration";
-import { deferPushPrompt } from "@/lib/push/pre-prompt";
+import { recordPushSheetDismissal } from "@/lib/push/pre-prompt";
 
 const POINTS = ["push.point1", "push.point2", "push.point3", "push.point4"] as const;
 
 /**
  * Push pre-permission sheet (#237). Opens from `usePushRegistration` after
  * sign-in when the OS has not been asked yet, and from Profile. Every way
- * out — "Aktivieren" completing (grant or deny), "Später", swipe, back —
- * writes the per-device deferral on unmount, and the sheet closes on any
+ * out a signed-in user can take — "Aktivieren" completing (grant or deny),
+ * "Später", swipe, back — writes the per-device deferral on unmount, and a
+ * signed-out bounce writes nothing (#252). The sheet closes on any
  * outcome of the OS prompt so a rejected/thrown call cannot strand the user
  * in it. A deferral written right after a grant is inert: `decidePushFlow`
  * (`lib/push/pre-prompt.ts`) checks the OS status before it ever reads the
@@ -26,11 +27,19 @@ export default function PushPermissionSheet() {
   const { colors, spacing, radius, textStyles } = useTheme();
   const { data: session, isPending } = authClient.useSession();
   const mounted = useRef(true);
+  // Latched, and read in the unmount cleanup: by the time the sheet unmounts
+  // the session may be gone (a sign-out closes it), and the cleanup only ever
+  // sees a ref. What it needs to know is whether a signed-in user was ever
+  // looking at the sheet — not what the session is at the moment it closes.
+  const sawSession = useRef(false);
+  useEffect(() => {
+    if (session) sawSession.current = true;
+  }, [session]);
 
   useEffect(() => {
     return () => {
       mounted.current = false;
-      void deferPushPrompt();
+      void recordPushSheetDismissal(sawSession.current);
     };
   }, []);
 
