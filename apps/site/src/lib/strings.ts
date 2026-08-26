@@ -254,7 +254,7 @@ export const strings = {
       "Kontakt zu den HB Dragons: Vorstand, Ansprechpartner und Coaches des Basketballvereins aus Hannover.",
     impressum: "Impressum der HB Dragons e.V. mit allen Anbieterangaben gemäß § 5 DDG.",
     datenschutz:
-      "Datenschutzerklärung der HB Dragons e.V.: Informationen zur Verarbeitung personenbezogener Daten auf dieser Website.",
+      "Datenschutzerklärung der HB Dragons e.V.: Informationen zur Verarbeitung personenbezogener Daten auf dieser Website, in der Web-App und in der Dragons App.",
     kontoLoeschen:
       "So beantragen Mitglieder die Löschung ihres Kontos in der Dragons App: per Mail an die Datenschutz-Adresse oder direkt aus der App.",
     notFound:

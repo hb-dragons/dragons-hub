@@ -28,6 +28,10 @@ _Avoid_: assigned league
 A league the club follows in a given season; the sync's unit of work. Chosen per season during onboarding and manageable afterwards.
 _Avoid_: selected league, subscribed league
 
+**Website / Web-App / Dragons App**:
+The club's three front doors, named this way in public-facing text and kept distinct: the **Website** is the public static site on hbdragons.de; the **Web-App** is the signed-in surface on app.hbdragons.de; the **Dragons App** is the native iOS/Android app. Fans meet the Website; Staff meet the Web-App and the Dragons App. One Datenschutzerklärung covers all three because they share one backend (ADR-0006).
+_Avoid_: the site vs. the app (ambiguous), frontend, portal
+
 **Vorabliga**:
 A preliminary league the federation publishes before promotion/relegation is settled. Carries a full schedule; superseded by a committed league whose fixtures replace it.
 

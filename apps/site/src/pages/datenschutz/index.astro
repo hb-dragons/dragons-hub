@@ -1,6 +1,17 @@
 ---
 // Port of dragons-app app/pages/datenschutz/index.vue — legal content
 // hardcoded in the page by design (plan C4 port table).
+//
+// Rewritten for #241 (audit 2026-08-25 §3.2, §7 Q5). One policy now covers all
+// three clients — the static site, the Web-App on app.hbdragons.de and the
+// Dragons App — because the accounts, the API, the chatbot and the hosting are
+// the same behind all of them, and a second document would go stale. The app
+// part lives at the stable anchor #app, which the app's Rechtliches entry and
+// both store records link to; do not renumber that section away.
+//
+// Decisions behind the wording are recorded in docs/adr/0006-one-privacy-policy-for-site-webapp-and-app.md.
+// legal-citations.test.ts reads this file from disk and fails on the retired
+// providers, the stale statutes and a missing anchor.
 import PageContainer from "../../components/PageContainer.astro";
 import PageHeader from "../../components/PageHeader.astro";
 import SafeMail from "../../components/SafeMail.astro";
@@ -13,14 +24,15 @@ import { strings } from "../../lib/strings";
 
   <PageContainer>
     <header class="mb-10">
-      <p class="mt-2 text-sm text-muted-foreground">Stand: 10. August 2025</p>
+      <p class="mt-2 text-sm text-muted-foreground">Stand: 26. August 2026</p>
     </header>
 
     <div class="space-y-4">
       <p>
         Wir, der <strong>Hanover Basketball Dragons e.V.</strong>, informieren Sie nachfolgend über
-        die Verarbeitung personenbezogener Daten bei Besuch unserer Website und Nutzung unserer
-        Online-Angebote. Die Verarbeitung erfolgt gemäß DSGVO und BDSG.
+        die Verarbeitung personenbezogener Daten bei Besuch unserer Website, bei Nutzung unserer
+        Web-App und bei Nutzung der <strong>Dragons App</strong> für iOS und Android. Die
+        Verarbeitung erfolgt gemäß DSGVO und BDSG.
       </p>
     </div>
 
@@ -36,72 +48,148 @@ import { strings } from "../../lib/strings";
         </p>
         <p>Vertreten durch den Vorstand gemäß § 26 BGB.</p>
       </div>
+      <div class="mt-4 space-y-2">
+        <p>
+          Für Fragen zum Datenschutz und zur Ausübung Ihrer Rechte erreichen Sie uns unter:
+        </p>
+        <p>
+          <SafeMail email="datenschutz@hbdragons.de" />
+        </p>
+        <p>
+          Anfragen zum Probetraining richten Sie bitte an:
+        </p>
+        <p>
+          <SafeMail email="training@hbdragons.de" />
+        </p>
+        <p><strong>Ein Datenschutzbeauftragter ist nicht benannt.</strong> Die Voraussetzungen des § 38 BDSG liegen bei uns nicht vor.</p>
+      </div>
+    </section>
+
+    <section id="geltungsbereich" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">2. Geltungsbereich</h2>
+      <div class="mt-3 space-y-4">
+        <p>Diese Erklärung gilt für</p>
+        <ul class="list-disc pl-6">
+          <li>unsere öffentliche Website <strong>hbdragons.de</strong>,</li>
+          <li>
+            unsere <strong>Web-App</strong> unter <strong>app.hbdragons.de</strong>, über die
+            Schiedsrichterinnen und Schiedsrichter, Trainerinnen und Trainer, Team-Managerinnen
+            und Team-Manager sowie der Vorstand ihre Vereinsaufgaben organisieren, und
+          </li>
+          <li>die <strong>Dragons App</strong> für iOS und Android (Abschnitt <a href="#app" class="underline underline-offset-2">Dragons App und Web-App</a>).</li>
+        </ul>
+        <p>
+          Website und App greifen auf dieselbe Vereinsinfrastruktur zu. Abschnitte, die diese
+          Infrastruktur beschreiben (Hosting, Empfänger, Drittländer, Rechte), gelten deshalb für
+          alle drei Zugänge gleichermaßen.
+        </p>
+      </div>
     </section>
 
     <section id="allgemeines" class="scroll-mt-24">
-      <h2 class="text-2xl font-semibold">2. Allgemeines zur Datenverarbeitung</h2>
+      <h2 class="text-2xl font-semibold">3. Allgemeines zur Datenverarbeitung</h2>
       <div class="mt-3 space-y-4">
         <p>
-          Wir verarbeiten personenbezogene Daten nur, soweit dies zur Bereitstellung einer
-          funktionsfähigen Website sowie unserer Inhalte und Leistungen erforderlich ist. Die
+          Wir verarbeiten personenbezogene Daten nur, soweit dies zur Bereitstellung
+          funktionsfähiger Angebote sowie unserer Inhalte und Leistungen erforderlich ist. Die
           Verarbeitung erfolgt auf Basis der in Abschnitt
           <a href="#rechtsgrundlagen" class="underline underline-offset-2">Rechtsgrundlagen</a>
           genannten Vorschriften.
+        </p>
+        <p>
+          Wir setzen <strong>keine Analyse-, Tracking- oder Marketing-Werkzeuge</strong> ein. Es
+          sind keine Inhalte Dritter (etwa Karten, Videos oder Schriftarten von fremden Servern)
+          eingebettet, die beim Aufruf einer Seite ohne Ihr Zutun geladen würden.
         </p>
       </div>
     </section>
 
     <section id="hosting" class="scroll-mt-24">
-      <h2 class="text-2xl font-semibold">3. Hosting (IONOS &amp; Hetzner)</h2>
+      <h2 class="text-2xl font-semibold">4. Hosting und technische Bereitstellung</h2>
       <div class="mt-3 space-y-4">
         <p>
-          Unsere Systeme werden auf Servern der
-          <strong>IONOS SE, Elgendorfer Straße 57, 56410 Montabaur, Deutschland</strong>, sowie der
+          Die statischen Seiten von hbdragons.de und unser Mail-Server werden bei der
           <strong>Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, Deutschland</strong>,
           betrieben.
         </p>
         <p>
-          Über IONOS hosten wir u.a. unser Headless-CMS (Strapi). Hetzner wird für die
-          Bereitstellung unserer <strong>statischen Website</strong> sowie für den Betrieb unseres
-          <strong>Mail-Servers</strong> genutzt.
+          Unsere Vereinsanwendungen — die Schnittstelle (API) unter api.app.hbdragons.de, die
+          Web-App unter app.hbdragons.de, unser Redaktionssystem (Payload CMS) unter
+          cms.hbdragons.de, die zugehörigen Datenbanken und der Medienspeicher — laufen bei
+          <strong>Google Cloud</strong> in der Region <strong>europe-west3 (Frankfurt am Main)</strong>.
+          Vertragspartner ist Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland.
         </p>
         <p>
-          Die Provider verarbeiten technische Daten (z.&nbsp;B. IP-Adresse, Datum und Uhrzeit des
-          Zugriffs, angeforderte Ressource, HTTP-Status, übertragene Datenmenge, Referrer,
-          User-Agent), um die Bereitstellung und Sicherheit der Website sowie den E-Mail-Betrieb zu
-          gewährleisten.
+          Einzelne Bereiche der Website — Spielplan, nächste Spiele, Live-Anzeige und das
+          Probetrainings-Formular — laden ihre Inhalte beim Aufruf direkt aus dieser Schnittstelle
+          nach; Bilder aus dem Redaktionssystem werden aus dem Medienspeicher bei Google Cloud
+          geladen. Dabei übermittelt Ihr Browser technisch notwendige Verbindungsdaten
+          (insbesondere IP-Adresse, Zeitpunkt, angeforderte Ressource, HTTP-Status, übertragene
+          Datenmenge, Referrer, User-Agent) an die genannten Anbieter.
         </p>
         <p>
           <strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an
           einer sicheren und zuverlässigen Bereitstellung unserer Systeme).
         </p>
-        <p>Mit IONOS und Hetzner bestehen Verträge über Auftragsverarbeitung gem. Art. 28 DSGVO.</p>
+        <p>
+          Mit Hetzner besteht ein Vertrag über Auftragsverarbeitung gemäß Art. 28 DSGVO. Für Google
+          Cloud gilt der <strong>Cloud Data Processing Addendum</strong>, der Bestandteil der
+          Google-Cloud-Bedingungen ist.
+        </p>
       </div>
     </section>
 
-    <section id="cookies" class="scroll-mt-24">
-      <h2 class="text-2xl font-semibold">4. Verwendung von Cookies</h2>
+    <section id="server-logfiles" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">5. Server-Logfiles</h2>
       <div class="mt-3 space-y-4">
         <p>
-          Unsere Website verwendet <strong>ausschließlich technisch notwendige Cookies</strong>
-          (z.&nbsp;B. Session-Cookies), die für die Funktionsfähigkeit der Seite erforderlich sind
-          (u.&nbsp;a. Sitzungsverwaltung, grundlegende Navigation). Tracking- oder Marketing-Cookies
-          setzen wir nicht ein.
+          Die genannten Anbieter erheben und speichern automatisch Informationen in sogenannten
+          Server-Logfiles, die Ihr Browser oder die App automatisch übermittelt. Dazu gehören
+          insbesondere IP-Adresse, Datum und Uhrzeit, Zeitzonendifferenz, aufgerufene URL,
+          HTTP-Statuscode, jeweils übertragene Datenmenge, Referrer-URL sowie Browsertyp und
+          -version und Betriebssystem.
         </p>
         <p>
           <strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an
-          der fehlerfreien Bereitstellung der Website). Ein Cookie-Banner ist daher nicht
-          erforderlich.
+          der technischen Bereitstellung und Sicherheit, insbesondere zur Abwehr und Aufklärung von
+          Missbrauchs- oder Angriffsszenarien).
         </p>
-        <p class="text-sm text-muted-foreground">
-          Hinweis: Die Speicherdauer technisch notwendiger Cookies ist auf die jeweilige Sitzung
-          oder einen kurzen, zweckgebundenen Zeitraum beschränkt.
+        <p>
+          <strong>Speicherdauer:</strong> Logdaten werden nur so lange vorgehalten, wie es für
+          Betrieb und Sicherheit erforderlich ist, und danach von den Anbietern gelöscht.
         </p>
       </div>
     </section>
 
-    <section id="kontaktformular" class="scroll-mt-24">
-      <h2 class="text-2xl font-semibold">5. Kontaktformular / Probetraining</h2>
+    <section id="endgeraet" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">6. Cookies und Speicherung auf Ihrem Endgerät</h2>
+      <div class="mt-3 space-y-4">
+        <p>
+          <strong>Öffentliche Website:</strong> hbdragons.de setzt <strong>keine Cookies</strong>
+          und speichert nichts auf Ihrem Endgerät. Ein Cookie-Banner ist deshalb nicht
+          erforderlich.
+        </p>
+        <p>
+          <strong>Web-App (app.hbdragons.de):</strong> Nach der Anmeldung setzen wir ein
+          <strong>technisch notwendiges Sitzungs-Cookie</strong>, das Sie angemeldet hält.
+          Tracking- oder Marketing-Cookies setzen wir nicht ein. Das Cookie wird mit der Abmeldung
+          oder mit Ablauf der Sitzung ungültig.
+        </p>
+        <p>
+          <strong>Dragons App:</strong> Die App speichert auf Ihrem Gerät das Anmelde-Token, Ihre
+          Anzeige-Einstellungen, einen Zwischenspeicher für App-Aktualisierungen und die
+          Einstellung, ob die App per Geräte-Sperre geschützt ist.
+        </p>
+        <p>
+          <strong>Rechtsgrundlage:</strong> § 25 Abs. 2 Nr. 2 TDDDG (unbedingt erforderlich, damit
+          der von Ihnen ausdrücklich gewünschte Dienst bereitgestellt werden kann) sowie für die
+          anschließende Verarbeitung Art. 6 Abs. 1 lit. b und lit. f DSGVO.
+        </p>
+      </div>
+    </section>
+
+    <section id="probetraining" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">7. Probetraining</h2>
       <div class="mt-3 space-y-4">
         <p>
           Auf unserer Website stellen wir ein Formular zur Anmeldung für ein Probetraining bereit.
@@ -110,54 +198,382 @@ import { strings } from "../../lib/strings";
         <ul class="list-disc pl-6">
           <li>Geburtsmonat und Geburtsjahr</li>
           <li>Geschlecht</li>
+          <li>Angabe, ob bereits Basketball gespielt wurde</li>
           <li>E-Mail-Adresse</li>
           <li>Ihre Nachricht (Freitext)</li>
+          <li>die Bestätigung, dass Sie diese Datenschutzerklärung zur Kenntnis genommen haben</li>
         </ul>
         <p>
           <strong>Zweck der Verarbeitung:</strong> Bearbeitung Ihrer Anfrage, Koordination des
-          Probetrainings sowie ggf. weitere organisatorische Kommunikation.
+          Probetrainings sowie gegebenenfalls weitere organisatorische Kommunikation.
         </p>
         <p>
-          <strong>Speicherung und Empfänger:</strong> Die Angaben werden in unserem Headless-CMS
-          <strong>Strapi</strong> gespeichert (Betrieb über IONOS). Zusätzlich werden die
-          Formulardaten per <strong>E-Mail</strong> über unseren Mail-Server bei
-          <strong>Hetzner</strong> an uns übermittelt. Eine Weitergabe an Dritte findet nicht
-          statt.
+          <strong>Speicherung und Empfänger:</strong> Die Angaben werden in unserer Vereinsdatenbank
+          bei Google Cloud in Frankfurt am Main gespeichert und zusätzlich per E-Mail über unseren
+          Mail-Server bei Hetzner an das Vereinspostfach
+          <SafeMail email="training@hbdragons.de" /> übermittelt. Eine Weitergabe an weitere Dritte
+          findet nicht statt.
         </p>
         <p>
-          <strong>Rechtsgrundlagen:</strong> Art. 6 Abs. 1 lit. b DSGVO (vorvertragliche Maßnahmen)
-          und Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an der Vereinsorganisation und
-          Beantwortung von Anfragen).
+          <strong>Missbrauchsschutz:</strong> Zur Begrenzung automatisierter Massenanfragen halten
+          wir die IP-Adresse der Absenderin oder des Absenders für <strong>eine Stunde</strong> in
+          einem flüchtigen Zwischenspeicher vor. Die IP-Adresse wird <strong>nicht</strong> zusammen
+          mit Ihrer Anfrage gespeichert. Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO.
         </p>
         <p>
-          <strong>Speicherdauer:</strong> Die Daten werden spätestens 6 Monate nach Abschluss des
-          Probetrainings gelöscht, sofern keine Mitgliedschaft zustande kommt oder keine
-          gesetzlichen Aufbewahrungspflichten entgegenstehen.
+          <strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. b DSGVO (Durchführung
+          vorvertraglicher Maßnahmen auf Ihre Anfrage hin). Die Bestätigung im Formular ist eine
+          Kenntnisnahme dieser Erklärung, keine Einwilligung.
+        </p>
+        <p>
+          <strong>Speicherdauer:</strong> Die Anfragen werden spätestens <strong>6 Monate</strong>
+          nach Eingang gelöscht, sofern keine Mitgliedschaft zustande kommt oder keine gesetzlichen
+          Aufbewahrungspflichten entgegenstehen.
         </p>
       </div>
     </section>
 
-    <section id="server-logfiles" class="scroll-mt-24">
-      <h2 class="text-2xl font-semibold">6. Server-Logfiles</h2>
+    <section id="personen" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">8. Namen und Fotos auf unserer Website</h2>
       <div class="mt-3 space-y-4">
         <p>
-          Die Hosting-Provider (IONOS und Hetzner) erheben und speichern automatisch Informationen
-          in sogenannten Server-Logfiles, die Ihr Browser automatisch übermittelt. Dazu gehören
-          insbesondere IP-Adresse, Datum und Uhrzeit, Zeitzonendifferenz, aufgerufene URL,
-          HTTP-Statuscode, jeweils übertragene Datenmenge, Referrer-URL sowie Browsertyp/-version
-          und Betriebssystem.
+          Auf unserer Website nennen wir Vorstandsmitglieder, Ehrenamtliche, Trainerinnen und
+          Trainer sowie Schiedsrichterinnen und Schiedsrichter mit Name, Funktion und in der Regel
+          mit einem Foto. Zweck ist die Darstellung des Vereins und die Erreichbarkeit der
+          jeweiligen Ansprechpersonen.
         </p>
         <p>
           <strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an
-          der technischen Bereitstellung und Sicherheit, insbesondere zur Abwehr und Aufklärung von
-          Missbrauchs- oder Angriffsszenarien).
+          einer nachvollziehbaren Vereinsdarstellung).
+        </p>
+        <p>
+          Sie können der Veröffentlichung jederzeit nach Art. 21 DSGVO widersprechen. Wir entfernen
+          den Eintrag dann ohne Angabe von Gründen. Eine formlose Nachricht an
+          <SafeMail email="datenschutz@hbdragons.de" /> genügt.
         </p>
       </div>
+    </section>
+
+    <section id="spielbetrieb" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">9. Spielplan, Ergebnisse und Tabellen</h2>
+      <div class="mt-3 space-y-4">
+        <p>
+          Spielpläne, Ergebnisse und Tabellen beziehen wir über die Schnittstelle des
+          <strong>Deutschen Basketball Bundes</strong> (basketball-bund.net). Die auf der
+          öffentlichen Website angezeigten Angaben — Mannschaften, Spielstätten, Anwurfzeiten und
+          Ergebnisse — enthalten <strong>keine personenbezogenen Daten</strong>.
+        </p>
+        <p>
+          Personenbezogene Daten aus dieser Quelle (insbesondere Schiedsrichter-Ansetzungen)
+          verarbeiten wir ausschließlich im angemeldeten Bereich; siehe Abschnitt
+          <a href="#app" class="underline underline-offset-2">Dragons App und Web-App</a>.
+        </p>
+      </div>
+    </section>
+
+    <section id="social-media" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">10. Soziale Netzwerke und externe Links</h2>
+      <div class="mt-3 space-y-4">
+        <p>
+          Wir betreiben Vereinsseiten bei <strong>Instagram</strong> und <strong>Facebook</strong>
+          (Meta Platforms Ireland Limited), <strong>YouTube</strong> (Google Ireland Limited) und
+          <strong>LinkedIn</strong> (LinkedIn Ireland Unlimited Company).
+        </p>
+        <p>
+          Auf unserer Website stehen dazu <strong>einfache Verweise (Links)</strong>. Es sind keine
+          Inhalte oder Schaltflächen dieser Netzwerke eingebettet: Solange Sie einen Link nicht
+          anklicken, werden keine Daten an die Netzwerke übertragen. Gleiches gilt für den Verweis
+          auf Google Maps in den Angaben zu Spielstätten.
+        </p>
+        <p>
+          Für die Verarbeitung auf den Plattformen selbst sind die jeweiligen Anbieter
+          verantwortlich; es gelten deren Datenschutzhinweise. Für die Besuchsstatistiken unserer
+          Seiten bei Instagram und Facebook sind wir gemeinsam mit Meta Verantwortliche im Sinne des
+          <strong>Art. 26 DSGVO</strong>. Auf die dort erhobenen Daten haben wir nur in Form
+          zusammengefasster, nicht personenbezogener Statistiken Zugriff. Rechtsgrundlage für unsere
+          Vereinsdarstellung in diesen Netzwerken ist Art. 6 Abs. 1 lit. f DSGVO.
+        </p>
+        <p>
+          Für Inhalte verlinkter fremder Seiten sind ausschließlich deren Anbieter verantwortlich.
+        </p>
+      </div>
+    </section>
+
+    <section id="app" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">11. Dragons App und Web-App</h2>
+      <div class="mt-3 space-y-4">
+        <p>
+          Dieser Abschnitt beschreibt die Verarbeitung in der <strong>Dragons App</strong> für iOS
+          und Android sowie in der <strong>Web-App</strong> unter app.hbdragons.de. Beide greifen auf
+          dieselbe Vereinsinfrastruktur zu; die Abschnitte
+          <a href="#hosting" class="underline underline-offset-2">Hosting</a>,
+          <a href="#empfaenger" class="underline underline-offset-2">Empfänger</a>,
+          <a href="#drittland" class="underline underline-offset-2">Drittländer</a> und
+          <a href="#rechte" class="underline underline-offset-2">Rechte</a> gelten entsprechend.
+        </p>
+      </div>
+
+      <h3 class="mt-6 text-xl font-semibold">11.1 Öffentliche Inhalte ohne Konto</h3>
+      <div class="mt-3 space-y-4">
+        <p>
+          Spielpläne, Ergebnisse und Tabellen lassen sich ohne Konto abrufen. Dabei fallen die in
+          Abschnitt <a href="#server-logfiles" class="underline underline-offset-2">Server-Logfiles</a>
+          beschriebenen Verbindungsdaten an. Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO.
+        </p>
+      </div>
+
+      <h3 class="mt-6 text-xl font-semibold">11.2 Konten und Rollen</h3>
+      <div class="mt-3 space-y-4">
+        <p>
+          Konten werden <strong>vom Verein angelegt</strong>; eine Selbstregistrierung gibt es
+          nicht. Verarbeitet werden Name, E-Mail-Adresse, die zugewiesene Rolle (etwa
+          Schiedsrichter, Trainer, Team-Manager, Vorstand), ein optionales Profilbild sowie die im
+          Rahmen der Vereinsaufgaben anfallenden Daten (zum Beispiel Ansetzungen, Aufgaben,
+          Benachrichtigungen).
+        </p>
+        <p>
+          <strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. b DSGVO im Rahmen des
+          Mitgliedschafts- beziehungsweise Ehrenamtsverhältnisses sowie Art. 6 Abs. 1 lit. f DSGVO
+          (berechtigtes Interesse an der Organisation des Spiel- und Vereinsbetriebs).
+        </p>
+        <p>
+          <strong>Hinweis nach Art. 13 Abs. 2 lit. e DSGVO:</strong> Die Bereitstellung der Daten
+          ist erforderlich, um ein Konto führen zu können; ohne sie ist eine Nutzung des
+          angemeldeten Bereichs nicht möglich.
+        </p>
+      </div>
+
+      <h3 class="mt-6 text-xl font-semibold">11.3 Push-Benachrichtigungen</h3>
+      <div class="mt-3 space-y-4">
+        <p>
+          Push-Benachrichtigungen erhalten Sie nur, wenn Sie sie im Betriebssystem zulassen. Dazu
+          speichern wir auf dem Vereinsserver ein <strong>Push-Token</strong>, die Plattform (iOS
+          oder Android) und die Spracheinstellung Ihres Geräts.
+        </p>
+        <p>
+          <strong>Empfänger:</strong> Der Versand läuft über den Push-Dienst von
+          <strong>Expo (650 Industries, Inc., USA)</strong> und von dort über
+          <strong>Apple Push Notification service</strong> beziehungsweise
+          <strong>Firebase Cloud Messaging</strong> an Ihr Gerät.
+        </p>
+        <p>
+          Sie können Push-Benachrichtigungen jederzeit in den Einstellungen Ihres Geräts abschalten.
+          <strong>Mit der Abmeldung in der App wird das Push-Token auf dem Vereinsserver gelöscht.</strong>
+        </p>
+        <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an der zeitnahen Information über Ansetzungen und Spielbetrieb).</p>
+      </div>
+
+      <h3 class="mt-6 text-xl font-semibold">11.4 App-Aktualisierungen</h3>
+      <div class="mt-3 space-y-4">
+        <p>
+          Bei jedem Start prüft die App bei <strong>u.expo.dev</strong> (Expo, USA), ob eine
+          aktualisierte Fassung vorliegt. Dabei werden IP-Adresse, Plattform, die Laufzeitversion
+          der App und eine zufällige Kennung übertragen. <strong>Eine Nutzerkennung wird dabei nicht
+          übermittelt.</strong>
+        </p>
+        <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an einer aktuellen und fehlerfreien App).</p>
+      </div>
+
+      <h3 class="mt-6 text-xl font-semibold">11.5 Sperre per Geräte-Entsperrung</h3>
+      <div class="mt-3 space-y-4">
+        <p>
+          Sie können die App optional mit der Entsperrmethode Ihres Geräts (zum Beispiel Face ID,
+          Touch ID oder Geräte-Code) schützen. Die Prüfung übernimmt ausschließlich das
+          Betriebssystem; die App erhält lediglich die Rückmeldung „erfolgreich“ oder
+          „nicht erfolgreich“.
+          <strong>Biometrische Daten erreichen den Verein zu keiner Zeit</strong>, eine Verarbeitung
+          besonderer Kategorien personenbezogener Daten nach Art. 9 DSGVO findet nicht statt.
+        </p>
+      </div>
+
+      <h3 class="mt-6 text-xl font-semibold">11.6 KI-Assistent</h3>
+      <div class="mt-3 space-y-4">
+        <p>
+          Im angemeldeten Bereich steht ein KI-gestützter Assistent für Fragen rund um den Verein
+          zur Verfügung. <strong>Sie kommunizieren dabei mit einem KI-System, nicht mit einem
+          Menschen.</strong>
+        </p>
+        <p>
+          Ihre Eingaben werden über unsere Schnittstelle an die <strong>Gemini API von Google</strong>
+          weitergegeben und dort für die Dauer der Antwortgenerierung verarbeitet. Google handelt
+          dabei als Auftragsverarbeiter auf Grundlage des Google-Auftragsverarbeitungsvertrags; wir
+          nutzen die kostenpflichtigen Dienste, sodass <strong>Ihre Eingaben nicht zum Training von
+          Modellen verwendet werden</strong>. Wir speichern die Verläufe nicht auf dem
+          Vereinsserver.
+        </p>
+        <p>
+          Bitte geben Sie im Assistenten <strong>keine personenbezogenen Daten Dritter</strong> und
+          keine vertraulichen Informationen ein.
+        </p>
+        <p>
+          <strong>Hinweis nach Art. 13 Abs. 2 lit. f DSGVO:</strong> Eine automatisierte
+          Entscheidungsfindung einschließlich Profiling im Sinne des Art. 22 DSGVO findet nicht
+          statt.
+        </p>
+        <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an einem einfachen Zugang zu Vereinsinformationen).</p>
+      </div>
+
+      <h3 class="mt-6 text-xl font-semibold">11.7 Daten aus dem Spielbetrieb</h3>
+      <div class="mt-3 space-y-4">
+        <p>
+          Für den angemeldeten Bereich übernehmen wir Spiel-, Vereins- und Schiedsrichterdaten aus
+          der Schnittstelle des <strong>Deutschen Basketball Bundes</strong>. Dazu gehören
+          insbesondere Ansetzungen mit Namen der angesetzten Schiedsrichterinnen und
+          Schiedsrichter.
+        </p>
+        <p>
+          <strong>Hinweis nach Art. 14 Abs. 2 lit. f DSGVO:</strong> Quelle dieser Daten ist der
+          Deutsche Basketball Bund (basketball-bund.net).
+        </p>
+        <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an der Organisation des Spielbetriebs).</p>
+      </div>
+
+      <h3 class="mt-6 text-xl font-semibold">11.8 App Stores</h3>
+      <div class="mt-3 space-y-4">
+        <p>
+          Der Bezug der App läuft über den <strong>App Store</strong> (Apple Distribution
+          International Ltd., Irland) beziehungsweise <strong>Google Play</strong> (Google Ireland
+          Limited). Die dabei anfallenden Daten — etwa Nutzerkonto, Downloadzeitpunkt und
+          Gerätekennung — verarbeiten die Betreiber <strong>eigenverantwortlich</strong>; wir haben
+          darauf keinen Einfluss und erhalten von dort keine personenbezogenen Daten.
+        </p>
+      </div>
+
+      <h3 class="mt-6 text-xl font-semibold">11.9 Löschung des Kontos</h3>
+      <div class="mt-3 space-y-4">
+        <p>
+          Sie können die Löschung Ihres Kontos jederzeit beantragen — in der App unter
+          <strong>Profil → Rechtliches → Konto löschen beantragen</strong> oder per E-Mail an
+          <SafeMail email="datenschutz@hbdragons.de" />. Wir löschen das Konto, die zugehörigen
+          Rollen und die gespeicherten Push-Tokens <strong>innerhalb von 30 Tagen</strong> und
+          bestätigen die Löschung per E-Mail.
+        </p>
+        <p>
+          Unabhängig davon deaktivieren oder löschen die Vereinsadministratorinnen und
+          -administratoren Konten, wenn die zugrunde liegende Rolle oder die Mitgliedschaft endet.
+          Eine automatische Löschung nach einer festen Frist findet nicht statt.
+        </p>
+        <p>
+          Daten, die wir aus rechtlichen Gründen aufbewahren müssen (zum Beispiel
+          Schiedsrichter-Abrechnungen), bleiben davon unberührt und werden nach Ablauf der
+          gesetzlichen Aufbewahrungsfristen gelöscht.
+        </p>
+      </div>
+    </section>
+
+    <section id="email" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">12. E-Mail-Kommunikation</h2>
+      <div class="mt-3 space-y-4">
+        <p>
+          Wenn Sie uns per E-Mail schreiben oder wir Ihnen Benachrichtigungen per E-Mail senden,
+          läuft der Versand und Empfang über unseren Mail-Server bei der
+          <strong>Hetzner Online GmbH</strong> in Deutschland. Wir verarbeiten die Absenderadresse
+          und den Inhalt Ihrer Nachricht, um Ihr Anliegen zu bearbeiten.
+        </p>
+        <p>
+          <strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. b DSGVO, soweit es um ein Vertrags-
+          oder Mitgliedschaftsverhältnis geht, sonst Art. 6 Abs. 1 lit. f DSGVO (berechtigtes
+          Interesse an der Beantwortung von Anfragen).
+        </p>
+      </div>
+    </section>
+
+    <section id="empfaenger" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">13. Empfänger und Auftragsverarbeiter</h2>
+      <div class="mt-3 space-y-4">
+        <p>Wir setzen die folgenden Dienstleister ein:</p>
+        <ul class="list-disc space-y-2 pl-6">
+          <li>
+            <strong>Hetzner Online GmbH</strong> (Deutschland) — Webspace und Mail-Server;
+            Auftragsverarbeitung nach Art. 28 DSGVO.
+          </li>
+          <li>
+            <strong>Google Ireland Limited / Google Cloud</strong> (Rechenzentrum Frankfurt am
+            Main) — Anwendungen, Datenbanken, Medienspeicher; Auftragsverarbeitung nach dem Cloud
+            Data Processing Addendum.
+          </li>
+          <li>
+            <strong>Google Ireland Limited / Gemini API</strong> — KI-Assistent;
+            Auftragsverarbeitung nach dem Google-Auftragsverarbeitungsvertrag, kostenpflichtige
+            Dienste ohne Nutzung der Eingaben zu Trainingszwecken.
+          </li>
+          <li>
+            <strong>650 Industries, Inc. („Expo“)</strong> (USA) — Versand von
+            Push-Benachrichtigungen und Auslieferung von App-Aktualisierungen; Auftragsverarbeitung
+            auf Grundlage der Expo-Nutzungsbedingungen einschließlich der
+            <strong>Standardvertragsklauseln (Modul 2)</strong>.
+          </li>
+          <li>
+            <strong>Apple Distribution International Ltd.</strong> und
+            <strong>Google Ireland Limited</strong> — App Stores, jeweils
+            <strong>eigenverantwortlich</strong>.
+          </li>
+          <li>
+            <strong>Deutscher Basketball Bund e.V.</strong> — Quelle der Spiel- und
+            Schiedsrichterdaten, <strong>eigenverantwortlich</strong>.
+          </li>
+          <li>
+            <strong>Meta Platforms Ireland Limited</strong>, <strong>Google Ireland Limited</strong>
+            und <strong>LinkedIn Ireland Unlimited Company</strong> — Betrieb unserer Seiten in
+            sozialen Netzwerken (siehe Abschnitt
+            <a href="#social-media" class="underline underline-offset-2">Soziale Netzwerke</a>).
+          </li>
+        </ul>
+        <p>
+          Eine Kopie der jeweiligen Vereinbarung stellen wir Ihnen auf Anfrage zur Verfügung.
+        </p>
+      </div>
+    </section>
+
+    <section id="drittland" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">14. Übermittlung in Drittländer</h2>
+      <div class="mt-3 space-y-4">
+        <p>
+          Der Betrieb unserer Anwendungen findet in Deutschland statt. Eine Übermittlung in die
+          <strong>USA</strong> erfolgt bei Push-Benachrichtigungen und App-Aktualisierungen über
+          Expo sowie, soweit Google-Konzerngesellschaften eingebunden sind, im Rahmen der
+          Google-Dienste.
+        </p>
+        <p>
+          Für Google LLC besteht eine Zertifizierung nach dem
+          <strong>EU-US Data Privacy Framework</strong>, für das die Europäische Kommission mit
+          Beschluss vom 10. Juli 2023 ein angemessenes Schutzniveau festgestellt hat. Ergänzend und
+          für Expo gelten die <strong>Standardvertragsklauseln</strong> der Europäischen Kommission
+          nach Art. 46 Abs. 2 lit. c DSGVO. Trotz dieser Garantien lässt sich ein Zugriff
+          US-amerikanischer Behörden nicht vollständig ausschließen.
+        </p>
+        <p>
+          Eine Kopie der Standardvertragsklauseln erhalten Sie auf Anfrage unter
+          <SafeMail email="datenschutz@hbdragons.de" />.
+        </p>
+      </div>
+    </section>
+
+    <section id="speicherdauer" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">15. Speicherdauer im Überblick</h2>
+      <ul class="mt-3 list-disc space-y-2 pl-6">
+        <li><strong>Probetrainings-Anfragen:</strong> spätestens 6 Monate nach Eingang.</li>
+        <li><strong>IP-Adresse zum Missbrauchsschutz im Formular:</strong> 1 Stunde.</li>
+        <li>
+          <strong>Konten und Rollen:</strong> auf Antrag innerhalb von 30 Tagen, sonst bis zum Ende
+          der Rolle oder der Mitgliedschaft.
+        </li>
+        <li><strong>Push-Tokens:</strong> bis zur Abmeldung in der App.</li>
+        <li><strong>Eingaben im KI-Assistenten:</strong> keine Speicherung auf dem Vereinsserver.</li>
+        <li>
+          <strong>Protokolle des Spielbetriebs (Synchronisationsläufe):</strong> 90 Tage;
+          <strong>Vorgangsprotokolle:</strong> 365 Tage.
+        </li>
+        <li>
+          <strong>Server-Logfiles:</strong> nach Maßgabe der Anbieter, nur so lange wie für Betrieb
+          und Sicherheit erforderlich.
+        </li>
+      </ul>
     </section>
 
     <section id="sicherheit" class="scroll-mt-24">
       <h2 class="text-2xl font-semibold">
-        7. Sicherheit (SSL/TLS &amp; technische/organisatorische Maßnahmen)
+        16. Sicherheit (SSL/TLS &amp; technische/organisatorische Maßnahmen)
       </h2>
       <div class="mt-3 space-y-4">
         <p>
@@ -169,31 +585,48 @@ import { strings } from "../../lib/strings";
         <p>
           Darüber hinaus setzen wir angemessene technische und organisatorische Maßnahmen (TOMs)
           ein, um Ihre Daten gegen Manipulation, Verlust, Zerstörung oder unbefugten Zugriff zu
-          schützen. Unsere Maßnahmen werden entsprechend der technologischen Entwicklung
-          fortlaufend angepasst.
+          schützen. Zugriffe auf den angemeldeten Bereich sind an persönliche Konten und Rollen
+          gebunden; Zugangsdaten und Schlüssel werden getrennt von den Anwendungsdaten verwaltet.
+          Unsere Maßnahmen werden entsprechend der technologischen Entwicklung fortlaufend
+          angepasst.
         </p>
       </div>
     </section>
 
     <section id="rechtsgrundlagen" class="scroll-mt-24">
-      <h2 class="text-2xl font-semibold">8. Rechtsgrundlagen im Überblick</h2>
+      <h2 class="text-2xl font-semibold">17. Rechtsgrundlagen im Überblick</h2>
       <ul class="mt-3 list-disc space-y-2 pl-6">
         <li>
-          <strong>Art. 6 Abs. 1 lit. b DSGVO</strong> – Erforderlichkeit zur Durchführung
-          vorvertraglicher Maßnahmen (Probetraining-Anfragen).
+          <strong>Art. 6 Abs. 1 lit. b DSGVO</strong> – Erfüllung eines Vertrags- oder
+          Mitgliedschaftsverhältnisses und Durchführung vorvertraglicher Maßnahmen
+          (Probetrainings-Anfragen, Konten).
         </li>
         <li>
-          <strong>Art. 6 Abs. 1 lit. f DSGVO</strong> – Berechtigtes Interesse (Bereitstellung der
-          Website, Sicherheit, technisch notwendige Cookies, Bearbeitung allgemeiner Anfragen).
+          <strong>Art. 6 Abs. 1 lit. f DSGVO</strong> – Berechtigtes Interesse (Bereitstellung von
+          Website und Apps, Sicherheit, Vereinsdarstellung, Organisation des Spielbetriebs,
+          Push-Benachrichtigungen, KI-Assistent).
         </li>
         <li>
-          <strong>Art. 28 DSGVO</strong> – Auftragsverarbeitung (Hosting durch IONOS und Hetzner).
+          <strong>§ 25 Abs. 2 Nr. 2 TDDDG</strong> – Unbedingt erforderliche Speicherung auf dem
+          Endgerät (Sitzungs-Cookie der Web-App, Speicherung in der Dragons App).
+        </li>
+        <li>
+          <strong>Art. 28 DSGVO</strong> – Auftragsverarbeitung (Hetzner, Google Cloud, Gemini API,
+          Expo).
+        </li>
+        <li>
+          <strong>Art. 26 DSGVO</strong> – Gemeinsame Verantwortlichkeit (Seiten-Statistiken bei
+          Instagram und Facebook).
+        </li>
+        <li>
+          <strong>Art. 46 Abs. 2 lit. c DSGVO</strong> – Standardvertragsklauseln für
+          Übermittlungen in die USA.
         </li>
       </ul>
     </section>
 
     <section id="rechte" class="scroll-mt-24">
-      <h2 class="text-2xl font-semibold">9. Rechte der betroffenen Personen</h2>
+      <h2 class="text-2xl font-semibold">18. Rechte der betroffenen Personen</h2>
       <div class="mt-3 space-y-4">
         <p>Betroffene Personen haben folgende Rechte nach der DSGVO:</p>
         <ul class="list-disc pl-6">
@@ -205,10 +638,21 @@ import { strings } from "../../lib/strings";
           <li>Widerspruch (Art. 21 DSGVO)</li>
           <li>Beschwerde bei einer Aufsichtsbehörde (Art. 77 DSGVO)</li>
         </ul>
+        <p>
+          <strong>Widerspruchsrecht (Art. 21 DSGVO):</strong> Soweit wir Daten auf Grundlage
+          unseres berechtigten Interesses verarbeiten, können Sie der Verarbeitung aus Gründen, die
+          sich aus Ihrer besonderen Situation ergeben, jederzeit widersprechen.
+        </p>
+        <p>
+          <strong>Widerruf von Einwilligungen (Art. 7 Abs. 3 DSGVO):</strong> Soweit eine
+          Verarbeitung ausnahmsweise auf einer Einwilligung beruht — etwa die Zustimmung zu
+          Push-Benachrichtigungen im Betriebssystem — können Sie diese jederzeit mit Wirkung für
+          die Zukunft widerrufen.
+        </p>
         <div class="rounded-lg border border-border p-4">
           <p class="font-medium">Zuständige Aufsichtsbehörde (Niedersachsen)</p>
           <p>
-            Landesbeauftragte für den Datenschutz Niedersachsen<br />Prinzenstraße 5, 30159
+            Die Landesbeauftragte für den Datenschutz Niedersachsen<br />Prinzenstraße 5, 30159
             Hannover<br />
             E-Mail:
             <a href="mailto:poststelle@lfd.niedersachsen.de" class="underline underline-offset-2"
@@ -217,18 +661,21 @@ import { strings } from "../../lib/strings";
           </p>
         </div>
         <p>
-          Wenn Sie eines Ihrer Rechte ausüben möchten, wenden Sie sich bitte an uns (siehe
-          <a href="#verantwortlicher" class="underline underline-offset-2">Verantwortlicher</a>).
+          Wenn Sie eines Ihrer Rechte ausüben möchten, wenden Sie sich bitte an
+          <SafeMail email="datenschutz@hbdragons.de" /> oder an die in Abschnitt
+          <a href="#verantwortlicher" class="underline underline-offset-2">Verantwortlicher</a>
+          genannte Anschrift.
         </p>
       </div>
     </section>
 
     <section id="aenderungen" class="scroll-mt-24">
-      <h2 class="text-2xl font-semibold">10. Änderungen dieser Datenschutzerklärung</h2>
+      <h2 class="text-2xl font-semibold">19. Änderungen dieser Datenschutzerklärung</h2>
       <p class="mt-3">
         Wir behalten uns vor, diese Datenschutzerklärung anzupassen, damit sie stets den aktuellen
         rechtlichen Anforderungen entspricht oder um Änderungen unserer Leistungen in der Erklärung
-        umzusetzen.
+        umzusetzen. Es gilt die jeweils auf dieser Seite veröffentlichte Fassung mit dem oben
+        genannten Stand.
       </p>
     </section>
   </PageContainer>

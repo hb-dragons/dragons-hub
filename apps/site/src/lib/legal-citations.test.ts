@@ -13,6 +13,8 @@ import { IMPRESSUM_BOARD } from "./board";
 
 const SRC = fileURLToPath(new URL("..", import.meta.url));
 const IMPRESSUM = readFileSync(join(SRC, "pages/impressum/index.astro"), "utf8");
+const DATENSCHUTZ = readFileSync(join(SRC, "pages/datenschutz/index.astro"), "utf8");
+const KONTO_LOESCHEN = readFileSync(join(SRC, "pages/konto-loeschen/index.astro"), "utf8");
 const STRINGS = readFileSync(join(SRC, "lib/strings.ts"), "utf8");
 
 function walk(dir: string): string[] {
@@ -27,6 +29,15 @@ describe("legal citations", () => {
     const offenders = walk(SRC)
       .filter((file) => /\.(astro|ts|tsx)$/.test(file) && !file.endsWith(".test.ts"))
       .filter((file) => /\bTMG\b/.test(readFileSync(file, "utf8")))
+      .map((file) => file.slice(SRC.length));
+    expect(offenders).toEqual([]);
+  });
+
+  it("cites the repealed TTDSG nowhere in src", () => {
+    // Renamed to the TDDDG by the same 2024-05-14 act that retired the TMG.
+    const offenders = walk(SRC)
+      .filter((file) => /\.(astro|ts|tsx)$/.test(file) && !file.endsWith(".test.ts"))
+      .filter((file) => /\bTTDSG\b/.test(readFileSync(file, "utf8")))
       .map((file) => file.slice(SRC.length));
     expect(offenders).toEqual([]);
   });
@@ -72,5 +83,75 @@ describe("legal citations", () => {
     const numbers = [...IMPRESSUM.matchAll(/<h2[^>]*>(\d+)\. /g)].map((m) => Number(m[1]));
     expect(numbers.length).toBeGreaterThan(0);
     expect(numbers).toEqual(numbers.map((_, i) => i + 1));
+  });
+});
+
+// Issue #241: the Datenschutzerklärung now covers the website, the Web-App and
+// the Dragons App in one document. It is hand-written Astro like the Impressum,
+// so the same on-disk checks guard the parts that go stale silently — retired
+// providers, renamed statutes, and the anchor the app and both store records
+// link to.
+describe("Datenschutzerklärung", () => {
+  it("names no retired provider", () => {
+    // IONOS hosted the old Strapi CMS; both were replaced by Payload on Google
+    // Cloud. Naming a processor we no longer use is a false Art. 13 statement.
+    expect(DATENSCHUTZ).not.toMatch(/IONOS/i);
+    expect(DATENSCHUTZ).not.toMatch(/Strapi/i);
+  });
+
+  it("keeps the stable #app anchor the app and the store records link to", () => {
+    expect(DATENSCHUTZ).toMatch(/<section id="app"/);
+  });
+
+  it("records that no Datenschutzbeauftragter is appointed", () => {
+    expect(DATENSCHUTZ).toContain("Ein Datenschutzbeauftragter ist nicht benannt");
+  });
+
+  it("rests device storage on § 25 Abs. 2 Nr. 2 TDDDG", () => {
+    expect(DATENSCHUTZ).toContain("§ 25 Abs. 2 Nr. 2 TDDDG");
+  });
+
+  it("states that the public site sets no cookies", () => {
+    // The static site sets none; the session cookie belongs to the Web-App.
+    expect(DATENSCHUTZ).toMatch(/setzt <strong>keine Cookies<\/strong>/);
+  });
+
+  it("declares joint controllership for the Meta pages", () => {
+    expect(DATENSCHUTZ).toContain("Art. 26 DSGVO");
+  });
+
+  it("names both safeguards for the US transfers", () => {
+    expect(DATENSCHUTZ).toContain("EU-US Data Privacy Framework");
+    expect(DATENSCHUTZ).toContain("Standardvertragsklauseln");
+    expect(DATENSCHUTZ).toContain("Art. 46 Abs. 2 lit. c DSGVO");
+  });
+
+  it("discloses the federation as the source of third-party data", () => {
+    expect(DATENSCHUTZ).toContain("Art. 14 Abs. 2 lit. f DSGVO");
+  });
+
+  it("promises the same deletion window as the Konto-löschen page", () => {
+    // Both pages are read by the app stores; a mismatch between them is the
+    // kind of contradiction a reviewer notices.
+    for (const page of [DATENSCHUTZ, KONTO_LOESCHEN]) {
+      expect(page).toMatch(/innerhalb von 30 Tagen/);
+      expect(page).toContain("datenschutz@hbdragons.de");
+    }
+  });
+
+  it("numbers the sections contiguously from 1", () => {
+    // \s* because a long heading wraps to the next line under Prettier.
+    const numbers = [...DATENSCHUTZ.matchAll(/<h2[^>]*>\s*(\d+)\. /g)].map((m) => Number(m[1]));
+    expect(numbers.length).toBeGreaterThan(0);
+    expect(numbers).toEqual(numbers.map((_, i) => i + 1));
+  });
+
+  it("numbers every app subsection under its own section", () => {
+    const section = Number(/<h2[^>]*>\s*(\d+)\. Dragons App/.exec(DATENSCHUTZ)?.[1]);
+    expect(section).toBeGreaterThan(0);
+    const subs = [...DATENSCHUTZ.matchAll(/<h3[^>]*>(\d+)\.(\d+) /g)];
+    expect(subs.length).toBeGreaterThan(0);
+    expect(subs.map((m) => Number(m[1]))).toEqual(subs.map(() => section));
+    expect(subs.map((m) => Number(m[2]))).toEqual(subs.map((_, i) => i + 1));
   });
 });
