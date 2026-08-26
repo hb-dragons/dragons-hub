@@ -1,9 +1,14 @@
 /**
  * React island port of dragons-app HomeNextGames.vue + GameCard family:
  * @dragons/ui primitives restyled by site.css, @dragons/api-client raw-TS
- * consumption, /public/home/dashboard fetch (falls back to fixture data
- * when CORS blocks — TRUSTED_ORIGINS gap closes with plan Task B1). The
- * fetched games are narrowed to the legacy week window by lib/next-games.
+ * consumption, /public/home/dashboard fetch. The fetched games are narrowed
+ * to the legacy week window by lib/next-games.
+ *
+ * A failed fetch renders an error, never substitute games (#257). This island
+ * used to answer a rejection with three hardcoded fixtures as a stopgap for a
+ * CORS gap; that gap closed once TRUSTED_ORIGINS listed the site origins, and
+ * inventing fixtures on the club's landing page is not a fallback anyone can
+ * act on safely.
  */
 import { useEffect, useState } from "react";
 import { ApiClient, createApi } from "@dragons/api-client";
@@ -39,61 +44,6 @@ type GameLite = Pick<
   | "homeScore"
   | "guestScore"
 >;
-
-/* Fixture — used only when the live fetch fails (CORS gap until Task B1). */
-const FIXTURE: GameLite[] = [
-  {
-    id: 1,
-    kickoffDate: "2026-10-10",
-    kickoffTime: "15:00:00",
-    homeTeamName: "HB Dragons",
-    guestTeamName: "TK Hannover",
-    homeTeamCustomName: "Herren 1",
-    guestTeamCustomName: null,
-    homeIsOwnClub: true,
-    guestIsOwnClub: false,
-    homeClubId: 4121,
-    guestClubId: 4213,
-    venueName: "IGS Roderbruch",
-    venueNameOverride: null,
-    homeScore: null,
-    guestScore: null,
-  },
-  {
-    id: 2,
-    kickoffDate: "2026-10-10",
-    kickoffTime: "17:30:00",
-    homeTeamName: "HB Dragons 2",
-    guestTeamName: "VfL Eintracht Hannover",
-    homeTeamCustomName: "Herren 2",
-    guestTeamCustomName: null,
-    homeIsOwnClub: true,
-    guestIsOwnClub: false,
-    homeClubId: 4121,
-    guestClubId: 4189,
-    venueName: "IGS Roderbruch",
-    venueNameOverride: null,
-    homeScore: null,
-    guestScore: null,
-  },
-  {
-    id: 3,
-    kickoffDate: "2026-10-11",
-    kickoffTime: "12:00:00",
-    homeTeamName: "SG Weende",
-    guestTeamName: "HB Dragons",
-    homeTeamCustomName: null,
-    guestTeamCustomName: "Damen 1",
-    homeIsOwnClub: false,
-    guestIsOwnClub: true,
-    homeClubId: 4302,
-    guestClubId: 4121,
-    venueName: "Sporthalle Weende",
-    venueNameOverride: null,
-    homeScore: null,
-    guestScore: null,
-  },
-];
 
 function formatTime(timeString: string) {
   return timeString.split(":").slice(0, 2).join(":");
@@ -180,15 +130,14 @@ function GameCard({ game }: { game: GameLite }) {
 
 export default function NextGamesIsland() {
   const [games, setGames] = useState<GameLite[] | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     api.public
       .getHomeDashboard()
       .then((d) => setGames(nextGames(d.upcomingGames)))
       .catch(() => {
-        // Fixture stays unwindowed on purpose: its static dates would age out
-        // of the week window and blank the fallback.
-        setGames(FIXTURE);
+        setFailed(true);
       });
   }, []);
 
@@ -203,7 +152,7 @@ export default function NextGamesIsland() {
         {strings.nextGames.heading}
       </h2>
 
-      {games === null && (
+      {games === null && !failed && (
         <div className="space-y-6">
           <Skeleton className="h-6 w-48 mx-auto" />
           <div className="space-y-3">
@@ -212,6 +161,12 @@ export default function NextGamesIsland() {
             ))}
           </div>
         </div>
+      )}
+
+      {failed && (
+        <p className="text-center text-muted-foreground py-8">
+          {strings.nextGames.loadError}
+        </p>
       )}
 
       {games?.length === 0 && (

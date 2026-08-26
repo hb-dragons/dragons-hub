@@ -35,10 +35,14 @@ export default defineConfig({
         // not importable under vitest. The pattern for covering them is
         // `legal-citations.test.ts` and `deploy-config.test.ts` — read the
         // file from disk and assert against its text.
-        branches: 56,
-        functions: 48,
-        lines: 60,
-        statements: 62,
+        //
+        // Ratcheted 2026-08-26 (#257): the NextGamesIsland tests that replaced
+        // the fabricated-fixture fallback. Measured 65.23 statements / 62.67
+        // branches / 53.15 functions / 63.78 lines.
+        branches: 62,
+        functions: 53,
+        lines: 63,
+        statements: 65,
       },
     },
   },
