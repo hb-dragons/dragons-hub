@@ -55,6 +55,9 @@ export const strings = {
   nextGames: {
     heading: "Unsere nächsten Spiele",
     empty: "Keine Spiele geplant",
+    // Kept distinct from `empty` on purpose (#257): an outage must not read
+    // as "no games this week".
+    loadError: "Die nächsten Spiele konnten nicht geladen werden. Bitte versuche es später erneut.",
     allGames: "Alle Spiele",
     versus: "VS",
   },
