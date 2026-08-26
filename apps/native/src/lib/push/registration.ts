@@ -33,14 +33,17 @@ export async function getPushPermissionStatus(): Promise<PushPermissionStatus> {
   }
 }
 
-async function registerToken(projectId: string): Promise<void> {
+/** True only once the token has actually reached the API. */
+async function registerToken(projectId: string): Promise<boolean> {
   try {
     const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
     const locale = getLocales()[0]?.languageTag;
     const platform = Platform.OS === "android" ? "android" : "ios";
     await deviceApi.register(token, platform, locale);
+    return true;
   } catch (err) {
     console.warn("[push] registration failed", err);
+    return false;
   }
 }
 
@@ -52,18 +55,23 @@ async function registerToken(projectId: string): Promise<void> {
  * `requestPushPermissionAndRegister`.
  *
  * No-ops on simulators and when projectId / permission is missing.
+ *
+ * Returns whether a token reached the API, which is what lets
+ * `createSessionRegistration` stop calling this on every foreground (#253)
+ * without breaking the "granted in iOS Settings" path — that case returns
+ * false until the grant happens, and true once.
  */
-export async function registerForPush(): Promise<void> {
-  if (!Device.isDevice) return;
+export async function registerForPush(): Promise<boolean> {
+  if (!Device.isDevice) return false;
 
   const projectId = getProjectId();
   if (!projectId) {
     console.warn("[push] missing EAS projectId, push disabled");
-    return;
+    return false;
   }
 
-  if ((await getPushPermissionStatus()) !== "granted") return;
-  await registerToken(projectId);
+  if ((await getPushPermissionStatus()) !== "granted") return false;
+  return registerToken(projectId);
 }
 
 /** The one call site of the OS prompt. Registers on grant. */

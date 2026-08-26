@@ -5,6 +5,7 @@ import { AppState } from "react-native";
 import { authClient } from "@/lib/auth-client";
 import { getPushPermissionStatus, registerForPush } from "@/lib/push/registration";
 import { decidePushFlow, readPushPromptDeferred } from "@/lib/push/pre-prompt";
+import { createSessionRegistration } from "@/lib/push/session-registration";
 import {
   setPushAuthState,
   subscribeToTaps,
@@ -16,7 +17,8 @@ import {
  * exists, either registers the device's push token (permission already
  * granted) or opens the pre-permission sheet once (#237). Also re-checks on
  * every foreground, so permission granted in iOS Settings registers the
- * device in the same session instead of waiting for the next cold start.
+ * device in the same session instead of waiting for the next cold start —
+ * once per session rather than once per foreground (#253).
  *
  * Must be mounted INSIDE the auth tree (so the session is available)
  * and above any screen that expects taps to deep-link.
@@ -26,6 +28,15 @@ export function usePushRegistration(): void {
   // One sheet per sign-in: the effect re-runs on the same user id only after
   // sign-out, which resets this.
   const prompted = useRef(false);
+  // One registration per signed-in session, shared by the sign-in effect and
+  // the foreground listener below. Rebuilt when the user id changes so
+  // signing in as somebody else registers the device for the new account.
+  const userId = session?.user?.id;
+  const registration = useRef({ userId, tracker: createSessionRegistration(registerForPush) });
+  if (registration.current.userId !== userId) {
+    registration.current = { userId, tracker: createSessionRegistration(registerForPush) };
+  }
+  const { tracker } = registration.current;
 
   // Feed the session state to the deep-link gate FIRST, so a cold-start tap
   // resolved by the subscription below is held rather than followed blind.
@@ -55,7 +66,7 @@ export function usePushRegistration(): void {
       if (cancelled) return;
       const flow = decidePushFlow({ isDevice: Device.isDevice, signedIn: true, status, deferred });
       if (flow === "register") {
-        await registerForPush();
+        await tracker.ensure();
       } else if (flow === "prompt" && !prompted.current) {
         prompted.current = true;
         router.push("/push-permission");
@@ -69,15 +80,15 @@ export function usePushRegistration(): void {
   // Re-register when the app returns from Settings with permission newly
   // granted (#237 review): registerForPush is a no-op unless the OS says
   // granted, so this can never prompt — the sheet is the sign-in effect's
-  // job alone.
-  const userId = session?.user?.id;
+  // job alone. `ensure` makes it a no-op once a token has reached the API,
+  // so a banner tap or a control-centre swipe costs nothing (#253).
   useEffect(() => {
     if (!userId) return;
     const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") void registerForPush();
+      if (state === "active") void tracker.ensure();
     });
     return () => sub.remove();
-  }, [userId]);
+  }, [userId, tracker]);
 
   // Tap subscription + cold-start tap check. Subscribe once.
   useEffect(() => {

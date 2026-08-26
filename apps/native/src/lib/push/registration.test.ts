@@ -74,13 +74,13 @@ describe("registerForPush", () => {
   it("registers the token when permission is already granted", async () => {
     vi.mocked(Notifications.getPermissionsAsync).mockResolvedValue({ status: "granted" } as never);
     vi.mocked(Notifications.getExpoPushTokenAsync).mockResolvedValue({ data: "tok-1" } as never);
-    await registerForPush();
+    await expect(registerForPush()).resolves.toBe(true);
     expect(deviceApi.register).toHaveBeenCalledWith("tok-1", "ios", "de-DE");
   });
 
   it("never triggers the OS prompt itself (the pre-permission sheet does, #237)", async () => {
     vi.mocked(Notifications.getPermissionsAsync).mockResolvedValue({ status: "undetermined", canAskAgain: true } as never);
-    await registerForPush();
+    await expect(registerForPush()).resolves.toBe(false);
     expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
     expect(deviceApi.register).not.toHaveBeenCalled();
   });
@@ -93,11 +93,27 @@ describe("registerForPush", () => {
     expect(deviceApi.register).toHaveBeenCalledWith("tok-2", "ios", undefined);
   });
 
+  // #253: `createSessionRegistration` stops calling this once it returns true,
+  // so every path that did not register a token has to say so.
+  it("reports false on a simulator without asking the OS", async () => {
+    env.isDevice = false;
+    await expect(registerForPush()).resolves.toBe(false);
+    expect(Notifications.getPermissionsAsync).not.toHaveBeenCalled();
+  });
+
+  it("reports false and warns when the EAS projectId is missing", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    env.projectId = undefined;
+    await expect(registerForPush()).resolves.toBe(false);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it("swallows a token failure with a warning (a build without FCM keeps working)", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.mocked(Notifications.getPermissionsAsync).mockResolvedValue({ status: "granted" } as never);
     vi.mocked(Notifications.getExpoPushTokenAsync).mockRejectedValue(new Error("no FCM"));
-    await registerForPush();
+    await expect(registerForPush()).resolves.toBe(false);
     expect(deviceApi.register).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
