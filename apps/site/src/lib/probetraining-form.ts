@@ -161,7 +161,7 @@ export function buildRequestBody(state: ProbetrainingFormState): ProbetrainingRe
 }
 
 /** Deadline for a submission. Matches the API client default (#271). */
-export const SUBMIT_TIMEOUT_MS = 30_000;
+const SUBMIT_TIMEOUT_MS = 30_000;
 
 export type SubmitOutcome = "success" | "rate_limited" | "error";
 

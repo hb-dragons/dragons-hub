@@ -39,10 +39,14 @@ export default defineConfig({
         // Ratcheted 2026-08-26 (#257): the NextGamesIsland tests that replaced
         // the fabricated-fixture fallback. Measured 65.23 statements / 62.67
         // branches / 53.15 functions / 63.78 lines.
-        branches: 62,
-        functions: 53,
-        lines: 63,
-        statements: 65,
+        //
+        // Ratcheted 2026-08-26 (#265, #269, #271): the nav-drawer, board,
+        // standings and next/prev-game tests. Measured 72.73 statements /
+        // 68.75 branches / 63.06 functions / 72.41 lines.
+        branches: 68,
+        functions: 62,
+        lines: 72,
+        statements: 72,
       },
     },
   },
