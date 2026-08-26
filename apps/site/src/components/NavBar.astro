@@ -91,7 +91,7 @@ const isActiveTeam = (slug: string) => path.includes(slug);
                   </div>
                 </a>
               ) : (
-                <button type="button" class="cursor-pointer">
+                <button type="button" class="cursor-pointer" data-panel-toggle aria-expanded="false">
                   <div class:list={itemClasses(link.active, false)}>
                     <p class="relative z-10 font-black uppercase">{link.label}</p>
                   </div>
@@ -173,15 +173,23 @@ const isActiveTeam = (slug: string) => path.includes(slug);
         id="nav-open"
         class="p-3 text-white cursor-pointer"
         aria-label={strings.nav.openMenu}
+        aria-expanded="false"
+        aria-controls="nav-drawer"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12"></line><line x1="4" x2="20" y1="6" y2="6"></line><line x1="4" x2="20" y1="18" y2="18"></line></svg>
       </button>
     </div>
   </div>
 
+  <div id="nav-backdrop" class="nav-backdrop fixed inset-0 z-40 bg-black/60 md:hidden"></div>
+
+  {/* `inert` while closed: the drawer is only moved offscreen by a transform,
+      so without it every link stays tabbable and announced below md (#265).
+      The script drops the attribute on open. */}
   <div
     id="nav-drawer"
-    class="nav-drawer fixed top-1 right-1 bottom-1 left-1 z-50 rounded-lg bg-background border border-border overflow-y-auto md:hidden"
+    class="nav-drawer fixed top-1 right-1 bottom-1 left-16 z-50 rounded-lg bg-background border border-border overflow-y-auto md:hidden"
+    inert
   >
     <div class="absolute top-0 right-0 flex justify-end items-center p-4">
       <button type="button" id="nav-close" class="p-2 cursor-pointer" aria-label={strings.nav.closeMenu}>
@@ -251,7 +259,8 @@ const isActiveTeam = (slug: string) => path.includes(slug);
   }
 
   .nav-item:hover .nav-panel,
-  .nav-item:focus-within .nav-panel {
+  .nav-item:focus-within .nav-panel,
+  .nav-item[data-panel-open] .nav-panel {
     display: block;
   }
 
@@ -262,20 +271,41 @@ const isActiveTeam = (slug: string) => path.includes(slug);
   :global(#site-nav[data-menu-open]) .nav-drawer {
     transform: translateX(0);
   }
+
+  /* Scroll lock while the drawer is open. */
+  :global(html[data-menu-open]) {
+    overflow: hidden;
+  }
+
+  .nav-backdrop {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  :global(#site-nav[data-menu-open]) .nav-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Below md the logo is hidden and the crossfade would leave the corner empty
+     until the first scroll, so the wordmark simply stays on (#265). */
+  @media (max-width: 767px) {
+    .nav-letters {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
 </style>
 
 <script>
+  import { setupMegaPanels, setupNavDrawer } from "../lib/nav-drawer";
+
   const setScrolled = () => {
     document.documentElement.toggleAttribute("data-scrolled", window.scrollY > 10);
   };
   setScrolled();
   window.addEventListener("scroll", setScrolled, { passive: true });
 
-  const nav = document.getElementById("site-nav");
-  document.getElementById("nav-open")?.addEventListener("click", () => {
-    nav?.setAttribute("data-menu-open", "");
-  });
-  document.getElementById("nav-close")?.addEventListener("click", () => {
-    nav?.removeAttribute("data-menu-open");
-  });
+  setupNavDrawer(document);
+  setupMegaPanels(document);
 </script>
