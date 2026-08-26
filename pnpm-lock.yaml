@@ -370,7 +370,7 @@ importers:
         version: 57.0.14(expo@57.0.16)(react-native@0.86.2(@babel/core@7.29.0(supports-color@8.1.1))(@react-native/metro-config@0.86.2(@babel/core@7.29.0(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.14)(react@19.2.6)(supports-color@8.1.1))(react@19.2.6)(supports-color@8.1.1)(typescript@6.0.3)
       expo-router:
         specifier: ~57.0.16
-        version: 57.0.16(87dbfd5ba0b6aba1a7057ea3f9818e63)
+        version: 57.0.16(8c9358d5caecc98e54e12f268cafadf5)
       expo-secure-store:
         specifier: ~57.0.1
         version: 57.0.1(expo@57.0.16)
@@ -490,6 +490,15 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.3.0
         version: 4.3.3(vite@8.2.1(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(sass@1.77.4)(terser@5.46.1)(tsx@4.23.12)(yaml@2.9.0))
+      '@testing-library/dom':
+        specifier: ^10.4.1
+        version: 10.4.1
+      '@testing-library/jest-dom':
+        specifier: ^6.9.1
+        version: 6.9.1
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.14
@@ -502,6 +511,9 @@ importers:
       eslint:
         specifier: ^9.28.0
         version: 9.39.4(jiti@2.7.0)(supports-color@8.1.1)
+      happy-dom:
+        specifier: ^20.9.0
+        version: 20.9.0
       tailwindcss:
         specifier: ^4.3.0
         version: 4.3.0
@@ -13427,7 +13439,7 @@ snapshots:
       ws: 8.21.3
       zod: 3.25.76
     optionalDependencies:
-      expo-router: 57.0.16(87dbfd5ba0b6aba1a7057ea3f9818e63)
+      expo-router: 57.0.16(8c9358d5caecc98e54e12f268cafadf5)
       react-native: 0.86.2(@babel/core@7.29.0(supports-color@8.1.1))(@react-native/metro-config@0.86.2(@babel/core@7.29.0(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.14)(react@19.2.6)(supports-color@8.1.1)
     transitivePeerDependencies:
       - '@expo/dom-webview'
@@ -13704,7 +13716,7 @@ snapshots:
       react: 19.2.6
     optionalDependencies:
       '@expo/metro-runtime': 57.0.13(@expo/log-box@57.0.3)(expo@57.0.16)(react-dom@19.2.6(react@19.2.6))(react-native@0.86.2(@babel/core@7.29.0(supports-color@8.1.1))(@react-native/metro-config@0.86.2(@babel/core@7.29.0(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.14)(react@19.2.6)(supports-color@8.1.1))(react@19.2.6)
-      expo-router: 57.0.16(87dbfd5ba0b6aba1a7057ea3f9818e63)
+      expo-router: 57.0.16(8c9358d5caecc98e54e12f268cafadf5)
       react-dom: 19.2.6(react@19.2.6)
     transitivePeerDependencies:
       - supports-color
@@ -19273,7 +19285,7 @@ snapshots:
       - supports-color
       - typescript
 
-  expo-router@57.0.16(87dbfd5ba0b6aba1a7057ea3f9818e63):
+  expo-router@57.0.16(8c9358d5caecc98e54e12f268cafadf5):
     dependencies:
       '@expo/log-box': 57.0.3(@expo/dom-webview@57.0.1)(expo@57.0.16)(react-native@0.86.2(@babel/core@7.29.0(supports-color@8.1.1))(@react-native/metro-config@0.86.2(@babel/core@7.29.0(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.14)(react@19.2.6)(supports-color@8.1.1))(react@19.2.6)
       '@expo/metro-runtime': 57.0.13(@expo/log-box@57.0.3)(expo@57.0.16)(react-dom@19.2.6(react@19.2.6))(react-native@0.86.2(@babel/core@7.29.0(supports-color@8.1.1))(@react-native/metro-config@0.86.2(@babel/core@7.29.0(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.14)(react@19.2.6)(supports-color@8.1.1))(react@19.2.6)
