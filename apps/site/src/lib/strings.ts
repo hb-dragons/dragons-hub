@@ -97,7 +97,7 @@ export const strings = {
     fallbackHeading: "Supporter",
     heroTitle: "Werde Supporter unseres Vereins!",
     heroDescription:
-      "Unser Verein steht für Integration, Zusammenhalt und soziales Miteinander - mit Basketball als Herzstück. Wir machen den Sport für alle zugänglich, bauen Barrieren ab und fördern Teilhabe. Um diese Arbeit fortzuführen und weiter auszubauen, sind starke Suppoerter an unserer Seite unverzichtbar.",
+      "Unser Verein steht für Integration, Zusammenhalt und soziales Miteinander - mit Basketball als Herzstück. Wir machen den Sport für alle zugänglich, bauen Barrieren ab und fördern Teilhabe. Um diese Arbeit fortzuführen und weiter auszubauen, sind starke Supporter an unserer Seite unverzichtbar.",
     listTitle: "Unsere Supporter",
     buttonLabel: "Zum Partner",
   },

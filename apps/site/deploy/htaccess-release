@@ -1,7 +1,16 @@
 # Uploaded by deploy-site.yml into every release as releases/<sha>/.htaccess.
 # It is the docroot file for site.testing.hbdragons.de; live traffic also
 # passes through here via current/, so the noindex header is host-gated.
-SetEnvIf Host ^site\.testing\. TESTING_HOST
-Header set X-Robots-Tag "noindex, nofollow" env=TESTING_HOST
+# Both directives are module-gated (#260): an unloaded module makes Apache
+# return 500 for every request in this directory rather than skip the line,
+# and this file is the docroot for the testing host while live apex traffic
+# passes through it via current/. A missing module must cost us the noindex
+# header, not the site.
+<IfModule mod_setenvif.c>
+  SetEnvIf Host ^site\.testing\. TESTING_HOST
+</IfModule>
+<IfModule mod_headers.c>
+  Header set X-Robots-Tag "noindex, nofollow" env=TESTING_HOST
+</IfModule>
 
 ErrorDocument 404 /404.html
