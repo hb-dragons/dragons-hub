@@ -58,16 +58,15 @@ const html = lexicalToHtml(Astro.props.content, cmsBaseUrl());
     font-size: 1rem;
     line-height: 1.5rem;
   }
-  /* Legacy links were Tailwind blue-400/300 in dark mode; the site theme has
-     no blue token (same mapping as DownloadCard's badge), so the resolved
-     values are pinned here. */
+  /* Legacy links were Tailwind blue-400/300 in dark mode; those values are the
+     site theme's `--info` / `--info-subtle` (issue #266). */
   .rich-text a {
-    color: #51a2ff;
+    color: var(--info);
     text-decoration: underline;
     transition: color 150ms;
   }
   .rich-text a:hover {
-    color: #8ec5ff;
+    color: var(--info-subtle);
   }
   .rich-text blockquote {
     border-left: 4px solid var(--border);

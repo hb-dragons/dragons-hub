@@ -108,6 +108,17 @@ Use shadows only for floating elements (popovers, dropdowns, modals). Cards use 
 
 Use `text-heat` or `bg-heat` when you need orange for urgency. Never use `--secondary` for this.
 
+### Info Palette (Blue — neutral emphasis)
+
+| Token | Light | Dark | Purpose |
+|---|---|---|---|
+| `info` | #1447e6 | #51a2ff | File-type badges, body links in rich text |
+| `info-foreground` | #ffffff | #052f6b | Text on info backgrounds |
+| `info-subtle` | #8ec5ff | #8ec5ff | Link hover, subtle info backgrounds |
+
+Blue carries no status meaning here. Use it for informational chrome, never for
+success or error — those are `--primary` and `--destructive`.
+
 ### Accent (Interactive hover/focus)
 
 | Token | Light | Dark | Purpose |

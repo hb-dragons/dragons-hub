@@ -1,8 +1,8 @@
 import type { MatchListItem } from "@dragons/shared";
-import { API_BASE } from "../../lib/api";
 import { formatGameDate, formatGameTime } from "../../lib/game-format";
 import { strings } from "../../lib/strings";
 import { TeamBadge, teamSlug } from "../spielplan/TeamBadge";
+import { ClubLogo } from "./ClubLogo";
 
 /**
  * Faithful port of the dragons-app game card family —
@@ -100,17 +100,21 @@ function CardTeam({ game, isAway = false }: { game: GameCardMatch; isAway?: bool
           className="h-full"
         >
           {isOwn ? (
-            <img
-              src="/img/logo.svg"
-              className="w-full h-full object-contain"
+            <ClubLogo
+              clubId={clubId}
+              isOwnClub
               alt={badgeName}
+              className="w-full h-full object-contain"
+              fallbackClassName="text-3xl md:text-4xl"
             />
           ) : (
             <div className="max-w-[80%] h-full">
-              <img
-                src={`${API_BASE}/public/assets/clubs/${clubId}.webp`}
-                className="w-full h-full object-contain"
+              <ClubLogo
+                clubId={clubId}
+                isOwnClub={false}
                 alt={federationName}
+                className="w-full h-full object-contain"
+                fallbackClassName="text-3xl md:text-4xl"
               />
             </div>
           )}

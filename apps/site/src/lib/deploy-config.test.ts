@@ -11,6 +11,10 @@ import { describe, expect, it } from "vitest";
 
 const DEPLOY = fileURLToPath(new URL("../../deploy/", import.meta.url));
 const RELEASE_HTACCESS = readFileSync(join(DEPLOY, "htaccess-release"), "utf8");
+const DEPLOY_WORKFLOW = readFileSync(
+  fileURLToPath(new URL("../../../../.github/workflows/deploy-site.yml", import.meta.url)),
+  "utf8",
+);
 
 /** Directives Apache rejects with a 500 when their module is not loaded. */
 const MODULE_GATED = [
@@ -35,5 +39,37 @@ describe("deploy/htaccess-release", () => {
   it("keeps the noindex header gated to the testing host", () => {
     expect(RELEASE_HTACCESS).toMatch(/X-Robots-Tag[^\n]*env=TESTING_HOST/);
     expect(RELEASE_HTACCESS).toMatch(/SetEnvIf\s+Host\s+\^site\\?\.testing\\?\./);
+  });
+});
+
+// Issue #269: an empty CMS produced a content-less build that passed every
+// gate — index.html and 404.html are static, and the smoke test's
+// case-insensitive "dragons" matched the NavBar logo alt. The workflow is
+// shell in YAML, so the gates are asserted here rather than left to a failed
+// production deploy.
+describe("deploy-site workflow content gates", () => {
+  it("was actually found", () => {
+    expect(DEPLOY_WORKFLOW).toContain("name: Deploy Site");
+  });
+
+  it("counts emitted team and news pages before uploading", () => {
+    expect(DEPLOY_WORKFLOW).toMatch(/TEAMS=\$\(count_pages teams\)/);
+    expect(DEPLOY_WORKFLOW).toMatch(/NEWS=\$\(count_pages news\)/);
+    expect(DEPLOY_WORKFLOW).toMatch(/content-less build/);
+  });
+
+  it("smoke-tests for a team link, not for the word dragons", () => {
+    expect(DEPLOY_WORKFLOW).not.toMatch(/grep -qi dragons/);
+    expect(DEPLOY_WORKFLOW).toContain(`grep -q 'href="/teams/'`);
+  });
+
+  it("publishes the release sha so the live release can be identified", () => {
+    expect(DEPLOY_WORKFLOW).toMatch(/release\.txt/);
+  });
+
+  it("rolls back automatically when the smoke test fails", () => {
+    expect(DEPLOY_WORKFLOW).toMatch(
+      /if: failure\(\) && steps\.smoke\.outcome == 'failure' && steps\.live\.outputs\.sha != ''/,
+    );
   });
 });

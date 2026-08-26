@@ -160,6 +160,9 @@ export function buildRequestBody(state: ProbetrainingFormState): ProbetrainingRe
   return { ...parsed.data, website: state.website };
 }
 
+/** Deadline for a submission. Matches the API client default (#271). */
+const SUBMIT_TIMEOUT_MS = 30_000;
+
 export type SubmitOutcome = "success" | "rate_limited" | "error";
 
 /**
@@ -169,19 +172,29 @@ export type SubmitOutcome = "success" | "rate_limited" | "error";
  */
 export async function submitProbetraining(
   body: ProbetrainingRequest,
-  options: { baseUrl: string; fetchImpl?: typeof fetch },
+  options: { baseUrl: string; fetchImpl?: typeof fetch; timeoutMs?: number },
 ): Promise<SubmitOutcome> {
   const fetchImpl = options.fetchImpl ?? fetch;
+  // A hung connection would otherwise leave the button in its submitting state
+  // forever: nothing rejects, so the island never reaches an outcome (#271).
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new Error("timeout")),
+    options.timeoutMs ?? SUBMIT_TIMEOUT_MS,
+  );
   try {
     const response = await fetchImpl(`${options.baseUrl}/public/probetraining`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
     if (response.status === 429) return "rate_limited";
     return response.ok ? "success" : "error";
   } catch {
     return "error";
+  } finally {
+    clearTimeout(timer);
   }
 }
 

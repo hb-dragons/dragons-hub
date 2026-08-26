@@ -2,7 +2,8 @@
  * The team detail page's Tabelle tab — React island port of dragons-app
  * `app/components/teams/Standings.vue`: the league table with Rang/Name/
  * Spiele/S/N/Punkte/Körbe columns, withdrawn teams struck through, and the
- * "N Teams" footer (error state: "Fehler beim Laden").
+ * "N Teams" footer. A failed fetch replaces the table with the error line
+ * rather than rendering an empty one (#271).
  *
  * The legacy island queried `/api/standings?ligaId=` with the CMS team's
  * league id; the public API serves every tracked league at once, so the
@@ -47,7 +48,17 @@ export default function StandingsIsland({ teamApiId }: { teamApiId: number | nul
     };
   }, [teamApiId]);
 
-  if (rows === null && !failed) {
+  // A failed (or timed-out) fetch used to fall through to the table below and
+  // render a full column header above zero rows, which reads as an empty
+  // league rather than a failure — GamesIsland already answers this case with
+  // a message, and the two disagreed (#271).
+  if (failed) {
+    return (
+      <p className="text-center text-muted-foreground py-8">{strings.teams.standingsError}</p>
+    );
+  }
+
+  if (rows === null) {
     return (
       <div className="space-y-2 py-2">
         {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -104,13 +115,9 @@ export default function StandingsIsland({ teamApiId }: { teamApiId: number | nul
         </table>
       </div>
       <div className="px-4 py-1 md:py-2 lg:py-3.5 border-t text-xs md:text-sm lg:text-base text-muted-foreground w-full flex justify-between items-center">
-        {failed ? (
-          <span className="text-red-500">{strings.teams.standingsError}</span>
-        ) : (
-          <span>
-            {standings.length} {strings.teams.teamsCount}
-          </span>
-        )}
+        <span>
+          {standings.length} {strings.teams.teamsCount}
+        </span>
       </div>
     </div>
   );

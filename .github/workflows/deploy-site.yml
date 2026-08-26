@@ -140,13 +140,38 @@ jobs:
           PUBLIC_API_URL: https://api.app.hbdragons.de
         run: pnpm turbo build --filter @dragons/site
 
+      # index.html and 404.html are emitted whatever the CMS answers, so their
+      # presence proves nothing about content. The counts below do: teams/ and
+      # news/ pages exist only because getStaticPaths mapped real documents, so
+      # an empty (or anonymously-read) CMS fails here, before anything is
+      # uploaded and long before the swap (#269).
       - name: Verify build output
         if: steps.mode.outputs.build == 'true'
+        env:
+          RELEASE_SHA: ${{ steps.mode.outputs.sha }}
         run: |
           set -euo pipefail
-          test -f apps/site/dist/index.html
-          test -f apps/site/dist/404.html
-          echo "dist: $(find apps/site/dist -type f | wc -l) files"
+          DIST=apps/site/dist
+          test -f "$DIST/index.html"
+          test -f "$DIST/404.html"
+
+          count_pages() { find "$DIST/$1" -mindepth 2 -name index.html 2>/dev/null | wc -l | tr -d ' '; }
+          TEAMS=$(count_pages teams)
+          NEWS=$(count_pages news)
+          echo "dist: $(find "$DIST" -type f | wc -l) files, $TEAMS team pages, $NEWS news pages"
+
+          if [ "$TEAMS" -lt 1 ] || [ "$NEWS" -lt 1 ]; then
+            echo "::error::content-less build (teams=$TEAMS news=$NEWS) — refusing to publish"
+            exit 1
+          fi
+          if ! grep -q 'href="/teams/' "$DIST/index.html"; then
+            echo "::error::homepage links no team — the CMS answered without content"
+            exit 1
+          fi
+
+          # Read back after the swap to identify the live release, which is
+          # what the rollback below needs.
+          printf '%s\n' "$RELEASE_SHA" > "$DIST/release.txt"
 
       # SFTP only — this webspace has no ssh, no rsync, and no way to create a
       # symlink remotely (swap.php owns `current`). The docroot `.htaccess` is
@@ -185,6 +210,24 @@ jobs:
 
           rm -f "$HOME/deploy_key"
 
+      # The sha that is live right now, so a failed smoke test can put it back.
+      # Best-effort: a first deploy, or a release predating release.txt, leaves
+      # it empty and the rollback step below becomes a no-op.
+      - name: Record the live release
+        id: live
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          set -uo pipefail
+          PREVIOUS=$(curl -fsS --max-time 20 "$SITE_URL/release.txt" 2>/dev/null | tr -d '[:space:]' || true)
+          if [[ "$PREVIOUS" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "sha=$PREVIOUS" >> "$GITHUB_OUTPUT"
+            echo "live release: $PREVIOUS"
+          else
+            echo "sha=" >> "$GITHUB_OUTPUT"
+            echo "live release: unknown (no usable release.txt) — auto-rollback unavailable"
+          fi
+
       # Always run — this single step is the whole rollback fast path.
       # The apex serves swap.php directly; never call it on the testing subdomain.
       - name: Swap current -> release
@@ -206,6 +249,7 @@ jobs:
       # browsable at SITE_URL (site.testing.hbdragons.de's docroot is
       # public_html/current), so there is nothing to gate on.
       - name: Smoke test
+        id: smoke
         env:
           SITE_URL: ${{ vars.SITE_URL }}
         run: |
@@ -213,8 +257,11 @@ jobs:
           # Body captured, not piped: `curl | grep -q` makes grep exit on the
           # first match, curl die of SIGPIPE, and `pipefail` fail a green smoke.
           HOMEPAGE=$(curl -fsS --retry 3 --retry-delay 5 --retry-connrefused "$SITE_URL/")
-          if ! grep -qi dragons <<<"$HOMEPAGE"; then
-            echo "::error::homepage at $SITE_URL/ does not look like the site"
+          # Not a case-insensitive grep for "dragons": the NavBar logo alt is
+          # "HB Dragons Logo", so that matched a page with no content at all
+          # (#269). A team link exists only if the CMS returned teams.
+          if ! grep -q 'href="/teams/' <<<"$HOMEPAGE"; then
+            echo "::error::homepage at $SITE_URL/ serves no team links — content-less release"
             exit 1
           fi
           # Real 404, not a soft 200 — .htaccess ErrorDocument must be in place.
@@ -223,7 +270,28 @@ jobs:
             echo "::error::expected HTTP 404 for an unknown path, got $STATUS"
             exit 1
           fi
-          echo "smoke ok: homepage serves, unknown path returns a real 404"
+          echo "smoke ok: homepage serves content, unknown path returns a real 404"
+
+      # The swap happens before the smoke test can reach the release — the
+      # testing host's docroot *is* current/ — so a failed smoke has to undo
+      # it rather than prevent it (#269).
+      - name: Roll back a failed smoke test
+        if: failure() && steps.smoke.outcome == 'failure' && steps.live.outputs.sha != ''
+        env:
+          DEPLOY_TOKEN: ${{ secrets.HETZNER_DEPLOY_TOKEN }}
+          PREVIOUS_SHA: ${{ steps.live.outputs.sha }}
+        run: |
+          set -euo pipefail
+          echo "::warning::smoke test failed — swapping back to $PREVIOUS_SHA"
+          RESPONSE=$(curl -fsS -X POST "https://hbdragons.de/swap.php" \
+            -H "X-Deploy-Token: $DEPLOY_TOKEN" \
+            --data-urlencode "sha=$PREVIOUS_SHA")
+          echo "swap.php: $RESPONSE"
+          if [ "$RESPONSE" != "ok $PREVIOUS_SHA" ]; then
+            echo "::error::rollback swap failed — the site is still on the bad release"
+            exit 1
+          fi
+          echo "rolled back to $PREVIOUS_SHA"
 
       - name: Summary
         if: always()

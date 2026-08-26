@@ -17,6 +17,7 @@ import type { MatchListItem } from "@dragons/shared";
 import { Badge } from "@dragons/ui/components/badge";
 import { Skeleton } from "@dragons/ui/components/skeleton";
 import { DEFAULT_API_BASE } from "../lib/api-base";
+import { ClubLogo } from "./game/ClubLogo";
 import { nextGames } from "../lib/next-games";
 import { SOFT_BUTTON_CLASSES } from "../lib/site-assets";
 import { strings } from "../lib/strings";
@@ -59,23 +60,19 @@ function TeamSide({ game, isAway }: { game: GameLite; isAway?: boolean }) {
   const own = isAway ? game.guestIsOwnClub : game.homeIsOwnClub;
   const clubId = isAway ? game.guestClubId : game.homeClubId;
   const score = isAway ? game.guestScore : game.homeScore;
-  const [imgFailed, setImgFailed] = useState(false);
   return (
     <div className="w-full flex flex-col items-center justify-center gap-1 md:gap-2 p-1 md:p-2 z-20">
       <div className="h-full flex items-center justify-center overflow-hidden mb-5 md:mb-8">
         {isAway && score != null && (
           <div className="text-xl md:text-2xl font-mono font-bold mr-4">{score}</div>
         )}
-        {imgFailed ? (
-          <span className="text-3xl md:text-4xl">🏀</span>
-        ) : (
-          <img
-            src={own ? "/img/logo.svg" : `${API_BASE}/public/assets/clubs/${clubId}.webp`}
-            className="h-12 md:h-16 w-auto object-contain"
-            alt={teamLabel(game, isAway ?? false)}
-            onError={() => setImgFailed(true)}
-          />
-        )}
+        <ClubLogo
+          clubId={clubId}
+          isOwnClub={own === true}
+          alt={teamLabel(game, isAway ?? false)}
+          className="h-12 md:h-16 w-auto object-contain"
+          fallbackClassName="text-3xl md:text-4xl"
+        />
         {!isAway && score != null && (
           <div className="text-xl md:text-2xl font-mono font-bold ml-4">{score}</div>
         )}

@@ -48,6 +48,46 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("payloadLoader content gate", () => {
+  // An expired CMS token degrades to anonymous reads rather than a 403, so the
+  // build used to succeed with every draft — or every document — missing, and
+  // shipped an empty site past every gate (#269).
+  it("fails a configured build when a required collection comes back empty", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(payloadPage([], false)));
+    const { context } = loaderHarness();
+
+    await expect(payloadLoader("teams", { required: true }).load(context)).rejects.toThrow(
+      /teams.*empty/i,
+    );
+  });
+
+  it("accepts a required collection that has documents", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(payloadPage([{ id: 1 }], false)));
+    const { entries, context } = loaderHarness();
+
+    await payloadLoader("teams", { required: true }).load(context);
+
+    expect([...entries.keys()]).toEqual(["1"]);
+  });
+
+  it("leaves an optional collection free to be empty", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(payloadPage([], false)));
+    const { context } = loaderHarness();
+
+    await expect(payloadLoader("downloads").load(context)).resolves.toBeUndefined();
+  });
+
+  it("says nothing about emptiness on an env-less shell build", async () => {
+    vi.unstubAllEnvs();
+    vi.stubEnv("CMS_URL", "");
+    vi.stubEnv("CMS_API_TOKEN", "");
+    const { context, warn } = loaderHarness();
+
+    await expect(payloadLoader("teams", { required: true }).load(context)).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+  });
+});
+
 describe("payloadLoader", () => {
   it("pages through the REST API until hasNextPage is false and stores every doc", async () => {
     const fetchMock = vi
