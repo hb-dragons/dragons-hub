@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { IMPRESSUM_BOARD } from "./board";
+
 // Issue #242: the TMG was repealed on 2024-05-14 (§ 5 TMG became § 5 DDG) and
 // the MStV was renumbered (§ 55 Abs. 2 became § 18 Abs. 2). The legal pages
 // are hand-written Astro outside any type system, so this test reads them from
@@ -46,11 +48,12 @@ describe("legal citations", () => {
     expect(IMPRESSUM).toMatch(/Verantwortlich[^<]*§ 18 Abs\. 2 MStV/);
   });
 
-  it("makes the 1. Vorsitzende(r) the § 18 MStV responsible, so a board change edits both lines", () => {
-    const chair = IMPRESSUM.match(/<li>([^<]+), 1\. Vorsitzende\w*<\/li>/)?.[1];
-    expect(chair).toBeTruthy();
-    const responsible = IMPRESSUM.match(/§ 18 Abs\. 2 MStV:<\/p>\s*<div[^>]*>\s*<p>([^<]+), 1\. Vorsitzende\w*<\/p>/)?.[1];
-    expect(responsible).toBe(chair);
+  it("takes both board statements from one source, so they cannot disagree", () => {
+    // Both the § 26 BGB list and the § 18 MStV responsible now render from
+    // IMPRESSUM_BOARD (#270), which the build also checks against the CMS.
+    expect(IMPRESSUM).toContain("IMPRESSUM_BOARD.map");
+    expect(IMPRESSUM).toMatch(/§ 18 Abs\. 2 MStV:<\/p>\s*<div[^>]*>\s*<p>\{chair\?\.name\}, \{chair\?\.role\}<\/p>/);
+    expect(IMPRESSUM_BOARD.some((member) => /^1\. Vorsitzende/.test(member.role))).toBe(true);
   });
 
   it("promises no Bildnachweise the CMS cannot attach to an image", () => {

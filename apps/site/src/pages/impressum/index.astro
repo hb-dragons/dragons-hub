@@ -1,11 +1,29 @@
 ---
 // Port of dragons-app app/pages/impressum/index.vue — legal content
-// hardcoded in the page by design (plan C4 port table).
+// hardcoded in the page by design (plan C4 port table), the board included:
+// see lib/board.ts for why, and for the build-time check below that stops it
+// drifting from the CMS `vorstand` collection /dragons/team/ renders (#270).
+import { getCollection } from "astro:content";
+
 import PageContainer from "../../components/PageContainer.astro";
 import PageHeader from "../../components/PageHeader.astro";
 import SafeMail from "../../components/SafeMail.astro";
 import Layout from "../../layouts/Layout.astro";
+import { boardMismatches, IMPRESSUM_BOARD } from "../../lib/board";
+import { publishedOnly } from "../../lib/published";
 import { strings } from "../../lib/strings";
+
+const chair = IMPRESSUM_BOARD.find((member) => /^1\. Vorsitzende/.test(member.role));
+
+const mismatches = boardMismatches(
+  (await getCollection("vorstand", publishedOnly)).map((entry) => entry.data),
+);
+if (mismatches.length > 0) {
+  throw new Error(
+    `Impressum board disagrees with the CMS Vorstand:\n- ${mismatches.join("\n- ")}\n` +
+      "Update src/lib/board.ts (and the § 18 MStV line follows it).",
+  );
+}
 ---
 
 <Layout title={strings.impressum.heading} description={strings.seo.impressum}>
@@ -32,8 +50,7 @@ import { strings } from "../../lib/strings";
       <h2 class="text-2xl font-semibold">2. Vertretungsberechtigter Vorstand (§ 26 BGB)</h2>
       <p class="mt-3">Vertreten durch den Vorstand gemäß § 26 BGB:</p>
       <ul class="mt-2 list-disc pl-6">
-        <li>Kianusch Pour Rahimi, 1. Vorsitzender</li>
-        <li>Talha Diş, stellv. Vorsitzender</li>
+        {IMPRESSUM_BOARD.map((member) => <li>{member.name}, {member.role}</li>)}
       </ul>
     </section>
 
@@ -59,7 +76,7 @@ import { strings } from "../../lib/strings";
       <h2 class="text-2xl font-semibold">5. Verantwortlich für journalistisch-redaktionelle Inhalte</h2>
       <p class="mt-3">Verantwortlich im Sinne von § 18 Abs. 2 MStV:</p>
       <div class="mt-2 space-y-1">
-        <p>Kianusch Pour Rahimi, 1. Vorsitzender</p>
+        <p>{chair?.name}, {chair?.role}</p>
         <p>Kolbergstraße 7, 30175 Hannover</p>
       </div>
     </section>
