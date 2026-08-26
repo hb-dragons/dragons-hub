@@ -238,12 +238,9 @@ describe("navigation architecture", () => {
   // the OS cannot handle) has one place to be reported. A second call site is
   // what this test exists to catch — today there is only the helper.
   it("routes every Linking.openURL through lib/legal/open-external", () => {
-    const sites = SOURCE_FILES.filter((file) => {
-      const source = readFileSync(file, "utf8");
-      return (
-        reactNativeImports(source).includes("Linking") && source.includes("Linking.openURL(")
-      );
-    }).map(rel);
+    const sites = SOURCE_FILES.filter((file) =>
+      reachesLinkingOpenURL(readFileSync(file, "utf8")),
+    ).map(rel);
     expect(sites).toEqual(["src/lib/legal/open-external.ts"]);
   });
 
@@ -351,6 +348,61 @@ function flatten(node: object, prefix = ""): [string, string][] {
 }
 
 /** The names a file imports from `react-native`, across a multi-line import. */
+/**
+ * Whether a file can reach `openURL` on react-native's `Linking`.
+ *
+ * Deliberately coarse: any file that pulls something out of `react-native`
+ * and names `openURL` anywhere counts. The precise version — the import
+ * clause must name `Linking`, the source must contain `Linking.openURL(` —
+ * missed a namespace import, an aliased one, a destructured method and a
+ * bracket access (#254), and the rule it serves wants the opposite bias.
+ * A false positive is a file that mentions `openURL` without calling it,
+ * which is one comment reworded; a false negative is a second call site
+ * shipping unnoticed.
+ */
+function reachesLinkingOpenURL(source: string): boolean {
+  const reachesReactNative = /(?:from|require)\s*\(?\s*["']react-native["']/.test(source);
+  return reachesReactNative && /\bopenURL\b/.test(source);
+}
+
+/**
+ * The rule above is only as good as this predicate (#254): its first version
+ * asked for the literal `Linking.openURL(` in a file whose react-native import
+ * clause named `Linking`, which every other spelling walked straight past.
+ */
+describe("reachesLinkingOpenURL", () => {
+  const cases: [string, string][] = [
+    ["a named import", `import { Linking } from "react-native";\nLinking.openURL(url);`],
+    ["a namespace import", `import * as RN from "react-native";\nRN.Linking.openURL(url);`],
+    ["an aliased import", `import { Linking as L } from "react-native";\nL.openURL(url);`],
+    [
+      "a destructured method",
+      `import { Linking } from "react-native";\nconst { openURL } = Linking;\nopenURL(url);`,
+    ],
+    ["a bracket access", `import { Linking } from "react-native";\nLinking["openURL"](url);`],
+    [
+      "a re-exported binding",
+      `export { Linking } from "react-native";\nexport const go = (u) => Linking.openURL(u);`,
+    ],
+  ];
+
+  it.each(cases)("catches %s", (_shape, source) => {
+    expect(reachesLinkingOpenURL(source)).toBe(true);
+  });
+
+  it("ignores a file that never reaches react-native", () => {
+    expect(reachesLinkingOpenURL(`import { openURL } from "./somewhere";\nopenURL(url);`)).toBe(
+      false,
+    );
+  });
+
+  it("ignores a react-native import with no openURL in it", () => {
+    expect(reachesLinkingOpenURL(`import { View } from "react-native";\nexport const A = View;`)).toBe(
+      false,
+    );
+  });
+});
+
 function reactNativeImports(source: string): string[] {
   // `[^}]` rather than a lazy `[\s\S]`: the lazy form happily starts at an
   // earlier import's brace and swallows everything up to this one's closer,
