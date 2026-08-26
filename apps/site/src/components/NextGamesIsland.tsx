@@ -130,7 +130,11 @@ function TeamSide({ game, isAway }: { game: GameLite; isAway?: boolean }) {
           <div className="text-xl md:text-2xl font-mono font-bold ml-4">{score}</div>
         )}
       </div>
-      <div className="absolute bottom-5 md:bottom-0.5">
+      {/* Clears the venue strip below (#261): it is absolutely positioned at
+          bottom-0 and grows from text-xs to text-sm at md, so a badge pinned
+          nearer the floor than that overprints it once the three-column grid
+          narrows each card. */}
+      <div className="absolute bottom-5 md:bottom-6">
         <Badge
           variant={own ? "default" : "secondary"}
           className="text-xs md:text-sm max-w-36 md:max-w-44 truncate"
