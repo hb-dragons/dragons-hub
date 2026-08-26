@@ -11,15 +11,18 @@ interface AssistantComposerProps {
   status: ChatStatus;
   onSend: (text: string) => void;
   onStop: () => void;
+  /** Gated until the AI notice is acknowledged (#236, ADR 0005). */
+  disabled?: boolean;
 }
 
-export function AssistantComposer({ status, onSend, onStop }: AssistantComposerProps) {
+export function AssistantComposer({ status, onSend, onStop, disabled = false }: AssistantComposerProps) {
   const t = useTranslations("qa");
   const [input, setInput] = useState("");
   const busy = status === "submitted" || status === "streaming";
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (disabled) return;
     const trimmed = input.trim();
     if (!trimmed) return;
     onSend(trimmed);
@@ -32,6 +35,7 @@ export function AssistantComposer({ status, onSend, onStop }: AssistantComposerP
         value={input}
         onChange={(e) => setInput(e.target.value)}
         placeholder={t("placeholder")}
+        disabled={disabled}
         className="max-h-32 min-h-[2.5rem] resize-none rounded-md"
         rows={1}
         onKeyDown={(e) => {
@@ -43,7 +47,9 @@ export function AssistantComposer({ status, onSend, onStop }: AssistantComposerP
           {t("stop")}
         </Button>
       ) : (
-        <Button type="submit">{t("send")}</Button>
+        <Button type="submit" disabled={disabled}>
+          {t("send")}
+        </Button>
       )}
     </form>
   );
