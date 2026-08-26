@@ -46,6 +46,13 @@ describe("legal citations", () => {
     expect(IMPRESSUM).toMatch(/Verantwortlich[^<]*§ 18 Abs\. 2 MStV/);
   });
 
+  it("makes the 1. Vorsitzende(r) the § 18 MStV responsible, so a board change edits both lines", () => {
+    const chair = IMPRESSUM.match(/<li>([^<]+), 1\. Vorsitzende\w*<\/li>/)?.[1];
+    expect(chair).toBeTruthy();
+    const responsible = IMPRESSUM.match(/§ 18 Abs\. 2 MStV:<\/p>\s*<div[^>]*>\s*<p>([^<]+), 1\. Vorsitzende\w*<\/p>/)?.[1];
+    expect(responsible).toBe(chair);
+  });
+
   it("promises no Bildnachweise the CMS cannot attach to an image", () => {
     expect(IMPRESSUM).not.toContain("Bildnachweise");
   });
