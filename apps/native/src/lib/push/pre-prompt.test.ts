@@ -13,8 +13,8 @@ import {
   PUSH_PROMPT_DEFERRED_KEY,
   clearPushPromptDeferral,
   decidePushFlow,
-  deferPushPrompt,
   pushStatusLabelKey,
+  recordPushSheetDismissal,
   readPushPromptDeferred,
 } from "@/lib/push/pre-prompt";
 
@@ -59,12 +59,28 @@ describe("deferral storage", () => {
     expect(await readPushPromptDeferred()).toBe(false);
   });
 
-  it("writes and clears the flag", async () => {
+  it("clears the flag", async () => {
     setItem.mockResolvedValue(undefined);
-    await deferPushPrompt();
-    expect(setItem).toHaveBeenCalledWith(PUSH_PROMPT_DEFERRED_KEY, "1");
     await clearPushPromptDeferral();
     expect(setItem).toHaveBeenCalledWith(PUSH_PROMPT_DEFERRED_KEY, "0");
+  });
+});
+
+describe("recordPushSheetDismissal", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("defers after a signed-in dismissal, so the sheet does not reopen on relaunch", async () => {
+    setItem.mockResolvedValue(undefined);
+    await recordPushSheetDismissal(true);
+    expect(setItem).toHaveBeenCalledWith(PUSH_PROMPT_DEFERRED_KEY, "1");
+  });
+
+  // #252: a `dragons://push-permission` link opened signed out is bounced by
+  // the sheet's Redirect before the user ever reads it. Writing the deferral
+  // there would suppress the automatic sheet after the next sign-in.
+  it("writes nothing when the sheet only ever bounced a signed-out visitor", async () => {
+    await recordPushSheetDismissal(false);
+    expect(setItem).not.toHaveBeenCalled();
   });
 });
 
