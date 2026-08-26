@@ -35,7 +35,23 @@ describe("legal citations", () => {
   });
 
   it("rests the liability section on the Digital Services Act", () => {
-    expect(IMPRESSUM).toMatch(/Verordnung \(EU\) 2022\/2065/);
+    expect(IMPRESSUM).toMatch(/Art\. 8 der Verordnung \(EU\) 2022\/2065/);
+  });
+
+  it("claims no hosting privilege — the site stores no user-posted content", () => {
+    expect(IMPRESSUM).not.toMatch(/Art\. 6/);
+  });
+
+  it("names the person responsible under § 18 Abs. 2 MStV", () => {
+    expect(IMPRESSUM).toMatch(/Verantwortlich[^<]*§ 18 Abs\. 2 MStV/);
+  });
+
+  it("promises no Bildnachweise the CMS cannot attach to an image", () => {
+    expect(IMPRESSUM).not.toContain("Bildnachweise");
+  });
+
+  it("calls the club Diensteanbieter throughout, never Seitenbetreiber", () => {
+    expect(IMPRESSUM).not.toContain("Seitenbetreiber");
   });
 
   it("names § 5 DDG in the Impressum SEO description", () => {
