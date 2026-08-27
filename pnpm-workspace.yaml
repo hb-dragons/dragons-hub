@@ -104,6 +104,10 @@ allowBuilds:
   # the SDK's build scripts were silently skipped. Same intent, spelled the
   # way this pnpm reads it.
   basketball-bund-sdk@https://codeload.github.com/dirkdrutschmann/basketball-bund-sdk/tar.gz/c72789068d9ec5910440f9e2b94f99b6e56d4800: true
+  # Its postinstall downloads the sentry-cli binary, which the EAS build hook
+  # uses to upload the JS source maps to GlitchTip (#238). Without the build
+  # script the package installs an empty shim and the upload step no-ops.
+  '@sentry/cli': true
 
 # pnpm's minimum-release-age gate holds back packages published in the last few
 # days. The Expo SDK 57 line (issue #213) is younger than that window, so each

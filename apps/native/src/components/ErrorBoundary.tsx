@@ -3,6 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { colors } from "@/theme/colors";
 import { radius, spacing } from "@/theme/spacing";
 import { i18n } from "@/lib/i18n";
+import { handleBoundaryError } from "@/lib/error-reporting";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -17,8 +18,9 @@ interface ErrorBoundaryState {
  * Root error boundary with a themed fallback rendered from the dark palette.
  *
  * Uses the dark tokens directly instead of `useTheme()` because the
- * ThemeProvider itself may be the thing that crashed. Logs via the same
- * `DRAGONS_JS_ERROR` prefix the global handler in `_layout.tsx` uses so it
+ * ThemeProvider itself may be the thing that crashed. Reporting goes through
+ * `handleBoundaryError`, which sends to GlitchTip and writes the same
+ * `DRAGONS_JS_ERROR` prefix the global handler uses, so a caught error still
  * shows up under `idevicesyslog | grep DRAGONS_JS_ERROR`.
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -29,11 +31,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    const stack = error.stack?.split("\n").slice(0, 8).join(" | ");
-    const componentStack = info.componentStack?.split("\n").slice(0, 8).join(" | ");
-    console.warn(
-      `DRAGONS_JS_ERROR boundary=root name=${error.name} msg=${error.message} stack=${stack} component=${componentStack}`,
-    );
+    handleBoundaryError(error, info.componentStack);
   }
 
   private handleReload = (): void => {

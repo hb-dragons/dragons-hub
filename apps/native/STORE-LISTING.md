@@ -24,6 +24,22 @@ before the system prompt.
 
 Demo accounts (production API): filled in by #250 before submission.
 
+## Privacy label (App Store Connect) / Data safety (Play)
+
+Both forms must match `ios.privacyManifests.NSPrivacyCollectedDataTypes`
+in `app.json` and § 11 of the Datenschutzerklärung. Since #238 the app
+collects one category:
+
+- **Diagnostics → Crash Data** and **Diagnostics → Other Diagnostic
+  Data** — crash and error reports sent to the club's GlitchTip project.
+  Purpose **App Functionality**; **not** linked to the user's identity;
+  **not** used for tracking. The SDK runs with `sendDefaultPii: false`,
+  so no name, mail address or account id is attached.
+
+Everything else the app sends (account data, push tokens, assistant
+prompts) goes to the club's own backend and is covered by the
+"Contact Info"/"User Content" answers, not by Diagnostics.
+
 ## Listing copy
 
 Filled by #245.

@@ -223,7 +223,18 @@ NEXT_PUBLIC_SCOREBOARD_DEVICE_ID=<must match SCOREBOARD_DEVICE_ID>
 NEXT_PUBLIC_ASSISTANT_ENABLED=false # web: show the reschedule copilot entry point on match detail
 NEXT_PUBLIC_CHATBOT_ENABLED=false # web: mount the club assistant widget on public pages
 EXPO_PUBLIC_CHATBOT_ENABLED=false # native: show the club assistant entry point
+EXPO_PUBLIC_GLITCHTIP_DSN= # native: crash reporting DSN; unset = reporting off
 ```
+
+`EXPO_PUBLIC_GLITCHTIP_DSN` is set as an EAS environment variable in the
+`preview` and `production` environments only, never in the repo and never in
+the `development` environment — a simulator build with a DSN would spend the
+free tier on errors nobody shipped. `lib/crash-reporting/options.ts` returns
+`null` without it, so the SDK is simply never started. Source-map upload runs
+inside the native build from the `@sentry/react-native/expo` plugin and needs
+`SENTRY_AUTH_TOKEN` in the same two EAS environments; the org and project
+slugs are not secrets and live in `app.json`. Details in
+`apps/native/RELEASES.md`.
 
 `apps/site` has its own env contract (see `apps/site/.env.example`, not the
 root `.env.example`, which is drift-locked to `apps/api`): `CMS_URL` +
