@@ -189,10 +189,13 @@ Android 13+ themed icons look bad without a monochrome layer.
       (#232): the manifest declares UserDefaults `CA92.1`, FileTimestamp
       `C617.1`, SystemBootTime `35F9.1` and DiskSpace `85F4.1`/`E174.1`
       (expo-file-system) with `NSPrivacyTracking: false`, and
-      `lib/app-config.test.ts` pins all five. Still open: read the
-      ITMS-91053 mail after the first upload of a new build and add any
-      API Apple flags; keep the App Store Connect privacy label in step
-      (audit §2.2).
+      `lib/app-config.test.ts` pins all five. `@sentry/react-native`
+      (#238) added no category — sentry-cocoa uses `CA92.1`, `35F9.1`
+      and `C617.1`, all already declared — but it did add
+      `NSPrivacyCollectedDataTypes` (crash + other diagnostic data,
+      unlinked, untracked). Still open: read the ITMS-91053 mail after
+      the first upload of a new build and add any API Apple flags; keep
+      the App Store Connect privacy label in step (audit §2.2).
 - [x] `locales` declares de + en with a translated Face ID prompt and
       `CFBundleAllowMixedLocalizations` is on (#232), so the binary is no
       longer English-only to iOS Settings and the store.
@@ -242,16 +245,61 @@ Android 13+ themed icons look bad without a monochrome layer.
 
 ## Observability
 
-### Crash reporting
+### Crash reporting — wired (#238)
 
-Currently only `console.warn` + NSLog. Release-build crashes are
-invisible.
-
-- [ ] Pick a service (Sentry, Bugsnag, Crashlytics) and create a
-      project for the org.
-- [ ] Wire it into `lib/global-error-handler.ts` and `ErrorBoundary`.
-- [ ] Upload source maps via EAS build hook (e.g. the Sentry Expo
-      config plugin) so stack traces symbolicate.
+- [x] Service chosen: **GlitchTip**, EU instance (`eu.glitchtip.com`,
+      Frankfurt), org `hb-dragons`, project `dragons-native`. It speaks
+      the Sentry ingest API, so the client is `@sentry/react-native`
+      pointed at it. Picked over Sentry SaaS because the EU instance
+      keeps the whole flow inside the EU — no third-country transfer to
+      argue in the Datenschutzerklärung — and over Crashlytics because
+      that would pull the Firebase native SDKs in for one feature.
+      Self-hosting later is a DSN change and nothing else.
+- [x] Both error paths report. Fatals: `Sentry.init` installs the
+      `ReactNativeErrorHandlers` integration, which patches
+      `ErrorUtils` itself and flushes the event before RCTFatal aborts —
+      `installGlobalErrorHandler` in `lib/error-reporting.ts` wraps that
+      handler and deliberately does *not* capture again, or every crash
+      would be filed twice. Caught errors:
+      `components/ErrorBoundary.tsx` reports by hand through
+      `handleBoundaryError`. Both paths still write the
+      `DRAGONS_JS_ERROR` NSLog line, the only trace readable with no
+      network and no account.
+- [x] Source maps: the `@sentry/react-native/expo` config plugin writes
+      `sentry.properties` with `defaults.url=https://eu.glitchtip.com/`,
+      and `metro.config.js` builds the config with `getSentryExpoConfig`
+      so the bundle and its map carry a matching Debug ID (verified
+      locally 2026-08-27 via `expo export:embed`). It must not be
+      `withSentryConfig` — see RELEASES.md.
+- [ ] **Human step, before the first preview build:** set two EAS
+      environment variables in the `preview` *and* `production`
+      environments (not `development`):
+      `EXPO_PUBLIC_GLITCHTIP_DSN` (the project DSN) and
+      `SENTRY_AUTH_TOKEN` (GlitchTip → profile → auth tokens, scope
+      `project:releases`), both visibility `sensitive`. Neither belongs
+      in the repo.
+- [ ] **Verify once:** build `preview`, install it, and force each path
+      once. There is no crash button in the app on purpose; add a
+      throw to a screen on a throwaway branch, or run
+      `eas build --profile preview --platform ios` against a commit that
+      has one:
+      `useEffect(() => { setTimeout(() => { throw new Error("DRAGONS_CRASH_TEST"); }, 3000); }, [])`
+      for the fatal path, and a bare `throw` in a component body for the
+      boundary path. Confirm two issues arrive in GlitchTip — tagged
+      `onerror` and `source: error-boundary` — with symbolicated JS
+      stacks, and confirm the fatal arrives exactly *once*. Native
+      (ObjC / Java) frames will *not* symbolicate: GlitchTip has no
+      native symbolication, which is accepted since both paths are JS.
+- [ ] Add "Diagnostics → Crash Data / Other Diagnostic Data" to the App
+      Store Connect privacy label and to Play's Data safety form, matching
+      `NSPrivacyCollectedDataTypes` in `app.json` (both unlinked,
+      untracked, App Functionality).
+- [ ] **Vorstand / Datenschutz:** request the AVV from GlitchTip (they
+      offer one on request, based on the Proton Mail DPA) and file it with
+      the other processor agreements. Confirm the 90-day event retention
+      the Datenschutzerklärung § 11.8 states — it is GlitchTip's default
+      (`GLITCHTIP_MAX_EVENT_LIFE_DAYS`), not something we set on the
+      hosted plan. Add the processor to the Verzeichnis (Art. 30).
 
 ### Analytics (optional)
 
@@ -380,8 +428,9 @@ SecureStore (it's an actual secret).
 - [x] ~~Move `ErrorUtils.setGlobalHandler` in `_layout.tsx` from
       module-scope into a `useEffect(..., [])` so fast-refresh doesn't
       chain handlers in dev.~~ Resolved (#213): it lives in
-      `lib/global-error-handler.ts`, installing returns the restore
-      function, and the effect's cleanup runs it.
+      `lib/error-reporting.ts` (named `global-error-handler.ts` until
+      #238 gave it the boundary's reporting path too), installing
+      returns the restore function, and the effect's cleanup runs it.
 - [x] ~~Fix pluralisation in `home.countdown.inDays` — `"In 1 Tagen"` is
       wrong German.~~ Done — `getCountdown` in `(tabs)/index.tsx` returns
       `home.countdown.today` / `.tomorrow` for 0 and 1 day, so `inDays`

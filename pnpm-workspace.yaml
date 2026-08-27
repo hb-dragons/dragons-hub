@@ -12,12 +12,13 @@ overrides:
   #     of the expo-* tree into two copies of each module.
   #   expo-glass-effect: expo-router asks for ^57.0.1 and apps/native pins the
   #     same line, so one copy serves both.
-  #   expo-constants: apps/native pins 57.0.14 while expo-linking asks for
-  #     ~57.0.13, which resolved a second copy of the module.
+  #   expo-constants: apps/native pins the SDK 57 version while expo-linking
+  #     asks for a slightly older patch line, which resolved a second copy of
+  #     the module.
   react: 19.2.6
-  react-native: 0.86.2
+  react-native: 0.86.3
   expo-glass-effect: 57.0.1
-  expo-constants: 57.0.14
+  expo-constants: 57.0.15
   # Capped at 1.6.23: better-auth 1.6.24 regressed the client-plugin generics, so
   # any plugin declaring `getActions` stops being assignable to
   # `BetterAuthClientPlugin`. One bad plugin collapses inference for the whole
@@ -103,6 +104,10 @@ allowBuilds:
   # the SDK's build scripts were silently skipped. Same intent, spelled the
   # way this pnpm reads it.
   basketball-bund-sdk@https://codeload.github.com/dirkdrutschmann/basketball-bund-sdk/tar.gz/c72789068d9ec5910440f9e2b94f99b6e56d4800: true
+  # Its postinstall downloads the sentry-cli binary, which the EAS build hook
+  # uses to upload the JS source maps to GlitchTip (#238). Without the build
+  # script the package installs an empty shim and the upload step no-ops.
+  '@sentry/cli': true
 
 # pnpm's minimum-release-age gate holds back packages published in the last few
 # days. The Expo SDK 57 line (issue #213) is younger than that window, so each
@@ -110,4 +115,4 @@ allowBuilds:
 # list itself — entries appear when an install needs them, so do not hand-edit.
 # Prune an entry once the lockfile no longer resolves that exact version (#231
 # dropped the SDK-57.0.12-era set).
-minimumReleaseAgeExclude: []
+minimumReleaseAgeExclude: [ '@expo/cli@57.0.19', '@expo/inline-modules@0.1.7', '@expo/local-build-cache-provider@57.0.8', '@expo/log-box@57.0.4', '@expo/metro-config@57.0.11', '@expo/metro-runtime@57.0.14', '@expo/prebuild-config@57.0.15', '@expo/router-server@57.0.8', babel-preset-expo@57.0.9, expo-asset@57.0.15, expo-constants@57.0.15, expo-file-system@57.0.6, expo-modules-autolinking@57.0.12, expo-modules-core@57.0.14, expo-modules-jsi@57.0.6, expo@57.0.17, '@expo/ui@57.0.14', expo-eas-client@57.0.2, expo-haptics@57.0.2, expo-linking@57.0.8, expo-notifications@57.0.15, expo-router@57.0.17, expo-secure-store@57.0.2, expo-updates@57.0.18 ]

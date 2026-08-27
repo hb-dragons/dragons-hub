@@ -26,6 +26,12 @@ const { expo } = JSON.parse(readFileSync(APP_JSON, "utf8")) as {
           NSPrivacyAccessedAPIType: string;
           NSPrivacyAccessedAPITypeReasons: string[];
         }[];
+        NSPrivacyCollectedDataTypes?: {
+          NSPrivacyCollectedDataType: string;
+          NSPrivacyCollectedDataTypeLinked: boolean;
+          NSPrivacyCollectedDataTypeTracking: boolean;
+          NSPrivacyCollectedDataTypePurposes: string[];
+        }[];
       };
     };
     android?: {
@@ -94,6 +100,12 @@ describe("app.json universal links", () => {
  * already covered) — verified in node_modules on 2026-08-25. Re-check the
  * union after adding a native dependency, and read the ITMS-91053 mail after
  * every first upload of a new build.
+ *
+ * @sentry/react-native (#238) adds no new category: sentry-cocoa declares
+ * UserDefaults CA92.1, SystemBootTime 35F9.1 and FileTimestamp C617.1, all
+ * three of which the list below already carries. It ships its manifest only
+ * in the dynamic framework, and this app builds static pods, which is the
+ * case Apple mis-parses — so the app-level declaration is what counts.
  */
 const REQUIRED_REASON_APIS: [type: string, reasons: string[]][] = [
   ["NSPrivacyAccessedAPICategoryUserDefaults", ["CA92.1"]],
@@ -141,5 +153,101 @@ describe("app.json locales", () => {
 
   it("allows mixed localizations so iOS picks the translated strings", () => {
     expect(expo.ios?.infoPlist?.CFBundleAllowMixedLocalizations).toBe(true);
+  });
+});
+
+/**
+ * What the binary sends off-device, declared for Apple. Crash reporting is
+ * the only collection the app does (#238): GlitchTip receives the exception,
+ * its stack and the breadcrumbs that led there. Performance data is not
+ * listed because tracing is off (`lib/crash-reporting/options.ts`), and
+ * nothing here is linked to a user or used for tracking.
+ *
+ * This has to agree with the App Store Connect privacy label and with § 11.8
+ * of the Datenschutzerklärung; all three are edited together.
+ */
+const COLLECTED_DATA_TYPES = [
+  "NSPrivacyCollectedDataTypeCrashData",
+  "NSPrivacyCollectedDataTypeOtherDiagnosticData",
+];
+
+describe("app.json collected data types", () => {
+  const collected = expo.ios?.privacyManifests?.NSPrivacyCollectedDataTypes;
+
+  it("declares exactly the diagnostic types crash reporting sends", () => {
+    expect(collected?.map((entry) => entry.NSPrivacyCollectedDataType)).toEqual(
+      COLLECTED_DATA_TYPES,
+    );
+  });
+
+  it.each(COLLECTED_DATA_TYPES)("declares %s as unlinked, untracked and app-functional", (type) => {
+    const entry = collected?.find((candidate) => candidate.NSPrivacyCollectedDataType === type);
+
+    expect(entry?.NSPrivacyCollectedDataTypeLinked).toBe(false);
+    expect(entry?.NSPrivacyCollectedDataTypeTracking).toBe(false);
+    expect(entry?.NSPrivacyCollectedDataTypePurposes).toEqual([
+      "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+    ]);
+  });
+});
+
+/**
+ * Crash-reporting credentials must not be committed (#238). The DSN and the
+ * sentry-cli auth token are EAS environment variables in the `preview` and
+ * `production` environments; the org and project slugs are not secrets and do
+ * live in `app.json`. A DSN pasted into a build profile's `env` block would
+ * work, which is exactly why nothing would notice it.
+ */
+const EAS_JSON = path.resolve(path.dirname(APP_JSON), "eas.json");
+
+describe("crash-reporting configuration", () => {
+  const easJson = readFileSync(EAS_JSON, "utf8");
+
+  it("keeps the DSN and the auth token out of the repo", () => {
+    const committed = `${easJson}\n${readFileSync(APP_JSON, "utf8")}`;
+
+    // A GlitchTip/Sentry DSN is `https://<32 hex>@<host>/<project id>`.
+    expect(committed).not.toMatch(/https:\/\/[0-9a-f]{16,}@/i);
+    expect(committed).not.toContain("SENTRY_AUTH_TOKEN");
+  });
+
+  // Left unset, EAS derives the environment from the profile, and `preview`
+  // — which is `distribution: "store"` — resolves to `production`. The two
+  // would then share one set of variables.
+  it("pins every build profile to its own EAS environment", () => {
+    const { build } = JSON.parse(easJson) as {
+      build: Record<string, { environment?: string }>;
+    };
+
+    expect(build.development?.environment).toBe("development");
+    expect(build.preview?.environment).toBe("preview");
+    expect(build.production?.environment).toBe("production");
+  });
+});
+
+/**
+ * Metro's Sentry wiring (#238). Two spellings exist and only one works on
+ * Expo: `getSentryExpoConfig` passes a debug-id plugin into Expo's own
+ * `getDefaultConfig`, while `withSentryConfig` installs a custom serializer
+ * wrapping Metro's — the bare React Native path. Against Expo's serializer
+ * that one reads `undefined` for the bundle source and fails the build with
+ * "Cannot read properties of undefined (reading 'match')", during
+ * `expo export:embed`, which on EAS reads as a plain bundling failure.
+ *
+ * Asserted as source text because the plugin is consumed inside
+ * `getDefaultConfig` and never surfaces on the returned config object, so
+ * there is nothing to inspect at runtime.
+ */
+const METRO_CONFIG = path.resolve(path.dirname(APP_JSON), "metro.config.js");
+
+describe("metro Sentry wiring", () => {
+  const metroConfig = readFileSync(METRO_CONFIG, "utf8");
+
+  it("builds the config with getSentryExpoConfig", () => {
+    expect(metroConfig).toContain("getSentryExpoConfig");
+  });
+
+  it("does not wrap Metro's serializer with the bare-RN helper", () => {
+    expect(metroConfig).not.toMatch(/\bwithSentryConfig\s*\(/);
   });
 });
