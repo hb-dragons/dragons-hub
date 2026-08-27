@@ -43,7 +43,13 @@ const {
     <!-- Square crops of public/img/logo.svg, which is 3:4 and would be
          letterboxed by the browser. SVG first for the tab, PNG for the
          browsers that still refuse SVG icons, and the 180px apple-touch-icon
-         for an iOS home-screen bookmark. -->
+         for an iOS home-screen bookmark.
+
+         The tab icons are transparent — a browser draws them against its own
+         chrome, which is not this page's #18181b in either theme. The
+         apple-touch-icon is the exception and stays opaque: iOS composites a
+         home-screen icon onto black, so transparency there is a black tile,
+         not a transparent one. -->
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
