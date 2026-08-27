@@ -88,6 +88,9 @@
   --shadow-lg: 0 20px 50px rgba(24, 24, 27, 0.08);
   --shadow-xl: 0 24px 60px rgba(24, 24, 27, 0.10);
   --shadow-2xl: 0 32px 80px rgba(24, 24, 27, 0.12);
+  /* 0em, same as globals.css: the site no longer tracks anything out, and the
+     name has to stay for site-css-parity.test.ts. */
+  --tracking-normal: 0em;
   --spacing: 0.25rem;
 }
 
