@@ -46,10 +46,16 @@ export default defineConfig({
         // Ratcheted 2026-08-27: the blur-image branch/width helpers behind
         // BlurImage's move onto `astro:assets`. Measured 73.04 statements /
         // 69.22 branches / 63.82 functions / 72.69 lines.
-        branches: 69,
-        functions: 63,
-        lines: 72,
-        statements: 73,
+        //
+        // Ratcheted 2026-08-27: the dither render-budget helpers and the
+        // DitherIsland test that mocks `ogl` (there is no WebGL under
+        // happy-dom, so the island is asserted through what it asks ogl to
+        // do). Measured 78.56 statements / 72.42 branches / 66.10 functions /
+        // 78.76 lines.
+        branches: 72,
+        functions: 66,
+        lines: 78,
+        statements: 78,
       },
     },
   },

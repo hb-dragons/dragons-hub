@@ -1,8 +1,13 @@
 ---
 /**
  * Dither background slot: static gradient fallback painted immediately, the
- * WebGL island (ogl) hydrates lazily on idle and covers it. The fallback
- * echoes the shader's palette (black field, faint wave-colored patches).
+ * WebGL island (ogl) hydrates when the band scrolls into view and covers it.
+ * The fallback echoes the shader's palette (black field, faint wave-colored
+ * patches).
+ *
+ * `client:visible`, not `client:idle`: home's band sits below the fold, and
+ * on idle it compiled shaders and started rendering for visitors who never
+ * scrolled that far. The fallback is what they saw either way.
  */
 import DitherIsland, { type DitherProps } from "./DitherIsland";
 
@@ -26,5 +31,5 @@ const [r, g, b] = waveColor.map((channel) => Math.round(channel * 255)) as [
       #000;`}
   >
   </div>
-  <DitherIsland client:idle waveColor={waveColor} {...rest} />
+  <DitherIsland client:visible waveColor={waveColor} {...rest} />
 </div>
