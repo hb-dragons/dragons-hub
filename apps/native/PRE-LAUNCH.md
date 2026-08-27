@@ -267,8 +267,10 @@ Android 13+ themed icons look bad without a monochrome layer.
       network and no account.
 - [x] Source maps: the `@sentry/react-native/expo` config plugin writes
       `sentry.properties` with `defaults.url=https://eu.glitchtip.com/`,
-      and `metro.config.js` runs `withSentryConfig` so the bundle and its
-      map carry a matching Debug ID.
+      and `metro.config.js` builds the config with `getSentryExpoConfig`
+      so the bundle and its map carry a matching Debug ID (verified
+      locally 2026-08-27 via `expo export:embed`). It must not be
+      `withSentryConfig` — see RELEASES.md.
 - [ ] **Human step, before the first preview build:** set two EAS
       environment variables in the `preview` *and* `production`
       environments (not `development`):

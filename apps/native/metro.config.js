@@ -1,7 +1,14 @@
-const { getDefaultConfig } = require("expo/metro-config");
-const { withSentryConfig } = require("@sentry/react-native/metro");
+const { getSentryExpoConfig } = require("@sentry/react-native/metro");
 
-const config = getDefaultConfig(__dirname);
+// `getSentryExpoConfig`, not `getDefaultConfig` + `withSentryConfig` (#238).
+// Both stamp a Debug ID into the bundle and its source map, which is what
+// lets GlitchTip pair the two after the fact, but they do it differently:
+// `withSentryConfig` installs a *custom serializer* wrapping Metro's, which is
+// the bare-React-Native path, while this one passes a debug-id plugin into
+// Expo's own `getDefaultConfig` and leaves the serializer alone. On Expo the
+// serializer wrapper reads `undefined` for the bundle source and fails the
+// build with "Cannot read properties of undefined (reading 'match')".
+const config = getSentryExpoConfig(__dirname);
 
 config.transformer = {
   ...config.transformer,
@@ -16,8 +23,4 @@ config.resolver = {
 
 config.resolver.unstable_enablePackageExports = true;
 
-// Applied last, and via `withSentryConfig` rather than `getSentryExpoConfig`,
-// so it wraps the serializer without replacing the SVG babel transformer set
-// above. It stamps a Debug ID into the bundle and its source map, which is
-// what lets GlitchTip pair the two after the fact (#238).
-module.exports = withSentryConfig(config);
+module.exports = config;

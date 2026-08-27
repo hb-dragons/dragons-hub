@@ -326,10 +326,28 @@ Without that, EAS derives it from the profile's configuration, and
 `preview` — which is `distribution: "store"` — would resolve to the
 `production` environment and pick up the wrong variables.
 
-Symbolication is by Debug ID: `metro.config.js` wraps the config in
-`withSentryConfig`, which stamps the same id into the bundle and its
+Symbolication is by Debug ID: `metro.config.js` builds the config with
+`getSentryExpoConfig`, which stamps the same id into the bundle and its
 source map, and the `@sentry/react-native/expo` plugin's build phase
-uploads the map. Release and dist are deliberately not set in
+uploads the map.
+
+**Use `getSentryExpoConfig`, never `getDefaultConfig` + `withSentryConfig`.**
+Both are documented ways to get a Debug ID, but `withSentryConfig`
+installs a custom serializer wrapping Metro's, which is the bare
+React Native path. Against Expo's serializer it reads `undefined` for
+the bundle source and fails the build with `Cannot read properties of
+undefined (reading 'match')` — during `expo export:embed`, so on EAS it
+surfaces as a bundling failure with no mention of Sentry in the first
+few lines. `getSentryExpoConfig` passes a debug-id plugin into Expo's
+own `getDefaultConfig` instead and leaves the serializer alone.
+Reproduce a bundle locally before spending a cloud build on it:
+
+```bash
+pnpm expo export:embed --eager --platform ios --dev false \
+  --bundle-output /tmp/main.jsbundle \
+  --sourcemap-output /tmp/main.jsbundle.map --assets-dest /tmp
+grep -o "debugId=[0-9a-f-]*" /tmp/main.jsbundle   # must match debug_id in the map
+``` Release and dist are deliberately not set in
 `Sentry.init` — the SDK and sentry-cli each derive them from the native
 bundle, and overriding one side is the usual reason a trace arrives
 unsymbolicated.

@@ -224,3 +224,30 @@ describe("crash-reporting configuration", () => {
     expect(build.production?.environment).toBe("production");
   });
 });
+
+/**
+ * Metro's Sentry wiring (#238). Two spellings exist and only one works on
+ * Expo: `getSentryExpoConfig` passes a debug-id plugin into Expo's own
+ * `getDefaultConfig`, while `withSentryConfig` installs a custom serializer
+ * wrapping Metro's — the bare React Native path. Against Expo's serializer
+ * that one reads `undefined` for the bundle source and fails the build with
+ * "Cannot read properties of undefined (reading 'match')", during
+ * `expo export:embed`, which on EAS reads as a plain bundling failure.
+ *
+ * Asserted as source text because the plugin is consumed inside
+ * `getDefaultConfig` and never surfaces on the returned config object, so
+ * there is nothing to inspect at runtime.
+ */
+const METRO_CONFIG = path.resolve(path.dirname(APP_JSON), "metro.config.js");
+
+describe("metro Sentry wiring", () => {
+  const metroConfig = readFileSync(METRO_CONFIG, "utf8");
+
+  it("builds the config with getSentryExpoConfig", () => {
+    expect(metroConfig).toContain("getSentryExpoConfig");
+  });
+
+  it("does not wrap Metro's serializer with the bare-RN helper", () => {
+    expect(metroConfig).not.toMatch(/\bwithSentryConfig\s*\(/);
+  });
+});
