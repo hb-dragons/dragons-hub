@@ -110,12 +110,19 @@ const isActiveTeam = (slug: string) => path.includes(slug);
                             class="w-full"
                           >
                             <div class="flex items-center justify-center h-24 relative group overflow-hidden">
+                              {/* A 96px-tall strip behind a black scrim, at most
+                                  a third of the drawer wide. BlurImage's default
+                                  half-viewport sizing pulled an 800w variant
+                                  into it, nine times over, the moment the menu
+                                  opened. */}
                               <BlurImage
                                 src={mediaUrl(team.teamImage?.url, cmsBase) ?? BANNER_IMAGE.url}
                                 blurhash={team.teamImage?.blurhash ?? BANNER_IMAGE.blurhash}
                                 alt={team.teamImage?.alt ?? team.name}
                                 class="absolute inset-0 w-full h-full"
                                 imgClass="object-cover"
+                                widths={[320, 640]}
+                                sizes="(max-width: 768px) 100vw, 640px"
                               />
                               <div
                                 class:list={[
