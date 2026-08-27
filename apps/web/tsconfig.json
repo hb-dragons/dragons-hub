@@ -28,6 +28,10 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
+    // TypeScript's wildcard includes skip dot-prefixed directories, so the
+    // app-links route handlers under `src/app/.well-known/` are invisible to
+    // both `tsc` and the ESLint project service without naming them here.
+    "src/app/.well-known/**/*.ts",
     ".next/types/**/*.ts",
     "**/*.mts"
   ],

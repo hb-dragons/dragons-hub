@@ -82,6 +82,17 @@ variable "scoreboard_device_id" {
   type        = string
 }
 
+variable "android_app_signing_sha256" {
+  description = "SHA-256 of Play's app signing certificate (ANDROID_APP_SIGNING_SHA256), served by the web service at /.well-known/assetlinks.json so Android app-link verification succeeds. Play Console -> Setup -> App signing, not the EAS upload keystore. A published value, not a secret. Empty until the first Play upload exists; the key is then omitted from env_vars and the route serves 404 rather than a wrong statement."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.android_app_signing_sha256 == "" || can(regex("^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){31}$", var.android_app_signing_sha256))
+    error_message = "android_app_signing_sha256 must be empty or 32 colon-separated hex bytes."
+  }
+}
+
 variable "chatbot_enabled" {
   description = "Enable the members-only club Q&A assistant (CHATBOT_ENABLED). Set to \"true\" to activate; defaults to disabled."
   type        = string

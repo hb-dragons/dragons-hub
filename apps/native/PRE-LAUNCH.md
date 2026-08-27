@@ -83,10 +83,15 @@ Remaining, still-open:
       checks below, Apple's CDN, and a tapped link on a post-#217 device
       build. `app.hbdragons.de` is the Next.js web service,
       so the file goes in `apps/web/public/.well-known/` with a
-      `headers()` rule serving `application/json`; `assetlinks.json` sits
-      next to it (Android's `autoVerify: true` is already declared and
-      silently fails without it — its SHA-256 must be Play's app signing
-      key, not the upload key). **This is the activation step**, and it
+      `headers()` rule serving `application/json`. Android's
+      `assetlinks.json` is served next to it by a route handler,
+      `apps/web/src/app/.well-known/assetlinks.json/route.ts` (#249) —
+      `autoVerify: true` is already declared and silently fails without
+      it. That route reads Play's app signing SHA-256 (not the upload
+      key) from `ANDROID_APP_SIGNING_SHA256` and 404s until it is set, so
+      Android links stay unverified until the first Play upload (#247)
+      produces a fingerprint and the Cloud Run web service is configured
+      with it. **This is the activation step**, and it
       is a web-property ticket, not this app's: until that file is live the
       entitlement changes nothing user-visible, because iOS asks for the
       file before it ever routes a link to the app. Landing the native

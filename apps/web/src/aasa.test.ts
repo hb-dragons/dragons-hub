@@ -8,11 +8,11 @@ import { fileURLToPath } from "node:url";
 vi.mock("next-intl/middleware", () => ({ default: () => () => undefined }));
 
 import { PUBLIC_PATH_PREFIXES } from "./proxy";
+import { readExpoConfig } from "./test/expo-config";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const AASA_PATH = path.join(__dirname, "../public/.well-known/apple-app-site-association");
 const NEXT_CONFIG_PATH = path.join(__dirname, "../next.config.ts");
-const NATIVE_APP_JSON = path.join(__dirname, "../../native/app.json");
 const NATIVE_APP_DIR = path.join(__dirname, "../../native/src/app");
 
 interface Aasa {
@@ -21,9 +21,7 @@ interface Aasa {
 
 const aasa = JSON.parse(fs.readFileSync(AASA_PATH, "utf8")) as Aasa;
 const detail = aasa.applinks.details[0]!;
-const { expo } = JSON.parse(fs.readFileSync(NATIVE_APP_JSON, "utf8")) as {
-  expo: { ios: { appleTeamId: string; bundleIdentifier: string } };
-};
+const { ios } = readExpoConfig();
 
 const isGroup = (segment: string): boolean => /^\(.+\)$/.test(segment);
 
@@ -83,7 +81,7 @@ const ACTUAL_CLAIMS = [
  */
 describe("apple-app-site-association", () => {
   it("names the team and bundle id the native binary is built with", () => {
-    expect(detail.appIDs).toEqual([`${expo.ios.appleTeamId}.${expo.ios.bundleIdentifier}`]);
+    expect(detail.appIDs).toEqual([`${ios.appleTeamId}.${ios.bundleIdentifier}`]);
   });
 
   it("read the native route tree", () => {

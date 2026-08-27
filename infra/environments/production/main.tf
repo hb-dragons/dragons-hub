@@ -521,10 +521,17 @@ module "web" {
   min_instances = 0
   max_instances = 10
 
-  env_vars = {
+  env_vars = merge({
     NODE_ENV            = "production"
     NEXT_PUBLIC_API_URL = "https://${var.api_domain}"
-  }
+    # Android app links: the web service serves /.well-known/assetlinks.json
+    # from this fingerprint. Read per request, so publishing it is a service
+    # update rather than a rebuild. Omitted while empty — the route then 404s,
+    # which fails verification the same way a wrong fingerprint would but
+    # leaves no placeholder claiming to be Play's signing key.
+    }, var.android_app_signing_sha256 == "" ? {} : {
+    ANDROID_APP_SIGNING_SHA256 = var.android_app_signing_sha256
+  })
 
   ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
 
