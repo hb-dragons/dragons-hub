@@ -5,7 +5,8 @@ plain files behind Apache (trailing-slash directory URLs). Reuses @dragons/ui
 primitives themed by `packages/ui/src/styles/site.css` and talks to the API via
 @dragons/api-client.
 
-- Fonts: self-hosted via the Astro Fonts API (Archivo, JetBrains Mono) — no
+- Fonts: self-hosted via the Astro Fonts API (Bricolage Grotesque, JetBrains
+  Mono) — no
   Google Fonts requests.
 - Content/strings: German only, every UI literal lives in `src/lib/strings.ts`
   (no i18n layer).

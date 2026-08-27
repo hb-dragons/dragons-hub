@@ -20,8 +20,25 @@ export default defineConfig({
     ],
   },
   fonts: [
-    { provider: fontProviders.fontsource(), name: "Archivo", cssVariable: "--font-archivo",
-      weights: [400, 500, 600, 700, 800, 900] },
+    // Bricolage Grotesque, not Archivo: the nav sets its links in caps at 16px
+    // and Archivo's heavy weights close their counters at that size, which is
+    // what made the bar read as a row of blocks. Bricolage is the display face
+    // that pairs with Edo on the hero — both carry visible drawing rather than
+    // neutral UI-grotesque shapes.
+    //
+    // It tops out at 800: `font-black` (14 uses) resolves to 800, since CSS
+    // weight matching picks the nearest available face rather than
+    // synthesising past the top of the family. So `font-bold` and
+    // `font-black` sit one step apart instead of two — intended, not a
+    // regression to fix by adding a weight that does not exist.
+    //
+    // Every variant listed here is preloaded — `<Font preload />` has no
+    // per-variant control — so the list is exactly what the site uses. The
+    // family ships no italic at all, so RichText's `em` is the browser's
+    // synthetic oblique.
+    { provider: fontProviders.fontsource(), name: "Bricolage Grotesque",
+      cssVariable: "--font-bricolage",
+      weights: [400, 500, 600, 700, 800], styles: ["normal"] },
     { provider: fontProviders.fontsource(), name: "JetBrains Mono", cssVariable: "--font-jetbrains-mono",
       weights: [400, 700] },
     // Display face for the home hero claim, and nothing else — a brush font
@@ -37,10 +54,10 @@ export default defineConfig({
     // zero contours and a real advance width. A browser has no way to know
     // they are empty, so it renders an invisible gap and never falls back.
     // Declaring the range Edo can actually draw hands everything else to
-    // Archivo. Re-derive it from the font, not by eye, if the file is ever
+    // Bricolage. Re-derive it from the font, not by eye, if the file is ever
     // replaced.
     { provider: fontProviders.local(), name: "Edo", cssVariable: "--font-edo",
-      fallbacks: ["Archivo", "sans-serif"],
+      fallbacks: ["Bricolage Grotesque", "sans-serif"],
       options: {
         variants: [{
           weight: 400, style: "normal", src: ["./src/assets/fonts/edo.woff2"],
