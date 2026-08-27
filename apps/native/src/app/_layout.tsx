@@ -30,13 +30,18 @@ import {
   tabRootHeaderOptions,
 } from "@/lib/nav/headers";
 import { formSheetOptions, searchSheetOptions } from "@/lib/nav/sheet-routes";
-import { installGlobalErrorHandler } from "@/lib/global-error-handler";
+import { installGlobalErrorHandler } from "@/lib/error-reporting";
+import { initCrashReporting } from "@/lib/crash-reporting";
 import { usePushRegistration } from "@/hooks/usePushRegistration";
 import { ToastProvider } from "@/hooks/useToast";
 import { ToastHost } from "@/components/ui/ToastHost";
 
 void SplashScreen.preventAutoHideAsync();
 configureNotificationHandler();
+// At module scope, not in an effect: an error thrown while the first render
+// tree is being built happens before any effect runs, and that is exactly the
+// class of crash release builds hide. A no-op wherever no DSN is compiled in.
+initCrashReporting();
 
 function RootNavigator() {
   usePushRegistration();

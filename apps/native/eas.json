@@ -13,6 +13,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "channel": "development",
+      "environment": "development",
       "env": {
         "EXPO_PUBLIC_API_URL": "http://localhost:3001"
       }
@@ -21,6 +22,7 @@
       "extends": "base",
       "distribution": "store",
       "channel": "preview",
+      "environment": "preview",
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.app.hbdragons.de",
@@ -31,6 +33,7 @@
       "extends": "base",
       "autoIncrement": true,
       "channel": "production",
+      "environment": "production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.app.hbdragons.de",
         "EXPO_PUBLIC_CHATBOT_ENABLED": "true"

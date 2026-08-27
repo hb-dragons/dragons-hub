@@ -289,6 +289,67 @@ When `app.json > expo.version` changes:
 
 ---
 
+## Crash reporting (GlitchTip)
+
+Release-build crashes go to the club's GlitchTip project on the EU
+instance — org `hb-dragons`, project `dragons-native`, ingest at
+`eu.glitchtip.com`. GlitchTip implements the Sentry ingest API, so the
+client is `@sentry/react-native` with the features GlitchTip does not
+have (sessions, tracing) switched off in
+`src/lib/crash-reporting/options.ts`.
+
+Two EAS environment variables drive it, both set in the `preview` and
+`production` environments and **not** in `development`, and neither of
+them in the repo:
+
+| Variable | Visibility | What it does |
+| --- | --- | --- |
+| `EXPO_PUBLIC_GLITCHTIP_DSN` | sensitive | Inlined into the bundle. Without it the SDK is never started, which is what makes a local `pnpm start` and a CI build inert. |
+| `SENTRY_AUTH_TOKEN` | secret | Read by sentry-cli inside the native build phase to upload the JS source map. GlitchTip → profile → auth tokens, scope `project:releases`. |
+
+```bash
+# Run from apps/native. `--environment` repeats, so one command covers both;
+# `development` is deliberately left out. On eas-cli 21+ the command is
+# spelled `env:set`; `env:create` is the older name and still works.
+eas env:create --name EXPO_PUBLIC_GLITCHTIP_DSN --value "<dsn>" \
+  --visibility sensitive --environment preview --environment production
+
+eas env:create --name SENTRY_AUTH_TOKEN --value "<token>" \
+  --visibility secret --environment preview --environment production
+
+# Check what landed where:
+eas env:list --environment preview
+```
+
+Each build profile pins its `environment` explicitly in `eas.json`.
+Without that, EAS derives it from the profile's configuration, and
+`preview` — which is `distribution: "store"` — would resolve to the
+`production` environment and pick up the wrong variables.
+
+Symbolication is by Debug ID: `metro.config.js` wraps the config in
+`withSentryConfig`, which stamps the same id into the bundle and its
+source map, and the `@sentry/react-native/expo` plugin's build phase
+uploads the map. Release and dist are deliberately not set in
+`Sentry.init` — the SDK and sentry-cli each derive them from the native
+bundle, and overriding one side is the usual reason a trace arrives
+unsymbolicated.
+
+Two paths report, and they are wired differently on purpose. Fatals are
+the SDK's: `Sentry.init` installs the `ReactNativeErrorHandlers`
+integration, which patches `ErrorUtils`, captures with `handled: false`
+and flushes before RCTFatal aborts the process.
+`installGlobalErrorHandler` wraps that handler for the `DRAGONS_JS_ERROR`
+NSLog line only — capturing there as well filed every crash twice.
+Errors a React boundary catches never reach `ErrorUtils`, so
+`components/ErrorBoundary.tsx` reports those by hand, tagged
+`source: error-boundary`.
+
+What does *not* work, and is accepted: GlitchTip has no native
+symbolication, so ObjC/Java frames stay as addresses. Both paths are JS,
+which symbolicates fine.
+
+---
+
 ## `expo doctor` gates the build
 
 EAS runs `expo doctor` during the build and fails the whole build on a

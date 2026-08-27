@@ -107,10 +107,16 @@ export default defineConfig({
         // decision, the privacy-manifest and nav-architecture guards).
         // Measured 18.19/12.18/21.97/17.61 — functions holds at 21, not
         // having cleared the next whole point.
+        //
+        // Ratcheted 2026-08-27 (#238): statements 18 -> 19, functions 21 -> 22,
+        // lines 17 -> 18, on the crash-reporting modules and the boundary
+        // reporting the ErrorBoundary shed into `global-error-handler.ts`.
+        // Measured 19.27/12.89/22.6/18.63 — branches holds at 12, not having
+        // cleared the next whole point.
         branches: 12,
-        functions: 21,
-        lines: 17,
-        statements: 18,
+        functions: 22,
+        lines: 18,
+        statements: 19,
       },
     },
   },

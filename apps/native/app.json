@@ -40,6 +40,24 @@
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace",
             "NSPrivacyAccessedAPITypeReasons": ["85F4.1", "E174.1"]
           }
+        ],
+        "NSPrivacyCollectedDataTypes": [
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeCrashData",
+            "NSPrivacyCollectedDataTypeLinked": false,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherDiagnosticData",
+            "NSPrivacyCollectedDataTypeLinked": false,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          }
         ]
       }
     },
@@ -77,6 +95,14 @@
     "plugins": [
       "expo-router",
       "expo-font",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://eu.glitchtip.com/",
+          "organization": "hb-dragons",
+          "project": "dragons-native"
+        }
+      ],
       "expo-secure-store",
       "expo-local-authentication",
       "expo-updates",
