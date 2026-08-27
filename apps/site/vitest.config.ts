@@ -43,10 +43,13 @@ export default defineConfig({
         // Ratcheted 2026-08-26 (#265, #269, #271): the nav-drawer, board,
         // standings and next/prev-game tests. Measured 72.73 statements /
         // 68.75 branches / 63.06 functions / 72.41 lines.
-        branches: 68,
-        functions: 62,
+        // Ratcheted 2026-08-27: the blur-image branch/width helpers behind
+        // BlurImage's move onto `astro:assets`. Measured 73.04 statements /
+        // 69.22 branches / 63.82 functions / 72.69 lines.
+        branches: 69,
+        functions: 63,
         lines: 72,
-        statements: 72,
+        statements: 73,
       },
     },
   },

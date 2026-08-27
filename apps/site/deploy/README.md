@@ -62,6 +62,25 @@ pre-create `current/` as a **real directory**, which breaks `swap.php`'s
      (Apache applies parent-dir .htaccess). If it does, wrap its rules in a
      `RewriteCond %{HTTP_HOST}` guard.
 
+## Caching and compression
+
+`htaccess-release` also sets the release's cache policy, which is why it has to
+ship with every deploy rather than sit in the parent `.htaccess`:
+
+| path | `Cache-Control` | why |
+|---|---|---|
+| `_astro/*` | `max-age=31536000, immutable` | Astro content-hashes these names, so a changed file is a changed URL |
+| other assets (`public/`) | `max-age=86400` | keeps its name across deploys, so it must stay bustable |
+| `*.html` | `no-cache` | a swap repoints `current` under the same URLs; a cached page would reference the previous release's assets, which the pruner deletes after five deploys |
+
+Compression is `AddOutputFilterByType DEFLATE` over the text types. The host
+negotiates none of its own — before this it served HTML and CSS uncompressed
+even to clients sending `Accept-Encoding: gzip`.
+
+Every directive is module-gated, and the gating is verified rather than assumed:
+serving the release through Apache 2.4 with `mod_headers`, `mod_setenvif`,
+`mod_deflate` and `mod_filter` all absent returns 200s, not 500s.
+
 Live-host safety: the noindex header is gated on `Host ~ ^site\.testing\.`, and
 the new `.htaccess`'s catch-all rewrite is gated on `Host ~ (www\.)?hbdragons\.de`,
 so neither file can leak testing behavior onto live traffic.

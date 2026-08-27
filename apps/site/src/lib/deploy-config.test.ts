@@ -20,6 +20,10 @@ const DEPLOY_WORKFLOW = readFileSync(
 const MODULE_GATED = [
   { directive: /^\s*Header\s/m, module: "mod_headers.c" },
   { directive: /^\s*SetEnvIf\s/m, module: "mod_setenvif.c" },
+  // AddOutputFilterByType is mod_filter's, not mod_deflate's, so the compression
+  // block needs both guards or a host with deflate but no filter 500s.
+  { directive: /^\s*AddOutputFilterByType\s/m, module: "mod_deflate.c" },
+  { directive: /^\s*AddOutputFilterByType\s/m, module: "mod_filter.c" },
 ];
 
 describe("deploy/htaccess-release", () => {
@@ -39,6 +43,36 @@ describe("deploy/htaccess-release", () => {
   it("keeps the noindex header gated to the testing host", () => {
     expect(RELEASE_HTACCESS).toMatch(/X-Robots-Tag[^\n]*env=TESTING_HOST/);
     expect(RELEASE_HTACCESS).toMatch(/SetEnvIf\s+Host\s+\^site\\?\.testing\\?\./);
+  });
+
+  // Only Astro's output is content-hashed. Caching anything else immutably
+  // strands a stale file in every visitor's cache for a year, with no URL
+  // change available to bust it.
+  it("scopes the immutable cache to the content-hashed _astro/ path", () => {
+    expect(RELEASE_HTACCESS).toMatch(/SetEnvIf\s+Request_URI\s+"\/_astro\/"\s+HASHED_ASSET/);
+    expect(RELEASE_HTACCESS).toMatch(/Cache-Control\s+"[^"]*immutable"\s+env=HASHED_ASSET/);
+  });
+
+  it("does not let the unhashed-asset rule swallow a hashed one", () => {
+    const rule = RELEASE_HTACCESS.match(/Header set Cache-Control "public, max-age=86400"[^\n]*/);
+    expect(rule?.[0]).toContain("env=!HASHED_ASSET");
+  });
+
+  // A deploy repoints `current` under the same URLs, and the pruner deletes the
+  // previous release's hashed assets after five more. A cached HTML page would
+  // outlive the assets it references.
+  it("forbids caching HTML across a release swap", () => {
+    expect(RELEASE_HTACCESS).toMatch(/<FilesMatch\s+"\\\.\(\?:\)?html\$"|\\\.html\$/);
+    expect(RELEASE_HTACCESS).toMatch(/Header set Cache-Control "no-cache"/);
+  });
+
+  it("compresses the text types the host serves uncompressed", () => {
+    // Join the directive's backslash continuations before matching it.
+    const unwrapped = RELEASE_HTACCESS.replace(/\\\n\s*/g, " ");
+    const filter = unwrapped.match(/^\s*AddOutputFilterByType DEFLATE .*$/m)?.[0] ?? "";
+    expect(filter).toContain("text/html");
+    expect(filter).toContain("text/css");
+    expect(filter).toContain("application/javascript");
   });
 });
 

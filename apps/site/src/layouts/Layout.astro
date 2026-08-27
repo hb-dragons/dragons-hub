@@ -48,6 +48,10 @@ const {
     <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
     <Seo {title} {description} {image} {jsonLd} {noindex} {ogType} />
+    <!-- BlurImage holds each image at opacity 0 until its `onload` fires, so
+         with scripting off it would never appear. This is the only place that
+         can say so: `<noscript>` in `<head>` may contain a `<style>`. -->
+    <noscript><style>img[data-blur-img] { opacity: 1 !important; }</style></noscript>
     <Font cssVariable="--font-archivo" preload />
     <Font cssVariable="--font-jetbrains-mono" />
     <slot name="head" />

@@ -41,6 +41,8 @@ const posts = (await getCollection("posts", publishedOnly))
                 alt={post.headerImage.alt ?? post.title}
                 class="w-full h-full"
                 imgClass="object-cover group-hover:md:scale-105 transition-transform duration-300"
+                widths={[420, 840]}
+                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 420px"
               />
             )}
             <div class="absolute inset-x-0 bottom-0 z-10 px-3 pb-3 pt-6 md:px-6 md:pb-4 md:pt-8 bg-gradient-to-t from-black/80 via-black/20 to-transparent @container">

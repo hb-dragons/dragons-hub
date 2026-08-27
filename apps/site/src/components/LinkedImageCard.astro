@@ -30,6 +30,8 @@ const { href, title, image, ariaLabel } = Astro.props;
         alt={image.alt ?? title}
         class="w-full h-full"
         imgClass="object-cover group-hover:md:scale-105 transition-transform duration-300"
+        widths={[420, 840]}
+        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 420px"
       />
     )
   }

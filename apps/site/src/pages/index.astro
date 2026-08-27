@@ -2,6 +2,10 @@
 // Home, ported 1:1 from dragons-app index.vue: Start (hero) → Join → NextGames
 // → News → FollowUs. Hero comes from HomeStart.vue + HomeVideoBackground.vue —
 // the motion-v letter stagger is server-rendered spans + CSS delays (zero JS).
+import { Font } from "astro:assets";
+
+import heroPoster from "../assets/img/hero-poster.webp";
+import heroVideo from "../assets/video.webm";
 import Layout from "../layouts/Layout.astro";
 import ScoreboardIsland from "../components/live/ScoreboardIsland";
 import NextGamesIsland from "../components/NextGamesIsland";
@@ -47,10 +51,34 @@ const years =
   description={strings.seo.defaultDescription}
   jsonLd={jsonLd}
 >
+  {/* Edo is loaded here rather than in Layout: the claim below is the only
+      place on the site that uses it, so no other page carries the request. */}
+  <Fragment slot="head">
+    <Font cssVariable="--font-edo" preload />
+  </Fragment>
+
   <div class="relative">
     <div class="w-full h-svh">
-      <video autoplay muted loop playsinline class="w-full h-full object-cover">
-        <source src="/img/video.webm" type="video/webm" />
+      {/* Decorative, and behind an 80% black scrim — it was shipping at
+          2.2 Mbps (5.3 MB) for footage that is soft and grainy to begin with,
+          so most of that bitrate was encoding noise nobody can see through the
+          overlay. Re-encoded two-pass at 350 kbps with a denoise pass: 850 kB.
+          Imported rather than served from public/ so it gets a content-hashed
+          filename, which is what lets deploy/htaccess-release cache it
+          immutably. The poster is frame 0, so the handover to the first video
+          frame is invisible, and it is also what browsers without WebM
+          playback are left with. */}
+      <video
+        autoplay
+        muted
+        loop
+        playsinline
+        preload="auto"
+        poster={heroPoster.src}
+        aria-hidden="true"
+        class="w-full h-full object-cover"
+      >
+        <source src={heroVideo} type="video/webm" />
       </video>
       <div class="absolute inset-0 bg-black/80"></div>
       <div class="absolute inset-0 flex justify-center items-center">
@@ -63,7 +91,7 @@ const years =
               <h1 class="text-4xl md:text-6xl xl:text-7xl font-bold text-white hero-title">
                 {strings.site.name}
               </h1>
-              <div class="rounded-md text-[1.35rem] md:text-[2.26rem] lg:text-[2.27rem] xl:text-[2.7rem] text-white mt-2">
+              <div class="hero-claim rounded-md text-[1.45rem] md:text-[2.85rem] lg:text-[2.86rem] xl:text-[3.4rem] text-white mt-2">
                 {
                   [...firstPart].map((char, i) => (
                     <span
@@ -121,6 +149,20 @@ const years =
   }
   .hero-title {
     animation: fade-up 0.5s ease-out both;
+  }
+  /* The claim is the one piece of Edo on the site. Its brush strokes carry a
+     smaller apparent size than Archivo at the same em, hence the larger steps
+     above, and the site-wide 0.03em tracking pulls the strokes apart, so the
+     claim opts out of it.
+
+     The claim is one line of per-character spans, so it must not wrap — a
+     break would land mid-word. Every step is sized against Edo's own advance
+     widths (14.8em for this string) so the line fits the space its breakpoint
+     gives it; re-measure if the claim text changes. */
+  .hero-claim {
+    font-family: var(--font-edo);
+    letter-spacing: 0;
+    font-weight: 400;
   }
   .hero-letter {
     opacity: 0;

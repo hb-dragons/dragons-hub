@@ -153,13 +153,13 @@ describe("absoluteUrl", () => {
   });
 
   it("resolves site-relative paths against the site origin", () => {
-    expect(absoluteUrl("/img/gesamt.webp", "https://hbdragons.de")).toBe(
-      "https://hbdragons.de/img/gesamt.webp",
+    expect(absoluteUrl("/img/banner.webp", "https://hbdragons.de")).toBe(
+      "https://hbdragons.de/img/banner.webp",
     );
   });
 
   it("throws for a relative path without a configured site", () => {
-    expect(() => absoluteUrl("/img/gesamt.webp", undefined)).toThrow(/site/);
+    expect(() => absoluteUrl("/img/banner.webp", undefined)).toThrow(/site/);
   });
 });
 

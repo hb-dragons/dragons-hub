@@ -2,13 +2,32 @@
 /**
  * Blurhash-placeholder image, ported from dragons-app UiBlurImage /
  * UiStaticBlurImage. The hash is decoded at build time into a tiny BMP data
- * URI painted as the wrapper's background; the real image loads on top and
- * simply covers it — no client JS involved.
+ * URI painted as the wrapper's background; the real image loads on top.
+ *
+ * Two things the port originally left out:
+ *
+ * 1. The image was a raw `<img>` pointed at the CMS original — a 5 MB webp
+ *    behind a 150px card. It now goes through `astro:assets`, so sharp resizes
+ *    it at build time and the browser picks a width off the `srcset`. Callers
+ *    that are not a half-width grid tile pass their own `sizes`.
+ * 2. An opaque image paints progressively over the placeholder, so the
+ *    blurhash was replaced top-down by a visible wipe. The image now fades in
+ *    once `load` fires, which is only possible when there is a placeholder to
+ *    hold the frame — without one the plain image renders as before.
  */
+import { Image } from "astro:assets";
+
 import { blurhashToDataUri } from "../lib/blurhash";
+import {
+  clampWidths,
+  DEFAULT_IMAGE_SIZES,
+  DEFAULT_IMAGE_WIDTHS,
+  imageBranch,
+  plainSrc,
+} from "../lib/blur-image";
 
 interface Props {
-  src: string;
+  src: string | ImageMetadata;
   blurhash?: string | null | undefined;
   alt?: string | null | undefined;
   width?: number | null | undefined;
@@ -18,6 +37,10 @@ interface Props {
   /** Image classes (e.g. object-cover, hover transforms). */
   imgClass?: string;
   loading?: "lazy" | "eager";
+  /** `srcset` candidates; defaults suit a half-width grid tile. */
+  widths?: readonly number[];
+  /** `sizes` for the generated `srcset`. */
+  sizes?: string;
 }
 
 const {
@@ -29,22 +52,94 @@ const {
   class: className = "",
   imgClass = "",
   loading = "lazy",
+  widths = DEFAULT_IMAGE_WIDTHS,
+  sizes = DEFAULT_IMAGE_SIZES,
 } = Astro.props;
 
 const placeholder = blurhash ? blurhashToDataUri(blurhash) : null;
 const wrapperStyle = placeholder
   ? `background-image:url(${placeholder});background-size:cover;background-position:center`
   : undefined;
+
+const branch = imageBranch(src);
+const imgClasses = ["h-full w-full object-cover", imgClass];
+// The fade only makes sense over a placeholder — see the header comment.
+const fade = placeholder !== null;
 ---
 
 <div class:list={["overflow-hidden", className]} style={wrapperStyle}>
-  <img
-    src={src}
-    alt={alt ?? ""}
-    width={width ?? undefined}
-    height={height ?? undefined}
-    loading={loading}
-    decoding="async"
-    class:list={["h-full w-full object-cover", imgClass]}
-  />
+  {
+    branch === "asset" && typeof src !== "string" && (
+      <Image
+        src={src}
+        alt={alt ?? ""}
+        widths={clampWidths(widths, src.width)}
+        sizes={sizes}
+        loading={loading}
+        decoding="async"
+        class:list={imgClasses}
+        data-blur-img={fade ? "" : undefined}
+        onload={fade ? "this.dataset.loaded=''" : undefined}
+      />
+    )
+  }
+  {
+    branch === "remote" && typeof src === "string" && (
+      <Image
+        src={src}
+        inferSize
+        alt={alt ?? ""}
+        widths={[...widths]}
+        sizes={sizes}
+        loading={loading}
+        decoding="async"
+        class:list={imgClasses}
+        data-blur-img={fade ? "" : undefined}
+        onload={fade ? "this.dataset.loaded=''" : undefined}
+      />
+    )
+  }
+  {
+    branch === "passthrough" && (
+      <img
+        src={plainSrc(src)}
+        alt={alt ?? ""}
+        width={width ?? undefined}
+        height={height ?? undefined}
+        loading={loading}
+        decoding="async"
+        class:list={imgClasses}
+        data-blur-img={fade ? "" : undefined}
+        onload={fade ? "this.dataset.loaded=''" : undefined}
+      />
+    )
+  }
 </div>
+
+<style is:global>
+  /* Global, not scoped: the `<img>` is emitted by `<Image>`, so Astro's
+     per-component class is not guaranteed to reach it. `data-blur-img` is this
+     component's own contract and nothing else sets it.
+
+     Held back until `load` so the blurhash is not wiped away line by line by a
+     progressively decoding image. `transition-property` names transform too:
+     this selector outranks the `transition-transform` utility several callers
+     put in `imgClass`, and would otherwise cancel their hover zoom.
+     Layout.astro carries the no-JS escape hatch — `onload` is script. */
+  img[data-blur-img] {
+    opacity: 0;
+    transition-property: opacity, transform;
+    transition-duration: 400ms, 300ms;
+    transition-timing-function: ease-out;
+  }
+
+  img[data-blur-img][data-loaded] {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    img[data-blur-img] {
+      transition-duration: 0s;
+    }
+  }
+</style>
