@@ -2,6 +2,7 @@
   "name": "@dragons/native",
   "version": "1.0.0",
   "private": true,
+  "//@sentry/cli": "Never imported, and not a second copy - it resolves to the same one @sentry/react-native depends on. Declared as a devDependency so `require.resolve('@sentry/cli/package.json')` succeeds from apps/native/ios, which is what the Xcode 'Bundle React Native code and images' phase does to find the binary. Under strict pnpm a transitive dep is invisible there, and sentry-xcode.sh's pnpm fallback then mis-parses NODE_PATH into a colon-joined string and fails the build with MODULE_NOT_FOUND (#238). Pinned exactly to @sentry/react-native's own dependency so the two stay one copy.",
   "main": "expo-router/entry",
   "expo": {
     "install": {
@@ -68,6 +69,7 @@
     "swr": "^2.4.1"
   },
   "devDependencies": {
+    "@sentry/cli": "2.58.4",
     "@types/react": "^19.2.14",
     "@vitest/coverage-v8": "^4.1.6",
     "expo-doctor": "1.20.1",
