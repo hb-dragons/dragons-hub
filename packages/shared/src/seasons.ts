@@ -32,6 +32,25 @@ export interface BrowsableLeague {
   geschlecht: string;
   vorabliga: boolean;
   alreadyTracked: boolean;
+  /**
+   * Name of the season that already owns this liga's league row, or `null` when
+   * no other season does. Picking a flagged liga is refused rather than allowed
+   * to move the row (see `LeagueSeasonConflict`), so the picker says so up front.
+   */
+  conflictSeasonName: string | null;
+}
+
+/**
+ * A selected liga whose league row already belongs to a different season. The
+ * federation is expected to mint a fresh liga ID per season; when one is reused
+ * the row cannot be re-scoped, because matches, standings and team entries all
+ * hang off it and would follow it into the new season.
+ */
+export interface LeagueSeasonConflict {
+  ligaId: number;
+  name: string;
+  ownedBySeasonId: number;
+  ownedBySeasonName: string;
 }
 
 export interface SetSeasonLeaguesResult {
@@ -39,6 +58,8 @@ export interface SetSeasonLeaguesResult {
   untracked: number;
   entriesSeeded: number;
   rosterFailures: number[];
+  /** Selected ligas that were skipped because another season owns the row. */
+  conflicts: LeagueSeasonConflict[];
 }
 
 export interface SeasonSummary {

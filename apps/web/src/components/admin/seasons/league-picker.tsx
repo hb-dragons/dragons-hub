@@ -126,6 +126,9 @@ function LeagueRow({
 }) {
   const t = useTranslations();
   const [expanded, setExpanded] = useState(false);
+  // The API refuses to move a league row between seasons (#227), so a liga
+  // another season owns cannot be picked here at all.
+  const conflictSeason = league.conflictSeasonName;
   const [teams, setTeams] = useState<LeagueTeam[] | null>(null);
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [error, setError] = useState(false);
@@ -155,11 +158,19 @@ function LeagueRow({
         <Checkbox
           className="mt-0.5"
           checked={checked}
+          disabled={conflictSeason !== null}
           aria-label={league.name}
           onCheckedChange={(c) => onToggle(league.ligaId, c === true)}
         />
         <span className="flex flex-1 flex-col">
-          <span className="text-sm font-medium">{league.name}</span>
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium">{league.name}</span>
+            {conflictSeason !== null && (
+              <Badge variant="outline">
+                {t("settings.seasons.wizard.leagueOwnedByOtherSeason", { season: conflictSeason })}
+              </Badge>
+            )}
+          </span>
           <span className="text-xs text-muted-foreground">
             {[league.skName, league.akName, league.geschlecht].filter(Boolean).join(" · ")}
           </span>

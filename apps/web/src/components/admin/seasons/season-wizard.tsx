@@ -305,7 +305,16 @@ export function SeasonWizard({
         id = season.id;
         setCreatedId(id);
       }
-      await api.seasons.setLeagues(id, { ligaIds: [...selected] });
+      const leagueResult = await api.seasons.setLeagues(id, { ligaIds: [...selected] });
+      // Refused ligas (a liga ID the federation reused from an earlier season)
+      // are named here; the season itself is created either way.
+      if (leagueResult.conflicts.length > 0) {
+        toast.warning(
+          t("settings.seasons.leagueConflicts", {
+            names: leagueResult.conflicts.map((c) => c.name).join(", "),
+          }),
+        );
+      }
       setStep("syncing");
       try {
         const run = await api.sync.trigger();

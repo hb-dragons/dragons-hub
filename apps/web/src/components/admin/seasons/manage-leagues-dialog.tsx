@@ -69,6 +69,8 @@ export function ManageLeaguesDialog({
             geschlecht: "",
             vorabliga: false,
             alreadyTracked: true,
+            // Tracked by this very season, so never another season's row.
+            conflictSeasonName: null,
           });
         }
       }
@@ -116,7 +118,17 @@ export function ManageLeaguesDialog({
     if (saving) return;
     setSaving(true);
     try {
-      await api.seasons.setLeagues(seasonId, { ligaIds: [...selected] });
+      const result = await api.seasons.setLeagues(seasonId, { ligaIds: [...selected] });
+      // A liga the federation reused from an earlier season is refused rather
+      // than moved, so say which ones were skipped instead of reporting a clean
+      // save the admin cannot square with the list.
+      if (result.conflicts.length > 0) {
+        toast.warning(
+          t("settings.seasons.leagueConflicts", {
+            names: result.conflicts.map((c) => c.name).join(", "),
+          }),
+        );
+      }
       try {
         await api.sync.trigger();
       } catch {

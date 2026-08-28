@@ -11,8 +11,8 @@ import { LeaguePicker } from "./league-picker";
 import type { BrowsableLeague } from "@dragons/shared";
 
 const LEAGUES: BrowsableLeague[] = [
-  { ligaId: 1, ligaNr: null, name: "Landesliga Herren 2", skName: "Landesliga", akName: "Senioren", geschlecht: "männlich", vorabliga: true, alreadyTracked: false },
-  { ligaId: 2, ligaNr: null, name: "Landesliga Damen 2", skName: "Landesliga", akName: "Senioren", geschlecht: "weiblich", vorabliga: true, alreadyTracked: false },
+  { ligaId: 1, ligaNr: null, name: "Landesliga Herren 2", skName: "Landesliga", akName: "Senioren", geschlecht: "männlich", vorabliga: true, alreadyTracked: false, conflictSeasonName: null },
+  { ligaId: 2, ligaNr: null, name: "Landesliga Damen 2", skName: "Landesliga", akName: "Senioren", geschlecht: "weiblich", vorabliga: true, alreadyTracked: false, conflictSeasonName: null },
 ];
 
 function renderPicker(props: Partial<React.ComponentProps<typeof LeaguePicker>> = {}) {
@@ -46,6 +46,20 @@ describe("LeaguePicker", () => {
     const { onToggle } = renderPicker();
     fireEvent.click(screen.getAllByRole("checkbox")[0]!);
     expect(onToggle).toHaveBeenCalledWith(1, true);
+  });
+
+  it("flags and disables a liga another season owns (#227)", () => {
+    const { onToggle } = renderPicker({
+      leagues: [{ ...LEAGUES[0]!, conflictSeasonName: "2025/26" }, LEAGUES[1]!],
+    });
+    const boxes = screen.getAllByRole("checkbox");
+    expect(boxes[0]).toBeDisabled();
+    expect(boxes[1]).not.toBeDisabled();
+    expect(
+      screen.getByText("settings.seasons.wizard.leagueOwnedByOtherSeason"),
+    ).toBeInTheDocument();
+    fireEvent.click(boxes[0]!);
+    expect(onToggle).not.toHaveBeenCalled();
   });
 
   it("filters by search query", () => {

@@ -3,16 +3,16 @@ import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 
-const { getLeagues, discover, setLeagues, trigger, leagueTeams, toastError, toastSuccess, mutate } = vi.hoisted(() => ({
+const { getLeagues, discover, setLeagues, trigger, leagueTeams, toastError, toastSuccess, toastWarning, mutate } = vi.hoisted(() => ({
   getLeagues: vi.fn(), discover: vi.fn(), setLeagues: vi.fn(), trigger: vi.fn(),
-  leagueTeams: vi.fn(), toastError: vi.fn(), toastSuccess: vi.fn(), mutate: vi.fn(),
+  leagueTeams: vi.fn(), toastError: vi.fn(), toastSuccess: vi.fn(), toastWarning: vi.fn(), mutate: vi.fn(),
 }));
 vi.mock("@/lib/api", () => ({
   api: { seasons: { getLeagues, discover, setLeagues, leagueTeams }, sync: { trigger } },
 }));
 vi.mock("swr", () => ({ useSWRConfig: () => ({ mutate }) }));
 vi.mock("next-intl", () => ({ useTranslations: () => (k: string) => k }));
-vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError } }));
+vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError, warning: toastWarning } }));
 
 import { ManageLeaguesDialog } from "./manage-leagues-dialog";
 
@@ -24,10 +24,10 @@ beforeEach(() => {
     leagues: [{ id: 11, ligaNr: 0, apiLigaId: 1, name: "Landesliga Herren 2", seasonName: "2026/27", ownClubRefs: false }],
   });
   discover.mockResolvedValue([
-    { ligaId: 1, ligaNr: null, name: "Landesliga Herren 2", skName: "Landesliga", akName: "Senioren", geschlecht: "männlich", vorabliga: true, alreadyTracked: true },
-    { ligaId: 2, ligaNr: null, name: "Landesliga Damen 2", skName: "Landesliga", akName: "Senioren", geschlecht: "weiblich", vorabliga: true, alreadyTracked: false },
+    { ligaId: 1, ligaNr: null, name: "Landesliga Herren 2", skName: "Landesliga", akName: "Senioren", geschlecht: "männlich", vorabliga: true, alreadyTracked: true, conflictSeasonName: null },
+    { ligaId: 2, ligaNr: null, name: "Landesliga Damen 2", skName: "Landesliga", akName: "Senioren", geschlecht: "weiblich", vorabliga: true, alreadyTracked: false, conflictSeasonName: null },
   ]);
-  setLeagues.mockResolvedValue({ tracked: 2, untracked: 0 });
+  setLeagues.mockResolvedValue({ tracked: 2, untracked: 0, entriesSeeded: 0, rosterFailures: [], conflicts: [] });
   trigger.mockResolvedValue({ ok: true });
   leagueTeams.mockResolvedValue({ teams: [] });
 });
@@ -50,6 +50,25 @@ describe("ManageLeaguesDialog", () => {
     await waitFor(() => expect(setLeagues).toHaveBeenCalledWith(9, { ligaIds: [1, 2] }));
     await waitFor(() => expect(trigger).toHaveBeenCalled());
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/admin/seasons"));
+    expect(toastSuccess).toHaveBeenCalledWith("settings.seasons.manage.saved");
+  });
+
+  it("warns about ligas the API refused because another season owns them (#227)", async () => {
+    setLeagues.mockResolvedValueOnce({
+      tracked: 1,
+      untracked: 0,
+      entriesSeeded: 0,
+      rosterFailures: [],
+      conflicts: [
+        { ligaId: 2, name: "Landesliga Damen 2", ownedBySeasonId: 4, ownedBySeasonName: "2025/26" },
+      ],
+    });
+    render(<ManageLeaguesDialog seasonId={9} open onOpenChange={() => {}} />);
+    await screen.findByText("Landesliga Damen 2");
+    fireEvent.click(screen.getByText("settings.seasons.manage.save"));
+    await waitFor(() =>
+      expect(toastWarning).toHaveBeenCalledWith("settings.seasons.leagueConflicts"),
+    );
     expect(toastSuccess).toHaveBeenCalledWith("settings.seasons.manage.saved");
   });
 
