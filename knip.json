@@ -80,7 +80,8 @@
         "src/**/*.{ts,tsx}"
       ],
       "ignoreDependencies": [
-        "expo-system-ui"
+        "expo-system-ui",
+        "@sentry/cli"
       ]
     }
   },
