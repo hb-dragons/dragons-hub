@@ -1,6 +1,6 @@
 import { getDb } from "../../config/database";
-import { leagues } from "@dragons/db/schema";
-import { eq, and, notInArray } from "drizzle-orm";
+import { leagues, seasons } from "@dragons/db/schema";
+import { eq, ne, and, inArray, notInArray } from "drizzle-orm";
 import { sdkClient } from "../sync/sdk-client";
 import { getActiveSeasonId } from "./season.service";
 import { getClubConfig } from "./settings.service";
@@ -9,6 +9,7 @@ import { seedSeasonTeamEntries } from "./team-entry-seeding.service";
 import type { SdkLiga } from "@dragons/sdk";
 import type {
   BrowsableLeague,
+  LeagueSeasonConflict,
   SetSeasonLeaguesResult,
   TrackedLeaguesResponse,
   LeagueTeamsResponse,
@@ -59,6 +60,18 @@ export async function browseLeagues(
     for (const t of tracked) trackedIds.add(t.apiLigaId);
   }
 
+  // A liga whose row belongs to another season cannot be tracked here — the
+  // upsert refuses to move it (#227) — so name the owner in the list rather
+  // than letting the admin find out from a warning after saving. Browsing
+  // without a season is the wizard's case: the season does not exist yet, so
+  // every existing row is another season's by definition.
+  const owned = await getDb()
+    .select({ apiLigaId: leagues.apiLigaId, seasonName: seasons.name })
+    .from(leagues)
+    .innerJoin(seasons, eq(seasons.id, leagues.seasonRefId))
+    .where(opts.seasonId !== undefined ? ne(leagues.seasonRefId, opts.seasonId) : undefined);
+  const conflictSeasonByLigaId = new Map(owned.map((o) => [o.apiLigaId, o.seasonName]));
+
   return filtered.map((l) => ({
     ligaId: l.ligaId,
     ligaNr: l.liganr,
@@ -68,6 +81,7 @@ export async function browseLeagues(
     geschlecht: l.geschlecht,
     vorabliga: l.vorabliga,
     alreadyTracked: trackedIds.has(l.ligaId),
+    conflictSeasonName: conflictSeasonByLigaId.get(l.ligaId) ?? null,
   }));
 }
 
@@ -87,11 +101,44 @@ export async function setSeasonLeagues(
   // that state. One transaction, and the per-league SELECT-then-INSERT-or-UPDATE
   // becomes a single atomic upsert on the `api_liga_id` unique constraint, so
   // two callers selecting the same league cannot both take the insert branch.
-  const keepIds = selected.map((l) => l.ligaId);
-  const untrackedCount = await getDb().transaction(async (tx) => {
+  const selectedIds = selected.map((l) => l.ligaId);
+  const { conflicts, keepIds, untrackedCount } = await getDb().transaction(async (tx) => {
     const now = new Date();
 
-    for (const l of selected) {
+    // A liga whose row already belongs to another season is refused, not moved.
+    // `api_liga_id` is globally unique and matches, standings and team entries
+    // all reference `leagues.id`, so re-scoping the row would drag a finished
+    // season's data into this one and corrupt both. The federation mints a
+    // fresh liga ID per season, so this only happens when it reuses one — an
+    // anomaly for an admin to resolve, not for us to guess at (#227).
+    const owned =
+      selectedIds.length > 0
+        ? await tx
+            .select({
+              apiLigaId: leagues.apiLigaId,
+              ownedBySeasonId: leagues.seasonRefId,
+              ownedBySeasonName: seasons.name,
+            })
+            .from(leagues)
+            .innerJoin(seasons, eq(seasons.id, leagues.seasonRefId))
+            .where(and(inArray(leagues.apiLigaId, selectedIds), ne(leagues.seasonRefId, seasonId)))
+        : [];
+    const ownedByLigaId = new Map(owned.map((o) => [o.apiLigaId, o]));
+    const conflicts = selected
+      .filter((l) => ownedByLigaId.has(l.ligaId))
+      .map<LeagueSeasonConflict>((l) => {
+        const owner = ownedByLigaId.get(l.ligaId)!;
+        return {
+          ligaId: l.ligaId,
+          name: l.liganame,
+          ownedBySeasonId: owner.ownedBySeasonId,
+          ownedBySeasonName: owner.ownedBySeasonName,
+        };
+      });
+    const trackable = selected.filter((l) => !ownedByLigaId.has(l.ligaId));
+    const keepIds = trackable.map((l) => l.ligaId);
+
+    for (const l of trackable) {
       const values = {
         ligaNr: l.liganr ?? 0,
         name: l.liganame,
@@ -122,6 +169,10 @@ export async function setSeasonLeagues(
           // deactivated locally must not be silently reactivated, and the
           // original discovery timestamp is history.
           set: values,
+          // Belt and braces on the refusal above: a caller working on another
+          // season could claim the row between the scan and this statement, so
+          // the update itself also declines to cross a season boundary.
+          setWhere: eq(leagues.seasonRefId, seasonId),
         });
     }
 
@@ -138,15 +189,16 @@ export async function setSeasonLeagues(
       )
       .returning({ id: leagues.id });
 
-    return untracked.length;
+    return { conflicts, keepIds, untrackedCount: untracked.length };
   });
 
   const seeding = await seedSeasonTeamEntries(seasonId, keepIds);
   return {
-    tracked: selected.length,
+    tracked: keepIds.length,
     untracked: untrackedCount,
     entriesSeeded: seeding.entriesSeeded,
     rosterFailures: seeding.rosterFailures,
+    conflicts,
   };
 }
 

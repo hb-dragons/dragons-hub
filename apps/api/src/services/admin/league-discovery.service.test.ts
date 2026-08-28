@@ -37,6 +37,7 @@ import {
   getLeagueTeams,
 } from "./league-discovery.service";
 import { leagues } from "@dragons/db/schema";
+import { eq } from "drizzle-orm";
 
 let ctx: TestDbContext;
 beforeAll(async () => {
@@ -78,10 +79,10 @@ function liga(
   };
 }
 
-async function makeSeason(status: string): Promise<number> {
+async function makeSeason(status: string, name = "2026/27"): Promise<number> {
   const r = await ctx.client.query<{ id: number }>(
-    `INSERT INTO seasons (name, status) VALUES ('2026/27',$1) RETURNING id`,
-    [status],
+    `INSERT INTO seasons (name, status) VALUES ($1,$2) RETURNING id`,
+    [name, status],
   );
   return r.rows[0]!.id;
 }
@@ -162,6 +163,53 @@ describe("browseLeagues", () => {
     getAllLigen.mockResolvedValue([liga(54136, true), liga(54137, false, 4001)]);
     const rows = await browseLeagues({});
     expect(rows.every((r) => r.alreadyTracked === false)).toBe(true);
+  });
+
+  it("names the season that owns a liga another season already holds (#227)", async () => {
+    // Selecting it would be refused, so say so before the admin picks it.
+    const past = await makeSeason("archived", "2025/26");
+    await ctx.client.query(
+      `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id, is_tracked, vorabliga)
+       VALUES (54136, 0, 'Oberliga 2025/26', 2025, '2025/26', $1, true, false)`,
+      [past],
+    );
+    const upcoming = await makeSeason("upcoming");
+    getAllLigen.mockResolvedValue([liga(54136, true), liga(54137, true)]);
+
+    const rows = await browseLeagues({ seasonId: upcoming });
+    expect(rows.find((r) => r.ligaId === 54136)?.conflictSeasonName).toBe("2025/26");
+    expect(rows.find((r) => r.ligaId === 54136)?.alreadyTracked).toBe(false);
+    expect(rows.find((r) => r.ligaId === 54137)?.conflictSeasonName).toBeNull();
+  });
+
+  it("does not flag a liga the season in question already owns (#227)", async () => {
+    const seasonId = await makeSeason("upcoming");
+    await ctx.client.query(
+      `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id, is_tracked, vorabliga)
+       VALUES (54136, 0, 'Liga 54136', 2026, '2026/27', $1, true, false)`,
+      [seasonId],
+    );
+    getAllLigen.mockResolvedValue([liga(54136, true)]);
+
+    const rows = await browseLeagues({ seasonId });
+    expect(rows[0]!.conflictSeasonName).toBeNull();
+    expect(rows[0]!.alreadyTracked).toBe(true);
+  });
+
+  it("flags every owned liga when browsing without a season (#227)", async () => {
+    // The wizard browses before the season row exists: any league row that
+    // already exists belongs to a different season by definition.
+    const past = await makeSeason("archived", "2025/26");
+    await ctx.client.query(
+      `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id, is_tracked, vorabliga)
+       VALUES (54136, 0, 'Oberliga 2025/26', 2025, '2025/26', $1, true, false)`,
+      [past],
+    );
+    getAllLigen.mockResolvedValue([liga(54136, true), liga(54137, true)]);
+
+    const rows = await browseLeagues({});
+    expect(rows.find((r) => r.ligaId === 54136)?.conflictSeasonName).toBe("2025/26");
+    expect(rows.find((r) => r.ligaId === 54137)?.conflictSeasonName).toBeNull();
   });
 });
 
@@ -270,6 +318,54 @@ describe("setSeasonLeagues", () => {
     // The upsert of 54136 rolled back with the failed untrack of 54137.
     expect(rows.map((r) => r.isTracked)).toEqual([true, true]);
     expect(rows.find((r) => r.apiLigaId === 54136)!.name).toBe("Seeded");
+  });
+
+  it("refuses to move a league row into another season when a liga id is reused (#227)", async () => {
+    // `api_liga_id` is globally unique and matches, standings and team entries
+    // all hang off `leagues.id`, so updating `season_ref_id` on the conflict
+    // path would drag a finished season's fixtures into the new one.
+    const past = await makeSeason("archived", "2025/26");
+    await ctx.client.query(
+      `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id,
+                            is_tracked, vorabliga)
+       VALUES (54136, 4001, 'Oberliga 2025/26', 2025, '2025/26', $1, true, false)`,
+      [past],
+    );
+    const upcoming = await makeSeason("upcoming");
+    getAllLigen.mockResolvedValue([liga(54136, true), liga(54137, true)]);
+
+    const result = await setSeasonLeagues(upcoming, [54136, 54137]);
+
+    expect(result.tracked).toBe(1);
+    expect(result.conflicts).toEqual([
+      { ligaId: 54136, name: "Liga 54136", ownedBySeasonId: past, ownedBySeasonName: "2025/26" },
+    ]);
+
+    const stolen = await ctx.db.select().from(leagues).where(eq(leagues.apiLigaId, 54136));
+    expect(stolen[0]!.seasonRefId).toBe(past);
+    expect(stolen[0]!.name).toBe("Oberliga 2025/26");
+    expect(stolen[0]!.isTracked).toBe(true);
+
+    const tracked = await getTrackedLeagues(upcoming);
+    expect(tracked.leagues.map((l) => l.apiLigaId)).toEqual([54137]);
+  });
+
+  it("does not seed team entries for a conflicting liga (#227)", async () => {
+    const past = await makeSeason("archived", "2025/26");
+    await ctx.client.query(
+      `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id,
+                            is_tracked, vorabliga)
+       VALUES (54136, 4001, 'Oberliga 2025/26', 2025, '2025/26', $1, true, false)`,
+      [past],
+    );
+    const upcoming = await makeSeason("upcoming");
+    getAllLigen.mockResolvedValue([liga(54136, true)]);
+
+    const result = await setSeasonLeagues(upcoming, [54136]);
+
+    expect(result.tracked).toBe(0);
+    expect(result.entriesSeeded).toBe(0);
+    expect(fetchLeagueRoster).not.toHaveBeenCalled();
   });
 });
 

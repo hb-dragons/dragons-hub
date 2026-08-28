@@ -1013,7 +1013,8 @@
         "reviewPlaceholders": "Unassigned fixture slots",
         "reviewPlaceholderHint": "The federation has not yet named both teams for these fixtures, so they are not imported yet. They arrive on a later sync once the teams are set.",
         "reviewUnavailable": "Counts could not be loaded. The season and its leagues are saved.",
-        "reviewProvisional": "The sync was still running when we stopped watching it, so these counts are provisional. Check the sync log for the final figures."
+        "reviewProvisional": "The sync was still running when we stopped watching it, so these counts are provisional. Check the sync log for the final figures.",
+        "leagueOwnedByOtherSeason": "Belongs to season {season}"
       },
       "subtitle": "Prepare next season's leagues in the background, then make it live.",
       "empty": "No seasons yet. Create one to start tracking a season's leagues.",
@@ -1022,7 +1023,8 @@
         "status": "Status",
         "leagues": "Leagues",
         "games": "Games"
-      }
+      },
+      "leagueConflicts": "Skipped: {names} — these liga IDs already belong to another season. Check with the federation."
     },
     "pushTest": {
       "pageTitle": "Notifications",

@@ -3,7 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 
-const { browse, create, setLeagues, trigger, syncLogs, summary, toastError } = vi.hoisted(() => ({
+const { browse, create, setLeagues, trigger, syncLogs, summary, toastError, toastWarning } = vi.hoisted(() => ({
   browse: vi.fn(),
   create: vi.fn(),
   setLeagues: vi.fn(),
@@ -11,6 +11,7 @@ const { browse, create, setLeagues, trigger, syncLogs, summary, toastError } = v
   syncLogs: vi.fn(),
   summary: vi.fn(),
   toastError: vi.fn(),
+  toastWarning: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -21,7 +22,7 @@ vi.mock("@/lib/api", () => ({
 }));
 vi.mock("swr", () => ({ useSWRConfig: () => ({ mutate: vi.fn() }) }));
 vi.mock("next-intl", () => ({ useTranslations: () => (k: string) => k }));
-vi.mock("sonner", () => ({ toast: { error: toastError } }));
+vi.mock("sonner", () => ({ toast: { error: toastError, warning: toastWarning } }));
 
 // The real component opens an EventSource; the wizard only needs its
 // onComplete callback, so stand in a button that fires it on demand.
@@ -36,15 +37,15 @@ vi.mock("@/components/admin/sync/sync-live-logs", () => ({
 import { SeasonWizard } from "./season-wizard";
 
 const LEAGUES = [
-  { ligaId: 1, ligaNr: null, name: "Oberliga Herren Ost", skName: "Oberliga", akName: "Senioren", geschlecht: "männlich", vorabliga: true, alreadyTracked: false },
-  { ligaId: 2, ligaNr: null, name: "Landesliga Damen", skName: "Landesliga", akName: "Senioren", geschlecht: "weiblich", vorabliga: true, alreadyTracked: false },
+  { ligaId: 1, ligaNr: null, name: "Oberliga Herren Ost", skName: "Oberliga", akName: "Senioren", geschlecht: "männlich", vorabliga: true, alreadyTracked: false, conflictSeasonName: null },
+  { ligaId: 2, ligaNr: null, name: "Landesliga Damen", skName: "Landesliga", akName: "Senioren", geschlecht: "weiblich", vorabliga: true, alreadyTracked: false, conflictSeasonName: null },
 ];
 
 beforeEach(() => {
   vi.clearAllMocks();
   browse.mockResolvedValue(LEAGUES);
   create.mockResolvedValue({ id: 9, name: "2026/27", status: "upcoming" });
-  setLeagues.mockResolvedValue({ tracked: 1, untracked: 0 });
+  setLeagues.mockResolvedValue({ tracked: 1, untracked: 0, entriesSeeded: 0, rosterFailures: [], conflicts: [] });
   trigger.mockResolvedValue({ jobId: "j1", syncRunId: 77, status: "queued", message: "" });
   syncLogs.mockResolvedValue({ items: [{ id: 77, status: "completed" }] });
   summary.mockResolvedValue({ leagueCount: 1, gameCount: 12, placeholderSlots: 0 });
@@ -116,6 +117,27 @@ describe("SeasonWizard", () => {
     );
     expect(setLeagues).toHaveBeenCalledWith(9, { ligaIds: [1] });
     await waitFor(() => expect(trigger).toHaveBeenCalled());
+    expect(await screen.findByTestId("live-logs")).toBeInTheDocument();
+  });
+
+  it("warns about ligas another season owns and still creates the season (#227)", async () => {
+    setLeagues.mockResolvedValueOnce({
+      tracked: 0,
+      untracked: 0,
+      entriesSeeded: 0,
+      rosterFailures: [],
+      conflicts: [
+        { ligaId: 1, name: "Oberliga Herren Ost", ownedBySeasonId: 4, ownedBySeasonName: "2025/26" },
+      ],
+    });
+    render(<SeasonWizard open onOpenChange={() => {}} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getAllByRole("checkbox")[0]!);
+    fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
+    await waitFor(() =>
+      expect(toastWarning).toHaveBeenCalledWith("settings.seasons.leagueConflicts"),
+    );
     expect(await screen.findByTestId("live-logs")).toBeInTheDocument();
   });
 
@@ -431,7 +453,7 @@ describe("SeasonWizard", () => {
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
 
-    pending.resolve({ tracked: 1, untracked: 0 });
+    pending.resolve({ tracked: 1, untracked: 0, entriesSeeded: 0, rosterFailures: [], conflicts: [] });
     await screen.findByTestId("live-logs");
 
     // Syncing: the work is committed and the sync continues server-side, so the
