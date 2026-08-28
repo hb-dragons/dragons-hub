@@ -33,7 +33,7 @@ vi.mock("../../config/database", () => ({
 // --- Imports (after mocks) ---
 
 import { getMatchContext } from "./match-context.service";
-import { matches, teams } from "@dragons/db/schema";
+import { leagues, matches, seasons, teams } from "@dragons/db/schema";
 
 const DRAGONS = 10;
 const RIVALS = 20;
@@ -41,6 +41,14 @@ const THIRD = 30;
 
 let ctx: TestDbContext;
 let trace: QueryTrace;
+let seasonId: number;
+/**
+ * League every seeded match belongs to unless a test says otherwise. The
+ * context queries join `matches -> leagues` to reach the season (ADR 0007), so
+ * a match with a null `league_id` has no season and scopes to nothing — see
+ * the season-scope cases below.
+ */
+let defaultLeagueId: number;
 
 beforeAll(async () => {
   ctx = await setupTestDb();
@@ -50,6 +58,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await resetTestDb(ctx);
+  seasonId = await seedSeason("2025/26", "active");
+  defaultLeagueId = await seedLeague(900, "Default League");
   vi.clearAllMocks();
   trace.reset();
 });
@@ -57,6 +67,36 @@ beforeEach(async () => {
 afterAll(async () => {
   await closeTestDb(ctx);
 });
+
+async function seedSeason(
+  name: string,
+  status: "upcoming" | "active" | "archived",
+): Promise<number> {
+  const [row] = await ctx.db
+    .insert(seasons)
+    .values({ name, status })
+    .returning({ id: seasons.id });
+  return row!.id;
+}
+
+async function seedLeague(
+  apiLigaId: number,
+  name: string,
+  seasonRefId?: number,
+): Promise<number> {
+  const [row] = await ctx.db
+    .insert(leagues)
+    .values({
+      apiLigaId,
+      ligaNr: apiLigaId,
+      name,
+      seasonId: 2026,
+      seasonName: "2025/26",
+      seasonRefId: seasonRefId ?? seasonId,
+    })
+    .returning({ id: leagues.id });
+  return row!.id;
+}
 
 async function seedTeam(
   apiTeamPermanentId: number,
@@ -80,6 +120,8 @@ interface MatchSpec {
   kickoffDate: string;
   homeScore?: number | null;
   guestScore?: number | null;
+  /** `null` puts the match in no league at all, and so in no season. */
+  leagueId?: number | null;
 }
 
 async function seedMatch(spec: MatchSpec): Promise<number> {
@@ -95,6 +137,7 @@ async function seedMatch(spec: MatchSpec): Promise<number> {
       guestTeamApiId: spec.guest,
       homeScore: spec.homeScore ?? null,
       guestScore: spec.guestScore ?? null,
+      leagueId: spec.leagueId === undefined ? defaultLeagueId : spec.leagueId,
     })
     .returning({ id: matches.id });
   return row!.id;
@@ -335,6 +378,67 @@ describe("getMatchContext — per-team form", () => {
     await seedMatch({ apiMatchId: 203, home: DRAGONS, guest: THIRD, kickoffDate: "2026-03-10" });
 
     expect((await getMatchContext(matchId))!.homeForm).toEqual([]);
+  });
+});
+
+describe("getMatchContext — season scope (ADR 0007)", () => {
+  it("excludes prior-season meetings from the record and prior-season games from form", async () => {
+    const matchId = await seedUpcomingFixture();
+    const oldSeason = await seedSeason("2024/25", "archived");
+    const oldLeagueId = await seedLeague(901, "Last Season", oldSeason);
+    await seedMatch({ apiMatchId: 401, home: DRAGONS, guest: RIVALS, kickoffDate: "2025-03-01", homeScore: 80, guestScore: 70, leagueId: oldLeagueId });
+    await seedTeam(THIRD, "Others", false);
+    await seedMatch({ apiMatchId: 402, home: DRAGONS, guest: THIRD, kickoffDate: "2025-02-01", homeScore: 90, guestScore: 60, leagueId: oldLeagueId });
+
+    const result = await getMatchContext(matchId);
+
+    expect(result!.headToHead).toMatchObject({ wins: 0, losses: 0, previousMeetings: [] });
+    expect(result!.homeForm).toEqual([]);
+    expect(result!.guestForm).toEqual([]);
+  });
+
+  it("counts a same-season meeting from another league", async () => {
+    const matchId = await seedUpcomingFixture();
+    const cupLeagueId = await seedLeague(902, "Pokal");
+    const cupMeeting = await seedMatch({ apiMatchId: 403, home: DRAGONS, guest: RIVALS, kickoffDate: "2026-03-01", homeScore: 80, guestScore: 70, leagueId: cupLeagueId });
+
+    const result = await getMatchContext(matchId);
+
+    // Season-scoped, not league-scoped: a cup meeting in the same season counts.
+    expect(result!.headToHead.previousMeetings.map((m) => m.matchId)).toEqual([cupMeeting]);
+    expect(result!.homeForm.map((f) => f.matchId)).toEqual([cupMeeting]);
+  });
+
+  it("anchors to the match's own season, not the active one", async () => {
+    await seedTeam(DRAGONS, "Dragons", true);
+    await seedTeam(RIVALS, "Rivals", false);
+    const oldSeason = await seedSeason("2024/25", "archived");
+    const oldLeagueId = await seedLeague(901, "Last Season", oldSeason);
+    const archivedMatch = await seedMatch({ apiMatchId: 404, home: DRAGONS, guest: RIVALS, kickoffDate: "2025-04-01", leagueId: oldLeagueId });
+    const oldMeeting = await seedMatch({ apiMatchId: 405, home: DRAGONS, guest: RIVALS, kickoffDate: "2025-03-01", homeScore: 80, guestScore: 70, leagueId: oldLeagueId });
+    // A meeting in the *active* season must not bleed into the archived match's context.
+    await seedMatch({ apiMatchId: 406, home: DRAGONS, guest: RIVALS, kickoffDate: "2026-03-01", homeScore: 60, guestScore: 90 });
+
+    const result = await getMatchContext(archivedMatch);
+
+    expect(result!.headToHead.previousMeetings.map((m) => m.matchId)).toEqual([oldMeeting]);
+    expect(result!.headToHead).toMatchObject({ wins: 1, losses: 0 });
+    expect(result!.homeForm.map((f) => f.matchId)).toEqual([oldMeeting]);
+  });
+
+  it("scopes to nothing when the match belongs to no league", async () => {
+    await seedTeam(DRAGONS, "Dragons", true);
+    await seedTeam(RIVALS, "Rivals", false);
+    const leaguelessMatch = await seedMatch({ apiMatchId: 407, home: DRAGONS, guest: RIVALS, kickoffDate: "2026-04-01", leagueId: null });
+    await seedMatch({ apiMatchId: 408, home: DRAGONS, guest: RIVALS, kickoffDate: "2026-03-01", homeScore: 80, guestScore: 70 });
+
+    const result = await getMatchContext(leaguelessMatch);
+
+    // Without a league there is no season to scope to — empty, not all-time.
+    expect(result).not.toBeNull();
+    expect(result!.headToHead).toMatchObject({ wins: 0, losses: 0, previousMeetings: [] });
+    expect(result!.homeForm).toEqual([]);
+    expect(result!.guestForm).toEqual([]);
   });
 });
 
