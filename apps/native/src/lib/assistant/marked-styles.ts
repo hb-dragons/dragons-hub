@@ -1,4 +1,5 @@
 import type { TextStyle, ViewStyle } from "react-native";
+import { fontFamilies } from "@/theme/font-families";
 import type { useTheme } from "@/hooks/useTheme";
 
 type Theme = ReturnType<typeof useTheme>;
@@ -36,15 +37,15 @@ export function markedStyles(theme: Theme): Styles {
   const { colors, spacing, radius, textStyles } = theme;
   const heading = (fontSize: number): TextStyle & ViewStyle => ({
     color: colors.foreground,
-    fontFamily: "SpaceGrotesk-Bold",
+    fontFamily: fontFamilies.display,
     fontSize,
     marginTop: spacing.sm,
     marginBottom: spacing.xs,
   });
   return {
-    text: { color: colors.foreground, fontFamily: "Inter-Regular", fontSize: textStyles.body.fontSize },
+    text: { color: colors.foreground, fontFamily: fontFamilies.body, fontSize: textStyles.body.fontSize },
     paragraph: { marginTop: spacing.xs, marginBottom: spacing.xs },
-    strong: { fontFamily: "Inter-SemiBold", color: colors.foreground },
+    strong: { fontFamily: fontFamilies.bodySemiBold, color: colors.foreground },
     em: { fontStyle: "italic" },
     strikethrough: { textDecorationLine: "line-through" },
     link: { color: colors.primary, textDecorationLine: "underline" },

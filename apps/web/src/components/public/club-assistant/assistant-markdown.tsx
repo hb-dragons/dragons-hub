@@ -16,7 +16,7 @@ interface AssistantMarkdownProps {
  * the defaults and drop sanitization.
  *
  * Theming: the `prose-*` utility classes map markdown elements to design tokens
- * (Inter body, Space Grotesk headings, rounded-md, tonal surfaces, primary links).
+ * (Bricolage Grotesque type, rounded-md, tonal surfaces, primary links).
  */
 function AssistantMarkdownImpl({ text, isStreaming }: AssistantMarkdownProps) {
   return (

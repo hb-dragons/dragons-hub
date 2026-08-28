@@ -1,37 +1,26 @@
 /**
  * Dragon's Lair typography tokens for React Native.
  *
- * Display/Headlines: Space Grotesk
- * Body/Data: Inter
+ * One family for everything: Bricolage Grotesque, the public site's face
+ * (see apps/site/astro.config.mjs) — display and body roles differ by
+ * weight, not family. Static instances, not the variable font: RN's
+ * Android renderer has no reliable fontVariationSettings support.
  */
 import type { TextStyle } from "react-native";
+import { fontFamilies } from "./font-families";
 
-/**
- * Semantic font family names mapped to loaded font asset names.
- * These keys are what you pass to `fontFamily` in styles.
- */
-export const fontFamilies = {
-  display: "SpaceGrotesk-Bold",
-  displayMedium: "SpaceGrotesk-Medium",
-  body: "Inter-Regular",
-  bodyMedium: "Inter-Medium",
-  bodySemiBold: "Inter-SemiBold",
-} as const;
+export { fontFamilies };
 
 /**
  * Font assets for expo-font loading.
  * Pass this object to `Font.loadAsync()` or `useFonts()`.
- *
- * NOTE: The require() calls will fail typecheck until the actual .ttf files
- * are present in assets/fonts/. This is expected during initial scaffolding.
  */
 export const fontAssets = {
-  [fontFamilies.display]: require("../../assets/fonts/SpaceGrotesk-Bold.ttf"),
-  [fontFamilies.displayMedium]: require("../../assets/fonts/SpaceGrotesk-Medium.ttf"),
-  [fontFamilies.body]: require("../../assets/fonts/Inter-Regular.ttf"),
-  [fontFamilies.bodyMedium]: require("../../assets/fonts/Inter-Medium.ttf"),
-  [fontFamilies.bodySemiBold]: require("../../assets/fonts/Inter-SemiBold.ttf"),
-} as const;
+  "BricolageGrotesque-Regular": require("../../assets/fonts/BricolageGrotesque-Regular.ttf"),
+  "BricolageGrotesque-Medium": require("../../assets/fonts/BricolageGrotesque-Medium.ttf"),
+  "BricolageGrotesque-SemiBold": require("../../assets/fonts/BricolageGrotesque-SemiBold.ttf"),
+  "BricolageGrotesque-Bold": require("../../assets/fonts/BricolageGrotesque-Bold.ttf"),
+} as const satisfies Record<(typeof fontFamilies)[keyof typeof fontFamilies], unknown>;
 
 /**
  * Predefined text styles matching the Dragon's Lair design system.

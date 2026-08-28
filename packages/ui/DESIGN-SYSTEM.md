@@ -43,13 +43,18 @@ Hierarchy is achieved through background color shifts, not shadows or borders.
 
 ### 3. Typography
 
-Two font families with distinct roles:
+One family across the club's surfaces — Bricolage Grotesque, the public
+site's face — with roles separated by weight and case, not family. JetBrains
+Mono covers tabular/log data. The `font-display` / `font-sans` split stays in
+the markup: the tokens both resolve to Bricolage today, and the semantic
+distinction is what lets a future display face slot in without a sweep.
 
 | Role | Font | CSS Variable | Usage |
 |---|---|---|---|
-| **Display/Headlines** | Space Grotesk | `font-display` | Page titles, KPI values, section headings |
-| **Body/Data** | Inter | `font-sans` | Paragraphs, table cells, form labels |
-| **Labels** | Space Grotesk | `font-display` | Table headers, badge text, small captions |
+| **Display/Headlines** | Bricolage Grotesque | `font-display` | Page titles, KPI values, section headings |
+| **Body/Data** | Bricolage Grotesque | `font-sans` | Paragraphs, table cells, form labels |
+| **Labels** | Bricolage Grotesque | `font-display` | Table headers, badge text, small captions |
+| **Mono/Data** | JetBrains Mono | `font-mono` | Scoreboard debug, sync logs, IDs |
 
 **Page titles:** `font-display text-4xl font-bold uppercase tracking-tight`
 **Table headers:** `font-display text-xs font-medium uppercase tracking-wide text-muted-foreground`
