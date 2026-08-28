@@ -371,7 +371,9 @@ export default function GameDetailScreen() {
         ) : null}
 
         {/* ── 4. Form (Last 5) ── */}
-        {context && (context.homeForm.length > 0 || context.guestForm.length > 0) ? (
+        {/* Kept mounted even with no games played: an empty strip at season
+            start is the clean slate, not a missing section (ADR 0007). */}
+        {context ? (
           <View style={{ marginBottom: spacing.md }}>
             <Text style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
               {i18n.t("gameDetail.form")}
@@ -397,9 +399,15 @@ export default function GameDetailScreen() {
                 >
                   {match.homeIsOwnClub ? homeLabel : guestLabel}
                 </Text>
-                <FormStrip
-                  form={match.homeIsOwnClub ? context.homeForm : context.guestForm}
-                />
+                {(match.homeIsOwnClub ? context.homeForm : context.guestForm).length > 0 ? (
+                  <FormStrip
+                    form={match.homeIsOwnClub ? context.homeForm : context.guestForm}
+                  />
+                ) : (
+                  <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
+                    {i18n.t("gameDetail.noGamesYet")}
+                  </Text>
+                )}
               </View>
               {/* Opponent form */}
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
@@ -414,9 +422,15 @@ export default function GameDetailScreen() {
                 >
                   {match.homeIsOwnClub ? guestLabel : homeLabel}
                 </Text>
-                <FormStrip
-                  form={match.homeIsOwnClub ? context.guestForm : context.homeForm}
-                />
+                {(match.homeIsOwnClub ? context.guestForm : context.homeForm).length > 0 ? (
+                  <FormStrip
+                    form={match.homeIsOwnClub ? context.guestForm : context.homeForm}
+                  />
+                ) : (
+                  <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
+                    {i18n.t("gameDetail.noGamesYet")}
+                  </Text>
+                )}
               </View>
             </View>
           </View>

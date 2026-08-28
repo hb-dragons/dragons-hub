@@ -267,7 +267,25 @@ export function HeadToHead({
             return <View key={meeting.matchId}>{row}</View>;
           })}
         </View>
-      ) : null}
+      ) : (
+        <View
+          style={{
+            backgroundColor: colors.surfaceLowest,
+            borderRadius: radius.md,
+            padding: spacing.lg,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              fontFamily: fontFamilies.body,
+              color: colors.mutedForeground,
+            }}
+          >
+            {i18n.t("gameDetail.noMeetings")}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
