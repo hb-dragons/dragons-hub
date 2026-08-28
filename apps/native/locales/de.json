@@ -1,3 +1,5 @@
 {
-  "NSFaceIDUsageDescription": "Mit Face ID die Dragons-App entsperren"
+  "ios": {
+    "NSFaceIDUsageDescription": "Mit Face ID die Dragons-App entsperren"
+  }
 }
