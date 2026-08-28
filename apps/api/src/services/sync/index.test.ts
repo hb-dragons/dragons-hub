@@ -85,6 +85,11 @@ vi.mock("./referees.sync", () => ({
   confirmIntentsFromSync: (...args: unknown[]) => mockConfirmIntents(...args),
 }));
 
+const mockSyncTeamEntries = vi.fn();
+vi.mock("./team-entries.sync", () => ({
+  syncTeamEntriesFromData: (...args: unknown[]) => mockSyncTeamEntries(...args),
+}));
+
 const mockCreateSyncLogger = vi.fn();
 vi.mock("./sync-logger", () => ({
   createSyncLogger: (...args: unknown[]) => mockCreateSyncLogger(...args),
@@ -192,6 +197,11 @@ beforeEach(async () => {
     total: 10, created: 5, updated: 5, skipped: 0, failed: 0, errors: [], durationMs: 40,
   });
 
+  mockSyncTeamEntries.mockResolvedValue({
+    total: 0, created: 0, moved: 0, unchanged: 0, supersededManual: 0, kept: 0, conflicts: 0,
+    errors: [], durationMs: 5,
+  });
+
   mockBuildVenueLookup.mockResolvedValue(new Map());
   mockBuildMatchLookup.mockResolvedValue(new Map());
 
@@ -295,6 +305,29 @@ describe("fullSync", () => {
         expect.objectContaining({ syncRunId: deletedId }),
         "Completion update did not match any rows",
       );
+    });
+
+    it("reports team-entry supersessions and conflicts as sync steps", async () => {
+      mockSyncTeamEntries.mockResolvedValue({
+        total: 3, created: 0, moved: 1, unchanged: 1, supersededManual: 1, kept: 1, conflicts: 1,
+        errors: [], durationMs: 5,
+      });
+
+      await fullSync("manual");
+
+      const messages = mockSyncLogger.info.mock.calls.map((c) => String(c[0]));
+      expect(messages).toContain(
+        "Superseded 1 manual league links with federation evidence",
+      );
+      expect(messages.some((m) => m.includes("appeared in more than one league of a season"))).toBe(true);
+    });
+
+    it("says nothing about team entries when the run is unambiguous", async () => {
+      await fullSync("manual");
+
+      const messages = mockSyncLogger.info.mock.calls.map((c) => String(c[0]));
+      expect(messages.some((m) => m.includes("more than one league"))).toBe(false);
+      expect(messages.some((m) => m.includes("Superseded"))).toBe(false);
     });
 
     it("calls all sync steps in order", async () => {

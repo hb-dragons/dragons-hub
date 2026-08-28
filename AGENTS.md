@@ -263,7 +263,11 @@ Step 3: Parallel upserts (Promise.all)
   - syncTeamEntriesFromData(leagueData)
     Reconciles per-season team entries (team_entries) from federation
     evidence: creates missing entries, moves links (committed beats
-    vorabliga), supersedes manual links and logs the supersession
+    vorabliga), supersedes manual links and logs the supersession.
+    Ambiguous evidence — one squad in two committed leagues of a season,
+    or in two vorabligas with no committed league — keeps an existing
+    link untouched and logs the conflict; a squad with no link yet falls
+    back to the lowest federation liga id (issue #228)
 
 Step 4: buildVenueIdLookup() -> syncMatchesFromData(leagueData, venueIdLookup, syncRunId)
   - buildVenueIdLookup gives the venue FK lookup (apiId -> dbId) first

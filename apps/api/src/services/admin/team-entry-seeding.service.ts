@@ -37,16 +37,28 @@ async function upsertSquad(ref: SdkTeamRef, isOwn: boolean): Promise<number> {
   return row.id;
 }
 
+export type UpsertEntryOutcome =
+  | { action: "created" | "unchanged"; previousSource: null; keptLeagueId?: undefined }
+  | { action: "moved"; previousSource: "seeded" | "manual"; keptLeagueId?: undefined }
+  | { action: "kept"; previousSource: "seeded" | "manual"; keptLeagueId: number };
+
 /**
  * Point a squad's entry for a season at a league, creating the entry (with
  * carry-forward) if it does not exist. Used by seeding and by the sync
  * (Task 6). Returns what happened so callers can log supersessions.
+ *
+ * `keepExistingLink` is for ambiguous evidence (a squad found in two committed
+ * leagues of one season, issue #228): an entry that already names a league is
+ * left exactly as it is and reported as `kept`, so the caller can log the
+ * conflict instead of silently flipping the link. A missing or unconnected
+ * entry is still written, since a connected league beats none.
  */
 export async function upsertEntryFromEvidence(
   teamId: number,
   seasonId: number,
   leagueId: number,
-): Promise<{ action: "created" | "moved" | "unchanged"; previousSource: "seeded" | "manual" | null }> {
+  options: { keepExistingLink?: boolean } = {},
+): Promise<UpsertEntryOutcome> {
   const db = getDb();
   const [existing] = await db
     .select({ id: teamEntries.id, leagueId: teamEntries.leagueId, linkSource: teamEntries.linkSource })
@@ -104,14 +116,18 @@ export async function upsertEntryFromEvidence(
 
   if (existing.leagueId === leagueId) return { action: "unchanged", previousSource: null };
 
+  const previousSource = existing.linkSource === "manual" ? "manual" : "seeded";
+  // An unconnected entry has no link to keep, so ambiguous evidence still
+  // connects it — a connected league beats none.
+  if (options.keepExistingLink && existing.leagueId !== null) {
+    return { action: "kept", previousSource, keptLeagueId: existing.leagueId };
+  }
+
   await db
     .update(teamEntries)
     .set({ leagueId, linkSource: "seeded", updatedAt: new Date() })
     .where(eq(teamEntries.id, existing.id));
-  return {
-    action: "moved",
-    previousSource: existing.linkSource === "manual" ? "manual" : "seeded",
-  };
+  return { action: "moved", previousSource };
 }
 
 export async function seedSeasonTeamEntries(

@@ -140,6 +140,9 @@ export async function fullSync(
     if (teamEntriesRes.supersededManual > 0) {
       await logStep(`Superseded ${teamEntriesRes.supersededManual} manual league links with federation evidence`);
     }
+    if (teamEntriesRes.conflicts > 0) {
+      await logStep(`${teamEntriesRes.conflicts} squad(s) appeared in more than one league of a season; see the log entries for how each resolved`);
+    }
 
     allErrors.push(...teamsRes.errors);
     allErrors.push(...venuesRes.errors);
