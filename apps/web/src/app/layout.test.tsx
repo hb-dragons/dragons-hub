@@ -6,8 +6,8 @@ vi.mock("next-intl/server", () => ({
 }));
 
 vi.mock("next/font/google", () => ({
-  Inter: () => ({ variable: "--font-sans" }),
-  Space_Grotesk: () => ({ variable: "--font-display" }),
+  Bricolage_Grotesque: () => ({ variable: "--font-sans" }),
+  JetBrains_Mono: () => ({ variable: "--font-mono" }),
 }));
 
 vi.mock("@wrksz/themes/next", () => ({

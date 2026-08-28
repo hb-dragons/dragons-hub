@@ -70,9 +70,9 @@
   --brand-foreground: #8be19f;
 
   /* Typography */
-  --font-sans: Inter, sans-serif;
-  --font-display: "Space Grotesk", sans-serif;
-  --font-mono: "Space Grotesk", sans-serif;
+  --font-sans: "Bricolage Grotesque", sans-serif;
+  --font-display: "Bricolage Grotesque", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
   --radius: 0.25rem;
   --shadow-2xs: 0 1px 3px 0px rgba(25, 28, 29, 0.03);
   --shadow-xs: 0 1px 3px 0px rgba(25, 28, 29, 0.03);
@@ -144,9 +144,9 @@
   --brand-foreground: #8be19f;
 
   /* Typography */
-  --font-sans: Inter, sans-serif;
-  --font-display: "Space Grotesk", sans-serif;
-  --font-mono: "Space Grotesk", sans-serif;
+  --font-sans: "Bricolage Grotesque", sans-serif;
+  --font-display: "Bricolage Grotesque", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
   --radius: 0.25rem;
   --shadow-2xs: 0 1px 3px 0px rgba(226, 226, 226, 0.03);
   --shadow-xs: 0 1px 3px 0px rgba(226, 226, 226, 0.03);
@@ -243,5 +243,9 @@
 
   body {
     @apply bg-background text-foreground;
+    /* next/font defines --font-sans on body. Alias --font-display here, not
+       on :root — a var() in a :root declaration resolves against :root, where
+       the loaded face is not in scope, and the fallback literal would win. */
+    --font-display: var(--font-sans);
   }
 }

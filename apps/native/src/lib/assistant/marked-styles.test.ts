@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { markedStyles } from "./marked-styles";
 import { colors } from "@/theme/colors";
+import { fontFamilies } from "@/theme/font-families";
 import { spacing, radius } from "@/theme/spacing";
 
 // Inline the slice of typography markedStyles reads. Importing
@@ -15,7 +16,7 @@ describe("markedStyles", () => {
     const s = markedStyles(theme);
     expect(s.text!.color).toBe(colors.dark.foreground);
     expect(s.link!.color).toBe(colors.dark.primary);
-    expect(s.strong!.fontFamily).toBe("Inter-SemiBold");
+    expect(s.strong!.fontFamily).toBe(fontFamilies.bodySemiBold);
     expect(s.code!.backgroundColor).toBe(colors.dark.surfaceLow);
   });
 });

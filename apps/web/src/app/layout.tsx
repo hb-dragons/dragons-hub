@@ -1,18 +1,20 @@
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Bricolage_Grotesque, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@wrksz/themes/next";
 import { getLocale } from "next-intl/server";
 import "@dragons/ui/globals.css";
 import "@daveyplate/better-auth-ui/css";
 import "./social-fonts.css";
 
-const inter = Inter({
+// One family for sans and display, matching the public site (apps/site):
+// globals.css aliases --font-display to --font-sans on body.
+const bricolage = Bricolage_Grotesque({
   variable: "--font-sans",
   subsets: ["latin"],
   display: "swap",
 });
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-display",
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-mono",
   subsets: ["latin"],
   display: "swap",
 });
@@ -36,7 +38,7 @@ export default async function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </head>
       <body
-        className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased`}
+        className={`${bricolage.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
