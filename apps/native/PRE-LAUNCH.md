@@ -271,25 +271,32 @@ Android 13+ themed icons look bad without a monochrome layer.
       so the bundle and its map carry a matching Debug ID (verified
       locally 2026-08-27 via `expo export:embed`). It must not be
       `withSentryConfig` — see RELEASES.md.
-- [ ] **Human step, before the first preview build:** set two EAS
+- [x] **Human step, before the first preview build:** set two EAS
       environment variables in the `preview` *and* `production`
       environments (not `development`):
       `EXPO_PUBLIC_GLITCHTIP_DSN` (the project DSN) and
       `SENTRY_AUTH_TOKEN` (GlitchTip → profile → auth tokens, scope
       `project:releases`), both visibility `sensitive`. Neither belongs
       in the repo.
-- [ ] **Verify once:** build `preview`, install it, and force each path
-      once. There is no crash button in the app on purpose; add a
-      throw to a screen on a throwaway branch, or run
-      `eas build --profile preview --platform ios` against a commit that
-      has one:
-      `useEffect(() => { setTimeout(() => { throw new Error("DRAGONS_CRASH_TEST"); }, 3000); }, [])`
-      for the fatal path, and a bare `throw` in a component body for the
-      boundary path. Confirm two issues arrive in GlitchTip — tagged
-      `onerror` and `source: error-boundary` — with symbolicated JS
-      stacks, and confirm the fatal arrives exactly *once*. Native
-      (ObjC / Java) frames will *not* symbolicate: GlitchTip has no
-      native symbolication, which is accepted since both paths are JS.
+      Done 2026-08-27; both point at the EU project.
+- [x] **Verified 2026-08-28** on an ad-hoc build of `de.hbdragons.app@1.0.0+10`
+      (iPhone, iOS 26.5.2). A throwaway `crash-test.tsx` screen forced each
+      path once; both issues arrived in GlitchTip within seconds:
+      `DRAGONS_CRASH_TEST_FATAL` with `mechanism: onerror`, `handled: no`,
+      level Fatal, and **one** event — the double-report guard holds — and
+      `DRAGONS_CRASH_TEST_BOUNDARY` tagged `source: error-boundary`,
+      `handled: yes`. Both stacks symbolicate to
+      `apps/native/src/app/crash-test.tsx` with source context, tagged
+      `release de.hbdragons.app@1.0.0+10` / `environment preview`, with HTTP
+      breadcrumbs attached. Source maps upload from the Xcode phase through
+      `sentry-cli` against GlitchTip's releases API (bundle and map share one
+      Debug ID) — no `glitchtip-cli` fallback needed. There is no crash
+      button in the app on purpose: to redo this, add a throw on a throwaway
+      branch and build with a `distribution: internal` profile that pins the
+      `preview` environment, since `preview` itself is `distribution: store`
+      and only installs through TestFlight. Native (ObjC / Java) frames still
+      do not symbolicate: GlitchTip has no native symbolication, accepted
+      since both paths are JS.
 - [ ] Add "Diagnostics → Crash Data / Other Diagnostic Data" to the App
       Store Connect privacy label and to Play's Data safety form, matching
       `NSPrivacyCollectedDataTypes` in `app.json` (both unlinked,
