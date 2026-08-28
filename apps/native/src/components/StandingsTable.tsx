@@ -11,9 +11,10 @@ interface StandingsTableProps {
   standings: StandingItem[];
   leagueName: string;
   seasonName?: string;
-  teamColors?: Record<string, string | null>;
-  onOwnClubPress?: (teamName: string) => void;
-  onOpponentPress?: (teamName: string) => void;
+  /** Badge colours keyed by `teamApiId` — team names are not unique. */
+  teamColors?: Record<number, string | null>;
+  onOwnClubPress?: (teamApiId: number) => void;
+  onOpponentPress?: (teamApiId: number) => void;
 }
 
 export function StandingsTable({
@@ -124,11 +125,11 @@ export function StandingsTable({
         {/* Rows */}
         {standings.map((item) => {
           const isOwn = item.isOwnClub;
-          const badgeColor = teamColors?.[item.teamName] ?? null;
+          const badgeColor = teamColors?.[item.teamApiId] ?? null;
           const onPress = isOwn ? onOwnClubPress : onOpponentPress;
           return (
             <StandingRow
-              key={`${item.position}-${item.teamName}`}
+              key={`${item.position}-${String(item.teamApiId)}`}
               item={item}
               isOwn={isOwn}
               badgeColor={badgeColor}
@@ -145,7 +146,7 @@ interface StandingRowProps {
   item: StandingItem;
   isOwn: boolean;
   badgeColor: string | null;
-  onPress?: (teamName: string) => void;
+  onPress?: (teamApiId: number) => void;
 }
 
 function StandingRowImpl({ item, isOwn, badgeColor, onPress }: StandingRowProps) {
@@ -171,8 +172,8 @@ function StandingRowImpl({ item, isOwn, badgeColor, onPress }: StandingRowProps)
     : colors.foreground;
 
   const handlePress = useCallback(() => {
-    onPress?.(item.teamName);
-  }, [onPress, item.teamName]);
+    onPress?.(item.teamApiId);
+  }, [onPress, item.teamApiId]);
 
   const row = (
     <View

@@ -4,7 +4,11 @@ import type { ListRenderItem } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import useSWR from "swr";
 import type { MatchListItem } from "@dragons/shared";
-import { getNativeTeamColor } from "@dragons/shared";
+import {
+  buildTeamsByApiId,
+  findLeagueStandingsForTeam,
+  getNativeTeamColor,
+} from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { useRefresh } from "@/hooks/useRefresh";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
@@ -90,21 +94,13 @@ export default function TeamDetailScreen() {
     };
   }, [allMatches]);
 
-  // Find league standings for this team
-  const leagueStandings = useMemo(() => {
-    if (!standingsData || !team) return null;
-    for (const league of standingsData) {
-      for (const standing of league.standings) {
-        if (
-          standing.teamName.includes(team.name) ||
-          (team.nameShort && standing.teamName.includes(team.nameShort))
-        ) {
-          return league;
-        }
-      }
-    }
-    return null;
-  }, [standingsData, team]);
+  // Find league standings for this team. Matched on the permanent api id:
+  // squad names repeat across leagues, so a name match showed a table the team
+  // is not in (the U12 page listed the U14 league).
+  const leagueStandings = useMemo(
+    () => findLeagueStandingsForTeam(standingsData, team?.apiTeamPermanentId),
+    [standingsData, team],
+  );
 
   const teamColor = getNativeTeamColor(
     team?.badgeColor,
@@ -112,15 +108,15 @@ export default function TeamDetailScreen() {
     isDark,
   );
 
+  const teamsByApiId = useMemo(() => buildTeamsByApiId(teams), [teams]);
+
   const teamColorMap = useMemo(() => {
-    const map: Record<string, string | null> = {};
-    for (const t of teams ?? []) {
-      map[t.name] = t.badgeColor;
-      if (t.nameShort) map[t.nameShort] = t.badgeColor;
-      if (t.customName) map[t.customName] = t.badgeColor;
+    const map: Record<number, string | null> = {};
+    for (const [apiId, t] of teamsByApiId) {
+      map[apiId] = t.badgeColor;
     }
     return map;
-  }, [teams]);
+  }, [teamsByApiId]);
 
   // The team list is what decides whether this route exists at all: a deep
   // link to an unknown id used to sit on a spinner forever, because `team` is
@@ -187,18 +183,10 @@ export default function TeamDetailScreen() {
     [spacing.xl],
   );
 
-  // Resolve opponent team API ID from standings team name
-  const handleOpponentPress = (teamName: string) => {
-    if (!teams) return;
-    const matched = teams.find(
-      (t) =>
-        t.name === teamName ||
-        t.nameShort === teamName ||
-        t.customName === teamName,
-    );
-    if (matched) {
-      router.push(`/h2h/${String(matched.apiTeamPermanentId)}`);
-    }
+  // The standings row already carries the permanent api id the h2h route
+  // takes, so no name lookup is needed to open an opponent.
+  const handleOpponentPress = (teamApiId: number) => {
+    router.push(`/h2h/${String(teamApiId)}`);
   };
 
   // --- Loading state ---
