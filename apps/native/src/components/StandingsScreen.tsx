@@ -2,22 +2,11 @@ import { useMemo } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import useSWR from "swr";
-import type { PublicTeam } from "@dragons/api-client";
+import { buildTeamsByApiId } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { StandingsTable } from "@/components/StandingsTable";
 import { publicApi } from "@/lib/api";
-
-/** Build a lookup map from every name a standings row may use → team record */
-function buildTeamLookup(teams: PublicTeam[]): Map<string, PublicTeam> {
-  const map = new Map<string, PublicTeam>();
-  for (const team of teams) {
-    map.set(team.name, team);
-    if (team.nameShort) map.set(team.nameShort, team);
-    if (team.customName) map.set(team.customName, team);
-  }
-  return map;
-}
 
 /**
  * The league tables. Rendered by two routes: the Standings tab that Fans get,
@@ -46,14 +35,17 @@ export function StandingsScreen() {
 
   const isLoading = standingsLoading || teamsLoading;
 
-  const teamLookup = useMemo(() => buildTeamLookup(teams ?? []), [teams]);
+  // Keyed by `teamApiId`, not by name: several squads share a display name
+  // (and a short name), so a name-keyed lookup opened whichever squad happened
+  // to be last in the list.
+  const teamLookup = useMemo(() => buildTeamsByApiId(teams ?? []), [teams]);
 
   // Keyed off the same lookup, so a badge colour is always the colour of the
   // team a tap on that row would open.
   const teamColorMap = useMemo(() => {
-    const map: Record<string, string | null> = {};
-    for (const [name, team] of teamLookup) {
-      map[name] = team.badgeColor;
+    const map: Record<number, string | null> = {};
+    for (const [apiId, team] of teamLookup) {
+      map[apiId] = team.badgeColor;
     }
     return map;
   }, [teamLookup]);
@@ -70,15 +62,15 @@ export function StandingsScreen() {
 
   const leagues = standings ?? [];
 
-  const handleOwnClubPress = (teamName: string) => {
-    const team = teamLookup.get(teamName);
+  const handleOwnClubPress = (teamApiId: number) => {
+    const team = teamLookup.get(teamApiId);
     if (team) {
       router.push(`/team/${String(team.id)}`);
     }
   };
 
-  const handleOpponentPress = (teamName: string) => {
-    const team = teamLookup.get(teamName);
+  const handleOpponentPress = (teamApiId: number) => {
+    const team = teamLookup.get(teamApiId);
     if (team) {
       router.push(`/h2h/${String(team.apiTeamPermanentId)}`);
     }

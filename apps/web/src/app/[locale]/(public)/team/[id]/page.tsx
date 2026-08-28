@@ -3,6 +3,7 @@ import { getPublicServerApi } from "@/lib/api.server";
 import { getTranslations, getFormatter } from "next-intl/server";
 import { Link } from "@/lib/navigation";
 import type { MatchListItem, LeagueStandings, FormEntry } from "@dragons/shared";
+import { findLeagueStandingsForTeam } from "@dragons/shared";
 import { resolveTeamName } from "@/components/public/schedule/types";
 import { cn } from "@dragons/ui/lib/utils";
 import { ClubLogo } from "@/components/brand/club-logo";
@@ -104,20 +105,12 @@ export default async function TeamDetailPage({
     api.getStandings().catch(() => [] as LeagueStandings[]),
   ]);
 
-  // Find this team's league standings
-  let leagueStandings: LeagueStandings | null = null;
-  for (const league of standings) {
-    for (const standing of league.standings) {
-      if (
-        standing.teamName.includes(team.name) ||
-        (team.nameShort && standing.teamName.includes(team.nameShort))
-      ) {
-        leagueStandings = league;
-        break;
-      }
-    }
-    if (leagueStandings) break;
-  }
+  // Find this team's league standings. Matched on the permanent api id, not
+  // the display name: squad names repeat across leagues.
+  const leagueStandings: LeagueStandings | null = findLeagueStandingsForTeam(
+    standings,
+    team.apiTeamPermanentId,
+  );
 
   // Recent completed games (last 10, most recent first)
   const completedMatches = matchesData.items
@@ -240,9 +233,7 @@ export default async function TeamDetailPage({
               <tbody>
                 {leagueStandings.standings.map((s) => {
                   const isCurrentTeam =
-                    s.teamName.includes(team.name) ||
-                    (team.nameShort &&
-                      s.teamName.includes(team.nameShort));
+                    s.teamApiId === team.apiTeamPermanentId;
                   return (
                     <tr
                       key={s.position}

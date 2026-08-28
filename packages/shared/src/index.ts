@@ -115,6 +115,7 @@ export type {
   EligibleOpenGamesResponse,
 } from "./referees";
 export type { StandingItem, LeagueStandings } from "./standings";
+export { findLeagueStandingsForTeam, buildTeamsByApiId } from "./standings-lookup";
 export type { VenueListItem, VenueSearchResult } from "./venues";
 export type { UserListItem } from "./users";
 export type {
