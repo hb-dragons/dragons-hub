@@ -1,3 +1,5 @@
 {
-  "NSFaceIDUsageDescription": "Use Face ID to unlock the Dragons app"
+  "ios": {
+    "NSFaceIDUsageDescription": "Use Face ID to unlock the Dragons app"
+  }
 }

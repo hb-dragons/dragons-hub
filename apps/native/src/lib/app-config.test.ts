@@ -147,8 +147,21 @@ describe("app.json locales", () => {
 
   it.each(APP_LANGUAGES)("%s translates the Face ID prompt", (lang) => {
     const file = path.resolve(path.dirname(APP_JSON), expo.locales?.[lang] ?? "");
-    const strings = JSON.parse(readFileSync(file, "utf8")) as Record<string, string>;
-    expect(strings.NSFaceIDUsageDescription).toMatch(/\S/);
+    const strings = JSON.parse(readFileSync(file, "utf8")) as {
+      ios?: Record<string, string>;
+    };
+    expect(strings.ios?.NSFaceIDUsageDescription).toMatch(/\S/);
+  });
+
+  // Prebuild copies unscoped top-level keys into BOTH platforms, so a bare
+  // iOS key lands in Android's strings.xml with no default-locale entry and
+  // `lintVitalRelease` fails the release build with a fatal ExtraTranslation.
+  it.each(APP_LANGUAGES)("%s scopes every key to a platform", (lang) => {
+    const file = path.resolve(path.dirname(APP_JSON), expo.locales?.[lang] ?? "");
+    const strings = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+    for (const key of Object.keys(strings)) {
+      expect(["ios", "android"]).toContain(key);
+    }
   });
 
   it("allows mixed localizations so iOS picks the translated strings", () => {
