@@ -1186,6 +1186,7 @@
     "title": "Game schedule",
     "searchPlaceholder": "Search games...",
     "empty": "No games found",
+    "hasComment": "Has a note",
     "export": "Excel export",
     "gamesCount": "games",
     "homeAway": {

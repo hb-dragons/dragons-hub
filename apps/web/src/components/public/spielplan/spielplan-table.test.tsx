@@ -154,6 +154,19 @@ describe("<SpielplanTable>", () => {
     expect(exported.map((m) => m.homeTeamName)).toEqual(["TSV Suchbar"]);
   });
 
+  it("marks games that carry a public comment, even with the comment column hidden", () => {
+    render(
+      <SpielplanTable
+        matches={[
+          makeMatch({ id: 1, publicComment: "Kuchenverkauf" }),
+          makeMatch({ id: 2, homeTeamName: "SV Ohne" }),
+        ]}
+      />,
+    );
+
+    expect(screen.getAllByLabelText("hasComment")).toHaveLength(1);
+  });
+
   it("tints Dragons home game rows", () => {
     render(
       <SpielplanTable

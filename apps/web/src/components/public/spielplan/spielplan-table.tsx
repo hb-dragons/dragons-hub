@@ -3,9 +3,15 @@
 import { useMemo } from "react"
 import { useFormatter, useTranslations } from "next-intl"
 import type { ColumnDef, FilterFn, Row } from "@tanstack/react-table"
-import { Ban, CircleOff, SearchIcon, SquareActivity } from "lucide-react"
+import { Ban, CircleOff, MessageSquareText, SearchIcon, SquareActivity } from "lucide-react"
 import { Button } from "@dragons/ui/components/button"
 import { Input } from "@dragons/ui/components/input"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@dragons/ui/components/tooltip"
 
 import type { MatchListItem } from "@dragons/shared"
 import { clubDayAnchor } from "@dragons/shared"
@@ -24,6 +30,27 @@ import {
 } from "@/components/admin/matches/utils"
 import { isDerbyGame, spielplanRowClass, withDerbyPrefix } from "./utils"
 import { exportSpielplanXlsx } from "./xlsx-export"
+
+/**
+ * Marks a game that carries an admin-entered note so it stays visible even
+ * when the Kommentar column is toggled off or truncated on a narrow screen.
+ */
+function CommentDot({ match, label }: { match: MatchListItem; label: string }) {
+  if (!match.publicComment) return null
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span aria-label={label} className="ml-1 inline-flex align-text-top text-heat">
+          <MessageSquareText className="size-3.5" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="max-w-64 text-xs">{match.publicComment}</p>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
 
 const includesFilterFn: FilterFn<MatchListItem> = (row, id, value) => {
   const filterValues = value as string[] | undefined
@@ -77,6 +104,7 @@ function getColumns(
       cell: ({ row }) => (
         <span className="whitespace-nowrap text-sm">
           {format.dateTime(clubDayAnchor(row.original.kickoffDate), "matchDate")}
+          <CommentDot match={row.original} label={t("hasComment")} />
         </span>
       ),
       filterFn: dateRangeFilterFn,
@@ -243,9 +271,10 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
   }
 
   return (
-    <DataTable
-      columns={columns}
-      data={matches}
+    <TooltipProvider>
+      <DataTable
+        columns={columns}
+        data={matches}
       rowClassName={getRowClassName}
       globalFilterFn={spielplanGlobalFilterFn}
       initialColumnVisibility={{
@@ -312,6 +341,7 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
           </div>
         )
       }}
-    </DataTable>
+      </DataTable>
+    </TooltipProvider>
   )
 }
