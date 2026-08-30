@@ -55,6 +55,30 @@ export const PUBLIC_PATH_PREFIXES = [
   "/spielplan",
 ];
 
+/**
+ * Public *content* pages that are parked for now: only the coach spielplan is
+ * in active use, so the homepage and the browse pages temporarily redirect
+ * there (307 — deliberately not cacheable-permanent, they may come back after
+ * the public refactor). Functional routes (`/auth`, `/live`, `/overlay`,
+ * `/admin`, `/api/auth`) are untouched. The pages themselves still exist in
+ * the route tree; remove an entry here to bring one back.
+ */
+export const SPIELPLAN_REDIRECT_PREFIXES = [
+  "/schedule",
+  "/standings",
+  "/teams",
+  "/team",
+  "/game",
+  "/h2h",
+];
+
+function redirectsToSpielplan(logicalPathname: string): boolean {
+  return (
+    logicalPathname === PUBLIC_ROOT_PATH ||
+    SPIELPLAN_REDIRECT_PREFIXES.some((prefix) => logicalPathname.startsWith(prefix))
+  );
+}
+
 function isPublicPath(logicalPathname: string): boolean {
   return (
     logicalPathname === PUBLIC_ROOT_PATH ||
@@ -65,6 +89,17 @@ function isPublicPath(logicalPathname: string): boolean {
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const logicalPathname = getLogicalPathname(pathname);
+
+  // Parked content pages — send to the spielplan, keeping the locale prefix
+  // (`/en/teams` → `/en/spielplan`, `/teams` → `/spielplan`).
+  if (redirectsToSpielplan(logicalPathname)) {
+    // A bare locale root ("/en") maps to logical "/" without being suffixed
+    // by it — there the whole pathname is the locale prefix.
+    const localePrefix = pathname.endsWith(logicalPathname)
+      ? pathname.slice(0, pathname.length - logicalPathname.length)
+      : pathname;
+    return NextResponse.redirect(new URL(`${localePrefix}/spielplan`, request.url), 307);
+  }
 
   // Public paths — skip auth, just handle locale
   if (isPublicPath(logicalPathname)) {

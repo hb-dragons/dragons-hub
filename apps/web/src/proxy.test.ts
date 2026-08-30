@@ -50,16 +50,43 @@ describe("public route allowlist derivation (regression guard for #95)", () => {
   });
 });
 
+describe("proxy — content pages redirect to /spielplan", () => {
+  const redirectCases: Array<[string, string]> = [
+    ["/", "/spielplan"],
+    ["/en", "/en/spielplan"],
+    ["/schedule", "/spielplan"],
+    ["/standings", "/spielplan"],
+    ["/teams", "/spielplan"],
+    ["/team/45", "/spielplan"],
+    ["/game/123", "/spielplan"],
+    ["/h2h/67", "/spielplan"],
+    ["/en/schedule", "/en/spielplan"],
+    ["/en/game/123", "/en/spielplan"],
+  ];
+
+  it.each(redirectCases)("temporarily redirects %s to %s", (pathname, destination) => {
+    const request = new NextRequest(`http://localhost:3000${pathname}`);
+    const response = proxy(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(`http://localhost:3000${destination}`);
+  });
+
+  it("does not redirect /spielplan itself", () => {
+    const request = new NextRequest("http://localhost:3000/spielplan");
+    const response = proxy(request);
+
+    expect(response.status).toBe(200);
+  });
+});
+
 describe("proxy — anonymous access to public pages", () => {
   const publicPaths = [
-    "/game/123",
-    "/team/45",
-    "/h2h/67",
     "/spielplan",
-    "/en/game/123",
-    "/en/team/45",
-    "/en/h2h/67",
     "/en/spielplan",
+    "/live",
+    "/overlay",
+    "/auth/sign-in",
   ];
 
   it.each(publicPaths)("does not redirect an anonymous request to %s", (pathname) => {
