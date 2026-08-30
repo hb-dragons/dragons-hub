@@ -344,13 +344,33 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
               </div>
             </div>
 
-            {/* Row 2: the team filter is the coaches' main filter — never collapsed. */}
+            {/* Row 2: the team filter is the coaches' main filter — never
+                collapsed. Subscribe and the count share the row to keep the
+                block above the table short on phones. */}
             <div className="flex flex-wrap items-center gap-2">
               <DataTableFacetedFilter
                 column={table.getColumn("team")!}
                 title={t("columns.team")}
                 options={teamFilterOptions}
               />
+              <SubscribeButton
+                teamApiId={selectedTeamApiId(
+                  matches,
+                  table.getColumn("team")?.getFilterValue() as string[] | undefined,
+                )}
+                translations={{
+                  subscribe: tPublic("subscribe"),
+                  subscribeTitle: tPublic("subscribeTitle"),
+                  copy: tPublic("copy"),
+                  copied: tPublic("copied"),
+                  instructionApple: tPublic("instructionApple"),
+                  instructionGoogle: tPublic("instructionGoogle"),
+                  instructionOutlook: tPublic("instructionOutlook"),
+                }}
+              />
+              <span className="ml-auto text-xs text-muted-foreground md:text-sm">
+                {visibleGames.length} {t("gamesCount")}
+              </span>
             </div>
 
             {/* Secondary filters: inline from md up, behind the toggle on phones. */}
@@ -388,26 +408,6 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
               )}
             </div>
 
-            <div className="flex items-center justify-between text-xs md:text-sm text-muted-foreground">
-              <SubscribeButton
-                teamApiId={selectedTeamApiId(
-                  matches,
-                  table.getColumn("team")?.getFilterValue() as string[] | undefined,
-                )}
-                translations={{
-                  subscribe: tPublic("subscribe"),
-                  subscribeTitle: tPublic("subscribeTitle"),
-                  copy: tPublic("copy"),
-                  copied: tPublic("copied"),
-                  instructionApple: tPublic("instructionApple"),
-                  instructionGoogle: tPublic("instructionGoogle"),
-                  instructionOutlook: tPublic("instructionOutlook"),
-                }}
-              />
-              <span>
-                {visibleGames.length} {t("gamesCount")}
-              </span>
-            </div>
           </div>
         )
       }}
