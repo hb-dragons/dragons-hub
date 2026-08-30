@@ -60,8 +60,14 @@ const links = [
   { label: strings.nav.downloads, href: "/downloads/", active: path.includes("/downloads") },
 ];
 
+// transition-colors at 150ms, not transition-all at 300ms: hover flips the
+// item's contrast (white-on-dark -> dark-on-primary), and a 300ms crossfade
+// spends its middle in grey-on-half-green — the background reads as done
+// early while the text visibly lags behind it. 150ms (the bar's own scroll
+// transition, and Tailwind's hover default) is short enough that no muddy
+// midpoint is perceptible.
 const itemClasses = (active: boolean, hasChildren: boolean) => [
-  "relative group py-4 px-6 lg:px-8 text-white hover:text-primary-foreground hover:bg-primary transition-all duration-300 ease-in-out flex items-center justify-between gap-3",
+  "relative group py-4 px-6 lg:px-8 text-white hover:text-primary-foreground hover:bg-primary transition-colors duration-150 ease-in-out flex items-center justify-between gap-3",
   active ? "bg-primary !text-primary-foreground" : "text-white",
   hasChildren && "hover:underline",
 ];
