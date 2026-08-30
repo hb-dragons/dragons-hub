@@ -20,7 +20,13 @@ const cmsBase = cmsBaseUrl();
 
 const page = publishedPage(await getCollection("pages"), "story");
 
-const items = (await getCollection("timelineItems", publishedOnly)).map((entry) => entry.data);
+// Newest era first, like the legacy story timeline. Sorted here, not by the
+// loader's REST `sort` — Astro's store returns entries in id order, not
+// response order (see payloadLoader's docs). Years are 4-digit text, so the
+// string compare is the numeric one; the odd year-less item goes last.
+const items = (await getCollection("timelineItems", publishedOnly))
+  .map((entry) => entry.data)
+  .sort((a, b) => (b.year ?? "").localeCompare(a.year ?? ""));
 
 const headerTitle = page?.header?.title ?? strings.dragons.story.heading;
 const seo = pageSeo(page, cmsBase, strings.seo.story);

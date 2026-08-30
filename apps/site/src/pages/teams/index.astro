@@ -11,6 +11,7 @@ import PageHeader from "../../components/PageHeader.astro";
 import TeamRows, { type RowTeam } from "../../components/teams/TeamRows.astro";
 import { apiBase } from "../../lib/api-base";
 import { cmsBaseUrl } from "../../lib/media";
+import { compareOrderKeys } from "../../lib/order-key";
 import { publishedPage } from "../../lib/pages";
 import { publishedOnly } from "../../lib/published";
 import { pageSeo } from "../../lib/seo";
@@ -21,9 +22,13 @@ import { fetchTeamLeagueNames, leagueNameFor } from "../../lib/team-league";
 
 const cmsBase = cmsBaseUrl();
 
-// Loader-sorted by the CMS drag-and-drop order (`_order`,
-// src/content.config.ts) — the legacy page sorted client-side.
-const teams = await getCollection("teams", publishedOnly);
+// Sorted here by the CMS drag-and-drop order: Astro's content store does NOT
+// preserve the loader's response order — getCollection comes back in
+// lexicographic id order ("1", "10", "2", …), so the REST `sort` alone is not
+// enough (see payloadLoader's docs).
+const teams = (await getCollection("teams", publishedOnly)).sort((a, b) =>
+  compareOrderKeys(a.data._order, b.data._order),
+);
 
 const pages = await getCollection("pages");
 const teamsPage = publishedPage(pages, "teams");

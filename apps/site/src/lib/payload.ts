@@ -64,7 +64,15 @@ async function fetchJson(env: CmsEnv, path: string, params: URLSearchParams, res
 export interface PayloadLoaderOptions {
   /** Relationship population depth (Payload `depth` query param). Default 1. */
   depth?: number;
-  /** Payload `sort` query param, e.g. `-publishedDate` or `orderIndex`. */
+  /**
+   * Payload `sort` query param, e.g. `-publishedDate` or `_order`.
+   *
+   * This orders the REST response only — it does NOT order `getCollection`.
+   * Astro's content store returns entries in lexicographic id order
+   * ("1", "10", "2", …), whatever order they were stored in, which is how
+   * /teams once rendered Damen 3 first. Every consumer that renders a list
+   * must sort it itself (see teams/index.astro, supporter, downloads, story).
+   */
   sort?: string;
   /**
    * Fail the build when the CMS is configured and this collection comes back
