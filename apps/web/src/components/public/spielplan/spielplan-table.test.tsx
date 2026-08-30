@@ -247,3 +247,17 @@ describe("<SpielplanTable>", () => {
     expect(row?.className).toContain("bg-primary/5");
   });
 });
+
+describe("<SpielplanTable> calendar subscription", () => {
+  afterEach(cleanup);
+
+  it("offers the club-wide ICS feed by default", () => {
+    render(<SpielplanTable matches={[makeMatch()]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /subscribe/ }));
+
+    const url = document.querySelector("code")?.textContent ?? "";
+    expect(url).toContain("/public/schedule.ics");
+    expect(url).not.toContain("teamApiId");
+  });
+});

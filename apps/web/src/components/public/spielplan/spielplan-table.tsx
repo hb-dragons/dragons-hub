@@ -37,7 +37,13 @@ import {
   getOpponentName,
   getOwnTeamLabel,
 } from "@/components/admin/matches/utils"
-import { isDerbyGame, spielplanRowClass, withDerbyPrefix } from "./utils"
+import { SubscribeButton } from "@/components/public/shared/subscribe-button"
+import {
+  isDerbyGame,
+  selectedTeamApiId,
+  spielplanRowClass,
+  withDerbyPrefix,
+} from "./utils"
 import { SpielplanDetailSheet } from "./spielplan-detail-sheet"
 
 /**
@@ -254,6 +260,7 @@ interface SpielplanTableProps {
 export function SpielplanTable({ matches }: SpielplanTableProps) {
   const t = useTranslations("spielplan")
   const tCommon = useTranslations("common")
+  const tPublic = useTranslations("public")
   const format = useFormatter()
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [selectedGame, setSelectedGame] = useState<MatchListItem | null>(null)
@@ -386,7 +393,22 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
               )}
             </div>
 
-            <div className="flex items-center justify-end text-xs md:text-sm text-muted-foreground">
+            <div className="flex items-center justify-between text-xs md:text-sm text-muted-foreground">
+              <SubscribeButton
+                teamApiId={selectedTeamApiId(
+                  matches,
+                  table.getColumn("team")?.getFilterValue() as string[] | undefined,
+                )}
+                translations={{
+                  subscribe: tPublic("subscribe"),
+                  subscribeTitle: tPublic("subscribeTitle"),
+                  copy: tPublic("copy"),
+                  copied: tPublic("copied"),
+                  instructionApple: tPublic("instructionApple"),
+                  instructionGoogle: tPublic("instructionGoogle"),
+                  instructionOutlook: tPublic("instructionOutlook"),
+                }}
+              />
               <span>
                 {visibleGames.length} {t("gamesCount")}
               </span>

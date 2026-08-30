@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { MatchListItem } from "@dragons/shared";
-import { isDerbyGame, spielplanRowClass, withDerbyPrefix } from "./utils";
+import {
+  isDerbyGame,
+  selectedTeamApiId,
+  spielplanRowClass,
+  withDerbyPrefix,
+} from "./utils";
 
 function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
   return {
@@ -98,5 +103,31 @@ describe("spielplanRowClass", () => {
 
   it("leaves a plain away game unstyled", () => {
     expect(spielplanRowClass(makeMatch())).toBe("");
+  });
+});
+
+describe("selectedTeamApiId", () => {
+  const games = [
+    makeMatch({ guestTeamCustomName: "Herren 2", guestTeamApiId: 20 }),
+    makeMatch({
+      id: 2,
+      homeIsOwnClub: true,
+      guestIsOwnClub: false,
+      homeTeamCustomName: "U18",
+      homeTeamApiId: 33,
+      guestTeamCustomName: null,
+    }),
+  ];
+
+  it("resolves the api id when exactly one team is selected", () => {
+    expect(selectedTeamApiId(games, ["Herren 2"])).toBe(20);
+    expect(selectedTeamApiId(games, ["U18"])).toBe(33);
+  });
+
+  it("is null without a single-team selection", () => {
+    expect(selectedTeamApiId(games, undefined)).toBeNull();
+    expect(selectedTeamApiId(games, [])).toBeNull();
+    expect(selectedTeamApiId(games, ["Herren 2", "U18"])).toBeNull();
+    expect(selectedTeamApiId(games, ["Damen 1"])).toBeNull();
   });
 });
