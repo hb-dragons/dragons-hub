@@ -22,6 +22,7 @@ import {
   clampWidths,
   DEFAULT_IMAGE_SIZES,
   DEFAULT_IMAGE_WIDTHS,
+  fallbackWidth,
   imageBranch,
   plainSrc,
 } from "../lib/blur-image";
@@ -74,6 +75,7 @@ const fade = placeholder !== null;
         src={src}
         alt={alt ?? ""}
         widths={clampWidths(widths, src.width)}
+        width={fallbackWidth(widths, src.width)}
         sizes={sizes}
         loading={loading}
         decoding="async"

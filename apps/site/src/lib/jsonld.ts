@@ -25,6 +25,16 @@ export function sportsOrganization(opts: { url: string; logo: string }): JsonLd 
     url: opts.url,
     logo: opts.logo,
     sport: SPORT,
+    // The Vereinsanschrift from the Impressum: local search needs a place, not
+    // just a name, to surface the club for "basketball hannover" queries.
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: strings.site.address.street,
+      postalCode: strings.site.address.postalCode,
+      addressLocality: strings.site.address.city,
+      addressCountry: strings.site.address.country,
+    },
+    email: strings.footer.email,
     sameAs: Object.values(SOCIAL_LINKS),
   };
 }

@@ -23,8 +23,11 @@ const iconClass = "size-8 md:size-15";
   </h2>
 
   <div class="grid grid-cols-3 grid-rows-12 gap-2 md:gap-4 h-[300px] md:h-[700px]">
+    {/* ariaLabel on every card: the tiles are image + icon only, and without
+        it SpotlightLinkCard falls back to announcing the raw href. */}
     <SpotlightLinkCard
       href={SOCIAL_LINKS.instagram}
+      ariaLabel={strings.footer.instagram}
       linkClass="col-span-3 row-span-4"
       cardClass="h-full"
     >
@@ -41,6 +44,7 @@ const iconClass = "size-8 md:size-15";
 
     <SpotlightLinkCard
       href={SOCIAL_LINKS.facebook}
+      ariaLabel={strings.footer.facebook}
       cardClass="h-full"
       linkClass="row-span-8"
     >
@@ -57,6 +61,7 @@ const iconClass = "size-8 md:size-15";
 
     <SpotlightLinkCard
       href={SOCIAL_LINKS.linkedin}
+      ariaLabel={strings.footer.linkedin}
       linkClass="col-span-1 row-span-4"
       cardClass="h-full"
     >
@@ -71,7 +76,13 @@ const iconClass = "size-8 md:size-15";
       <svg slot="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class={iconClass} aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect width="4" height="12" x="2" y="9"></rect><circle cx="4" cy="4" r="2"></circle></svg>
     </SpotlightLinkCard>
 
-    <SpotlightLinkCard href="/shop/" linkClass="col-span-1 row-span-8" cardClass="h-full" target="_self">
+    <SpotlightLinkCard
+      href="/shop/"
+      ariaLabel={strings.nav.shop}
+      linkClass="col-span-1 row-span-8"
+      cardClass="h-full"
+      target="_self"
+    >
       <BlurImage
         slot="image"
         src={BANNER_IMAGE.url}
@@ -87,6 +98,7 @@ const iconClass = "size-8 md:size-15";
 
     <SpotlightLinkCard
       href={SOCIAL_LINKS.youtube}
+      ariaLabel={strings.footer.youtube}
       linkClass="col-span-1 row-span-4"
       cardClass="h-full"
     >

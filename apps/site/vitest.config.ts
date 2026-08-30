@@ -52,10 +52,14 @@ export default defineConfig({
         // happy-dom, so the island is asserted through what it asks ogl to
         // do). Measured 78.56 statements / 72.42 branches / 66.10 functions /
         // 78.76 lines.
-        branches: 72,
-        functions: 66,
-        lines: 78,
-        statements: 78,
+        //
+        // Ratcheted 2026-08-30: the Lighthouse/SEO fix round (fallbackWidth,
+        // the shipped-OG-image assertion, JSON-LD address). Measured 84.71
+        // statements / 80.94 branches / 76.94 functions / 85.10 lines.
+        branches: 80,
+        functions: 76,
+        lines: 85,
+        statements: 84,
       },
     },
   },

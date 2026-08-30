@@ -60,6 +60,14 @@ describe("page structure", () => {
     );
     expect(nested).toEqual([]);
   });
+
+  // The nav (with its team mega-panel) sits before <main> on every page; the
+  // skip link is the way past it, and it needs a target to point at.
+  it("puts a skip link ahead of the nav, pointing at the main landmark", () => {
+    expect(LAYOUT).toMatch(/href="#main"/);
+    expect(LAYOUT).toMatch(/<main[^>]*id="main"/);
+    expect(LAYOUT.indexOf('href="#main"')).toBeLessThan(LAYOUT.indexOf("<NavBar"));
+  });
 });
 
 describe("document head", () => {

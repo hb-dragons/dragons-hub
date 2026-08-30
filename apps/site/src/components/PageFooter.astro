@@ -36,13 +36,15 @@ const socials = [
         <p class="font-semibold text-muted-foreground mb-4 uppercase">
           {strings.footer.contactHeading}
         </p>
+        {/* inline-block py-1 lifts each link to the 24px tap-target floor; the
+            visible text is the accessible name, so no aria-label. */}
         <p class="w-full">
-          <a href="/datenschutz/" aria-label={strings.footer.datenschutzerklaerung}>
+          <a href="/datenschutz/" class="inline-block py-1">
             {strings.footer.datenschutzerklaerung}
           </a>
         </p>
         <p class="w-full">
-          <a href="/impressum/" aria-label={strings.footer.impressum}>{strings.footer.impressum}</a>
+          <a href="/impressum/" class="inline-block py-1">{strings.footer.impressum}</a>
         </p>
       </div>
     </div>
@@ -55,7 +57,7 @@ const socials = [
         {
           socials.map((social) => (
             <p class="w-full">
-              <a href={social.href} target="_blank" rel="noopener" aria-label={social.label}>
+              <a href={social.href} target="_blank" rel="noopener" class="inline-block py-1">
                 {social.label}
               </a>
             </p>

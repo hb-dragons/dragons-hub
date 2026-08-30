@@ -22,7 +22,8 @@ const MODULE_GATED = [
   { directive: /^\s*SetEnvIf\s/m, module: "mod_setenvif.c" },
   // AddOutputFilterByType is mod_filter's, not mod_deflate's, so the compression
   // block needs both guards or a host with deflate but no filter 500s.
-  { directive: /^\s*AddOutputFilterByType\s/m, module: "mod_deflate.c" },
+  { directive: /^\s*AddOutputFilterByType\s+DEFLATE/m, module: "mod_deflate.c" },
+  { directive: /^\s*AddOutputFilterByType\s+BROTLI_COMPRESS/m, module: "mod_brotli.c" },
   { directive: /^\s*AddOutputFilterByType\s/m, module: "mod_filter.c" },
 ];
 
@@ -73,6 +74,45 @@ describe("deploy/htaccess-release", () => {
     expect(filter).toContain("text/html");
     expect(filter).toContain("text/css");
     expect(filter).toContain("application/javascript");
+  });
+
+  it("offers brotli for the same types deflate covers", () => {
+    const unwrapped = RELEASE_HTACCESS.replace(/\\\n\s*/g, " ");
+    const deflate = unwrapped.match(/^\s*AddOutputFilterByType DEFLATE (.*)$/m)?.[1] ?? "";
+    const brotli = unwrapped.match(/^\s*AddOutputFilterByType BROTLI_COMPRESS (.*)$/m)?.[1];
+    expect(brotli?.trim().split(/\s+/).sort()).toEqual(deflate.trim().split(/\s+/).sort());
+  });
+
+  // Filters run in registration order and each declines an already-encoded
+  // response. DEFLATE-first would encode for every gzip-capable client and
+  // leave the brotli filter permanently idle.
+  it("registers brotli before deflate so br clients actually get brotli", () => {
+    expect(RELEASE_HTACCESS.indexOf("BROTLI_COMPRESS")).toBeGreaterThan(-1);
+    expect(RELEASE_HTACCESS.indexOf("BROTLI_COMPRESS")).toBeLessThan(
+      RELEASE_HTACCESS.indexOf("AddOutputFilterByType DEFLATE"),
+    );
+  });
+
+  // `always`, not `set`: a security header that vanishes on the 404 page is a
+  // hole, not a policy.
+  it.each([
+    ["X-Content-Type-Options", /Header always set X-Content-Type-Options "nosniff"/],
+    [
+      "Referrer-Policy",
+      /Header always set Referrer-Policy "strict-origin-when-cross-origin"/,
+    ],
+    ["X-Frame-Options", /Header always set X-Frame-Options "SAMEORIGIN"/],
+    ["Strict-Transport-Security", /Header always set Strict-Transport-Security "max-age=\d+"/],
+  ])("sends %s on every response", (_header, directive) => {
+    expect(RELEASE_HTACCESS).toMatch(directive);
+  });
+
+  // includeSubDomains would pin api.app/cms/testing to this file's policy;
+  // they manage their own transport.
+  it("scopes HSTS to the apex host alone", () => {
+    const sts = RELEASE_HTACCESS.match(/Header always set Strict-Transport-Security[^\n]*/)?.[0];
+    expect(sts).toBeDefined();
+    expect(sts).not.toMatch(/includeSubDomains/i);
   });
 });
 

@@ -58,13 +58,28 @@ const {
          with scripting off it would never appear. This is the only place that
          can say so: `<noscript>` in `<head>` may contain a `<style>`. -->
     <noscript><style>img[data-blur-img] { opacity: 1 !important; }</style></noscript>
-    <Font cssVariable="--font-bricolage" preload />
+    {/* Preload only the weights on screen before any scroll: 400 (body), 700
+        (headings/font-bold) and 800 (the nav's font-black). 500/600 still
+        load via their @font-face rules when first used — preloading all five
+        was queueing two unused files against the LCP image. */}
+    <Font
+      cssVariable="--font-bricolage"
+      preload={[{ weight: "400" }, { weight: "700" }, { weight: "800" }]}
+    />
     <Font cssVariable="--font-jetbrains-mono" />
     <slot name="head" />
   </head>
   <body>
+    {/* First tab stop: keyboard and screen-reader users skip the nav (with
+        its team mega-panel) instead of walking it on every page. */}
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-60 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-foreground"
+    >
+      {strings.site.skipToContent}
+    </a>
     <NavBar />
-    <main class="min-h-screen relative">
+    <main id="main" class="min-h-screen relative">
       <SiteBackground />
       <ProbetrainingButton />
       <slot />

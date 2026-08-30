@@ -7,10 +7,14 @@ import { toSiteImage } from "./site-image";
 import { strings } from "./strings";
 
 /**
- * Default OG/Twitter card image: the club photo shipped in public/img/.
- * Routes with something more specific (news header, team photo) override it.
+ * Default OG/Twitter card image: a 1200×800 JPEG of the club photo, committed
+ * to public/img/ (regenerate from src/assets/img/gesamt.webp with sharp if the
+ * photo changes). JPEG, not the source webp — WhatsApp's link scraper still
+ * rejects webp cards. It must live in public/ under this exact path: seo.test
+ * asserts the file exists, because the previous default pointed at a path the
+ * build never emitted and every share card 404ed.
  */
-export const DEFAULT_OG_IMAGE = "/img/gesamt.webp";
+export const DEFAULT_OG_IMAGE = "/img/og-default.jpg";
 
 /** Meta description budget — Google truncates around this width on desktop. */
 const DESCRIPTION_MAX = 155;
