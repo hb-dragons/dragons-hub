@@ -109,3 +109,27 @@ describe("<DataTable> mobile scroll layout", () => {
     expect(root).toHaveClass("flex", "flex-col", "space-y-2");
   });
 });
+
+describe("<DataTable> toolbar padding", () => {
+  afterEach(cleanup);
+
+  it("lets callers override the toolbar's horizontal padding", () => {
+    render(
+      <DataTable columns={columns} data={data} toolbarClassName="px-1">
+        {() => <div>toolbar</div>}
+      </DataTable>,
+    );
+    const toolbar = document.querySelector('[data-slot="data-table-toolbar"]');
+    expect(toolbar).toHaveClass("px-1");
+    expect(toolbar).not.toHaveClass("px-6");
+  });
+
+  it("keeps the default px-6 toolbar padding otherwise", () => {
+    render(
+      <DataTable columns={columns} data={data}>
+        {() => <div>toolbar</div>}
+      </DataTable>,
+    );
+    expect(document.querySelector('[data-slot="data-table-toolbar"]')).toHaveClass("px-6");
+  });
+});

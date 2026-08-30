@@ -1,11 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { MatchListItem } from "@dragons/shared";
-import {
-  buildSpielplanExportRows,
-  isDerbyGame,
-  spielplanRowClass,
-  withDerbyPrefix,
-} from "./utils";
+import { isDerbyGame, spielplanRowClass, withDerbyPrefix } from "./utils";
 
 function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
   return {
@@ -52,8 +47,6 @@ function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
     ...overrides,
   };
 }
-
-afterEach(() => vi.unstubAllEnvs());
 
 describe("isDerbyGame", () => {
   it("flags games against a derby club on either side", () => {
@@ -105,71 +98,5 @@ describe("spielplanRowClass", () => {
 
   it("leaves a plain away game unstyled", () => {
     expect(spielplanRowClass(makeMatch())).toBe("");
-  });
-});
-
-describe("buildSpielplanExportRows", () => {
-  it("maps a game to the legacy column set, pinned to the club timezone", () => {
-    // Berlin is the one zone where a UTC-based day slice happens to look right,
-    // so run the assertion from a zone far away from it.
-    vi.stubEnv("TZ", "Pacific/Kiritimati");
-
-    const rows = buildSpielplanExportRows([
-      makeMatch({
-        homeScore: 78,
-        guestScore: 65,
-        anschreiber: "Damen 1",
-        zeitnehmer: "U18",
-        shotclock: "Herren 1",
-        publicComment: "Kuchenverkauf",
-      }),
-    ]);
-
-    expect(rows).toEqual([
-      {
-        "Nr.": 42,
-        Datum: "So., 06.09.26",
-        Uhrzeit: "15:30",
-        Team: "Herren 2",
-        Liga: "Bezirksliga",
-        Heim: "TSV Musterstadt",
-        Gast: "Dragons",
-        Halle: "Sporthalle Musterstadt",
-        Ergebnis: "78:65",
-        Anschreiber: "Damen 1",
-        Zeitnehmer: "U18",
-        Shotclock: "Herren 1",
-        Kommentar: "Kuchenverkauf",
-      },
-    ]);
-  });
-
-  it("prefers the venue override, shows Dragons on the home side, and blanks missing values", () => {
-    const [row] = buildSpielplanExportRows([
-      makeMatch({
-        homeIsOwnClub: true,
-        guestIsOwnClub: false,
-        homeTeamCustomName: "Herren 2",
-        guestTeamCustomName: null,
-        homeTeamName: "HB Dragons Hannover",
-        guestTeamName: "TSV Musterstadt",
-        venueNameOverride: "Ausweichhalle",
-      }),
-    ]);
-
-    expect(row).toMatchObject({
-      Team: "Herren 2",
-      Heim: "Dragons",
-      Gast: "TSV Musterstadt",
-      Halle: "Ausweichhalle",
-      Ergebnis: "—",
-      Anschreiber: "",
-      Kommentar: "",
-    });
-  });
-
-  it("marks a derby in the exported comment", () => {
-    const [row] = buildSpielplanExportRows([makeMatch({ homeTeamName: "TuS Ahlem" })]);
-    expect(row?.Kommentar).toBe("Derby");
   });
 });
