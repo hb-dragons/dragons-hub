@@ -1187,6 +1187,8 @@
     "searchPlaceholder": "Spiele suchen...",
     "empty": "Keine Spiele gefunden",
     "hasComment": "Hinweis vorhanden",
+    "moreFilters": "Weitere Filter",
+    "kampfgericht": "Kampfgericht",
     "export": "Excel-Export",
     "gamesCount": "Spiele",
     "homeAway": {
