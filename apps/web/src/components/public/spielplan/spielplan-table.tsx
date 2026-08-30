@@ -38,12 +38,7 @@ import {
   getOwnTeamLabel,
 } from "@/components/admin/matches/utils"
 import { SubscribeButton } from "@/components/public/shared/subscribe-button"
-import {
-  isDerbyGame,
-  selectedTeamApiId,
-  spielplanRowClass,
-  withDerbyPrefix,
-} from "./utils"
+import { selectedTeamApiId, spielplanRowClass } from "./utils"
 import { SpielplanDetailSheet } from "./spielplan-detail-sheet"
 
 /**
@@ -220,7 +215,7 @@ function getColumns(
       header: t("columns.comment"),
       cell: ({ row }) => (
         <span className="text-xs text-muted-foreground">
-          {withDerbyPrefix(row.original.publicComment, isDerbyGame(row.original))}
+          {row.original.publicComment ?? ""}
         </span>
       ),
       enableSorting: false,

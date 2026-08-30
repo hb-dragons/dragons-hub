@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MatchListItem } from "@dragons/shared";
-import {
-  isDerbyGame,
-  selectedTeamApiId,
-  spielplanRowClass,
-  withDerbyPrefix,
-} from "./utils";
+import { selectedTeamApiId, spielplanRowClass } from "./utils";
 
 function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
   return {
@@ -53,32 +48,6 @@ function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
   };
 }
 
-describe("isDerbyGame", () => {
-  it("flags games against a derby club on either side", () => {
-    expect(isDerbyGame(makeMatch({ homeTeamName: "TuS Ahlem" }))).toBe(true);
-    expect(isDerbyGame(makeMatch({ guestTeamName: "Linden Dudes II" }))).toBe(true);
-  });
-
-  it("is false for a regular opponent", () => {
-    expect(isDerbyGame(makeMatch())).toBe(false);
-  });
-});
-
-describe("withDerbyPrefix", () => {
-  it("prefixes an existing comment on a derby game", () => {
-    expect(withDerbyPrefix("Kuchenverkauf", true)).toBe("Derby | Kuchenverkauf");
-  });
-
-  it("is just 'Derby' when the derby game has no comment", () => {
-    expect(withDerbyPrefix(null, true)).toBe("Derby");
-  });
-
-  it("passes the comment through unchanged otherwise", () => {
-    expect(withDerbyPrefix("Kuchenverkauf", false)).toBe("Kuchenverkauf");
-    expect(withDerbyPrefix(null, false)).toBe("");
-  });
-});
-
 describe("spielplanRowClass", () => {
   it("tints a Dragons home game", () => {
     const cls = spielplanRowClass(makeMatch({ homeIsOwnClub: true, guestIsOwnClub: false }));
@@ -86,8 +55,8 @@ describe("spielplanRowClass", () => {
     expect(cls).toContain("bg-primary/5");
   });
 
-  it("highlights a derby game", () => {
-    expect(spielplanRowClass(makeMatch({ homeTeamName: "TuS Ahlem" }))).toContain("bg-heat/10");
+  it("gives a rival-club game no special highlight", () => {
+    expect(spielplanRowClass(makeMatch({ homeTeamName: "TuS Ahlem" }))).toBe("");
   });
 
   it("mutes a game whose comment says it was moved (verlegt)", () => {

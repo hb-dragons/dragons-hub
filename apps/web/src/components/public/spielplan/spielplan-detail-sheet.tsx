@@ -17,7 +17,6 @@ import {
   formatScore,
   getOwnTeamLabel,
 } from "@/components/admin/matches/utils"
-import { isDerbyGame, withDerbyPrefix } from "./utils"
 
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -124,12 +123,10 @@ export function SpielplanDetailSheet({ game, onOpenChange }: SpielplanDetailShee
               </dl>
             </div>
 
-            {withDerbyPrefix(game.publicComment, isDerbyGame(game)) && (
+            {game.publicComment && (
               <div className="space-y-1">
                 <SectionHeading>{t("columns.comment")}</SectionHeading>
-                <p className="text-sm font-medium">
-                  {withDerbyPrefix(game.publicComment, isDerbyGame(game))}
-                </p>
+                <p className="text-sm font-medium">{game.publicComment}</p>
               </div>
             )}
           </div>
