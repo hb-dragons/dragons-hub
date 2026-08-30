@@ -10,9 +10,12 @@ export default function SpielplanLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col">
+    // h-dvh + min-h-0 chain: the page itself never scrolls — the table body
+    // scrolls inside its own container under a sticky header (legacy UX,
+    // matters most on phones).
+    <div className="flex h-dvh flex-col">
       <PublicHeader />
-      <main className="mx-auto w-full max-w-[96rem] flex-1 px-4 py-6">
+      <main className="mx-auto flex min-h-0 w-full max-w-[96rem] flex-1 flex-col px-2 py-4 md:px-4 md:py-6">
         {children}
       </main>
     </div>

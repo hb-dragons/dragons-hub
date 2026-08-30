@@ -167,6 +167,14 @@ describe("<SpielplanTable>", () => {
     expect(screen.getAllByLabelText("hasComment")).toHaveLength(1);
   });
 
+  it("scrolls inside its own container with a sticky header, for phone use", () => {
+    render(<SpielplanTable matches={[makeMatch()]} />);
+
+    expect(document.querySelector('[data-slot="table-header"]')).toHaveClass("sticky");
+    const container = document.querySelector('[data-slot="table-container"]');
+    expect(container?.className).toContain("overflow-auto");
+  });
+
   it("tints Dragons home game rows", () => {
     render(
       <SpielplanTable

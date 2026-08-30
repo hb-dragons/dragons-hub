@@ -13,8 +13,8 @@ export default async function SpielplanPage() {
   ).catch(() => []);
 
   return (
-    <div className="space-y-4">
-      <h1 className="px-6 text-2xl font-bold">{t("title")}</h1>
+    <div className="flex min-h-0 flex-1 flex-col gap-3 md:gap-4">
+      <h1 className="px-6 text-xl font-bold md:text-2xl">{t("title")}</h1>
       <SpielplanTable matches={matches} />
     </div>
   );

@@ -92,7 +92,7 @@ function getColumns(
       accessorKey: "matchNo",
       header: t("columns.nr"),
       cell: ({ getValue }) => (
-        <span className="tabular-nums text-sm">{getValue() as number}</span>
+        <span className="tabular-nums text-xs md:text-sm">{getValue() as number}</span>
       ),
       meta: { label: t("columns.nr") },
     },
@@ -102,7 +102,7 @@ function getColumns(
         <DataTableColumnHeader column={column} title={t("columns.date")} />
       ),
       cell: ({ row }) => (
-        <span className="whitespace-nowrap text-sm">
+        <span className="whitespace-nowrap text-xs md:text-sm">
           {format.dateTime(clubDayAnchor(row.original.kickoffDate), "matchDate")}
           <CommentDot match={row.original} label={t("hasComment")} />
         </span>
@@ -116,7 +116,7 @@ function getColumns(
         <DataTableColumnHeader column={column} title={t("columns.time")} />
       ),
       cell: ({ row }) => (
-        <span className="tabular-nums text-sm">
+        <span className="tabular-nums text-xs md:text-sm">
           {formatMatchTime(row.original.kickoffTime)}
         </span>
       ),
@@ -140,7 +140,7 @@ function getColumns(
       accessorKey: "leagueName",
       header: t("columns.league"),
       cell: ({ getValue }) => (
-        <span className="text-sm">{(getValue() as string | null) ?? ""}</span>
+        <span className="text-xs md:text-sm">{(getValue() as string | null) ?? ""}</span>
       ),
       meta: { label: t("columns.league") },
     },
@@ -150,7 +150,7 @@ function getColumns(
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.home")} />
       ),
-      cell: ({ getValue }) => <span className="text-sm">{getValue() as string}</span>,
+      cell: ({ getValue }) => <span className="text-xs md:text-sm">{getValue() as string}</span>,
       meta: { label: t("columns.home") },
     },
     {
@@ -159,14 +159,14 @@ function getColumns(
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.guest")} />
       ),
-      cell: ({ getValue }) => <span className="text-sm">{getValue() as string}</span>,
+      cell: ({ getValue }) => <span className="text-xs md:text-sm">{getValue() as string}</span>,
       meta: { label: t("columns.guest") },
     },
     {
       id: "venue",
       accessorFn: (row) => row.venueNameOverride ?? row.venueName ?? "",
       header: t("columns.venue"),
-      cell: ({ getValue }) => <span className="text-sm">{getValue() as string}</span>,
+      cell: ({ getValue }) => <span className="text-xs md:text-sm">{getValue() as string}</span>,
       meta: { label: t("columns.venue") },
     },
     {
@@ -174,7 +174,7 @@ function getColumns(
       accessorFn: (row) => formatScore(row.homeScore, row.guestScore),
       header: t("columns.score"),
       cell: ({ getValue }) => (
-        <span className="tabular-nums text-sm">{getValue() as string}</span>
+        <span className="tabular-nums text-xs md:text-sm">{getValue() as string}</span>
       ),
       enableSorting: false,
       meta: { label: t("columns.score") },
@@ -275,6 +275,9 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
       <DataTable
         columns={columns}
         data={matches}
+        className="min-h-0 flex-1 flex flex-col"
+        containerClassName="min-h-0 flex-1 overflow-auto overscroll-contain"
+        stickyHeader
       rowClassName={getRowClassName}
       globalFilterFn={spielplanGlobalFilterFn}
       initialColumnVisibility={{
@@ -294,13 +297,13 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
         return (
           <div className="flex flex-wrap items-center gap-2">
             <DataTableToolbar table={table}>
-              <div className="relative">
+              <div className="relative w-full sm:w-auto">
                 <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder={t("searchPlaceholder")}
                   value={(table.getState().globalFilter as string) ?? ""}
                   onChange={(event) => table.setGlobalFilter(event.target.value)}
-                  className="h-8 w-[150px] pl-8 lg:w-[250px]"
+                  className="h-8 w-full pl-8 sm:w-[150px] lg:w-[250px]"
                 />
               </div>
               <DataTableFacetedFilter
@@ -323,7 +326,7 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
                 title={t("columns.date")}
               />
             </DataTableToolbar>
-            <div className="flex w-full items-center justify-between text-sm text-muted-foreground">
+            <div className="flex w-full items-center justify-between text-xs md:text-sm text-muted-foreground">
               <Button
                 variant="outline"
                 size="sm"
