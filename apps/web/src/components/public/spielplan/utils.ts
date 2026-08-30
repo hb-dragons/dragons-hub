@@ -2,32 +2,14 @@ import type { MatchListItem } from "@dragons/shared";
 import { cn } from "@dragons/ui/lib/utils";
 import { getOwnTeamLabel } from "@/components/admin/matches/utils";
 
-/**
- * Local rival clubs whose games the legacy spielplan highlighted. Matched by
- * substring against the federation team names, same as the legacy app.
- */
-const DERBY_TEAMS = ["Ahlem", "Linden Dudes"];
-
-type DerbySides = Pick<MatchListItem, "homeTeamName" | "guestTeamName">;
-
-export function isDerbyGame(match: DerbySides): boolean {
-  return DERBY_TEAMS.some(
-    (team) => match.homeTeamName.includes(team) || match.guestTeamName.includes(team),
-  );
-}
-
-export function withDerbyPrefix(comment: string | null, derby: boolean): string {
-  if (!derby) return comment ?? "";
-  return comment ? `Derby | ${comment}` : "Derby";
-}
-
-type RowClassMatch = DerbySides &
-  Pick<MatchListItem, "homeIsOwnClub" | "isCancelled" | "isForfeited" | "publicComment">;
+type RowClassMatch = Pick<
+  MatchListItem,
+  "homeIsOwnClub" | "isCancelled" | "isForfeited" | "publicComment"
+>;
 
 export function spielplanRowClass(match: RowClassMatch): string {
   return cn(
     match.homeIsOwnClub && "border-l-2 border-l-primary/50 bg-primary/5",
-    isDerbyGame(match) && "bg-heat/10",
     match.publicComment?.includes("verlegt") && "text-muted-foreground",
     match.isCancelled && "line-through text-muted-foreground opacity-60",
     match.isForfeited && "line-through text-muted-foreground opacity-40",
