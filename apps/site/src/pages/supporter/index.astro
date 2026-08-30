@@ -22,10 +22,18 @@ const page = publishedPage(await getCollection("pages"), "supporter", "partner")
 const headerTitle = page?.header?.title ?? strings.supporter.fallbackHeading;
 const seo = pageSeo(page, cmsBase, strings.seo.supporter);
 
-// Loader sorts by orderIndex. The legacy supporter page shows each partner's
-// prose (verified live against https://hbdragons.de/supporter/ 2026-08-03),
-// so it carries over the same way projects' description does.
-const partners: RowItem[] = (await getCollection("partners", publishedOnly)).map(({ data }) => ({
+// Sorted here by orderIndex — Astro's store returns entries in id order, not
+// the loader's response order (see payloadLoader's docs); unnumbered partners
+// go last. The legacy supporter page shows each partner's prose (verified
+// live against https://hbdragons.de/supporter/ 2026-08-03), so it carries
+// over the same way projects' description does.
+const partners: RowItem[] = (await getCollection("partners", publishedOnly))
+  .sort(
+    (a, b) =>
+      (a.data.orderIndex ?? Number.MAX_SAFE_INTEGER) -
+      (b.data.orderIndex ?? Number.MAX_SAFE_INTEGER),
+  )
+  .map(({ data }) => ({
   name: data.name,
   description: data.description,
   logo: toSiteImage(data.logo, cmsBase),

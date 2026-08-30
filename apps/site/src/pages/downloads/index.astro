@@ -19,7 +19,11 @@ const cmsBase = cmsBaseUrl();
 
 const page = publishedPage(await getCollection("pages"), "downloads");
 
-const downloads = (await getCollection("downloads", publishedOnly)).map((entry) => entry.data);
+// Newest first. Sorted here, not by the loader's REST `sort` — Astro's store
+// returns entries in id order, not response order (see payloadLoader's docs).
+const downloads = (await getCollection("downloads", publishedOnly))
+  .map((entry) => entry.data)
+  .sort((a, b) => b.createdAt.valueOf() - a.createdAt.valueOf());
 
 const headerTitle = page?.header?.title ?? strings.downloads.fallbackHeading;
 const seo = pageSeo(page, cmsBase, strings.seo.downloads);
