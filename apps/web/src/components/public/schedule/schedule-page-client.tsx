@@ -7,7 +7,7 @@ import { ScheduleView } from "./schedule-view";
 import { CalendarView } from "./calendar-view";
 import { ViewToggle } from "./view-toggle";
 import { TeamFilter } from "./team-filter";
-import { SubscribeButton } from "./subscribe-button";
+import { SubscribeButton } from "@/components/public/shared/subscribe-button";
 import type { PublicTeam } from "./types";
 
 interface SchedulePageClientProps {

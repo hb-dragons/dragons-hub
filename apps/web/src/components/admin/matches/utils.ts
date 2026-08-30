@@ -40,7 +40,18 @@ export function formatPeriodScores(match: MatchDetail): { label: string; home: n
   return periods;
 }
 
-export function getOwnTeamLabel(match: MatchListItem): string {
+type OwnTeamNameFields = Pick<
+  MatchListItem,
+  | "homeIsOwnClub"
+  | "homeTeamCustomName"
+  | "homeTeamNameShort"
+  | "homeTeamName"
+  | "guestTeamCustomName"
+  | "guestTeamNameShort"
+  | "guestTeamName"
+>;
+
+export function getOwnTeamLabel(match: OwnTeamNameFields): string {
   if (match.homeIsOwnClub) {
     return match.homeTeamCustomName ?? match.homeTeamNameShort ?? match.homeTeamName;
   }

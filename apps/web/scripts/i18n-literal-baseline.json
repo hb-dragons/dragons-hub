@@ -22,5 +22,5 @@
   "src/components/admin/sync/sync-status-cards.tsx",
   "src/components/admin/users/user-actions.tsx",
   "src/components/public/public-header.tsx",
-  "src/components/public/schedule/subscribe-button.tsx"
+  "src/components/public/shared/subscribe-button.tsx"
 ]
