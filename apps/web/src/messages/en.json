@@ -1182,6 +1182,39 @@
       "noMatches": "No matches found"
     }
   },
+  "spielplan": {
+    "title": "Game schedule",
+    "searchPlaceholder": "Search games...",
+    "empty": "No games found",
+    "export": "Excel export",
+    "gamesCount": "games",
+    "homeAway": {
+      "label": "Home/Away",
+      "home": "Home games",
+      "away": "Away games"
+    },
+    "status": {
+      "label": "Status",
+      "active": "Active",
+      "cancelled": "Cancelled",
+      "forfeited": "Forfeited"
+    },
+    "columns": {
+      "nr": "No.",
+      "date": "Date",
+      "time": "Time",
+      "team": "Team",
+      "league": "League",
+      "home": "Home",
+      "guest": "Guest",
+      "venue": "Venue",
+      "score": "Score",
+      "anschreiber": "Scorekeeper",
+      "zeitnehmer": "Timekeeper",
+      "shotclock": "Shot clock",
+      "comment": "Comment"
+    }
+  },
   "scoreboard": {
     "live": {
       "title": "Live",

@@ -30,7 +30,9 @@ export const PUBLIC_ROOT_PATH = "/";
  *
  * One entry per top-level directory under `app/[locale]/(public)/`, plus a
  * handful of routes that are public for other reasons (`/auth`, `/api/auth`,
- * `/overlay`, `/live` — none of which live in the `(public)` group).
+ * `/overlay`, `/live`, `/spielplan` — none of which live in the `(public)`
+ * group; `/spielplan` sits outside it because the coach table needs a wider
+ * layout than the phone-first `(public)` shell allows).
  *
  * `apps/web/src/proxy.test.ts` walks the `(public)` route group directory at
  * test time and fails if any of its subdirectories is missing from this
@@ -50,6 +52,7 @@ export const PUBLIC_PATH_PREFIXES = [
   "/h2h",
   "/overlay",
   "/live",
+  "/spielplan",
 ];
 
 function isPublicPath(logicalPathname: string): boolean {
