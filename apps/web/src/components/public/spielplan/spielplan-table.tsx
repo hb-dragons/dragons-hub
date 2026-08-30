@@ -1,11 +1,20 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useFormatter, useTranslations } from "next-intl"
 import type { ColumnDef, FilterFn, Row } from "@tanstack/react-table"
-import { Ban, CircleOff, MessageSquareText, SearchIcon, SquareActivity } from "lucide-react"
+import {
+  Ban,
+  CircleOff,
+  FilterIcon,
+  MessageSquareText,
+  SearchIcon,
+  SquareActivity,
+  XIcon,
+} from "lucide-react"
 import { Button } from "@dragons/ui/components/button"
 import { Input } from "@dragons/ui/components/input"
+import { cn } from "@dragons/ui/lib/utils"
 import {
   Tooltip,
   TooltipContent,
@@ -16,7 +25,7 @@ import {
 import type { MatchListItem } from "@dragons/shared"
 import { clubDayAnchor } from "@dragons/shared"
 import { DataTable } from "@/components/ui/data-table"
-import { DataTableToolbar } from "@/components/ui/data-table-toolbar"
+import { DataTableViewOptions } from "@/components/ui/data-table-view-options"
 import { DataTableColumnHeader } from "@/components/ui/data-table-column-header"
 import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter"
 import { DataTableDateFilter } from "@/components/ui/data-table-date-filter"
@@ -29,6 +38,7 @@ import {
   getOwnTeamLabel,
 } from "@/components/admin/matches/utils"
 import { isDerbyGame, spielplanRowClass, withDerbyPrefix } from "./utils"
+import { SpielplanDetailSheet } from "./spielplan-detail-sheet"
 import { exportSpielplanXlsx } from "./xlsx-export"
 
 /**
@@ -244,7 +254,10 @@ interface SpielplanTableProps {
 
 export function SpielplanTable({ matches }: SpielplanTableProps) {
   const t = useTranslations("spielplan")
+  const tCommon = useTranslations("common")
   const format = useFormatter()
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [selectedGame, setSelectedGame] = useState<MatchListItem | null>(null)
   const columns = useMemo(() => getColumns(t, format), [t, format])
 
   const teamFilterOptions = useMemo(
@@ -278,12 +291,18 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
         className="min-h-0 flex-1 flex flex-col"
         containerClassName="min-h-0 flex-1 overflow-auto overscroll-contain"
         stickyHeader
+      onRowClick={(row) => setSelectedGame(row.original)}
       rowClassName={getRowClassName}
       globalFilterFn={spielplanGlobalFilterFn}
       initialColumnVisibility={{
         matchNo: false,
         leagueName: false,
         venue: false,
+        score: false,
+        anschreiber: false,
+        zeitnehmer: false,
+        shotclock: false,
+        publicComment: false,
         status: false,
         homeAway: false,
       }}
@@ -294,10 +313,12 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
     >
       {(table) => {
         const visibleGames = table.getRowModel().rows.map((row) => row.original)
+        const isFiltered = table.getState().columnFilters.length > 0
         return (
-          <div className="flex flex-wrap items-center gap-2">
-            <DataTableToolbar table={table}>
-              <div className="relative w-full sm:w-auto">
+          <div className="flex flex-col gap-2">
+            {/* Row 1: search always visible; the mobile-only toggle reveals the secondary filters. */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 sm:flex-none">
                 <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder={t("searchPlaceholder")}
@@ -306,11 +327,49 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
                   className="h-8 w-full pl-8 sm:w-[150px] lg:w-[250px]"
                 />
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label={t("moreFilters")}
+                aria-expanded={filtersOpen}
+                className="h-8 md:hidden"
+                onClick={() => setFiltersOpen((open) => !open)}
+              >
+                <FilterIcon />
+              </Button>
+              <div className="ml-auto">
+                <DataTableViewOptions table={table} />
+              </div>
+            </div>
+
+            {/* Row 2: the team filter is the coaches' main filter — never collapsed. */}
+            <div className="flex flex-wrap items-center gap-2">
               <DataTableFacetedFilter
                 column={table.getColumn("team")!}
                 title={t("columns.team")}
                 options={teamFilterOptions}
               />
+              {isFiltered && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => table.resetColumnFilters()}
+                  className="h-8 px-2 lg:px-3"
+                >
+                  {tCommon("reset")}
+                  <XIcon />
+                </Button>
+              )}
+            </div>
+
+            {/* Secondary filters: inline from md up, behind the toggle on phones. */}
+            <div
+              data-slot="extra-filters"
+              className={cn(
+                "flex-wrap items-center gap-2",
+                filtersOpen ? "flex" : "hidden md:flex",
+              )}
+            >
               <DataTableFacetedFilter
                 column={table.getColumn("homeAway")!}
                 title={t("homeAway.label")}
@@ -325,8 +384,9 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
                 column={table.getColumn("kickoffDate")!}
                 title={t("columns.date")}
               />
-            </DataTableToolbar>
-            <div className="flex w-full items-center justify-between text-xs md:text-sm text-muted-foreground">
+            </div>
+
+            <div className="flex items-center justify-between text-xs md:text-sm text-muted-foreground">
               <Button
                 variant="outline"
                 size="sm"
@@ -345,6 +405,12 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
         )
       }}
       </DataTable>
+      <SpielplanDetailSheet
+        game={selectedGame}
+        onOpenChange={(open) => {
+          if (!open) setSelectedGame(null)
+        }}
+      />
     </TooltipProvider>
   )
 }

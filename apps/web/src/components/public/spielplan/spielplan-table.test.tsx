@@ -83,7 +83,7 @@ describe("<SpielplanTable>", () => {
     expect(screen.queryByText("Kampflos Gegner")).not.toBeInTheDocument();
   });
 
-  it("shows the Kampfgericht duty cells and comment, but not Nr./Liga/Halle by default", () => {
+  it("shows only the compact column set by default — no Nr./Liga/Halle, duties, score or comment", () => {
     render(
       <SpielplanTable
         matches={[
@@ -91,19 +91,57 @@ describe("<SpielplanTable>", () => {
             anschreiber: "Damen 1",
             zeitnehmer: "U18",
             shotclock: "Herren 1",
+            homeScore: 78,
+            guestScore: 65,
             publicComment: "Kuchenverkauf",
           }),
         ]}
       />,
     );
 
-    expect(screen.getByText("Damen 1")).toBeInTheDocument();
-    expect(screen.getByText("U18")).toBeInTheDocument();
-    expect(screen.getByText("Herren 1")).toBeInTheDocument();
-    expect(screen.getByText("Kuchenverkauf")).toBeInTheDocument();
+    expect(screen.getByText("TSV Musterstadt")).toBeInTheDocument();
+    expect(screen.queryByText("Damen 1")).not.toBeInTheDocument();
+    expect(screen.queryByText("U18")).not.toBeInTheDocument();
+    expect(screen.queryByText("Herren 1")).not.toBeInTheDocument();
+    expect(screen.queryByText("78:65")).not.toBeInTheDocument();
+    expect(screen.queryByText("Kuchenverkauf")).not.toBeInTheDocument();
     expect(screen.queryByText("971001")).not.toBeInTheDocument();
     expect(screen.queryByText("Bezirksliga Mitte")).not.toBeInTheDocument();
     expect(screen.queryByText("Sporthalle Musterstadt")).not.toBeInTheDocument();
+    // The comment marker still flags the game even with its column hidden.
+    expect(screen.getByLabelText("hasComment")).toBeInTheDocument();
+  });
+
+  it("opens a read-only detail panel on row click with venue, score, Kampfgericht and comment", () => {
+    render(
+      <SpielplanTable
+        matches={[
+          makeMatch({
+            anschreiber: "Damen 1",
+            zeitnehmer: "U18",
+            shotclock: "Herren 1",
+            homeScore: 78,
+            guestScore: 65,
+            publicComment: "Kuchenverkauf",
+            venueStreet: "Musterweg 1",
+            venuePostalCode: "30159",
+            venueCity: "Hannover",
+          }),
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("TSV Musterstadt"));
+
+    expect(screen.getByText("Damen 1")).toBeInTheDocument();
+    expect(screen.getByText("U18")).toBeInTheDocument();
+    expect(screen.getByText("Herren 1")).toBeInTheDocument();
+    expect(screen.getByText("78:65")).toBeInTheDocument();
+    expect(screen.getByText("Kuchenverkauf")).toBeInTheDocument();
+    expect(screen.getByText("Sporthalle Musterstadt")).toBeInTheDocument();
+    expect(screen.getByText(/Musterweg 1/)).toBeInTheDocument();
+    expect(screen.getByText(/30159 Hannover/)).toBeInTheDocument();
+    expect(screen.getByText("Bezirksliga Mitte")).toBeInTheDocument();
   });
 
   it("filters rows through the search box", () => {
@@ -165,6 +203,33 @@ describe("<SpielplanTable>", () => {
     );
 
     expect(screen.getAllByLabelText("hasComment")).toHaveLength(1);
+  });
+
+  it("tucks the secondary filters behind the filter toggle on mobile", () => {
+    render(<SpielplanTable matches={[makeMatch()]} />);
+
+    const extra = document.querySelector('[data-slot="extra-filters"]');
+    expect(extra?.className).toContain("hidden");
+
+    fireEvent.click(screen.getByRole("button", { name: "moreFilters" }));
+    expect(
+      document.querySelector('[data-slot="extra-filters"]')?.className,
+    ).not.toContain("hidden");
+  });
+
+  it("keeps search and the team filter always visible outside the toggle area", () => {
+    render(<SpielplanTable matches={[makeMatch()]} />);
+
+    const extra = document.querySelector('[data-slot="extra-filters"]');
+    const search = screen.getByPlaceholderText("searchPlaceholder");
+    // Matches both the faceted-filter trigger and the column-header sort
+    // button — neither may live in the collapsible area.
+    const teamButtons = screen.getAllByRole("button", { name: /columns\.team/ });
+
+    expect(extra).not.toContainElement(search);
+    for (const button of teamButtons) {
+      expect(extra).not.toContainElement(button);
+    }
   });
 
   it("scrolls inside its own container with a sticky header, for phone use", () => {
