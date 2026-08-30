@@ -26,7 +26,12 @@ function dashboardGame(overrides: Record<string, unknown> = {}) {
     guestIsOwnClub: false,
     homeClubId: 4121,
     guestClubId: 4213,
+    homeBadgeColor: "rose",
+    guestBadgeColor: null,
     venueName: "Goetheschule",
+    venueStreet: "Bunsenstraße 6",
+    venuePostalCode: "30165",
+    venueCity: "Hannover",
     venueNameOverride: null,
     homeScore: null,
     guestScore: null,
@@ -62,6 +67,12 @@ describe("fetchHomeDashboard", () => {
       id: 1,
       venueName: "Goetheschule",
       homeTeamCustomName: "Herren 1",
+      // The GameCard slice: badge colors and the maps-link address fields.
+      homeBadgeColor: "rose",
+      guestBadgeColor: null,
+      venueStreet: "Bunsenstraße 6",
+      venuePostalCode: "30165",
+      venueCity: "Hannover",
     });
   });
 

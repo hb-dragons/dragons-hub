@@ -9,10 +9,14 @@ export const Teams: CollectionConfig = {
   versions: { drafts: true },
   access: { read: publishedOrAuthed },
   admin: { useAsTitle: "name" },
+  // Drag-and-drop ordering in the list view (issue: /teams ordering). Payload
+  // injects a hidden fractional-index `_order` field; the site sorts by it.
+  // Replaced the hand-numbered `orderIndex` — the migration seeds `_order`
+  // from the old values, so the published order survives the switch.
+  orderable: true,
   fields: [
     { name: "name", type: "text", required: true },
     { name: "slug", type: "text", required: true, unique: true }, // damen-1 … u18
-    { name: "orderIndex", type: "number", required: true },
     { name: "teamImage", type: "upload", relationTo: "media" },
     {
       name: "apiTeamPermanentId",

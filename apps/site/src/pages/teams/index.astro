@@ -21,8 +21,8 @@ import { fetchTeamLeagueNames, leagueNameFor } from "../../lib/team-league";
 
 const cmsBase = cmsBaseUrl();
 
-// Loader-sorted by orderIndex (src/content.config.ts) — the legacy page
-// sorted client-side.
+// Loader-sorted by the CMS drag-and-drop order (`_order`,
+// src/content.config.ts) — the legacy page sorted client-side.
 const teams = await getCollection("teams", publishedOnly);
 
 const pages = await getCollection("pages");

@@ -35,7 +35,12 @@ function game(overrides: Record<string, unknown> = {}) {
     guestIsOwnClub: false,
     homeClubId: 4121,
     guestClubId: 4213,
+    homeBadgeColor: "rose",
+    guestBadgeColor: null,
     venueName: "Goetheschule",
+    venueStreet: null,
+    venuePostalCode: null,
+    venueCity: null,
     venueNameOverride: null,
     homeScore: null,
     guestScore: null,
@@ -52,6 +57,14 @@ describe("NextGamesIsland", () => {
     render(<NextGamesIsland />);
     expect(await screen.findByText("Goetheschule", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("Herren 1")).toBeInTheDocument();
+  });
+
+  it("renders the shared GameCard: colored dragons badge, opponent as text", async () => {
+    getHomeDashboard.mockResolvedValue({ upcomingGames: [game()] });
+    render(<NextGamesIsland />);
+    const badge = await screen.findByText("Herren 1");
+    expect(badge.className).toContain("bg-rose-100");
+    expect(screen.getByText("CVJM Hannover 2").closest("a")).toBeNull();
   });
 
   it("says nothing is scheduled when the API returns no games", async () => {

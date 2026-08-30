@@ -36,25 +36,25 @@ const hasStats = memberCount !== null && teamCount !== null && years !== null;
           <div class="text-3xl md:text-5xl xl:text-6xl font-bold text-center z-20 relative w-full flex items-center justify-center">
             <div class="grid grid-cols-3 gap-2 md:gap-12 text-center justify-center w-full px-4 font-mono">
               <div class="space-y-2">
-                <span class="inline-block text-primary italic">
+                <span class="stat-number inline-block text-primary">
                   {memberCount}
                   {/* Legacy styled this via `color: var(--muted)` which never
                       resolved (no such var in Nuxt UI), so prod renders it in
                       the inherited primary green — match that. */}
-                  <span class="ml-[0.1em] font-normal">+</span>
+                  <span class="ml-[0.1em]">+</span>
                 </span>
                 <p class="text-sm md:text-lg xl:text-2xl font-black font-sans">
                   {strings.home.statsMembers}
                 </p>
               </div>
               <div class="space-y-2">
-                <span class="inline-block text-primary italic">{teamCount}</span>
+                <span class="stat-number inline-block text-primary">{teamCount}</span>
                 <p class="text-sm md:text-lg xl:text-2xl font-black font-sans">
                   {strings.home.statsTeams}
                 </p>
               </div>
               <div class="space-y-2">
-                <span class="inline-block text-primary italic">{years}</span>
+                <span class="stat-number inline-block text-primary">{years}</span>
                 <p class="text-sm md:text-lg xl:text-2xl font-black font-sans">
                   {strings.home.statsYears}
                 </p>
@@ -82,3 +82,16 @@ const hasStats = memberCount !== null && teamCount !== null && years !== null;
     </div>
   </div>
 </div>
+
+<style>
+  /* The stat figures share the hero claim's brush face. Edo SZ ships a single
+     400 weight and no italic — a synthetic bold or oblique smears the brush
+     strokes, so the spans drop the band's font-mono/font-bold/italic instead
+     of faking them. Digits and "+" sit inside the font's declared
+     unicodeRange (U+2B-3B), so nothing falls back mid-number. Join renders on
+     the home page only, which is the one page that loads Edo (index.astro). */
+  .stat-number {
+    font-family: var(--font-edo);
+    font-weight: 400;
+  }
+</style>

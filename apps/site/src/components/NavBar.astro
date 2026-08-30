@@ -11,6 +11,7 @@
 import { getCollection } from "astro:content";
 
 import { groupTeamsForNav } from "../lib/nav-teams";
+import { compareOrderKeys } from "../lib/order-key";
 import { cmsBaseUrl, mediaUrl } from "../lib/media";
 import { publishedOnly } from "../lib/published";
 import { BANNER_IMAGE } from "../lib/site-assets";
@@ -21,7 +22,7 @@ const cmsBase = cmsBaseUrl();
 
 const teams = (await getCollection("teams", publishedOnly))
   .map((entry) => entry.data)
-  .sort((a, b) => a.orderIndex - b.orderIndex);
+  .sort((a, b) => compareOrderKeys(a._order, b._order));
 const teamGroups = groupTeamsForNav(teams);
 const teamRows = [teamGroups.damen, teamGroups.herren, teamGroups.jugend].filter(
   (row) => row.length > 0,
@@ -188,16 +189,22 @@ const isActiveTeam = (slug: string) => path.includes(slug);
     </div>
   </div>
 
-  <div id="nav-backdrop" class="nav-backdrop fixed inset-0 z-40 bg-black/60 md:hidden"></div>
+</nav>
 
-  {/* `inert` while closed: the drawer is only moved offscreen by a transform,
-      so without it every link stays tabbable and announced below md (#265).
-      The script drops the attribute on open. */}
-  <div
-    id="nav-drawer"
-    class="nav-drawer fixed top-1 right-1 bottom-1 left-16 z-50 rounded-lg bg-background border border-border overflow-y-auto md:hidden"
-    inert
-  >
+{/* Backdrop and drawer are siblings of the nav, not children: the scrolled
+    bar's backdrop-filter makes the nav the containing block for fixed
+    descendants, which would size `top-1 bottom-1` against the blur bar
+    instead of the viewport (see nav-structure.test.ts). */}
+<div id="nav-backdrop" class="nav-backdrop fixed inset-0 z-40 bg-black/60 md:hidden"></div>
+
+{/* `inert` while closed: the drawer is only moved offscreen by a transform,
+    so without it every link stays tabbable and announced below md (#265).
+    The script drops the attribute on open. */}
+<div
+  id="nav-drawer"
+  class="nav-drawer fixed top-1 right-1 bottom-1 left-16 z-50 rounded-lg bg-background border border-border overflow-y-auto md:hidden"
+  inert
+>
     <div class="absolute top-0 right-0 flex justify-end items-center p-4">
       <button type="button" id="nav-close" class="p-2 cursor-pointer" aria-label={strings.nav.closeMenu}>
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
@@ -230,9 +237,8 @@ const isActiveTeam = (slug: string) => path.includes(slug);
       </details>
       <a href="/supporter/" class:list={["py-2 text-xl font-medium", path.includes("/supporter") && "text-primary"]}>{strings.nav.supporter}</a>
       <a href="/downloads/" class:list={["py-2 text-xl font-medium", path.includes("/downloads") && "text-primary"]}>{strings.nav.downloads}</a>
-    </div>
   </div>
-</nav>
+</div>
 
 <style>
   /* Scrolled bar look ported from dragons-app NavBar: 20% background tint,
@@ -275,7 +281,7 @@ const isActiveTeam = (slug: string) => path.includes(slug);
     transform: translateX(103%);
     transition: transform 0.3s ease;
   }
-  :global(#site-nav[data-menu-open]) .nav-drawer {
+  :global(html[data-menu-open]) .nav-drawer {
     transform: translateX(0);
   }
 
@@ -289,7 +295,7 @@ const isActiveTeam = (slug: string) => path.includes(slug);
     pointer-events: none;
     transition: opacity 0.3s ease;
   }
-  :global(#site-nav[data-menu-open]) .nav-backdrop {
+  :global(html[data-menu-open]) .nav-backdrop {
     opacity: 1;
     pointer-events: auto;
   }
