@@ -8,10 +8,11 @@
  * while a failed fetch says so instead (#271).
  */
 import { useEffect, useState } from "react";
-import type { MatchListItem } from "@dragons/shared";
+import type { Dispatch, SetStateAction } from "react";
 import { todayInClubZone } from "@dragons/shared";
 import { Skeleton } from "@dragons/ui/components/skeleton";
 import { api } from "../../lib/api";
+import type { PlanGame } from "../../lib/full-plan";
 import { nextGameParams, prevGameParams } from "../../lib/team-games";
 import { strings } from "../../lib/strings";
 import { GameCard, GameDate } from "../game/GameCard";
@@ -22,7 +23,7 @@ import { GameCard, GameDate } from "../game/GameCard";
  * outage rendered "Kein Spiel gefunden" and read as a team with no fixture
  * (#271).
  */
-type SlotState = MatchListItem | null | undefined | "error";
+type SlotState = PlanGame | null | undefined | "error";
 
 function GameSlot({ heading, game }: { heading: string; game: SlotState }) {
   return (
@@ -51,9 +52,29 @@ function GameSlot({ heading, game }: { heading: string; game: SlotState }) {
   );
 }
 
-export default function NextPrevGame({ teamApiId }: { teamApiId: number | null }) {
-  const [prevGame, setPrevGame] = useState<SlotState>(teamApiId == null ? null : undefined);
-  const [nextGame, setNextGame] = useState<SlotState>(teamApiId == null ? null : undefined);
+/**
+ * Content builds pass `initialPrev`/`initialNext` — both slots derived from
+ * the full plan during `astro build` (src/lib/full-plan.ts `prevNextGames`),
+ * `null` meaning "the build knows there is no such game" — so the static HTML
+ * carries the cards. The client refetch revalidates; a failed refetch keeps
+ * whatever the slot already shows and only ever renders the error state when
+ * there was no build-time data at all (env-less shell builds, #271).
+ */
+export default function NextPrevGame({
+  teamApiId,
+  initialPrev,
+  initialNext,
+}: {
+  teamApiId: number | null;
+  initialPrev?: PlanGame | null;
+  initialNext?: PlanGame | null;
+}) {
+  const [prevGame, setPrevGame] = useState<SlotState>(
+    teamApiId == null ? null : initialPrev,
+  );
+  const [nextGame, setNextGame] = useState<SlotState>(
+    teamApiId == null ? null : initialNext,
+  );
 
   useEffect(() => {
     if (teamApiId == null) return;
@@ -61,7 +82,7 @@ export default function NextPrevGame({ teamApiId }: { teamApiId: number | null }
     const today = todayInClubZone();
     const loadSlot = (
       params: ReturnType<typeof prevGameParams>,
-      setSlot: (game: SlotState) => void,
+      setSlot: Dispatch<SetStateAction<SlotState>>,
     ) => {
       api.public
         .getMatches(params)
@@ -69,7 +90,9 @@ export default function NextPrevGame({ teamApiId }: { teamApiId: number | null }
           if (!cancelled) setSlot(page.items[0] ?? null);
         })
         .catch(() => {
-          if (!cancelled) setSlot("error");
+          // Keep a build-time card (or empty card) over an error line; only a
+          // slot that was still loading has nothing better to show.
+          if (!cancelled) setSlot((current) => (current === undefined ? "error" : current));
         });
     };
     loadSlot(prevGameParams(teamApiId, today), setPrevGame);

@@ -1,10 +1,12 @@
 ---
 // Port of dragons-app app/pages/teams/[slug].vue: team header, the team +
 // trainer hero, the last/next game band, and the Spielplan/Tabelle tabs.
-// The islands get the CMS team's apiTeamPermanentId join key as a prop and
-// query /public/* client-side (plan Task C5 Step 4); the league name joins
-// in once at build time from /public/standings.
+// The islands get the CMS team's apiTeamPermanentId join key as a prop plus
+// their first paint from one build-time standings fetch and one full-plan
+// crawl (src/lib/full-plan.ts); the client refetches revalidate against
+// /public/* (plan Task C5 Step 4).
 import { getCollection } from "astro:content";
+import { todayInClubZone } from "@dragons/shared";
 
 import Layout from "../../layouts/Layout.astro";
 import PageContainer from "../../components/PageContainer.astro";
@@ -13,30 +15,46 @@ import NextPrevGame from "../../components/teams/NextPrevGame";
 import TeamTabs from "../../components/teams/TeamTabs";
 import TeamTrainer from "../../components/teams/TeamTrainer.astro";
 import { apiBase } from "../../lib/api-base";
+import { fetchBuildPlan, prevNextGames, teamGames } from "../../lib/full-plan";
 import { sportsTeam } from "../../lib/jsonld";
 import { cmsBaseUrl } from "../../lib/media";
 import { publishedOnly } from "../../lib/published";
 import { absoluteUrl, canonicalUrl, metaDescription } from "../../lib/seo";
 import { strings } from "../../lib/strings";
 import { primaryTrainer, toSiteImage } from "../../lib/team-detail";
-import { fetchTeamLeagueNames, leagueNameFor } from "../../lib/team-league";
+import { findTeamLeague, toStandingRows } from "../../lib/team-standings";
+import { fetchStandingsLeagues, leagueNameFor, teamLeagueNames } from "../../lib/team-league";
 
 export async function getStaticPaths() {
   const teams = await getCollection("teams", publishedOnly);
-  // One standings fetch for every team page (content builds only — the
-  // collection is empty on env-less shell builds, so this never runs there).
-  const leagueNames =
-    teams.length > 0 ? await fetchTeamLeagueNames(apiBase()) : new Map<number, string>();
-  return teams.map(({ data }) => ({
-    params: { slug: data.slug },
-    props: {
-      team: data,
-      leagueName: leagueNameFor(leagueNames, data.apiTeamPermanentId),
-    },
-  }));
+  // One standings fetch and one full-plan crawl for every team page (content
+  // builds only — the collection is empty on env-less shell builds, so
+  // neither runs there and the islands fall back to their client fetches).
+  const leagues = teams.length > 0 ? await fetchStandingsLeagues(apiBase()) : [];
+  const leagueNames = teamLeagueNames(leagues);
+  const plan = teams.length > 0 ? await fetchBuildPlan(apiBase()) : null;
+  // Windowed with the build's clock; the islands re-query on the client, so a
+  // stale prev/next split only ever survives until hydration.
+  const today = todayInClubZone();
+  return teams.map(({ data }) => {
+    const games = plan === null ? null : teamGames(plan, data.apiTeamPermanentId ?? null);
+    const { prev, next } = games === null ? { prev: undefined, next: undefined } : prevNextGames(games, today);
+    const league = findTeamLeague(leagues, data.apiTeamPermanentId);
+    return {
+      params: { slug: data.slug },
+      props: {
+        team: data,
+        leagueName: leagueNameFor(leagueNames, data.apiTeamPermanentId),
+        initialGames: games,
+        initialPrev: prev,
+        initialNext: next,
+        initialStandings: plan === null ? null : league === null ? [] : toStandingRows(league),
+      },
+    };
+  });
 }
 
-const { team, leagueName } = Astro.props;
+const { team, leagueName, initialGames, initialPrev, initialNext, initialStandings } = Astro.props;
 const cmsBase = cmsBaseUrl();
 
 const teamImage = toSiteImage(team.teamImage, cmsBase);
@@ -68,8 +86,18 @@ const jsonLd = sportsTeam({
   <PageContainer class="space-y-4 md:space-y-8 lg:space-y-12">
     <TeamTrainer teamImage={teamImage} leagueName={leagueName} trainer={trainer} />
 
-    <NextPrevGame client:visible teamApiId={teamApiId} />
+    <NextPrevGame
+      client:visible
+      teamApiId={teamApiId}
+      initialPrev={initialPrev}
+      initialNext={initialNext}
+    />
 
-    <TeamTabs client:visible teamApiId={teamApiId} />
+    <TeamTabs
+      client:visible
+      teamApiId={teamApiId}
+      initialGames={initialGames}
+      initialStandings={initialStandings}
+    />
   </PageContainer>
 </Layout>
