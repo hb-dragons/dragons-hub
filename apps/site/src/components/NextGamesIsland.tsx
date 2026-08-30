@@ -4,20 +4,28 @@
  * consumption, /public/home/dashboard fetch. The fetched games are narrowed
  * to the legacy week window by lib/next-games.
  *
- * A failed fetch renders an error, never substitute games (#257). This island
- * used to answer a rejection with three hardcoded fixtures as a stopgap for a
- * CORS gap; that gap closed once TRUSTED_ORIGINS listed the site origins, and
- * inventing fixtures on the club's landing page is not a fallback anyone can
- * act on safely.
+ * Content builds pass `initialGames` — the same dashboard fetched during
+ * `astro build` — so the static HTML paints real games with no skeleton and
+ * no layout jump. The client refetch then revalidates: fresh data replaces
+ * the list (identical data reconciles to zero DOM changes), and a failed
+ * refetch keeps the build-time list on screen — it is real fetched data,
+ * merely as old as the last nightly build.
+ *
+ * Without initial data (env-less shell builds), a failed fetch renders an
+ * error, never substitute games (#257). This island used to answer a
+ * rejection with three hardcoded fixtures as a stopgap for a CORS gap; that
+ * gap closed once TRUSTED_ORIGINS listed the site origins, and inventing
+ * fixtures on the club's landing page is not a fallback anyone can act on
+ * safely.
  */
 import { useEffect, useState } from "react";
 import { ApiClient, createApi } from "@dragons/api-client";
 import { formatKickoffLong } from "@dragons/shared";
-import type { MatchListItem } from "@dragons/shared";
 import { Badge } from "@dragons/ui/components/badge";
 import { Skeleton } from "@dragons/ui/components/skeleton";
 import { DEFAULT_API_BASE } from "../lib/api-base";
 import { ClubLogo } from "./game/ClubLogo";
+import type { HomeGame } from "../lib/home-stats";
 import { nextGames } from "../lib/next-games";
 import { SOFT_BUTTON_CLASSES } from "../lib/site-assets";
 import { strings } from "../lib/strings";
@@ -27,24 +35,7 @@ const API_BASE =
 
 const api = createApi(new ApiClient({ baseUrl: API_BASE }));
 
-type GameLite = Pick<
-  MatchListItem,
-  | "id"
-  | "kickoffDate"
-  | "kickoffTime"
-  | "homeTeamName"
-  | "guestTeamName"
-  | "homeTeamCustomName"
-  | "guestTeamCustomName"
-  | "homeIsOwnClub"
-  | "guestIsOwnClub"
-  | "homeClubId"
-  | "guestClubId"
-  | "venueName"
-  | "venueNameOverride"
-  | "homeScore"
-  | "guestScore"
->;
+type GameLite = HomeGame;
 
 function formatTime(timeString: string) {
   return timeString.split(":").slice(0, 2).join(":");
@@ -125,8 +116,12 @@ function GameCard({ game }: { game: GameLite }) {
   );
 }
 
-export default function NextGamesIsland() {
-  const [games, setGames] = useState<GameLite[] | null>(null);
+export default function NextGamesIsland({
+  initialGames = null,
+}: {
+  initialGames?: GameLite[] | null;
+}) {
+  const [games, setGames] = useState<GameLite[] | null>(initialGames);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -149,18 +144,25 @@ export default function NextGamesIsland() {
         {strings.nextGames.heading}
       </h2>
 
+      {/* Shell builds and pre-hydration only — content builds paint games
+          statically. Mirrors the real geometry (date pill, card grid, card
+          heights) so the swap to content moves nothing. */}
       {games === null && !failed && (
         <div className="space-y-6">
-          <Skeleton className="h-6 w-48 mx-auto" />
-          <div className="space-y-3">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-20 w-full rounded-lg" />
-            ))}
+          <div className="space-y-2">
+            <div className="flex justify-center">
+              <Skeleton className="h-7 md:h-8 lg:h-9 w-32 rounded-lg" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 w-full gap-4 items-center justify-center">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-24 md:h-32 lg:h-38 xl:h-42 w-full rounded-md" />
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {failed && (
+      {failed && games === null && (
         <p className="text-center text-muted-foreground py-8">
           {strings.nextGames.loadError}
         </p>
