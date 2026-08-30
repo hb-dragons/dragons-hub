@@ -114,7 +114,9 @@ const team = z.object({
   id: z.number(),
   name: z.string(),
   slug: z.string(),
-  orderIndex: z.number(),
+  // Payload `orderable` fractional-index key — the one team ordering source
+  // (drag-and-drop in the CMS list view). Sort with compareOrderKeys.
+  _order: z.string(),
   teamImage: media.nullish(),
   apiTeamPermanentId: z.number().nullish(),
   trainers: z.array(trainer).nullish(),
@@ -134,7 +136,7 @@ export const collections = {
     schema: page,
   }),
   teams: defineCollection({
-    loader: payloadLoader("teams", { depth: 3, sort: "orderIndex", required: true }),
+    loader: payloadLoader("teams", { depth: 3, sort: "_order", required: true }),
     schema: team,
   }),
   partners: defineCollection({

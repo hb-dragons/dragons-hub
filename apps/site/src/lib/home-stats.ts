@@ -27,7 +27,12 @@ export type HomeGame = Pick<
   | "guestIsOwnClub"
   | "homeClubId"
   | "guestClubId"
+  | "homeBadgeColor"
+  | "guestBadgeColor"
   | "venueName"
+  | "venueStreet"
+  | "venuePostalCode"
+  | "venueCity"
   | "venueNameOverride"
   | "homeScore"
   | "guestScore"
@@ -47,7 +52,12 @@ const homeGameSchema = z.object({
   guestIsOwnClub: z.boolean(),
   homeClubId: z.number(),
   guestClubId: z.number(),
+  homeBadgeColor: z.string().nullable(),
+  guestBadgeColor: z.string().nullable(),
   venueName: z.string().nullable(),
+  venueStreet: z.string().nullable(),
+  venuePostalCode: z.string().nullable(),
+  venueCity: z.string().nullable(),
   venueNameOverride: z.string().nullable(),
   homeScore: z.number().nullable(),
   guestScore: z.number().nullable(),

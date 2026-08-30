@@ -282,10 +282,12 @@ describe("mapTeam", () => {
       media: new Map([[3, 300]]),
       trainers: new Map([[8, 800]]),
     });
+    // No orderIndex: teams became `orderable` (drag-and-drop `_order`), and
+    // Payload rejects writes to fields a collection no longer declares.
+    expect(mapped).not.toHaveProperty("orderIndex");
     expect(mapped).toMatchObject({
       name: "Damen 1",
       slug: "damen-1",
-      orderIndex: 1,
       leagueName: "2. Regionalliga Damen West",
       leagueId: "48668",
       teamImage: 300,

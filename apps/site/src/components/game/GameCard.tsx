@@ -128,12 +128,21 @@ function CardTeam({ game, isAway = false }: { game: GameCardMatch; isAway?: bool
           the venue name wherever the card is narrow enough for the two to
           meet horizontally — which on the Spielplan grid is most of them. */}
       <div className="absolute bottom-5 md:bottom-6 lg:bottom-7">
-        <TeamBadge
-          teamName={badgeName}
-          isDragonsTeam={isOwn}
-          badgeColor={badgeColor}
-          className="w-fit h-auto text-xs md:text-sm lg:text-base xl:text-base col-span-5 md:px-2"
-        />
+        {/* Dragons teams carry their configured color badge; opponents are
+            plain text — mirrors the web /spielplan table, where only the own
+            team is a colored chip. */}
+        {isOwn ? (
+          <TeamBadge
+            teamName={badgeName}
+            isDragonsTeam
+            badgeColor={badgeColor}
+            className="w-fit h-auto text-xs md:text-sm lg:text-base xl:text-base col-span-5 md:px-2"
+          />
+        ) : (
+          <span className="block font-semibold text-center truncate max-w-36 md:max-w-44 lg:max-w-52 text-xs md:text-sm lg:text-base">
+            {badgeName}
+          </span>
+        )}
       </div>
     </div>
   );

@@ -193,7 +193,8 @@ export function mapTeam(doc: StrapiDoc, ids: IdMaps) {
   return {
     name: doc.name as string,
     slug,
-    orderIndex: (doc.orderIndex as number | null) ?? 0,
+    // Strapi's team.orderIndex is dropped: Payload teams are `orderable`
+    // (drag-and-drop `_order`), and writes to undeclared fields are rejected.
     teamImage: rel(doc.teamImage, ids.media),
     apiTeamPermanentId: TEAM_PERMANENT_IDS[slug] ?? null,
     leagueName: (doc.leagueName as string | null) ?? null,

@@ -114,12 +114,18 @@ describe("drafted collections", () => {
 });
 
 describe("teams", () => {
+  it("is drag-and-drop orderable instead of carrying a hand-numbered index", () => {
+    // Payload injects the fractional-index `_order` field at init, so the
+    // raw config must not declare its own ordering field next to it.
+    expect(Teams.orderable).toBe(true);
+    expect(fieldNames(Teams.fields)).not.toContain("orderIndex");
+  });
+
   it("carries the contracted fields incl. the apiTeamPermanentId join key", () => {
     expect(Teams.slug).toBe("teams");
     expect(fieldNames(Teams.fields)).toEqual([
       "name",
       "slug",
-      "orderIndex",
       "teamImage",
       "apiTeamPermanentId",
       "leagueName",

@@ -112,7 +112,7 @@ describe("payloadLoader", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { context } = loaderHarness();
 
-    await payloadLoader("teams", { depth: 3, sort: "orderIndex" }).load(context);
+    await payloadLoader("teams", { depth: 3, sort: "_order" }).load(context);
 
     const [rawUrl, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const url = new URL(rawUrl);
@@ -120,7 +120,7 @@ describe("payloadLoader", () => {
     expect(url.pathname).toBe("/api/teams");
     expect(url.searchParams.get("limit")).toBe("100");
     expect(url.searchParams.get("depth")).toBe("3");
-    expect(url.searchParams.get("sort")).toBe("orderIndex");
+    expect(url.searchParams.get("sort")).toBe("_order");
     expect(init.headers).toEqual({
       Authorization: `users API-Key ${CMS_API_TOKEN}`,
     });

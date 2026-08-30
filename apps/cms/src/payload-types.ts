@@ -289,9 +289,9 @@ export interface Page {
  */
 export interface Team {
   id: number;
+  _order?: string | null;
   name: string;
   slug: string;
-  orderIndex: number;
   teamImage?: (number | null) | Media;
   /**
    * Join-Key zu /public/teams (Sync-Daten)
@@ -703,9 +703,9 @@ export interface PagesSelect<T extends boolean = true> {
  * via the `definition` "teams_select".
  */
 export interface TeamsSelect<T extends boolean = true> {
+  _order?: T;
   name?: T;
   slug?: T;
-  orderIndex?: T;
   teamImage?: T;
   apiTeamPermanentId?: T;
   leagueName?: T;
