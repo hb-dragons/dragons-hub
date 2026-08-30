@@ -13,8 +13,10 @@ export default async function SpielplanPage() {
   ).catch(() => []);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 md:gap-4">
-      <h1 className="px-1 text-xl font-bold md:px-2 md:text-2xl">{t("title")}</h1>
+    <div className="flex min-h-0 flex-1 flex-col gap-2 md:gap-4">
+      {/* On phones the sticky brand header is identity enough — the title
+          would be a third stacked banner above the table. */}
+      <h1 className="hidden px-2 text-2xl font-bold md:block">{t("title")}</h1>
       <SpielplanTable matches={matches} />
     </div>
   );

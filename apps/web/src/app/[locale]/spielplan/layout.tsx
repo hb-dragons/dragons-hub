@@ -15,7 +15,7 @@ export default function SpielplanLayout({
     // matters most on phones).
     <div className="flex h-dvh flex-col">
       <PublicHeader />
-      <main className="mx-auto flex min-h-0 w-full max-w-[96rem] flex-1 flex-col px-2 py-4 md:px-4 md:py-6">
+      <main className="mx-auto flex min-h-0 w-full max-w-[96rem] flex-1 flex-col px-2 py-2 md:px-4 md:py-6">
         {children}
       </main>
     </div>
