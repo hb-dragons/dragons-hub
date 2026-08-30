@@ -22,9 +22,18 @@ import { isDerbyGame, withDerbyPrefix } from "./utils"
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4">
-      <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className="text-right text-sm">{children}</dd>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="text-right text-sm font-medium text-foreground">{children}</dd>
     </div>
+  )
+}
+
+/** Section heading, styled like the table headers so it reads as a label in both themes. */
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="font-display text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      {children}
+    </h3>
   )
 }
 
@@ -88,10 +97,10 @@ export function SpielplanDetailSheet({ game, onOpenChange }: SpielplanDetailShee
             </dl>
 
             <div className="space-y-1">
-              <h3 className="text-sm font-medium text-muted-foreground">
-                {t("columns.venue")}
-              </h3>
-              <p className="text-sm">{game.venueNameOverride ?? game.venueName ?? "—"}</p>
+              <SectionHeading>{t("columns.venue")}</SectionHeading>
+              <p className="text-sm font-medium">
+                {game.venueNameOverride ?? game.venueName ?? "—"}
+              </p>
               {game.venueStreet && <p className="text-sm">{game.venueStreet}</p>}
               {(game.venuePostalCode || game.venueCity) && (
                 <p className="text-sm">
@@ -101,9 +110,7 @@ export function SpielplanDetailSheet({ game, onOpenChange }: SpielplanDetailShee
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-medium text-muted-foreground">
-                {t("kampfgericht")}
-              </h3>
+              <SectionHeading>{t("kampfgericht")}</SectionHeading>
               <dl className="space-y-3">
                 <DetailRow label={t("columns.anschreiber")}>
                   {game.anschreiber ? <TeamBadge name={game.anschreiber} /> : "—"}
@@ -119,10 +126,8 @@ export function SpielplanDetailSheet({ game, onOpenChange }: SpielplanDetailShee
 
             {withDerbyPrefix(game.publicComment, isDerbyGame(game)) && (
               <div className="space-y-1">
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  {t("columns.comment")}
-                </h3>
-                <p className="text-sm">
+                <SectionHeading>{t("columns.comment")}</SectionHeading>
+                <p className="text-sm font-medium">
                   {withDerbyPrefix(game.publicComment, isDerbyGame(game))}
                 </p>
               </div>

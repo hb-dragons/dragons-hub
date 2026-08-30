@@ -39,7 +39,6 @@ import {
 } from "@/components/admin/matches/utils"
 import { isDerbyGame, spielplanRowClass, withDerbyPrefix } from "./utils"
 import { SpielplanDetailSheet } from "./spielplan-detail-sheet"
-import { exportSpielplanXlsx } from "./xlsx-export"
 
 /**
  * Marks a game that carries an admin-entered note so it stays visible even
@@ -289,6 +288,7 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
         columns={columns}
         data={matches}
         className="min-h-0 flex-1 flex flex-col"
+        toolbarClassName="px-1 md:px-2"
         containerClassName="min-h-0 flex-1 overflow-auto overscroll-contain"
         stickyHeader
       onRowClick={(row) => setSelectedGame(row.original)}
@@ -349,17 +349,6 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
                 title={t("columns.team")}
                 options={teamFilterOptions}
               />
-              {isFiltered && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => table.resetColumnFilters()}
-                  className="h-8 px-2 lg:px-3"
-                >
-                  {tCommon("reset")}
-                  <XIcon />
-                </Button>
-              )}
             </div>
 
             {/* Secondary filters: inline from md up, behind the toggle on phones. */}
@@ -384,19 +373,20 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
                 column={table.getColumn("kickoffDate")!}
                 title={t("columns.date")}
               />
+              {isFiltered && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => table.resetColumnFilters()}
+                  className="h-8 px-2 lg:px-3"
+                >
+                  {tCommon("reset")}
+                  <XIcon />
+                </Button>
+              )}
             </div>
 
-            <div className="flex items-center justify-between text-xs md:text-sm text-muted-foreground">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={visibleGames.length === 0}
-                onClick={() => {
-                  void exportSpielplanXlsx(visibleGames)
-                }}
-              >
-                {t("export")}
-              </Button>
+            <div className="flex items-center justify-end text-xs md:text-sm text-muted-foreground">
               <span>
                 {visibleGames.length} {t("gamesCount")}
               </span>

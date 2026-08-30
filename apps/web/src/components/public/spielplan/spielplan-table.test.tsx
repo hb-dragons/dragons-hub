@@ -10,9 +10,6 @@ vi.mock("next-intl", () => ({
     dateTime: (value: Date) => value.toISOString().slice(0, 10),
   }),
 }));
-vi.mock("./xlsx-export", () => ({ exportSpielplanXlsx: vi.fn() }));
-
-import { exportSpielplanXlsx } from "./xlsx-export";
 import { SpielplanTable } from "./spielplan-table";
 
 function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
@@ -61,10 +58,7 @@ function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
   };
 }
 
-afterEach(() => {
-  cleanup();
-  vi.mocked(exportSpielplanXlsx).mockReset();
-});
+afterEach(cleanup);
 
 describe("<SpielplanTable>", () => {
   it("shows active and cancelled games by default but hides forfeited ones", () => {
@@ -172,24 +166,17 @@ describe("<SpielplanTable>", () => {
     expect(screen.getByText(/1 gamesCount/)).toBeInTheDocument();
   });
 
-  it("exports exactly the filtered rows", () => {
-    render(
-      <SpielplanTable
-        matches={[
-          makeMatch({ id: 1, homeTeamName: "TSV Suchbar" }),
-          makeMatch({ id: 2, homeTeamName: "SV Anders" }),
-        ]}
-      />,
-    );
+  it("offers no export button", () => {
+    render(<SpielplanTable matches={[makeMatch()]} />);
+    expect(screen.queryByRole("button", { name: /export/ })).not.toBeInTheDocument();
+  });
 
-    fireEvent.change(screen.getByPlaceholderText("searchPlaceholder"), {
-      target: { value: "suchbar" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /export/ }));
+  it("keeps the reset button inside the collapsible filter area", () => {
+    render(<SpielplanTable matches={[makeMatch()]} />);
 
-    expect(exportSpielplanXlsx).toHaveBeenCalledTimes(1);
-    const exported = vi.mocked(exportSpielplanXlsx).mock.calls[0]![0];
-    expect(exported.map((m) => m.homeTeamName)).toEqual(["TSV Suchbar"]);
+    // The default status filter counts as an active filter, so reset is shown.
+    const reset = screen.getByRole("button", { name: /reset/ });
+    expect(document.querySelector('[data-slot="extra-filters"]')).toContainElement(reset);
   });
 
   it("marks games that carry a public comment, even with the comment column hidden", () => {

@@ -45,6 +45,8 @@ interface DataTableProps<TData, TValue> {
   globalFilterFn?: FilterFn<TData>
   /** Extra classes on the root, e.g. flex plumbing so the table region can fill the viewport. */
   className?: string
+  /** Extra classes on the toolbar wrapper; overrides the default px-6 via tailwind-merge. */
+  toolbarClassName?: string
   /** Extra classes on the table's scroll container (see `Table`'s `containerClassName`). */
   containerClassName?: string
   /** Pin the header row while the table body scrolls inside its container. */
@@ -62,6 +64,7 @@ export function DataTable<TData, TValue>({
   initialColumnFilters,
   globalFilterFn,
   className,
+  toolbarClassName,
   containerClassName,
   stickyHeader,
 }: DataTableProps<TData, TValue>) {
@@ -100,7 +103,11 @@ export function DataTable<TData, TValue>({
 
   return (
     <div data-slot="data-table" className={cn("space-y-2", className)}>
-      {children && <div className="px-6">{children(table)}</div>}
+      {children && (
+        <div data-slot="data-table-toolbar" className={cn("px-6", toolbarClassName)}>
+          {children(table)}
+        </div>
+      )}
       {table.getRowModel().rows.length === 0 ? (
         emptyState ?? (
           <p className="py-12 text-center text-muted-foreground">
