@@ -86,4 +86,39 @@ describe("NextGamesIsland", () => {
     resolve({ upcomingGames: [] });
     await waitFor(() => expect(screen.getByText(strings.nextGames.empty)).toBeInTheDocument());
   });
+
+  /**
+   * Build-time first paint: index.astro fetches the same dashboard during
+   * `astro build` and passes the windowed list in as `initialGames`, so the
+   * static HTML carries real games instead of a skeleton. The client refetch
+   * then revalidates against the live API.
+   */
+  describe("with build-time initialGames", () => {
+    it("renders them immediately, without a skeleton", () => {
+      getHomeDashboard.mockReturnValue(new Promise(() => {}));
+      const { container } = render(<NextGamesIsland initialGames={[game()]} />);
+      expect(screen.getByText("Goetheschule", { exact: false })).toBeInTheDocument();
+      expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBe(0);
+    });
+
+    it("swaps in the refetched list when the live data differs", async () => {
+      getHomeDashboard.mockResolvedValue({
+        upcomingGames: [game({ id: 2, venueName: "IGS Linden", homeTeamCustomName: "Herren 2" })],
+      });
+      render(<NextGamesIsland initialGames={[game()]} />);
+      // Build-time list paints synchronously, live list replaces it.
+      expect(screen.getByText("Goetheschule", { exact: false })).toBeInTheDocument();
+      expect(await screen.findByText("IGS Linden", { exact: false })).toBeInTheDocument();
+      expect(screen.queryByText("Goetheschule", { exact: false })).toBeNull();
+    });
+
+    it("keeps showing them when the refetch fails, without an error", async () => {
+      getHomeDashboard.mockRejectedValue(new Error("network"));
+      render(<NextGamesIsland initialGames={[game()]} />);
+      // Let the rejection settle before asserting nothing changed.
+      await waitFor(() => expect(getHomeDashboard).toHaveBeenCalled());
+      expect(screen.getByText("Goetheschule", { exact: false })).toBeInTheDocument();
+      expect(screen.queryByText(strings.nextGames.loadError)).toBeNull();
+    });
+  });
 });
