@@ -86,7 +86,7 @@ const isActiveTeam = (slug: string) => path.includes(slug);
           links.map((link) => (
             <li class="nav-item">
               {link.href !== null ? (
-                <a href={link.href} aria-label={link.label}>
+                <a href={link.href}>
                   <div class:list={itemClasses(link.active, link.slot !== undefined)}>
                     <p class="relative z-10 font-black uppercase">{link.label}</p>
                   </div>
@@ -105,11 +105,7 @@ const isActiveTeam = (slug: string) => path.includes(slug);
                     {teamRows.map((row) => (
                       <div class="flex gap-2">
                         {row.map((team) => (
-                          <a
-                            href={`/teams/${team.slug}/`}
-                            aria-label={team.slug}
-                            class="w-full"
-                          >
+                          <a href={`/teams/${team.slug}/`} class="w-full">
                             <div class="flex items-center justify-center h-24 relative group overflow-hidden">
                               {/* A 96px-tall strip behind a black scrim, at most
                                   a third of the drawer wide. BlurImage's default
@@ -153,7 +149,7 @@ const isActiveTeam = (slug: string) => path.includes(slug);
                 <div class="nav-panel absolute left-0 right-0 top-full hidden bg-background border border-border rounded-md shadow-lg overflow-hidden">
                   <div class="grid">
                     {aboutChildren.map((child) => (
-                      <a href={child.href} aria-label={child.label}>
+                      <a href={child.href}>
                         <div class="flex items-center justify-center h-12 relative group">
                           <p
                             class:list={[

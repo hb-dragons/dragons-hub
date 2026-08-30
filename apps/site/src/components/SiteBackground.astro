@@ -28,7 +28,10 @@ const balls = Array.from({ length: 10 }, (_, id) => {
         class="deco-ball opacity-5 fixed"
         style={`--ball-x: ${ball.x}vw; --ball-y: ${ball.y}vh; --ball-scale: ${ball.scale}; --ball-scale-mobile: ${ball.mobileScale}; --ball-rotation: ${ball.rotation}deg;`}
       >
-        <img src="/img/basketball.svg" alt="" class="w-full h-full" loading="lazy" />
+        {/* No loading="lazy": all ten reference one cached SVG, and a lazy
+            in-viewport instance paints late enough that Lighthouse crowned it
+            the page's LCP element. */}
+        <img src="/img/basketball.svg" alt="" width="555" height="563" class="w-full h-full" />
       </div>
     ))
   }

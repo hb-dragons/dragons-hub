@@ -72,3 +72,15 @@ export function clampWidths(widths: readonly number[], sourceWidth: number): num
   const fitting = widths.filter((width) => width <= sourceWidth);
   return fitting.length > 0 ? fitting : [sourceWidth];
 }
+
+/**
+ * The width for the fallback `src` — the largest `srcset` candidate.
+ *
+ * Without an explicit `width`, Astro renders the fallback at the source's
+ * original width: a client that ignores `srcset` (OG scrapers, mail clients,
+ * old browsers) then downloads the full original — 733 KB for the home page's
+ * club photo — instead of the largest size the layout ever asks for.
+ */
+export function fallbackWidth(widths: readonly number[], sourceWidth: number): number {
+  return Math.max(...clampWidths(widths, sourceWidth));
+}

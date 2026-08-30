@@ -4,6 +4,7 @@ import {
   clampWidths,
   DEFAULT_IMAGE_SIZES,
   DEFAULT_IMAGE_WIDTHS,
+  fallbackWidth,
   imageBranch,
   plainSrc,
 } from "./blur-image";
@@ -71,6 +72,22 @@ describe("clampWidths", () => {
 
   it("falls back to the source's own width rather than an empty srcset", () => {
     expect(clampWidths([400, 800, 1200], 240)).toEqual([240]);
+  });
+});
+
+describe("fallbackWidth", () => {
+  // Without an explicit width, Astro's fallback `src` is the original — the
+  // home page's club photo handed 733 KB to every srcset-ignoring client.
+  it("caps the fallback src at the largest srcset candidate", () => {
+    expect(fallbackWidth([400, 800, 1200], 1920)).toBe(1200);
+  });
+
+  it("never asks for more than the source has", () => {
+    expect(fallbackWidth([400, 800, 1200], 900)).toBe(800);
+  });
+
+  it("falls back to the source's own width when every candidate is larger", () => {
+    expect(fallbackWidth([400, 800, 1200], 240)).toBe(240);
   });
 });
 

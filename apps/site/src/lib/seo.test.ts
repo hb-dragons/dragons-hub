@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -164,8 +166,14 @@ describe("absoluteUrl", () => {
 });
 
 describe("DEFAULT_OG_IMAGE", () => {
-  it("points at a bundled public asset", () => {
+  // The default once pointed at a path no build emitted, so every share card
+  // without a CMS override 404ed. public/ ships byte-for-byte, so the path
+  // must name a real file there — not an import under src/assets, whose output
+  // name carries a content hash this constant cannot know.
+  it("points at a file that actually ships in public/", () => {
     expect(DEFAULT_OG_IMAGE.startsWith("/img/")).toBe(true);
+    const shipped = fileURLToPath(new URL(`../../public${DEFAULT_OG_IMAGE}`, import.meta.url));
+    expect(existsSync(shipped), `${DEFAULT_OG_IMAGE} is not in public/`).toBe(true);
   });
 });
 

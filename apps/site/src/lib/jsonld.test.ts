@@ -26,6 +26,22 @@ describe("sportsOrganization", () => {
   it("names the registered club as alternateName", () => {
     expect(org.alternateName).toBe("Hanover Basketball Dragons e.V.");
   });
+
+  // Local search needs a place: without a PostalAddress the club competes for
+  // "basketball hannover" on its name alone.
+  it("carries the Vereinsanschrift as a PostalAddress", () => {
+    expect(org.address).toEqual({
+      "@type": "PostalAddress",
+      streetAddress: "Kolbergstraße 7",
+      postalCode: "30175",
+      addressLocality: "Hannover",
+      addressCountry: "DE",
+    });
+  });
+
+  it("carries the club contact email", () => {
+    expect(org.email).toBe("info@hbdragons.de");
+  });
 });
 
 describe("sportsTeam", () => {

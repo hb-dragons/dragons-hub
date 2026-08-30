@@ -32,9 +32,9 @@ export default defineConfig({
     // `font-black` sit one step apart instead of two — intended, not a
     // regression to fix by adding a weight that does not exist.
     //
-    // Every variant listed here is preloaded — `<Font preload />` has no
-    // per-variant control — so the list is exactly what the site uses. The
-    // family ships no italic at all, so RichText's `em` is the browser's
+    // The list is exactly what the site uses; Layout.astro preloads the
+    // 400/700/800 subset of it (`<Font preload={[...]}>` filters by weight).
+    // The family ships no italic at all, so RichText's `em` is the browser's
     // synthetic oblique.
     { provider: fontProviders.fontsource(), name: "Bricolage Grotesque",
       cssVariable: "--font-bricolage",

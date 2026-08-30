@@ -11,6 +11,15 @@ export const strings = {
       courtPart: "One Court, ",
       culturesPart: "United Cultures",
     },
+    skipToContent: "Zum Inhalt springen",
+    // Vereinsanschrift (Impressum) — schema.org PostalAddress on the home
+    // page's SportsOrganization, so local search can place the club.
+    address: {
+      street: "Kolbergstraße 7",
+      postalCode: "30175",
+      city: "Hannover",
+      country: "DE",
+    },
   },
   nav: {
     home: "Home",
