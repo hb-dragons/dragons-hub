@@ -1182,6 +1182,40 @@
       "noMatches": "Keine Spiele gefunden"
     }
   },
+  "spielplan": {
+    "title": "Spielplan",
+    "searchPlaceholder": "Spiele suchen...",
+    "empty": "Keine Spiele gefunden",
+    "hasComment": "Hinweis vorhanden",
+    "export": "Excel-Export",
+    "gamesCount": "Spiele",
+    "homeAway": {
+      "label": "Heim/Auswärts",
+      "home": "Heimspiele",
+      "away": "Auswärtsspiele"
+    },
+    "status": {
+      "label": "Status",
+      "active": "Aktiv",
+      "cancelled": "Abgesagt",
+      "forfeited": "Kampflos"
+    },
+    "columns": {
+      "nr": "Nr.",
+      "date": "Datum",
+      "time": "Uhrzeit",
+      "team": "Team",
+      "league": "Liga",
+      "home": "Heim",
+      "guest": "Gast",
+      "venue": "Halle",
+      "score": "Ergebnis",
+      "anschreiber": "Anschreiber",
+      "zeitnehmer": "Zeitnehmer",
+      "shotclock": "Shotclock",
+      "comment": "Kommentar"
+    }
+  },
   "scoreboard": {
     "live": {
       "title": "Live",

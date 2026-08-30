@@ -1,0 +1,197 @@
+// @vitest-environment happy-dom
+import "@testing-library/jest-dom/vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { MatchListItem } from "@dragons/shared";
+
+vi.mock("next-intl", () => ({
+  useTranslations: () => (key: string) => key,
+  useFormatter: () => ({
+    dateTime: (value: Date) => value.toISOString().slice(0, 10),
+  }),
+}));
+vi.mock("./xlsx-export", () => ({ exportSpielplanXlsx: vi.fn() }));
+
+import { exportSpielplanXlsx } from "./xlsx-export";
+import { SpielplanTable } from "./spielplan-table";
+
+function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
+  return {
+    id: 1,
+    apiMatchId: 100,
+    matchNo: 971001,
+    matchDay: 3,
+    kickoffDate: "2026-09-06",
+    kickoffTime: "15:30:00",
+    homeTeamApiId: 10,
+    homeTeamName: "TSV Musterstadt",
+    homeTeamNameShort: null,
+    homeTeamCustomName: null,
+    homeClubId: 500,
+    guestTeamApiId: 20,
+    guestTeamName: "HB Dragons Hannover",
+    guestTeamNameShort: null,
+    guestTeamCustomName: "Herren 2",
+    guestClubId: 4121,
+    homeIsOwnClub: false,
+    guestIsOwnClub: true,
+    homeBadgeColor: null,
+    guestBadgeColor: null,
+    homeScore: null,
+    guestScore: null,
+    leagueId: 7,
+    leagueName: "Bezirksliga Mitte",
+    venueId: 9,
+    venueName: "Sporthalle Musterstadt",
+    venueStreet: null,
+    venuePostalCode: null,
+    venueCity: null,
+    venueNameOverride: null,
+    isConfirmed: true,
+    isForfeited: false,
+    isCancelled: false,
+    anschreiber: null,
+    zeitnehmer: null,
+    shotclock: null,
+    publicComment: null,
+    hasLocalChanges: false,
+    overriddenFields: [],
+    booking: null,
+    ...overrides,
+  };
+}
+
+afterEach(() => {
+  cleanup();
+  vi.mocked(exportSpielplanXlsx).mockReset();
+});
+
+describe("<SpielplanTable>", () => {
+  it("shows active and cancelled games by default but hides forfeited ones", () => {
+    render(
+      <SpielplanTable
+        matches={[
+          makeMatch({ id: 1, homeTeamName: "Aktiv Gegner" }),
+          makeMatch({ id: 2, homeTeamName: "Abgesagt Gegner", isCancelled: true }),
+          makeMatch({ id: 3, homeTeamName: "Kampflos Gegner", isForfeited: true }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Aktiv Gegner")).toBeInTheDocument();
+    expect(screen.getByText("Abgesagt Gegner")).toBeInTheDocument();
+    expect(screen.queryByText("Kampflos Gegner")).not.toBeInTheDocument();
+  });
+
+  it("shows the Kampfgericht duty cells and comment, but not Nr./Liga/Halle by default", () => {
+    render(
+      <SpielplanTable
+        matches={[
+          makeMatch({
+            anschreiber: "Damen 1",
+            zeitnehmer: "U18",
+            shotclock: "Herren 1",
+            publicComment: "Kuchenverkauf",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Damen 1")).toBeInTheDocument();
+    expect(screen.getByText("U18")).toBeInTheDocument();
+    expect(screen.getByText("Herren 1")).toBeInTheDocument();
+    expect(screen.getByText("Kuchenverkauf")).toBeInTheDocument();
+    expect(screen.queryByText("971001")).not.toBeInTheDocument();
+    expect(screen.queryByText("Bezirksliga Mitte")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sporthalle Musterstadt")).not.toBeInTheDocument();
+  });
+
+  it("filters rows through the search box", () => {
+    render(
+      <SpielplanTable
+        matches={[
+          makeMatch({ id: 1, homeTeamName: "TSV Suchbar" }),
+          makeMatch({ id: 2, homeTeamName: "SV Anders" }),
+        ]}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("searchPlaceholder"), {
+      target: { value: "suchbar" },
+    });
+
+    expect(screen.getByText("TSV Suchbar")).toBeInTheDocument();
+    expect(screen.queryByText("SV Anders")).not.toBeInTheDocument();
+  });
+
+  it("shows the filtered game count", () => {
+    render(
+      <SpielplanTable
+        matches={[makeMatch({ id: 1 }), makeMatch({ id: 2, isForfeited: true })]}
+      />,
+    );
+
+    expect(screen.getByText(/1 gamesCount/)).toBeInTheDocument();
+  });
+
+  it("exports exactly the filtered rows", () => {
+    render(
+      <SpielplanTable
+        matches={[
+          makeMatch({ id: 1, homeTeamName: "TSV Suchbar" }),
+          makeMatch({ id: 2, homeTeamName: "SV Anders" }),
+        ]}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("searchPlaceholder"), {
+      target: { value: "suchbar" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /export/ }));
+
+    expect(exportSpielplanXlsx).toHaveBeenCalledTimes(1);
+    const exported = vi.mocked(exportSpielplanXlsx).mock.calls[0]![0];
+    expect(exported.map((m) => m.homeTeamName)).toEqual(["TSV Suchbar"]);
+  });
+
+  it("marks games that carry a public comment, even with the comment column hidden", () => {
+    render(
+      <SpielplanTable
+        matches={[
+          makeMatch({ id: 1, publicComment: "Kuchenverkauf" }),
+          makeMatch({ id: 2, homeTeamName: "SV Ohne" }),
+        ]}
+      />,
+    );
+
+    expect(screen.getAllByLabelText("hasComment")).toHaveLength(1);
+  });
+
+  it("scrolls inside its own container with a sticky header, for phone use", () => {
+    render(<SpielplanTable matches={[makeMatch()]} />);
+
+    expect(document.querySelector('[data-slot="table-header"]')).toHaveClass("sticky");
+    const container = document.querySelector('[data-slot="table-container"]');
+    expect(container?.className).toContain("overflow-auto");
+  });
+
+  it("tints Dragons home game rows", () => {
+    render(
+      <SpielplanTable
+        matches={[
+          makeMatch({
+            homeIsOwnClub: true,
+            guestIsOwnClub: false,
+            homeTeamName: "HB Dragons Hannover",
+            homeTeamCustomName: "Herren 2",
+            guestTeamName: "TSV Musterstadt",
+            guestTeamCustomName: null,
+          }),
+        ]}
+      />,
+    );
+
+    const row = screen.getByText("TSV Musterstadt").closest("tr");
+    expect(row?.className).toContain("bg-primary/5");
+  });
+});

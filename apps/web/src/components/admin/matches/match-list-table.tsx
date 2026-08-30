@@ -17,10 +17,10 @@ import { Badge } from "@dragons/ui/components/badge"
 import { cn } from "@dragons/ui/lib/utils"
 import { Ban, Calendar, CircleOff, SearchIcon, SquareActivity } from "lucide-react"
 import { Input } from "@dragons/ui/components/input"
-import type { DateRange } from "@dragons/ui/components/calendar"
 
-import { clubDayAnchor, calendarDayString } from "@dragons/shared"
+import { clubDayAnchor } from "@dragons/shared"
 import { DataTable } from "@/components/ui/data-table"
+import { dateRangeFilterFn } from "@/components/ui/data-table-filters"
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar"
 import { DataTableColumnHeader } from "@/components/ui/data-table-column-header"
 import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter"
@@ -52,23 +52,7 @@ function OverrideDot({ match, field }: { match: MatchListItem; field: string }) 
   )
 }
 
-/**
- * Range filter over the `YYYY-MM-DD` kickoff day.
- *
- * The picked `Date`s are local midnight of the days the user clicked, so their
- * calendar components are read directly (`calendarDayString`). Converting them
- * to UTC instead — `toISOString().slice(0, 10)` — dropped the end day and
- * admitted the day before the start for every admin east of Greenwich, and
- * disagreed with the trigger label, which renders the same days via next-intl.
- */
-export const dateRangeFilterFn: FilterFn<MatchListItem> = (row, columnId, value) => {
-  const dateRange = value as DateRange | undefined
-  if (!dateRange) return true
-  const cellValue = row.getValue(columnId) as string
-  if (dateRange.from && cellValue < calendarDayString(dateRange.from)) return false
-  if (dateRange.to && cellValue > calendarDayString(dateRange.to)) return false
-  return true
-}
+export { dateRangeFilterFn }
 
 function getColumns(t: ReturnType<typeof useTranslations<"matches">>, tBookings: ReturnType<typeof useTranslations<"bookings">>, format: ReturnType<typeof useFormatter>): ColumnDef<MatchListItem, unknown>[] {
   return [

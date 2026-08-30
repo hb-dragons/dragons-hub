@@ -55,9 +55,11 @@ describe("proxy — anonymous access to public pages", () => {
     "/game/123",
     "/team/45",
     "/h2h/67",
+    "/spielplan",
     "/en/game/123",
     "/en/team/45",
     "/en/h2h/67",
+    "/en/spielplan",
   ];
 
   it.each(publicPaths)("does not redirect an anonymous request to %s", (pathname) => {

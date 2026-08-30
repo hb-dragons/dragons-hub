@@ -79,3 +79,33 @@ describe("<DataTable> row interaction", () => {
     expect(onRowClick).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("<DataTable> mobile scroll layout", () => {
+  afterEach(cleanup);
+
+  it("makes the header row sticky when stickyHeader is set", () => {
+    render(<DataTable columns={columns} data={data} stickyHeader />);
+    const thead = document.querySelector('[data-slot="table-header"]');
+    expect(thead).toHaveClass("sticky", "top-0");
+  });
+
+  it("leaves the header static by default", () => {
+    render(<DataTable columns={columns} data={data} />);
+    const thead = document.querySelector('[data-slot="table-header"]');
+    expect(thead).not.toHaveClass("sticky");
+  });
+
+  it("forwards containerClassName to the table scroll container", () => {
+    render(
+      <DataTable columns={columns} data={data} containerClassName="min-h-0 flex-1" />,
+    );
+    const container = document.querySelector('[data-slot="table-container"]');
+    expect(container).toHaveClass("min-h-0", "flex-1");
+  });
+
+  it("applies className to the data table root", () => {
+    render(<DataTable columns={columns} data={data} className="flex flex-col" />);
+    const root = document.querySelector('[data-slot="data-table"]');
+    expect(root).toHaveClass("flex", "flex-col", "space-y-2");
+  });
+});

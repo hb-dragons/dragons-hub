@@ -43,6 +43,12 @@ interface DataTableProps<TData, TValue> {
   initialColumnVisibility?: VisibilityState
   initialColumnFilters?: ColumnFiltersState
   globalFilterFn?: FilterFn<TData>
+  /** Extra classes on the root, e.g. flex plumbing so the table region can fill the viewport. */
+  className?: string
+  /** Extra classes on the table's scroll container (see `Table`'s `containerClassName`). */
+  containerClassName?: string
+  /** Pin the header row while the table body scrolls inside its container. */
+  stickyHeader?: boolean
 }
 
 export function DataTable<TData, TValue>({
@@ -55,6 +61,9 @@ export function DataTable<TData, TValue>({
   initialColumnVisibility,
   initialColumnFilters,
   globalFilterFn,
+  className,
+  containerClassName,
+  stickyHeader,
 }: DataTableProps<TData, TValue>) {
   "use no memo" // table instance is a stable ref with mutable state — opt out of React Compiler
   const t = useTranslations()
@@ -90,7 +99,7 @@ export function DataTable<TData, TValue>({
   })
 
   return (
-    <div className="space-y-2">
+    <div data-slot="data-table" className={cn("space-y-2", className)}>
       {children && <div className="px-6">{children(table)}</div>}
       {table.getRowModel().rows.length === 0 ? (
         emptyState ?? (
@@ -99,8 +108,8 @@ export function DataTable<TData, TValue>({
           </p>
         )
       ) : (
-        <Table>
-          <TableHeader>
+        <Table containerClassName={containerClassName}>
+          <TableHeader className={cn(stickyHeader && "sticky top-0 z-10")}>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
