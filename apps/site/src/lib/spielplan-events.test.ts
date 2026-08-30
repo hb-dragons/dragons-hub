@@ -1,69 +1,36 @@
 import { describe, expect, it } from "vitest";
 
-import { fetchUpcomingMatches, UPCOMING_EVENT_LIMIT } from "./spielplan-events";
+import type { PlanGame } from "./full-plan";
+import { planGameFixture } from "./full-plan.fixture";
+import { UPCOMING_EVENT_LIMIT, upcomingMatches } from "./spielplan-events";
 
-const MATCH = {
-  kickoffDate: "2026-10-10",
-  kickoffTime: "15:00:00",
-  homeTeamName: "HB Dragons",
-  guestTeamName: "TK Hannover",
-  venueName: "IGS Roderbruch",
-  venueNameOverride: null,
-  venueStreet: "Rotekreuzstraße 23",
-  venuePostalCode: "30627",
-  venueCity: "Hannover",
-};
-
-/** The extra MatchListItem fields the narrow schema must tolerate and strip. */
-const EXTRA_FIELDS = { id: 1, matchNo: 77, homeScore: null, isCancelled: false };
-
-function fetchReturning(status: number, body: unknown): typeof fetch {
-  return (async () => new Response(JSON.stringify(body), { status })) as typeof fetch;
+function planGame(overrides: Partial<PlanGame> = {}): PlanGame {
+  return planGameFixture({ kickoffDate: "2026-10-10", kickoffTime: "15:00:00", ...overrides });
 }
 
-describe("fetchUpcomingMatches", () => {
-  it("queries /public/matches from today in the club zone, ascending", async () => {
-    let requested = "";
-    const fetchImpl = (async (input: string | URL | Request) => {
-      requested = String(input);
-      return new Response(JSON.stringify({ items: [] }), { status: 200 });
-    }) as typeof fetch;
-
+describe("upcomingMatches", () => {
+  it("keeps games from today in the club zone on, dropping the past", () => {
+    const plan = [
+      planGame({ id: 1, kickoffDate: "2026-07-31" }),
+      planGame({ id: 2, kickoffDate: "2026-08-01" }),
+      planGame({ id: 3, kickoffDate: "2026-08-08" }),
+    ];
     // 23:30 UTC on Jul 31 is already Aug 1 in Europe/Berlin.
-    await fetchUpcomingMatches("https://api.example", new Date("2026-07-31T23:30:00Z"), fetchImpl);
-
-    const url = new URL(requested);
-    expect(url.pathname).toBe("/public/matches");
-    expect(url.searchParams.get("dateFrom")).toBe("2026-08-01");
-    expect(url.searchParams.get("limit")).toBe(String(UPCOMING_EVENT_LIMIT));
-    expect(url.searchParams.get("sort")).toBe("asc");
+    const upcoming = upcomingMatches(plan, new Date("2026-07-31T23:30:00Z"));
+    expect(upcoming.map((game) => game.id)).toEqual([2, 3]);
   });
 
-  it("tolerates a trailing slash on the base URL", async () => {
-    let requested = "";
-    const fetchImpl = (async (input: string | URL | Request) => {
-      requested = String(input);
-      return new Response(JSON.stringify({ items: [] }), { status: 200 });
-    }) as typeof fetch;
-    await fetchUpcomingMatches("https://api.example/", new Date(), fetchImpl);
-    expect(new URL(requested).pathname).toBe("/public/matches");
+  it("caps the snapshot at the event limit", () => {
+    const plan = Array.from({ length: UPCOMING_EVENT_LIMIT + 3 }, (_, i) =>
+      planGame({ id: i + 1, kickoffDate: "2026-10-10" }),
+    );
+    const upcoming = upcomingMatches(plan, new Date("2026-08-30T12:00:00Z"));
+    expect(upcoming).toHaveLength(UPCOMING_EVENT_LIMIT);
+    expect(upcoming[0]?.id).toBe(1);
   });
 
-  it("returns the page's items narrowed to the event fields", async () => {
-    const fetchImpl = fetchReturning(200, { items: [{ ...MATCH, ...EXTRA_FIELDS }] });
-    const matches = await fetchUpcomingMatches("https://api.example", new Date(), fetchImpl);
-    expect(matches).toEqual([MATCH]);
-  });
-
-  it("throws on a non-200 response", async () => {
-    await expect(
-      fetchUpcomingMatches("https://api.example", new Date(), fetchReturning(503, {})),
-    ).rejects.toThrow(/HTTP 503/);
-  });
-
-  it("throws on an unexpected response shape", async () => {
-    await expect(
-      fetchUpcomingMatches("https://api.example", new Date(), fetchReturning(200, { nope: 1 })),
-    ).rejects.toThrow();
+  it("is empty for a fully played plan", () => {
+    const plan = [planGame({ kickoffDate: "2026-03-01" })];
+    expect(upcomingMatches(plan, new Date("2026-08-30T12:00:00Z"))).toEqual([]);
   });
 });

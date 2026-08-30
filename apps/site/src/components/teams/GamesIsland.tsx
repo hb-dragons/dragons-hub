@@ -12,10 +12,10 @@
  * text-muted→text-muted-foreground, lg:text-md→lg:text-base.
  */
 import { useEffect, useMemo, useState } from "react";
-import type { MatchListItem } from "@dragons/shared";
 import { Button } from "@dragons/ui";
 import { Skeleton } from "@dragons/ui/components/skeleton";
 import { api } from "../../lib/api";
+import type { PlanGame } from "../../lib/full-plan";
 import { formatGameTime } from "../../lib/game-format";
 import { fetchFullPlan } from "../../lib/spielplan";
 import {
@@ -90,8 +90,22 @@ function DownloadIcon() {
 const TH_CLASSES = "px-4 text-left font-semibold text-foreground py-1 text-xs md:text-sm lg:text-base";
 const TD_CLASSES = "px-4 whitespace-nowrap py-1 md:py-1.5 text-foreground text-xs md:text-sm lg:text-base";
 
-export default function GamesIsland({ teamApiId }: { teamApiId: number | null }) {
-  const [games, setGames] = useState<MatchListItem[] | null>(teamApiId == null ? [] : null);
+/**
+ * Content builds pass `initialGames` — the full plan filtered to this team
+ * during `astro build` (src/lib/full-plan.ts) — so the static HTML carries
+ * the table. The client refetch revalidates; a failed refetch keeps the
+ * build-time rows instead of replacing them with the error line.
+ */
+export default function GamesIsland({
+  teamApiId,
+  initialGames = null,
+}: {
+  teamApiId: number | null;
+  initialGames?: PlanGame[] | null;
+}) {
+  const [games, setGames] = useState<PlanGame[] | null>(
+    initialGames ?? (teamApiId == null ? [] : null),
+  );
   const [failed, setFailed] = useState(false);
   const [direction, setDirection] = useState<KickoffSortDirection>("asc");
 
@@ -110,7 +124,8 @@ export default function GamesIsland({ teamApiId }: { teamApiId: number | null })
 
   const sorted = useMemo(() => sortGamesByKickoff(games ?? [], direction), [games, direction]);
 
-  if (failed) {
+  // A failed refetch with build-time games keeps them on screen.
+  if (failed && games === null) {
     return (
       <p className="text-center text-muted-foreground py-8">{strings.spielplan.loadError}</p>
     );

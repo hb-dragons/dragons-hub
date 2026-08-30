@@ -7,7 +7,6 @@
  * card equivalent.
  */
 import { useEffect, useMemo, useState } from "react";
-import type { MatchListItem } from "@dragons/shared";
 import { Button } from "@dragons/ui";
 import {
   DropdownMenu,
@@ -19,6 +18,7 @@ import {
 } from "@dragons/ui/components/dropdown-menu";
 import { Skeleton } from "@dragons/ui/components/skeleton";
 import { api } from "../../lib/api";
+import type { PlanGame } from "../../lib/full-plan";
 import {
   fetchFullPlan,
   filterGames,
@@ -75,8 +75,20 @@ const LOCATION_LABELS: Record<GameLocationFilter, string> = {
   away: strings.spielplan.filterAway,
 };
 
-export default function SpielplanIsland() {
-  const [games, setGames] = useState<MatchListItem[] | null>(null);
+/**
+ * Content builds pass `initialGames` — the same plan fetched during
+ * `astro build` (src/lib/full-plan.ts) — so the static HTML paints real games
+ * with no skeleton. The client refetch then revalidates: fresh data replaces
+ * the list, and a failed refetch keeps the build-time plan on screen — real
+ * fetched data, merely as old as the last nightly build. Without initial data
+ * (env-less shell builds), a failed fetch renders the error line.
+ */
+export default function SpielplanIsland({
+  initialGames = null,
+}: {
+  initialGames?: PlanGame[] | null;
+}) {
+  const [games, setGames] = useState<PlanGame[] | null>(initialGames);
   const [failed, setFailed] = useState(false);
   // null = "no explicit choice yet" — treated as every team selected, so the
   // filter works before and after the plan arrives without re-syncing state.
@@ -186,7 +198,8 @@ export default function SpielplanIsland() {
         </div>
       )}
 
-      {failed && (
+      {/* A failed refetch with build-time games keeps them on screen. */}
+      {failed && games === null && (
         <p className="text-center text-muted-foreground py-8">
           {strings.spielplan.loadError}
         </p>

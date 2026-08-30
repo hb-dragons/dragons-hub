@@ -26,8 +26,22 @@ const TD_CLASSES = "px-4 whitespace-nowrap py-1 md:py-1.5 text-foreground text-x
 const CENTERED_TH = `${TH_CLASSES} !text-center`;
 const CENTERED_TD = `${TD_CLASSES} !text-center !font-mono`;
 
-export default function StandingsIsland({ teamApiId }: { teamApiId: number | null }) {
-  const [rows, setRows] = useState<LegacyStandingRow[] | null>(teamApiId == null ? [] : null);
+/**
+ * Content builds pass `initialRows` — the team's league adapted from the
+ * build's standings fetch (src/lib/team-league.ts) — so the static HTML
+ * carries the table. The client refetch revalidates; a failed refetch keeps
+ * the build-time rows instead of replacing them with the error line.
+ */
+export default function StandingsIsland({
+  teamApiId,
+  initialRows = null,
+}: {
+  teamApiId: number | null;
+  initialRows?: LegacyStandingRow[] | null;
+}) {
+  const [rows, setRows] = useState<LegacyStandingRow[] | null>(
+    initialRows ?? (teamApiId == null ? [] : null),
+  );
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -52,7 +66,8 @@ export default function StandingsIsland({ teamApiId }: { teamApiId: number | nul
   // render a full column header above zero rows, which reads as an empty
   // league rather than a failure — GamesIsland already answers this case with
   // a message, and the two disagreed (#271).
-  if (failed) {
+  // A failed refetch with build-time rows keeps them on screen.
+  if (failed && rows === null) {
     return (
       <p className="text-center text-muted-foreground py-8">{strings.teams.standingsError}</p>
     );

@@ -1,21 +1,24 @@
 ---
 // Port of dragons-app app/pages/spielplan/index.vue: PageHeader band + page
-// container + the full-plan island. No CMS collections on this route — all
-// data is live sports data fetched client-side by the island.
+// container + the full-plan island. No CMS collections on this route — the
+// sports data comes from one build-time crawl of /public/matches, which both
+// seeds the island's first paint and feeds the SportsEvent JSON-LD; the
+// island refetches client-side to stay fresh between nightly rebuilds.
 import Layout from "../../layouts/Layout.astro";
 import PageHeader from "../../components/PageHeader.astro";
 import SpielplanIsland from "../../components/spielplan/SpielplanIsland";
 import { apiBase } from "../../lib/api-base";
+import { fetchBuildPlan } from "../../lib/full-plan";
 import { event } from "../../lib/jsonld";
 import { cmsBaseUrl } from "../../lib/media";
-import { fetchUpcomingMatches } from "../../lib/spielplan-events";
+import { upcomingMatches } from "../../lib/spielplan-events";
 import { strings } from "../../lib/strings";
 
-// SEO (Task C8): the visible plan is island-only, so the SportsEvent JSON-LD
-// is a build-time snapshot of the next games. Content builds (CMS env set)
-// require the fetch — failures fail the build loudly, like the teams pages'
-// standings join; env-less shell builds skip it and ship no events.
-const matches = cmsBaseUrl() !== undefined ? await fetchUpcomingMatches(apiBase()) : [];
+// Content builds (CMS env set) require the fetch — failures fail the build
+// loudly, like the teams pages' standings join; env-less shell builds skip it,
+// ship no events, and leave the island to its client-side fetch.
+const plan = cmsBaseUrl() !== undefined ? await fetchBuildPlan(apiBase()) : null;
+const matches = plan === null ? [] : upcomingMatches(plan);
 const jsonLd = matches.length > 0 ? matches.map(event) : undefined;
 ---
 
@@ -23,6 +26,6 @@ const jsonLd = matches.length > 0 ? matches.map(event) : undefined;
   <PageHeader title={strings.spielplan.heading} />
   <!-- Legacy UiPageContainer -->
   <div class="container mx-auto space-y-4 py-8 px-2 md:px-2 xl:px-0">
-    <SpielplanIsland client:idle />
+    <SpielplanIsland client:idle initialGames={plan} />
   </div>
 </Layout>

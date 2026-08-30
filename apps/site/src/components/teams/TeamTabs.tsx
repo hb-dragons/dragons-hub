@@ -7,6 +7,8 @@
  * unmount-on-hide=false, so switching never refetches.
  */
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@dragons/ui/components/tabs";
+import type { PlanGame } from "../../lib/full-plan";
+import type { LegacyStandingRow } from "../../lib/team-standings";
 import { strings } from "../../lib/strings";
 import GamesIsland from "./GamesIsland";
 import StandingsIsland from "./StandingsIsland";
@@ -19,7 +21,17 @@ const TRIGGER_CLASSES =
   "text-muted-foreground hover:text-foreground data-[state=active]:text-primary dark:data-[state=active]:text-primary " +
   "data-[state=active]:bg-transparent dark:data-[state=active]:bg-transparent after:bg-primary";
 
-export default function TeamTabs({ teamApiId }: { teamApiId: number | null }) {
+export default function TeamTabs({
+  teamApiId,
+  initialGames = null,
+  initialStandings = null,
+}: {
+  teamApiId: number | null;
+  /** Build-time first paint for the Spielplan tab (content builds only). */
+  initialGames?: PlanGame[] | null;
+  /** Build-time first paint for the Tabelle tab (content builds only). */
+  initialStandings?: LegacyStandingRow[] | null;
+}) {
   return (
     <Tabs defaultValue="games" className="w-full items-center gap-2">
       <TabsList
@@ -34,14 +46,14 @@ export default function TeamTabs({ teamApiId }: { teamApiId: number | null }) {
         </TabsTrigger>
       </TabsList>
       <TabsContent value="games" forceMount className="w-full text-base data-[state=inactive]:hidden">
-        <GamesIsland teamApiId={teamApiId} />
+        <GamesIsland teamApiId={teamApiId} initialGames={initialGames} />
       </TabsContent>
       <TabsContent
         value="standings"
         forceMount
         className="w-full text-base data-[state=inactive]:hidden"
       >
-        <StandingsIsland teamApiId={teamApiId} />
+        <StandingsIsland teamApiId={teamApiId} initialRows={initialStandings} />
       </TabsContent>
     </Tabs>
   );

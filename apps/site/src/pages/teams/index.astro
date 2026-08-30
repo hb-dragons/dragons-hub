@@ -18,7 +18,7 @@ import { pageSeo } from "../../lib/seo";
 import { strings } from "../../lib/strings";
 import { fetchTeamBackground } from "../../lib/team-background";
 import { toSiteImage } from "../../lib/team-detail";
-import { fetchTeamLeagueNames, leagueNameFor } from "../../lib/team-league";
+import { fetchStandingsLeagues, leagueNameFor, teamLeagueNames } from "../../lib/team-league";
 
 const cmsBase = cmsBaseUrl();
 
@@ -38,7 +38,7 @@ const teamsPage = publishedPage(pages, "teams");
 // loaders' failure model. Env-less shell builds skip both and stay green.
 const leagueNames =
   cmsBase !== undefined && teams.length > 0
-    ? await fetchTeamLeagueNames(apiBase())
+    ? teamLeagueNames(await fetchStandingsLeagues(apiBase()))
     : new Map<number, string>();
 const backgroundImage =
   cmsBase !== undefined ? toSiteImage(await fetchTeamBackground(cmsBase), cmsBase) : null;

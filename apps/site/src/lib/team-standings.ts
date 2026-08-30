@@ -20,6 +20,24 @@ export type PublicLeagueStandings = Omit<LeagueStandings, "standings"> & {
   standings: PublicStandingItem[];
 };
 
+/**
+ * The row slice `toStandingRows` reads — satisfied by the runtime
+ * `PublicStandingItem` and by the build-time rows in src/lib/team-league.ts,
+ * so the Tabelle tab adapts both through one function.
+ */
+export interface StandingRowInput {
+  position: number;
+  teamApiId: number;
+  teamName: string;
+  played: number;
+  won: number;
+  lost: number;
+  leaguePoints: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  verzicht?: boolean;
+}
+
 /** The legacy `StandingItem` row shape the table renders. */
 export interface LegacyStandingRow {
   rank: number;
@@ -47,7 +65,9 @@ export function findTeamLeague<T extends { standings: { teamApiId: number }[] }>
 }
 
 /** Adapts one league's rows to the legacy naming, in API (position) order. */
-export function toStandingRows(league: PublicLeagueStandings): LegacyStandingRow[] {
+export function toStandingRows(league: {
+  standings: readonly StandingRowInput[];
+}): LegacyStandingRow[] {
   return league.standings.map((row) => ({
     rank: row.position,
     name: row.teamName,
