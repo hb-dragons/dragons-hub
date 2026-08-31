@@ -5,10 +5,15 @@ import { routing } from "./i18n/routing";
 
 const intlMiddleware = createMiddleware(routing);
 
-/** Strip non-default locale prefix to get the logical pathname for auth checks. */
+/**
+ * Strip any locale prefix to get the logical pathname for auth checks — the
+ * default locale included: with `localePrefix: "as-needed"` the locale
+ * switcher still navigates to `/de/...` and lets the intl middleware strip
+ * it, so the auth gate must classify that URL like its unprefixed form
+ * instead of bouncing it to sign-in.
+ */
 function getLogicalPathname(pathname: string): string {
   for (const locale of routing.locales) {
-    if (locale === routing.defaultLocale) continue;
     if (pathname === `/${locale}`) return "/";
     if (pathname.startsWith(`/${locale}/`)) {
       return pathname.slice(`/${locale}`.length);
@@ -95,9 +100,13 @@ export function proxy(request: NextRequest) {
   if (redirectsToSpielplan(logicalPathname)) {
     // A bare locale root ("/en") maps to logical "/" without being suffixed
     // by it — there the whole pathname is the locale prefix.
-    const localePrefix = pathname.endsWith(logicalPathname)
+    const rawPrefix = pathname.endsWith(logicalPathname)
       ? pathname.slice(0, pathname.length - logicalPathname.length)
       : pathname;
+    // The default locale's canonical URLs are unprefixed ("as-needed") —
+    // redirect "/de/schedule" straight to "/spielplan" instead of taking a
+    // second hop through the intl middleware.
+    const localePrefix = rawPrefix === `/${routing.defaultLocale}` ? "" : rawPrefix;
     return NextResponse.redirect(new URL(`${localePrefix}/spielplan`, request.url), 307);
   }
 

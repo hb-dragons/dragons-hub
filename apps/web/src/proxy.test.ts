@@ -62,6 +62,11 @@ describe("proxy — content pages redirect to /spielplan", () => {
     ["/h2h/67", "/spielplan"],
     ["/en/schedule", "/en/spielplan"],
     ["/en/game/123", "/en/spielplan"],
+    // Default-locale-prefixed URLs are what next-intl's locale switcher
+    // navigates to before the intl middleware strips the prefix again — they
+    // must land on the canonical unprefixed path, not keep "/de".
+    ["/de", "/spielplan"],
+    ["/de/schedule", "/spielplan"],
   ];
 
   it.each(redirectCases)("temporarily redirects %s to %s", (pathname, destination) => {
@@ -84,6 +89,10 @@ describe("proxy — anonymous access to public pages", () => {
   const publicPaths = [
     "/spielplan",
     "/en/spielplan",
+    // The locale switcher navigates to the default-locale-prefixed path and
+    // relies on the intl middleware to strip it — the auth gate must not
+    // intercept it with a sign-in redirect first (locale-toggle bug).
+    "/de/spielplan",
     "/live",
     "/overlay",
     "/auth/sign-in",
