@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import {
   clampWidths,
   DEFAULT_IMAGE_SIZES,
   DEFAULT_IMAGE_WIDTHS,
   fallbackWidth,
   imageBranch,
+  imageClasses,
   plainSrc,
 } from "./blur-image";
 
@@ -98,5 +102,50 @@ describe("defaults", () => {
 
   it("pairs the widths with a sizes value, which Astro requires alongside them", () => {
     expect(DEFAULT_IMAGE_SIZES).toMatch(/vw/);
+  });
+});
+
+describe("imageClasses", () => {
+  it("defaults to object-cover when the caller sets no object-fit", () => {
+    expect(imageClasses("").join(" ")).toContain("object-cover");
+    expect(imageClasses("group-hover:md:scale-105").join(" ")).toContain("object-cover");
+  });
+
+  // Both utilities on one element resolve by stylesheet order (Tailwind emits
+  // object-cover after object-contain), so the default must be omitted, not
+  // merely followed by the caller's class.
+  it("drops the default when the caller sets its own object-fit", () => {
+    const withContain = imageClasses("object-contain").join(" ");
+    expect(withContain).toContain("object-contain");
+    expect(withContain).not.toContain("object-cover");
+    expect(imageClasses("object-cover").join(" ")).toContain("object-cover");
+  });
+
+  it("does not mistake hover-variant object utilities for a base object-fit", () => {
+    expect(imageClasses("hover:object-contain").join(" ")).toContain("object-cover");
+  });
+});
+
+// Tailwind v4's scale-*/rotate-*/translate-* utilities animate the native
+// `scale`/`rotate`/`translate` properties, not `transform`. The blur-fade
+// style overrides transition-property on every blurhash image, so it must
+// name them all or the callers' hover zooms snap instead of animating.
+describe("BlurImage fade style", () => {
+  const component = readFileSync(
+    fileURLToPath(new URL("../components/BlurImage.astro", import.meta.url)),
+    "utf8",
+  );
+
+  it("transitions the native transform properties alongside opacity", () => {
+    const property = component.match(/transition-property:\s*([^;]+);/)?.[1] ?? "";
+    for (const needed of ["opacity", "transform", "translate", "scale", "rotate"]) {
+      expect(property).toContain(needed);
+    }
+  });
+
+  it("gives every transitioned property a duration", () => {
+    const property = component.match(/transition-property:\s*([^;]+);/)?.[1] ?? "";
+    const duration = component.match(/transition-duration:\s*([^;]+);/)?.[1] ?? "";
+    expect(duration.split(",").length).toBe(property.split(",").length);
   });
 });

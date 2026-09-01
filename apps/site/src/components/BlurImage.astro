@@ -24,6 +24,7 @@ import {
   DEFAULT_IMAGE_WIDTHS,
   fallbackWidth,
   imageBranch,
+  imageClasses,
   plainSrc,
 } from "../lib/blur-image";
 
@@ -63,7 +64,7 @@ const wrapperStyle = placeholder
   : undefined;
 
 const branch = imageBranch(src);
-const imgClasses = ["h-full w-full object-cover", imgClass];
+const imgClasses = imageClasses(imgClass);
 // The fade only makes sense over a placeholder — see the header comment.
 const fade = placeholder !== null;
 ---
@@ -124,14 +125,17 @@ const fade = placeholder !== null;
      component's own contract and nothing else sets it.
 
      Held back until `load` so the blurhash is not wiped away line by line by a
-     progressively decoding image. `transition-property` names transform too:
-     this selector outranks the `transition-transform` utility several callers
-     put in `imgClass`, and would otherwise cancel their hover zoom.
+     progressively decoding image. `transition-property` must name everything
+     the callers' hover utilities animate: this selector outranks the
+     `transition-transform` utility several callers put in `imgClass`, and
+     Tailwind v4's scale-*/rotate-*/translate-* utilities set the native
+     `scale`/`rotate`/`translate` properties, not `transform` — listing only
+     `transform` here made the news-card hover zoom jump instead of animate.
      Layout.astro carries the no-JS escape hatch — `onload` is script. */
   img[data-blur-img] {
     opacity: 0;
-    transition-property: opacity, transform;
-    transition-duration: 400ms, 300ms;
+    transition-property: opacity, transform, translate, scale, rotate;
+    transition-duration: 400ms, 300ms, 300ms, 300ms, 300ms;
     transition-timing-function: ease-out;
   }
 

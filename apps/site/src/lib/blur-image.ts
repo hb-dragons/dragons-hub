@@ -84,3 +84,19 @@ export function clampWidths(widths: readonly number[], sourceWidth: number): num
 export function fallbackWidth(widths: readonly number[], sourceWidth: number): number {
   return Math.max(...clampWidths(widths, sourceWidth));
 }
+
+/**
+ * The class list for the rendered `<img>`.
+ *
+ * `object-cover` is only the default, not a constant: a caller passing its own
+ * object-fit (ItemRows' sponsor logos use `object-contain`) must actually get
+ * it. With both utilities on the element the stylesheet order decides, not the
+ * class order — and Tailwind emits `object-cover` after `object-contain`, so
+ * the default silently won and cropped every logo.
+ */
+export function imageClasses(imgClass: string): string[] {
+  const callerSetsObjectFit = /(?:^|\s)object-(?:contain|cover|fill|none|scale-down)(?:\s|$)/.test(
+    imgClass,
+  );
+  return [callerSetsObjectFit ? "h-full w-full" : "h-full w-full object-cover", imgClass];
+}
