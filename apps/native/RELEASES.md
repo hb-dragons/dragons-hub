@@ -44,16 +44,19 @@ Assumes `cd apps/native` unless stated otherwise.
   - `development` → `http://localhost:3001`
   - `preview` → `https://api.app.hbdragons.de`
   - `production` → `https://api.app.hbdragons.de`
-- EAS account: `eshamounskerto` (personal; migrate before public launch —
-  and the Apple team has the same problem, see `PRE-LAUNCH.md` § Account /
-  ownership).
+- EAS account: organization `hb-dragons` (transferred from the personal
+  `eshamounskerto` account 2026-09-01, #239; projectId and updates URL
+  unchanged by the transfer). The Apple team still has the personal-account
+  problem, see `PRE-LAUNCH.md` § Account / ownership.
 
 **Builds:** six exist, all iOS, all on **SDK 55** (`eas build:list`,
 2026-08-25). April 2026: one `production` and three `preview` builds
 (`internal` distribution, numbered 1, 1 and 2). 2026-08-10: two `preview`
 builds with `store` distribution — build 3 errored, build 4 finished and
-is the newest binary. **No Android build has ever been made**, and the
-SDK 57 code has never been built at all. The two April TestFlight uploads
+is the newest binary. At the time of that snapshot no Android build had
+ever been made and the SDK 57 code had never been built; since then the
+first Android `preview` builds exist (2026-08-28, SDK 57, `store`
+distribution, version code 4 finished — `eas build:list`). The two April TestFlight uploads
 (version 1.0.0 builds 1 and 2) have **expired** (see the 90-day rule
 below), so no tester currently has an installable binary.
 
@@ -87,9 +90,9 @@ eas fingerprint:compare --build-id <id>   # from `eas build:list`
 # Install the EAS CLI globally if you don't have it
 npm i -g eas-cli
 
-# Sign in to the EAS account that owns the project
+# Sign in with an account that is a member of the hb-dragons organization
 eas login
-eas whoami   # should print: eshamounskerto
+eas whoami   # any member of the hb-dragons org works; the project is @hb-dragons/dragons
 ```
 
 ---

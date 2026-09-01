@@ -222,9 +222,11 @@ Android 13+ themed icons look bad without a monochrome layer.
 
 ## Account / ownership
 
-- [ ] EAS account: migrate from `eshamounskerto` (personal) to a club-
-      owned org account. Transfer the project before first public
-      release — ownership transfers post-launch are painful.
+- [x] EAS account: done 2026-09-01 (#239) — organization `hb-dragons`
+      created, project transferred from `eshamounskerto`, `owner` updated
+      in `app.json`, GitHub org re-linked. projectId and updates URL
+      unchanged; dashboard check 2026-09-01 confirmed the iOS credentials
+      and the Android keystore survived the transfer.
 - [ ] Apple: the harder half, which this list used to skip. Team
       `2ZDTV3KLV2` (the `appleTeamId` in `app.json`) is the maintainer's
       personal membership, and the bundle id `de.hbdragons.app` has been
