@@ -5,9 +5,9 @@ import { ClubLogo } from "./ClubLogo";
 /**
  * One team side of a games-table row, styled after the native app's
  * MatchCardCompact: our own teams show as their colored badge (or the
- * highlighted "Dragons" label on a team's own page, where the team is
- * implied), opponents as a small club crest plus their muted federation
- * name. A derby renders a badge on both sides and no crest.
+ * Dragons crest plus "Dragons" label on a team's own page, where the team is
+ * implied), opponents as a small club crest plus their federation name.
+ * A derby in badge mode renders a badge on both sides and no crest.
  */
 
 /** The slice of `MatchListItem` a cell renders. */
@@ -43,7 +43,18 @@ export function TeamCell({
 
   if (isOwn) {
     if (ownAs === "label") {
-      return <span className="font-semibold text-primary">Dragons</span>;
+      return (
+        <span className="flex items-center gap-1.5">
+          <ClubLogo
+            clubId={isHome ? game.homeClubId : game.guestClubId}
+            isOwnClub
+            alt="Dragons"
+            className="size-5 shrink-0 object-contain"
+            fallbackClassName="text-sm shrink-0"
+          />
+          <span className="font-semibold">Dragons</span>
+        </span>
+      );
     }
     const customName = isHome ? game.homeTeamCustomName : game.guestTeamCustomName;
     const badgeColor = isHome ? game.homeBadgeColor : game.guestBadgeColor;
@@ -66,7 +77,7 @@ export function TeamCell({
         className="size-5 shrink-0 object-contain"
         fallbackClassName="text-sm shrink-0"
       />
-      <span className="text-muted-foreground">{federationName}</span>
+      <span>{federationName}</span>
     </span>
   );
 }

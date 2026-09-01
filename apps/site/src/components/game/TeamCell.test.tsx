@@ -18,10 +18,10 @@ describe("TeamCell", () => {
     expect(badge.closest("a")).toHaveAttribute("href", "/teams/herren-1/");
   });
 
-  it("renders the opponent as a small club logo plus muted federation name", () => {
+  it("renders the opponent as a small club logo plus its plain-colored name", () => {
     render(<TeamCell game={game()} side="guest" />);
     const name = screen.getByText("CVJM Hannover 2");
-    expect(name.className).toContain("text-muted-foreground");
+    expect(name.className).not.toContain("text-muted-foreground");
     const logo = screen.getByRole("img", { name: "CVJM Hannover 2" });
     expect(logo).toHaveAttribute(
       "src",
@@ -46,11 +46,14 @@ describe("TeamCell", () => {
     expect(screen.queryByRole("img")).toBeNull();
   });
 
-  it("renders the own side as the highlighted Dragons label in label mode", () => {
+  it("renders the own side as the Dragons crest plus label in label mode", () => {
     render(<TeamCell game={game()} side="home" ownAs="label" />);
     const label = screen.getByText("Dragons");
-    expect(label.className).toContain("text-primary");
-    expect(label.className).toContain("font-semibold");
+    expect(label.className).not.toContain("text-primary");
+    expect(screen.getByRole("img", { name: "Dragons" })).toHaveAttribute(
+      "src",
+      "/img/logo.svg",
+    );
     expect(screen.queryByText("Herren 1")).toBeNull();
   });
 });

@@ -31,11 +31,11 @@ describe("GamesIsland", () => {
     expect(screen.getByText("Goetheschule")).toBeInTheDocument();
   });
 
-  it("highlights the Dragons side and shows the opponent's club logo", async () => {
+  it("shows both crests: the Dragons logo and the opponent's club logo", async () => {
     getMatches.mockResolvedValue({ items: [game()], hasMore: false });
     render(<GamesIsland teamApiId={7} />);
-    const label = await screen.findByText("Dragons");
-    expect(label.className).toContain("text-primary");
+    expect(await screen.findByText("Dragons")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Dragons" })).toHaveAttribute("src", "/img/logo.svg");
     expect(screen.getByRole("img", { name: "CVJM Hannover 2" })).toBeInTheDocument();
   });
 
