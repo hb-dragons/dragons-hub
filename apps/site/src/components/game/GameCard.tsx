@@ -178,6 +178,7 @@ function MapPinIcon() {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
+      className="shrink-0"
     >
       <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
       <circle cx="12" cy="10" r="3" />
@@ -208,8 +209,11 @@ function CardItem({ game }: { game: GameCardMatch }) {
         <CardVs time={game.kickoffTime} />
         <CardTeam game={game} isAway />
       </div>
-      <div className="absolute bottom-0 left-0 right-0 z-20 text-center flex items-center justify-center gap-1 py-[1px] text-foreground font-semibold text-xs md:text-sm lg:text-base">
-        <div className="flex items-center gap-1 hover:text-primary">
+      {/* Single line by construction: the badge clearance above (#261/#272)
+          assumes this strip is one text line tall, so a long venue name must
+          truncate rather than wrap up into the badges. */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 text-center flex items-center justify-center gap-1 px-2 py-[1px] text-foreground font-semibold text-xs md:text-sm lg:text-base">
+        <div className="flex items-center gap-1 min-w-0 max-w-full hover:text-primary">
           <MapPinIcon />
           {mapsUrl ? (
             <a
@@ -217,11 +221,12 @@ function CardItem({ game }: { game: GameCardMatch }) {
               target="_blank"
               rel="noopener noreferrer"
               aria-label={strings.spielplan.mapAriaLabel}
+              className="truncate"
             >
               {venueLabel}
             </a>
           ) : (
-            <span>{venueLabel}</span>
+            <span className="truncate">{venueLabel}</span>
           )}
         </div>
       </div>

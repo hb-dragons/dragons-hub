@@ -69,3 +69,27 @@ describe("GameCard team sides", () => {
     expect(screen.getByText("CVJM Hannover 2").closest("a")).toBeNull();
   });
 });
+
+describe("GameCard venue strip", () => {
+  // The badge clearance above the strip (#261/#272) assumes one text line;
+  // a wrapping venue name climbs into the team badges.
+  const longVenue = "Sporthalle Birkenstraße / Otfried-Preußler-Schule";
+
+  it("truncates a long venue name instead of wrapping (maps link)", () => {
+    render(
+      <GameCard
+        game={match({ venueName: longVenue, venueCity: "Hannover" })}
+      />,
+    );
+    const label = screen.getByText(longVenue);
+    expect(label.tagName).toBe("A");
+    expect(label.className).toContain("truncate");
+  });
+
+  it("truncates the plain-text venue when no address exists for a maps link", () => {
+    render(<GameCard game={match({ venueName: longVenue })} />);
+    const label = screen.getByText(longVenue);
+    expect(label.tagName).toBe("SPAN");
+    expect(label.className).toContain("truncate");
+  });
+});
