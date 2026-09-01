@@ -12,6 +12,14 @@ RewriteRule ^sitemap_index\.xml$ /sitemap-index.xml [R=301,L]
 RewriteRule ^teams/damen/?$ /teams/damen-1/ [R=301,L]
 RewriteRule ^teams/herren/?$ /teams/herren-1/ [R=301,L]
 RewriteRule ^media/?$ /news/ [R=301,L]
+# legacy v1 had top-level team pages; Google's sitelinks still carry them
+RewriteRule ^herren/?$ /teams/herren-1/ [R=301,L]
+RewriteRule ^damen/?$ /teams/damen-1/ [R=301,L]
+RewriteRule ^u10/?$ /teams/u10/ [R=301,L]
+RewriteRule ^u12/?$ /teams/u12/ [R=301,L]
+RewriteRule ^u14/?$ /teams/u14/ [R=301,L]
+RewriteRule ^u16/?$ /teams/u16/ [R=301,L]
+RewriteRule ^u18/?$ /teams/u18/ [R=301,L]
 
 # deploy endpoint served directly
 RewriteRule ^swap\.php$ - [L]

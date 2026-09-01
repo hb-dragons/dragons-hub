@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 
 const DEPLOY = fileURLToPath(new URL("../../deploy/", import.meta.url));
 const RELEASE_HTACCESS = readFileSync(join(DEPLOY, "htaccess-release"), "utf8");
+const ROOT_HTACCESS = readFileSync(join(DEPLOY, "htaccess"), "utf8");
 const DEPLOY_WORKFLOW = readFileSync(
   fileURLToPath(new URL("../../../../.github/workflows/deploy-site.yml", import.meta.url)),
   "utf8",
@@ -114,6 +115,44 @@ describe("deploy/htaccess-release", () => {
     expect(sts).toBeDefined();
     expect(sts).not.toMatch(/includeSubDomains/i);
   });
+});
+
+describe("deploy/htaccess (live-traffic switch)", () => {
+  it("was actually found", () => {
+    expect(ROOT_HTACCESS).toContain("RewriteEngine On");
+  });
+
+  // Without the host guard, Apache's parent-dir .htaccess walk applies the
+  // catch-all to site.testing.* requests too and double-prefixes current/.
+  it("host-guards the catch-all rewrite into current/", () => {
+    const catchAll = ROOT_HTACCESS.indexOf("RewriteRule ^(.*)$ current/$1");
+    const guard = ROOT_HTACCESS.indexOf("RewriteCond %{HTTP_HOST} ^(www\\.)?hbdragons\\.de$");
+    expect(catchAll).toBeGreaterThan(-1);
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(catchAll);
+  });
+
+  // Redirect targets must be canonical (site-absolute, trailing slash) or
+  // every hit chains through Astro's own trailing-slash 301.
+  it("points every local 301 at a canonical trailing-slash path", () => {
+    const targets = [...ROOT_HTACCESS.matchAll(/^RewriteRule\s+\S+\s+(\S+)\s+\[R=301/gm)]
+      .map((m) => m[1])
+      .filter((t) => t.startsWith("/"));
+    expect(targets.length).toBeGreaterThan(0);
+    for (const target of targets) {
+      expect(target).toMatch(/\/$|\.xml$/);
+    }
+  });
+
+  // The legacy site exposed top-level team pages that Google still lists as
+  // sitelinks; each needs a mapping onto the new /teams/<slug>/ tree.
+  it.each(["herren", "damen", "u10", "u12", "u14", "u16", "u18"])(
+    "redirects the legacy top-level /%s page onto the teams tree",
+    (path) => {
+      const rule = new RegExp(`^RewriteRule \\^${path}/\\?\\$ /teams/[a-z0-9-]+/ \\[R=301,L\\]$`, "m");
+      expect(ROOT_HTACCESS).toMatch(rule);
+    },
+  );
 });
 
 // Issue #269: an empty CMS produced a content-less build that passed every
