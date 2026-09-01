@@ -1,10 +1,10 @@
 /**
  * React island port of dragons-app `app/pages/spielplan/index.vue` +
- * `app/components/spielplan/Table.vue` controls: the full season plan from
- * the paginated `/public/matches` endpoint, the legacy team multi-select and
- * home/away filters, GameCards grouped per day, and the client-side Excel
- * export. Column-visibility ("Spalten") was a table-only control and has no
- * card equivalent.
+ * `app/components/spielplan/Table.vue`: the full season plan from the
+ * paginated `/public/matches` endpoint, the legacy team multi-select and
+ * home/away filters, and the shared {@link GamesTable} (sortable Datum
+ * column, Excel-export footer). The card grid this island rendered until
+ * 2026-09-01 lives on in GameCard for the home and team pages.
  */
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@dragons/ui";
@@ -22,14 +22,12 @@ import type { PlanGame } from "../../lib/full-plan";
 import {
   fetchFullPlan,
   filterGames,
-  groupByDate,
   teamFilterOptions,
   type GameLocationFilter,
 } from "../../lib/spielplan";
 import { strings } from "../../lib/strings";
-import { GameCard, GameDate } from "../game/GameCard";
+import { GamesTable } from "../game/GamesTable";
 import { TeamBadge } from "./TeamBadge";
-import { exportSpielplanXlsx } from "./XlsxExport";
 
 function ChevronDownIcon() {
   return (
@@ -45,26 +43,6 @@ function ChevronDownIcon() {
       aria-hidden="true"
     >
       <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
-}
-
-function DownloadIcon() {
-  return (
-    <svg
-      width="1em"
-      height="1em"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <path d="m7 10 5 5 5-5" />
-      <path d="M12 15V3" />
     </svg>
   );
 }
@@ -108,7 +86,6 @@ export default function SpielplanIsland({
   const teams = useMemo(() => teamFilterOptions(games ?? []), [games]);
   const selected = selectedTeams ?? new Set(teams.map((team) => team.name));
   const filtered = filterGames(games ?? [], selected, location);
-  const sections = groupByDate(filtered);
 
   return (
     <div className="flex flex-col">
@@ -188,13 +165,10 @@ export default function SpielplanIsland({
       </div>
 
       {games === null && !failed && (
-        <div className="space-y-6">
-          <Skeleton className="h-8 w-48 mx-auto" />
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Skeleton key={i} className="h-24 md:h-32 w-full rounded-md" />
-            ))}
-          </div>
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-8 w-full rounded-md" />
+          ))}
         </div>
       )}
 
@@ -205,41 +179,7 @@ export default function SpielplanIsland({
         </p>
       )}
 
-      {games !== null && sections.length === 0 && <GameCard />}
-
-      {sections.length > 0 && (
-        <div className="space-y-6">
-          {sections.map((section) => (
-            <div key={section.date} className="space-y-2">
-              <GameDate date={section.date} />
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 w-full gap-4 items-center justify-center">
-                {section.games.map((game) => (
-                  <GameCard key={game.id} game={game} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {games !== null && (
-        <div className="mt-4 py-1 md:py-2 flex justify-between items-center text-xs md:text-sm text-muted-foreground">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={filtered.length === 0}
-            onClick={() => {
-              void exportSpielplanXlsx(filtered);
-            }}
-          >
-            <DownloadIcon />
-            {strings.spielplan.exportLabel}
-          </Button>
-          <span>
-            {filtered.length} {strings.spielplan.gamesCount}
-          </span>
-        </div>
-      )}
+      {games !== null && <GamesTable games={filtered} />}
     </div>
   );
 }

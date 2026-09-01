@@ -29,6 +29,15 @@ describe("SpielplanIsland", () => {
     expect(screen.getByText(`1 ${strings.spielplan.gamesCount}`)).toBeInTheDocument();
   });
 
+  it("renders the plan as a table: column headers, own badge, opponent logo", async () => {
+    getMatches.mockResolvedValue(page([game()]));
+    render(<SpielplanIsland />);
+    expect(await screen.findByText(strings.teams.colHome)).toBeInTheDocument();
+    expect(screen.getByText(strings.teams.colGuest)).toBeInTheDocument();
+    expect(screen.getByText("Herren 1").className).toContain("bg-rose-100");
+    expect(screen.getByRole("img", { name: "CVJM Hannover 2" })).toBeInTheDocument();
+  });
+
   it("shows the loading skeleton before the fetch settles", () => {
     getMatches.mockReturnValue(new Promise(() => {}));
     const { container } = render(<SpielplanIsland />);

@@ -31,6 +31,14 @@ describe("GamesIsland", () => {
     expect(screen.getByText("Goetheschule")).toBeInTheDocument();
   });
 
+  it("highlights the Dragons side and shows the opponent's club logo", async () => {
+    getMatches.mockResolvedValue({ items: [game()], hasMore: false });
+    render(<GamesIsland teamApiId={7} />);
+    const label = await screen.findByText("Dragons");
+    expect(label.className).toContain("text-primary");
+    expect(screen.getByRole("img", { name: "CVJM Hannover 2" })).toBeInTheDocument();
+  });
+
   it("shows an error instead of an empty table when the fetch fails", async () => {
     getMatches.mockRejectedValue(new Error("timeout"));
     render(<GamesIsland teamApiId={7} />);

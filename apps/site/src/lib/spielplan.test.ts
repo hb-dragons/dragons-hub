@@ -3,7 +3,6 @@ import {
   dragonsTeamName,
   fetchFullPlan,
   filterGames,
-  groupByDate,
   isDragonsAwayGame,
   isDragonsHomeGame,
   teamFilterOptions,
@@ -125,22 +124,6 @@ describe("teamFilterOptions", () => {
     expect(teamFilterOptions(games)).toEqual([
       { name: "Herren 1", badgeColor: "teal" },
     ]);
-  });
-});
-
-describe("groupByDate", () => {
-  test("groups consecutive games under their kickoff date", () => {
-    const a = game({ kickoffDate: "2026-04-25", kickoffTime: "13:00:00" });
-    const b = game({ kickoffDate: "2026-04-25", kickoffTime: "15:00:00" });
-    const c = game({ kickoffDate: "2026-04-26" });
-    expect(groupByDate([a, b, c])).toEqual([
-      { date: "2026-04-25", games: [a, b] },
-      { date: "2026-04-26", games: [c] },
-    ]);
-  });
-
-  test("returns nothing for an empty list", () => {
-    expect(groupByDate([])).toEqual([]);
   });
 });
 

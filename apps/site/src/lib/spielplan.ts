@@ -109,22 +109,6 @@ export function teamFilterOptions(games: readonly SpielplanGame[]): TeamFilterOp
     .map(([name, badgeColor]) => ({ name, badgeColor }));
 }
 
-/** Groups an already date-sorted plan into per-day sections for the cards. */
-export function groupByDate<T extends SpielplanGame>(
-  games: readonly T[],
-): Array<{ date: string; games: T[] }> {
-  const sections: Array<{ date: string; games: T[] }> = [];
-  for (const game of games) {
-    const last = sections[sections.length - 1];
-    if (last && last.date === game.kickoffDate) {
-      last.games.push(game);
-    } else {
-      sections.push({ date: game.kickoffDate, games: [game] });
-    }
-  }
-  return sections;
-}
-
 /**
  * Crawls every page of `/public/matches` (the API caps a page at 1000 rows)
  * into the full season plan. The empty-page guard means a server that keeps
