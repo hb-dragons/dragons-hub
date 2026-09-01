@@ -128,9 +128,11 @@ const fade = placeholder !== null;
      progressively decoding image. `transition-property` must name everything
      the callers' hover utilities animate: this selector outranks the
      `transition-transform` utility several callers put in `imgClass`, and
-     Tailwind v4's scale-*/rotate-*/translate-* utilities set the native
-     `scale`/`rotate`/`translate` properties, not `transform` — listing only
-     `transform` here made the news-card hover zoom jump instead of animate.
+     Tailwind v4's scale/rotate/translate utilities set those native CSS
+     properties, not `transform` — listing only `transform` here made the
+     news-card hover zoom jump instead of animate. (Keep a literal
+     star-slash sequence out of this comment: it ends it early and the
+     leftover tokens break the lightningcss minify.)
      Layout.astro carries the no-JS escape hatch — `onload` is script. */
   img[data-blur-img] {
     opacity: 0;
