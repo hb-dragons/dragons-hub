@@ -1,5 +1,5 @@
 import { getDb } from "../../config/database";
-import { teams, teamEntries, leagues } from "@dragons/db/schema";
+import { teams, teamEntries, teamStaff, leagues } from "@dragons/db/schema";
 import { and, eq, sql, inArray } from "drizzle-orm";
 import { seasons } from "@dragons/db/schema";
 import { fetchLeagueRoster } from "./league-roster";
@@ -35,6 +35,35 @@ async function upsertSquad(ref: SdkTeamRef, isOwn: boolean): Promise<number> {
     .returning({ id: teams.id });
   if (!row) throw new Error(`Squad upsert returned no row for ${ref.teamPermanentId}`);
   return row.id;
+}
+
+/**
+ * Copy a previous entry's staff onto a freshly created one. Staff hang off the
+ * entry, so without this a season rollover would leave every new team without
+ * the coaches the club just had (ADR 0008) — same reasoning as badge color.
+ * The portrait object name comes along; the object itself is shared, and the
+ * upload path never deletes an object another row still references.
+ */
+async function copyStaffForward(fromEntryId: number, toEntryId: number): Promise<void> {
+  const db = getDb();
+  const previousStaff = await db
+    .select({
+      firstName: teamStaff.firstName,
+      lastName: teamStaff.lastName,
+      role: teamStaff.role,
+      phone: teamStaff.phone,
+      email: teamStaff.email,
+      licence: teamStaff.licence,
+      photoFilename: teamStaff.photoFilename,
+      refereeContact: teamStaff.refereeContact,
+    })
+    .from(teamStaff)
+    .where(eq(teamStaff.teamEntryId, fromEntryId));
+  if (previousStaff.length === 0) return;
+
+  await db
+    .insert(teamStaff)
+    .values(previousStaff.map((s) => ({ ...s, teamEntryId: toEntryId })));
 }
 
 export type UpsertEntryOutcome =
@@ -79,6 +108,7 @@ export async function upsertEntryFromEvidence(
     // oldest possible value instead.
     const candidates = await db
       .select({
+        id: teamEntries.id,
         badgeColor: teamEntries.badgeColor,
         estimatedGameDuration: teamEntries.estimatedGameDuration,
         displayOrder: teamEntries.displayOrder,
@@ -102,15 +132,20 @@ export async function upsertEntryFromEvidence(
         .from(teamEntries)
         .where(eq(teamEntries.seasonId, seasonId)))[0]?.max ?? -1) + 1;
 
-    await db.insert(teamEntries).values({
-      teamId,
-      seasonId,
-      leagueId,
-      linkSource: "seeded",
-      badgeColor: previous?.badgeColor ?? null,
-      estimatedGameDuration: previous?.estimatedGameDuration ?? null,
-      displayOrder,
-    });
+    const [created] = await db
+      .insert(teamEntries)
+      .values({
+        teamId,
+        seasonId,
+        leagueId,
+        linkSource: "seeded",
+        badgeColor: previous?.badgeColor ?? null,
+        estimatedGameDuration: previous?.estimatedGameDuration ?? null,
+        displayOrder,
+      })
+      .returning({ id: teamEntries.id });
+
+    if (previous && created) await copyStaffForward(previous.id, created.id);
     return { action: "created", previousSource: null };
   }
 

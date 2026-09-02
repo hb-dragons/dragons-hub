@@ -37,6 +37,8 @@ export { bookingEndpoints } from "./booking";
 
 export { teamEndpoints } from "./team";
 
+export { teamStaffEndpoints } from "./team-staff";
+
 export { channelConfigEndpoints } from "./channel-config";
 
 export { broadcastEndpoints } from "./broadcast";

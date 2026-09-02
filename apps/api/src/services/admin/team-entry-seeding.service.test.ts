@@ -212,3 +212,198 @@ describe("seedSeasonTeamEntries", () => {
     expect(after.rows[0]!.updated_at).toEqual(before.rows[0]!.updated_at);
   });
 });
+
+describe("staff carry-forward", () => {
+  async function seedStaff(
+    entryId: number,
+    values: {
+      firstName: string;
+      lastName: string;
+      role: string;
+      phone?: string | null;
+      email?: string | null;
+      licence?: string | null;
+      photoFilename?: string | null;
+      refereeContact?: boolean;
+    },
+  ) {
+    await ctx.client.query(
+      `INSERT INTO team_staff (team_entry_id, first_name, last_name, role, phone, email, licence, photo_filename, referee_contact)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        entryId,
+        values.firstName,
+        values.lastName,
+        values.role,
+        values.phone ?? null,
+        values.email ?? null,
+        values.licence ?? null,
+        values.photoFilename ?? null,
+        values.refereeContact ?? false,
+      ],
+    );
+  }
+
+  interface StaffRow {
+    team_entry_id: number;
+    first_name: string;
+    last_name: string;
+    role: string;
+    phone: string | null;
+    email: string | null;
+    licence: string | null;
+    photo_filename: string | null;
+    referee_contact: boolean;
+  }
+
+  function staffOfEntry(entryId: number) {
+    return ctx.client.query<StaffRow>(
+      `SELECT team_entry_id, first_name, last_name, role, phone, email, licence, photo_filename, referee_contact
+       FROM team_staff WHERE team_entry_id = $1 ORDER BY last_name`,
+      [entryId],
+    );
+  }
+
+  async function entryIdOf(squad: number, season: number): Promise<number> {
+    const r = await ctx.client.query<{ id: number }>(
+      `SELECT id FROM team_entries WHERE team_id = $1 AND season_id = $2`,
+      [squad, season],
+    );
+    return r.rows[0]!.id;
+  }
+
+  it("copies the previous entry's staff onto the new season's entry", async () => {
+    await seedClubConfig(100);
+    const old = await seedSeason("2025/26", "active", "2025-09-01");
+    const next = await seedSeason("2026/27", "upcoming", "2026-09-01");
+    const oldLeague = await seedLeague(50, "U14", old);
+    await seedLeague(51, "U16", next);
+    const squad = await seedTeam(9700, "Dragons U16");
+    const oldEntry = await ctx.client.query<{ id: number }>(
+      `INSERT INTO team_entries (team_id, season_id, league_id, custom_name, badge_color)
+       VALUES ($1, $2, $3, 'U14', 'red') RETURNING id`,
+      [squad, old, oldLeague],
+    );
+    const oldEntryId = oldEntry.rows[0]!.id;
+    await seedStaff(oldEntryId, {
+      firstName: "Ada",
+      lastName: "Lovelace",
+      role: "trainer",
+      phone: "+49 170 1234567",
+      email: "ada@example.de",
+      licence: "C-Lizenz",
+      photoFilename: "staff/ada.jpg",
+      refereeContact: true,
+    });
+    await seedStaff(oldEntryId, {
+      firstName: "Ben",
+      lastName: "Byron",
+      role: "co_trainer",
+    });
+    vi.mocked(fetchLeagueRoster).mockResolvedValue([ref(9700, "Dragons U16", 100)]);
+
+    await seedSeasonTeamEntries(next, [51]);
+
+    const newEntryId = await entryIdOf(squad, next);
+    const staff = await staffOfEntry(newEntryId);
+    expect(staff.rows).toEqual([
+      {
+        team_entry_id: newEntryId,
+        first_name: "Ben",
+        last_name: "Byron",
+        role: "co_trainer",
+        phone: null,
+        email: null,
+        licence: null,
+        photo_filename: null,
+        referee_contact: false,
+      },
+      {
+        team_entry_id: newEntryId,
+        first_name: "Ada",
+        last_name: "Lovelace",
+        role: "trainer",
+        phone: "+49 170 1234567",
+        email: "ada@example.de",
+        licence: "C-Lizenz",
+        photo_filename: "staff/ada.jpg",
+        referee_contact: true,
+      },
+    ]);
+    // The originals stay where they were — this is a copy, not a move.
+    expect((await staffOfEntry(oldEntryId)).rows).toHaveLength(2);
+    // And the custom name is still not carried forward.
+    const entry = await ctx.client.query<{ custom_name: string | null }>(
+      `SELECT custom_name FROM team_entries WHERE id = $1`,
+      [newEntryId],
+    );
+    expect(entry.rows[0]!.custom_name).toBeNull();
+  });
+
+  it("copies from the chronologically latest previous entry, not from every one", async () => {
+    await seedClubConfig(100);
+    const older = await seedSeason("2024/25", "archived", "2024-09-01");
+    const newer = await seedSeason("2025/26", "active", "2025-09-01");
+    const next = await seedSeason("2026/27", "upcoming", "2026-09-01");
+    const olderLeague = await seedLeague(52, "U12", older);
+    const newerLeague = await seedLeague(53, "U14", newer);
+    await seedLeague(54, "U16", next);
+    const squad = await seedTeam(9800, "Dragons U16");
+    const olderEntry = await ctx.client.query<{ id: number }>(
+      `INSERT INTO team_entries (team_id, season_id, league_id) VALUES ($1, $2, $3) RETURNING id`,
+      [squad, older, olderLeague],
+    );
+    const newerEntry = await ctx.client.query<{ id: number }>(
+      `INSERT INTO team_entries (team_id, season_id, league_id) VALUES ($1, $2, $3) RETURNING id`,
+      [squad, newer, newerLeague],
+    );
+    await seedStaff(olderEntry.rows[0]!.id, {
+      firstName: "Old",
+      lastName: "Coach",
+      role: "trainer",
+    });
+    await seedStaff(newerEntry.rows[0]!.id, {
+      firstName: "Current",
+      lastName: "Coach",
+      role: "trainer",
+    });
+    vi.mocked(fetchLeagueRoster).mockResolvedValue([ref(9800, "Dragons U16", 100)]);
+
+    await seedSeasonTeamEntries(next, [54]);
+
+    const staff = await staffOfEntry(await entryIdOf(squad, next));
+    expect(staff.rows.map((r) => r.first_name)).toEqual(["Current"]);
+  });
+
+  it("creates the entry with no staff when the previous entry had none", async () => {
+    await seedClubConfig(100);
+    const old = await seedSeason("2025/26", "active", "2025-09-01");
+    const next = await seedSeason("2026/27", "upcoming", "2026-09-01");
+    const oldLeague = await seedLeague(55, "U14", old);
+    await seedLeague(56, "U16", next);
+    const squad = await seedTeam(9900, "Dragons U16");
+    await ctx.client.query(
+      `INSERT INTO team_entries (team_id, season_id, league_id) VALUES ($1, $2, $3)`,
+      [squad, old, oldLeague],
+    );
+    vi.mocked(fetchLeagueRoster).mockResolvedValue([ref(9900, "Dragons U16", 100)]);
+
+    await seedSeasonTeamEntries(next, [56]);
+
+    expect((await staffOfEntry(await entryIdOf(squad, next))).rows).toEqual([]);
+  });
+
+  it("adds no staff to an entry seeded for a squad with no previous entry", async () => {
+    await seedClubConfig(100);
+    const season = await seedSeason("2026/27", "upcoming", "2026-09-01");
+    await seedLeague(57, "U16", season);
+    vi.mocked(fetchLeagueRoster).mockResolvedValue([ref(9950, "Dragons U16", 100)]);
+
+    await seedSeasonTeamEntries(season, [57]);
+
+    const squadRow = await ctx.client.query<{ id: number }>(
+      `SELECT id FROM teams WHERE api_team_permanent_id = 9950`,
+    );
+    expect((await staffOfEntry(await entryIdOf(squadRow.rows[0]!.id, season))).rows).toEqual([]);
+  });
+});
