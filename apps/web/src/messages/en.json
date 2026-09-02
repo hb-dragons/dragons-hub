@@ -386,7 +386,7 @@
       "local": "Manual",
       "changedBy": "by {name}",
       "fromSync": "from sync",
-      "fieldChange": "{field}: {oldValue} → {newValue}",
+      "fieldChange": "{field}: {oldValue} to {newValue}",
       "fieldSet": "{field}: set to {newValue}",
       "fieldCleared": "{field}: cleared (was {oldValue})",
       "showMore": "Load more"
@@ -1115,9 +1115,9 @@
     "subscribeTitle": "Subscribe to calendar",
     "copy": "Copy",
     "copied": "Copied!",
-    "instructionApple": "Calendar → File → New Calendar Subscription",
-    "instructionGoogle": "Settings → Add calendar → From URL",
-    "instructionOutlook": "Add calendar → From the internet",
+    "instructionApple": "Calendar > File > New Calendar Subscription",
+    "instructionGoogle": "Settings > Add calendar > From URL",
+    "instructionOutlook": "Add calendar > From the internet",
     "heroTitle": "Dragons",
     "heroSubtitle": "Basketball",
     "weekendLabel": "Sa/Su {satDay}/{sunDay} {month}",
@@ -1505,7 +1505,7 @@
       },
       "slot": {
         "label": "Slot {n} (SR{n})",
-        "open": "⚠ Open",
+        "open": "Open",
         "unassign": "Unassign"
       },
       "errorChip": {
@@ -1576,8 +1576,8 @@
       "search": "Search referees…",
       "sort": {
         "name": "Sort: Name",
-        "workloadDesc": "Games (high → low)",
-        "workloadAsc": "Games (low → high)"
+        "workloadDesc": "Games (most first)",
+        "workloadAsc": "Games (fewest first)"
       },
       "empty": "No referees match your filters",
       "profile": {
