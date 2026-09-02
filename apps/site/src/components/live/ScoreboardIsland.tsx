@@ -90,7 +90,7 @@ function Crest({ team, className }: { team: BroadcastTeamView; className: string
 function LogoCap({ team }: { team: BroadcastTeamView }) {
   return (
     <div className="flex shrink-0 items-center justify-center p-2">
-      <Crest team={team} className="h-full w-full max-h-13" />
+      <Crest team={team} className="h-full w-full max-h-18" />
     </div>
   );
 }
@@ -121,8 +121,8 @@ function TeamPanel({
 
 function ScoreCell({ value }: { value: number }) {
   return (
-    <div className="flex w-20 shrink-0 items-center justify-center">
-      <span className="text-[2.7rem] font-black tabular-nums leading-[0.85] text-white">
+    <div className="flex w-24 shrink-0 items-center justify-center">
+      <span className="text-[3.6rem] font-black tabular-nums leading-[0.85] text-white">
         {value}
       </span>
     </div>
@@ -216,8 +216,8 @@ function LiveBug({
   shotClockText: string;
 }) {
   return (
-    <div className="flex items-stretch justify-center [zoom:0.55] sm:[zoom:0.8] md:[zoom:1]">
-      <div className="flex h-20 items-stretch overflow-hidden rounded-md bg-surface-lowest">
+    <div className="flex items-stretch justify-center [zoom:0.4] sm:[zoom:0.7] md:[zoom:0.85] lg:[zoom:1.15] xl:[zoom:1.3]">
+      <div className="flex h-24 shrink-0 items-stretch overflow-hidden rounded-md bg-surface-lowest">
         {match && <LogoCap team={match.home} />}
         <TeamPanel
           abbr={match?.home.abbr ?? strings.scoreboard.home}
@@ -226,7 +226,7 @@ function LiveBug({
           period={scoreboard.period}
         />
         <div className="flex items-start gap-2">
-          <div className="bg-surface-highest flex px-4 py-1.5 rounded-b-xl gap-4">
+          <div className="bg-surface-highest flex px-5 py-2.5 rounded-b-xl gap-4">
             <ScoreCell value={scoreboard.scoreHome} />
             <div className="flex w-0.5 py-2">
               <div className="flex-1 bg-primary"></div>
@@ -242,7 +242,7 @@ function LiveBug({
         />
         {match && <LogoCap team={match.guest} />}
       </div>
-      <div className="flex justify-center items-center">
+      <div className="flex shrink-0 justify-center items-center">
         <div className="flex">
           <ClockCell clockText={clockText} period={scoreboard.period} />
           <div className="flex justify-center items-center">
@@ -271,40 +271,27 @@ function LiveCard({
   shotClockText: string;
 }) {
   return (
-    <div className="w-[min(820px,100%)] mx-auto overflow-hidden rounded-md bg-surface-low drop-shadow-[0_16px_40px_rgba(0,0,0,0.55)]">
-      {match && <ColorBars home={match.home.color} guest={match.guest.color} />}
-      <div className="flex flex-col items-center gap-3 px-3 py-5 md:px-6 md:py-6">
-        <div className="flex items-center gap-2.5">
-          <span aria-hidden="true" className="relative flex size-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
-            <span className="relative inline-flex size-2.5 rounded-full bg-red-500"></span>
+    <div className="flex flex-col items-center gap-3">
+      <div className="flex items-center gap-2.5">
+        <span aria-hidden="true" className="relative flex size-2.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+          <span className="relative inline-flex size-2.5 rounded-full bg-red-500"></span>
+        </span>
+        <span className="rounded-sm bg-red-500 px-2 py-0.5 text-[0.7rem] font-black uppercase tracking-widest text-white">
+          {strings.scoreboard.liveBadge}
+        </span>
+        {match?.leagueName && (
+          <span className="text-sm md:text-base font-bold uppercase text-white/65">
+            {match.leagueName}
           </span>
-          <span className="rounded-sm bg-red-500 px-2 py-0.5 text-[0.7rem] font-black uppercase tracking-widest text-white">
-            {strings.scoreboard.liveBadge}
-          </span>
-          {match?.leagueName && (
-            <span className="text-xs font-bold uppercase tracking-[0.3em] text-white/65">
-              {match.leagueName}
-            </span>
-          )}
-        </div>
-        <LiveBug
-          match={match}
-          scoreboard={scoreboard}
-          clockText={clockText}
-          shotClockText={shotClockText}
-        />
+        )}
       </div>
-      {match && <ColorBars home={match.home.color} guest={match.guest.color} />}
-    </div>
-  );
-}
-
-function ColorBars({ home, guest }: { home: string; guest: string }) {
-  return (
-    <div aria-hidden="true" className="grid h-1.5 grid-cols-2">
-      <div style={{ background: home }} />
-      <div style={{ background: guest }} />
+      <LiveBug
+        match={match}
+        scoreboard={scoreboard}
+        clockText={clockText}
+        shotClockText={shotClockText}
+      />
     </div>
   );
 }
@@ -389,7 +376,7 @@ export default function ScoreboardIsland() {
   return (
     <section
       aria-label={strings.scoreboard.sectionLabel}
-      className="dark mx-auto max-w-5xl px-4 pt-8 md:pt-10 font-display"
+      className="dark mx-auto max-w-6xl px-4 pt-8 md:pt-10 font-display"
     >
       <div className="flex flex-col items-center gap-4 drop-shadow-[0_12px_32px_rgba(0,0,0,0.55)]">
         {body}
