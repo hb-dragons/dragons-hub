@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TEAM_STAFF_ROLES } from "@dragons/shared";
 import { idParamSchema } from "./common";
 
 /** `/admin/teams/:id/staff/:staffId` — the entry id plus the staff row it addresses. */
@@ -6,9 +7,8 @@ export const teamStaffParamSchema = idParamSchema.extend({
   staffId: z.coerce.number().int().positive(),
 });
 
-export type TeamStaffParam = z.infer<typeof teamStaffParamSchema>;
-
-export const teamStaffRoleSchema = z.enum(["trainer", "co_trainer"]);
+/** Derived from the shared array, never restated — the value set is decided once. */
+const teamStaffRoleSchema = z.enum(TEAM_STAFF_ROLES);
 
 /**
  * An optional, nullable contact field. The editor sends a cleared input as `""`
@@ -39,17 +39,11 @@ export const teamStaffCreateBodySchema = z.strictObject({
 export type TeamStaffCreateBody = z.infer<typeof teamStaffCreateBodySchema>;
 
 /**
- * Every field optional, none nullable that the column is NOT NULL for — a patch
- * that omits a key leaves it alone, and `null` on a contact field clears it.
+ * The create body with every field optional: a patch that omits a key leaves it
+ * alone, and `null` (or `""`) on a contact field clears it. Derived rather than
+ * restated so the two bodies cannot drift apart field by field — the NOT NULL
+ * columns stay non-nullable here, they are only made omissible.
  */
-export const teamStaffUpdateBodySchema = z.strictObject({
-  firstName: nameSchema.optional(),
-  lastName: nameSchema.optional(),
-  role: teamStaffRoleSchema.optional(),
-  phone: contactField(phoneSchema),
-  email: contactField(emailSchema),
-  licence: contactField(licenceSchema),
-  refereeContact: z.boolean().optional(),
-});
+export const teamStaffUpdateBodySchema = teamStaffCreateBodySchema.partial();
 
 export type TeamStaffUpdateBody = z.infer<typeof teamStaffUpdateBodySchema>;

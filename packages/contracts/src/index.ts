@@ -146,10 +146,8 @@ export {
 
 export {
   teamStaffParamSchema,
-  teamStaffRoleSchema,
   teamStaffCreateBodySchema,
   teamStaffUpdateBodySchema,
-  type TeamStaffParam,
   type TeamStaffCreateBody,
   type TeamStaffUpdateBody,
 } from "./team-staff";
