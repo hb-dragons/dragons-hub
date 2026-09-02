@@ -144,7 +144,7 @@ Use for hero sections, brand badges, or gradient effects. Not for interactive el
 
 ## Component Conventions
 
-### Form Controls (Input, Textarea, Select, TimePicker, DatePicker)
+### Form Controls (Input, Textarea, Select, Checkbox, RadioGroup, TimePicker, DatePicker)
 
 ```
 Background: bg-input (light: #f3f4f5, dark: #1f1f1f)
@@ -153,7 +153,7 @@ Radius:     rounded-md
 Focus:      focus-visible:border-ring focus-visible:ring-ring/50
 ```
 
-All form controls share the same visual treatment. The DatePicker uses `Button variant="outline"` which also uses `bg-input`.
+All form controls share the same visual treatment. The DatePicker uses `Button variant="outline"` which also uses `bg-input`. Checkbox and RadioGroup carry the same ghost border and fill with `bg-primary` when checked; never drop a native `<input type="radio">` or `<input type="date">` into a page.
 
 ### Buttons
 

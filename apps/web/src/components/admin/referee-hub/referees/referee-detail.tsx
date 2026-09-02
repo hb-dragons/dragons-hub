@@ -28,7 +28,9 @@ export function RefereeDetail({ refereeId }: Props) {
       <div className="p-4 flex justify-between items-start bg-surface-low">
         <div className="min-w-0">
           <h2 className="font-display text-xl font-bold truncate">{ref.lastName}, {ref.firstName}</h2>
-          <div className="text-xs text-muted-foreground">Lic {ref.licenseNumber ?? "—"} · API {ref.apiId}</div>
+          <div className="text-xs text-muted-foreground">
+            {t("licenseLabel", { number: ref.licenseNumber ?? "—" })} · {t("apiIdLabel", { id: ref.apiId })}
+          </div>
         </div>
         {ref.isOwnClub && <Badge variant="secondary">{t("ownClubBadge")}</Badge>}
       </div>

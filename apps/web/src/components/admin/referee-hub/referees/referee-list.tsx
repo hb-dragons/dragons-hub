@@ -29,6 +29,14 @@ export function RefereeList({ selectedId, onSelect }: Props) {
   const [searchLocal, setSearchLocal] = useState(state.search);
   const debouncedSearch = useDebounce(searchLocal, 300);
 
+  // Back/forward, or a tab round trip, changes the URL underneath the input;
+  // follow it. Derived during render so it never fights a keystroke.
+  const [urlSearchSeen, setUrlSearchSeen] = useState(state.search);
+  if (state.search !== urlSearchSeen) {
+    setUrlSearchSeen(state.search);
+    setSearchLocal(state.search);
+  }
+
   useEffect(() => {
     if (debouncedSearch !== state.search) update({ search: debouncedSearch });
     // eslint-disable-next-line react-hooks/exhaustive-deps

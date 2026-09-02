@@ -14,6 +14,7 @@ vi.mock("../use-referee-hub-url", () => ({
 }));
 
 const messages = { refereeHub: { referees: {
+  licenseLabel: "Lic {number}", apiIdLabel: "API {id}",
   loading: "Loading…",
   notFound: "Referee not found",
   ownClubBadge: "Own club",

@@ -5,7 +5,8 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import useSWR from "swr";
 
 vi.mock("next-intl", () => ({
-  useTranslations: () => (k: string) => k,
+  useTranslations: () => (k: string, v?: Record<string, unknown>) =>
+    k === "matchup" && v ? `${v.home} vs ${v.guest}` : k,
   useFormatter: () => ({ dateTime: (d: Date) => d.toISOString().slice(0, 10) }),
 }));
 
@@ -37,6 +38,8 @@ const GAME = {
   matchNo: "42",
   homeTeamName: "Dragons",
   guestTeamName: "Bears",
+  venueName: "Sporthalle Nord",
+  venueCity: "Hamburg",
   sr1Status: "open",
   sr2Status: "open",
   sr1Name: null,
@@ -92,6 +95,19 @@ describe("<OpenSlotDetail>", () => {
 
     render(<OpenSlotDetail selectedGameId={500} />);
     expect(screen.getByText("detail.notFound")).toBeInTheDocument();
+  });
+
+  it("names the matchup and the venue", () => {
+    vi.mocked(useSWR).mockReturnValue({
+      data: GAME,
+      error: undefined,
+      isLoading: false,
+      mutate: vi.fn(),
+    } as never);
+
+    render(<OpenSlotDetail selectedGameId={500} />);
+    expect(screen.getByRole("heading", { name: "Dragons vs Bears" })).toBeInTheDocument();
+    expect(screen.getByText("Sporthalle Nord, Hamburg")).toBeInTheDocument();
   });
 
   it("refreshes the open-games list, not just the detail, after an assignment", () => {

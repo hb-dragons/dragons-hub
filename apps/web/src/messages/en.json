@@ -1554,6 +1554,13 @@
           "away": "Away"
         },
         "reset": "Reset filters"
+      },
+      "matchup": "{home} vs {guest}",
+      "resultCount": "{n} games",
+      "slotBadge": {
+        "assigned": "SR{n} {name}",
+        "offered": "SR{n} offered",
+        "open": "SR{n} open"
       }
     },
     "referees": {
@@ -1628,7 +1635,9 @@
           "saved": "Saved {n}s ago",
           "dirty": "Unsaved",
           "error": "Save failed: {msg}"
-        }
+        },
+        "notInSeason": "{name} (not fielded this season)",
+        "allTeamsRuled": "Every team already has a rule"
       },
       "subtabs": {
         "profile": "Profile",
@@ -1641,7 +1650,8 @@
         "own": "Own ({n})",
         "all": "All ({n})"
       },
-      "licenseLabel": "Lic {number}"
+      "licenseLabel": "Lic {number}",
+      "apiIdLabel": "API {id}"
     }
   },
   "errors": {

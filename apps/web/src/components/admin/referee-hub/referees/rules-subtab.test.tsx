@@ -12,18 +12,31 @@ const ref = { id: 1, apiId: 100, firstName: "A", lastName: "B", licenseNumber: 1
 // mock that built a fresh object per call would hand back a new dependency on
 // every render and spin render -> setState -> render forever, hanging the
 // worker. Real SWR keeps `data` referentially stable; the mock has to as well.
-vi.mock("swr", () => {
-  const teams = [{ id: 10, name: "Dragons H1", customName: null, leagueName: "OL" }];
-  const rules = { rules: [] };
-  return {
-    default: vi.fn((key: string) => {
-      if (key === "/admin/teams") return { data: teams };
-      if (key === "/admin/referees/1/rules") return { data: rules };
-      return { data: undefined };
-    }),
-    mutate: vi.fn(),
-  };
-});
+//
+// `/admin/teams` returns season *team entries* (ADR-0004): `id` is the entry
+// id, `teamId` the squad id. Rules are keyed by squad, so the two must differ
+// here or a component that sends the wrong one still passes.
+const fixtures = vi.hoisted(() => ({
+  teams: [
+    { id: 2, teamId: 10, name: "Dragons H1", customName: null, leagueName: "OL" },
+    { id: 3, teamId: 11, name: "Dragons H2", customName: "Herren 2", leagueName: "BL" },
+  ],
+  noRules: { rules: [] },
+  oneRule: { rules: [{ id: 1, teamId: 10, teamName: "Dragons H1", deny: true, allowSr1: false, allowSr2: false }] },
+  // A rule for a squad that has no entry in the active season (it played last
+  // season). The name must still come from somewhere.
+  staleRule: { rules: [{ id: 1, teamId: 99, teamName: "Dragons U14", deny: false, allowSr1: true, allowSr2: true }] },
+  current: { rules: undefined as unknown },
+}));
+
+vi.mock("swr", () => ({
+  default: vi.fn((key: string) => {
+    if (key === "/admin/teams") return { data: fixtures.teams };
+    if (key === "/admin/referees/1/rules") return { data: fixtures.current.rules };
+    return { data: undefined };
+  }),
+  mutate: vi.fn(),
+}));
 
 const updateRules = vi.fn().mockResolvedValue({ rules: [] });
 const setVisibility = vi.fn().mockResolvedValue({});
@@ -41,6 +54,8 @@ const messages = { refereeHub: { referees: { rules: {
   title: "Rules", add: "Add", deny: "Deny", allow: "Allow", selectTeam: "Team", none: "No rules",
   allowSr1: "SR1", allowSr2: "SR2", removeRule: "Remove rule",
   disabledHint: "Not an own-club referee", markOwnClub: "Mark as own club",
+  notInSeason: "{name} (not fielded this season)",
+  allTeamsRuled: "Every team already has a rule",
   save: { save: "Save", discard: "Discard", saving: "Saving", saved: "Saved {n}s ago", dirty: "Unsaved", error: "Failed: {msg}" },
 } } } };
 
@@ -50,9 +65,10 @@ function wrap(ui: React.ReactNode) {
 
 const saveButton = () => screen.getByRole("button", { name: /^save$/i });
 const discardButton = () => screen.getByRole("button", { name: /discard/i });
-const addRule = () => fireEvent.click(screen.getByRole("button", { name: /add/i }));
+const addButton = () => screen.getByRole("button", { name: /^add$/i });
+const addRule = () => fireEvent.click(addButton());
 
-beforeEach(() => { updateRules.mockClear(); setVisibility.mockClear(); });
+beforeEach(() => { updateRules.mockClear(); setVisibility.mockClear(); fixtures.current.rules = fixtures.noRules; });
 afterEach(() => { cleanup(); });
 
 // Assertions track the explicit save model (Save/Discard + inline error) that
@@ -65,7 +81,7 @@ describe("RulesSubtab", () => {
     expect(screen.getByText("No rules")).toBeInTheDocument();
   });
 
-  it("Save is enabled after adding a rule and POSTs to /rules", async () => {
+  it("Save is enabled after adding a rule and POSTs the squad id, not the entry id", async () => {
     render(wrap(<RulesSubtab referee={ref} />));
     addRule();
     expect(saveButton()).toBeEnabled();
@@ -74,10 +90,49 @@ describe("RulesSubtab", () => {
     await act(async () => { fireEvent.click(saveButton()); });
 
     // The new row defaults to SR2-only, and the payload carries that verbatim.
+    // teamId is the squad (teams.id) the API validates against — sending the
+    // entry id produced "Invalid or non-own-club team IDs: 2" in production.
     expect(updateRules).toHaveBeenCalledWith(1, {
       rules: [{ teamId: 10, deny: false, allowSr1: false, allowSr2: true }],
     });
     expect(saveButton()).toBeDisabled();
+  });
+
+  it("a second Add picks a team that has no rule yet, so the payload has no duplicate teamId", async () => {
+    render(wrap(<RulesSubtab referee={ref} />));
+    addRule();
+    addRule();
+
+    await act(async () => { fireEvent.click(saveButton()); });
+
+    const [, payload] = updateRules.mock.calls[0] as [number, unknown];
+    // Two adds used to both default to the first team; the API then rejected
+    // the body with "Duplicate teamId entries are not allowed".
+    const teamIds = (payload as { rules: { teamId: number }[] }).rules.map((r) => r.teamId);
+    expect(new Set(teamIds).size).toBe(teamIds.length);
+    expect(teamIds).toEqual([10, 11]);
+  });
+
+  it("disables Add once every team has a rule", () => {
+    render(wrap(<RulesSubtab referee={ref} />));
+    addRule();
+    addRule();
+    expect(addButton()).toBeDisabled();
+  });
+
+  it("shows the team an existing rule belongs to", () => {
+    fixtures.current.rules = fixtures.oneRule;
+    render(wrap(<RulesSubtab referee={ref} />));
+    // The rule's squad id 10 is entry id 2 this season; the trigger must show
+    // that entry's label rather than the empty "Team" placeholder.
+    expect(screen.getByRole("combobox")).toHaveTextContent("Dragons H1 (OL)");
+    expect(screen.getByRole("button", { name: /^deny$/i })).toBeInTheDocument();
+  });
+
+  it("keeps a rule for a squad not fielded this season readable", () => {
+    fixtures.current.rules = fixtures.staleRule;
+    render(wrap(<RulesSubtab referee={ref} />));
+    expect(screen.getByRole("combobox")).toHaveTextContent("Dragons U14 (not fielded this season)");
   });
 
   it("Discard resets to fetched rules and clears dirty", () => {
