@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, TriangleAlert } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@dragons/ui/components/button";
 import {
@@ -68,7 +68,10 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
         <div>
           <div className="text-xs text-muted-foreground">{t("slot.label", { n: String(slotNumber) })}</div>
           {isOpen ? (
-            <div className="text-sm font-semibold text-heat">{t("slot.open")}</div>
+            <div className="flex items-center gap-1 text-sm font-semibold text-heat">
+              <TriangleAlert className="size-4" aria-hidden="true" />
+              {t("slot.open")}
+            </div>
           ) : (
             <div className="text-sm font-semibold">{assignment.refereeName ?? "—"}</div>
           )}

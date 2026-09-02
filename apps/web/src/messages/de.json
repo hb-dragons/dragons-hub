@@ -386,7 +386,7 @@
       "local": "Manuell",
       "changedBy": "von {name}",
       "fromSync": "durch Sync",
-      "fieldChange": "{field}: {oldValue} → {newValue}",
+      "fieldChange": "{field}: {oldValue} zu {newValue}",
       "fieldSet": "{field}: gesetzt auf {newValue}",
       "fieldCleared": "{field}: gelöscht (war {oldValue})",
       "showMore": "Mehr laden"
@@ -1115,9 +1115,9 @@
     "subscribeTitle": "Kalender abonnieren",
     "copy": "Kopieren",
     "copied": "Kopiert!",
-    "instructionApple": "Kalender → Ablage → Neues Kalenderabo",
-    "instructionGoogle": "Einstellungen → Weitere Kalender → Per URL",
-    "instructionOutlook": "Kalender hinzufügen → Aus dem Internet",
+    "instructionApple": "Kalender > Ablage > Neues Kalenderabo",
+    "instructionGoogle": "Einstellungen > Weitere Kalender > Per URL",
+    "instructionOutlook": "Kalender hinzufügen > Aus dem Internet",
     "heroTitle": "Dragons",
     "heroSubtitle": "Basketball",
     "weekendLabel": "Sa/So {satDay}/{sunDay} {month}",
@@ -1505,7 +1505,7 @@
       },
       "slot": {
         "label": "Slot {n} (SR{n})",
-        "open": "⚠ Offen",
+        "open": "Offen",
         "unassign": "Aufheben"
       },
       "errorChip": {
@@ -1566,7 +1566,7 @@
     "referees": {
       "kpi": {
         "ownClubRefs": "Vereinseigene SR",
-        "avgMatches": "Ø Spiele/SR"
+        "avgMatches": "Schnitt Spiele/SR"
       },
       "columns": {
         "ref": "Schiedsrichter",
@@ -1576,8 +1576,8 @@
       "search": "Schiedsrichter suchen…",
       "sort": {
         "name": "Sortieren: Name",
-        "workloadDesc": "Spiele (hoch → niedrig)",
-        "workloadAsc": "Spiele (niedrig → hoch)"
+        "workloadDesc": "Spiele (meiste zuerst)",
+        "workloadAsc": "Spiele (wenigste zuerst)"
       },
       "empty": "Keine Schiedsrichter passen zu den Filtern",
       "profile": {

@@ -22,7 +22,7 @@ import {
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
+import { GripVertical, TriangleAlert } from "lucide-react";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { queries } from "@/lib/swr-queries";
 import { api } from "@/lib/api";
@@ -164,8 +164,9 @@ function TeamRowContent(props: TeamRowProps & TeamRowContentExtras) {
             </SelectContent>
           </Select>
           {!team.leagueTracked ? (
-            <span className="text-xs text-destructive" title={t("teams.leagueUntracked")}>
-              ⚠ {t("teams.leagueUntracked")}
+            <span className="flex items-center gap-1 text-xs text-destructive" title={t("teams.leagueUntracked")}>
+              <TriangleAlert className="size-3.5 shrink-0" aria-hidden="true" />
+              {t("teams.leagueUntracked")}
             </span>
           ) : null}
         </div>
