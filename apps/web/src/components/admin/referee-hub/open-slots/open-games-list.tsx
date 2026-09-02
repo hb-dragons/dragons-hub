@@ -19,19 +19,38 @@ interface Props {
   filters: HubFilters;
   selectedGameId: number | null;
   onSelect: (gameId: number) => void;
+  /** Debounced search text, for the URL. */
+  onSearch: (search: string) => void;
 }
 
 // Each row stacks three lines (date·time·league / teams / the two SR badges),
 // so the slot must clear ~76px of content or the badges clip at the bottom.
 const ROW_HEIGHT = 80;
 
-export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
+/** The server ignores shorter search terms, so the key does too. */
+const MIN_SEARCH_LENGTH = 3;
+
+export function OpenGamesList({ filters, selectedGameId, onSelect, onSearch }: Props) {
   const t = useTranslations("refereeHub.openSlots");
   const format = useFormatter();
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(filters.search);
   const debouncedSearch = useDebounce(search, 300);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [height, setHeight] = useState(400);
+
+  // Back/forward, or a tab round trip, changes the URL underneath the input;
+  // follow it. Derived during render so it never fights a keystroke.
+  const [urlSearchSeen, setUrlSearchSeen] = useState(filters.search);
+  if (filters.search !== urlSearchSeen) {
+    setUrlSearchSeen(filters.search);
+    setSearch(filters.search);
+  }
+
+  useEffect(() => {
+    if (debouncedSearch !== filters.search) onSearch(debouncedSearch);
+    // Only the debounced text should trigger a write; the other values are read.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -54,7 +73,7 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
     dateFrom: filters.dateFrom ?? undefined,
     dateTo: filters.dateTo ?? undefined,
     gameType: filters.gameType,
-    search: debouncedSearch.length >= 3 ? debouncedSearch : undefined,
+    search: filters.search.length >= MIN_SEARCH_LENGTH ? filters.search : undefined,
     limit: OPEN_GAMES_PAGE_SIZE,
     offset: 0,
   });
@@ -79,13 +98,16 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
           selected && "bg-primary/10 border-l-primary hover:bg-primary/10",
         )}
       >
-        <div className="text-xs opacity-70">
-          {formatKickoff(format, g.kickoffDate, g.kickoffTime)} · {g.leagueShort ?? ""}
+        <div className="text-xs text-muted-foreground">
+          {formatKickoff(format, g.kickoffDate, g.kickoffTime)}
+          {g.leagueShort && ` · ${g.leagueShort}`}
         </div>
-        <div className="text-sm font-medium truncate">{g.homeTeamName} vs {g.guestTeamName}</div>
+        <div className="text-sm font-medium truncate">
+          {t("matchup", { home: g.homeTeamName, guest: g.guestTeamName })}
+        </div>
         <div className="flex gap-1 mt-1">
-          <SlotBadge status={g.sr1Status} who={g.sr1Name} prefix="SR1" />
-          <SlotBadge status={g.sr2Status} who={g.sr2Name} prefix="SR2" />
+          <SlotBadge n={1} status={g.sr1Status} who={g.sr1Name} />
+          <SlotBadge n={2} status={g.sr2Status} who={g.sr2Name} />
         </div>
       </button>
     );
@@ -93,13 +115,18 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-3 bg-surface-low">
+      <div className="p-3 space-y-2 bg-surface-low">
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={t("searchPlaceholder")}
           aria-label={t("searchPlaceholder")}
         />
+        {data && !error && (
+          <div className="text-xs text-muted-foreground tabular-nums">
+            {t("resultCount", { n: data.total })}
+          </div>
+        )}
       </div>
       <div ref={containerRef} className="flex-1 min-h-0">
         {error && (
@@ -128,8 +155,9 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
   );
 }
 
-function SlotBadge({ status, who, prefix }: { status: string; who: string | null; prefix: string }) {
-  if (status === "assigned") return <Badge variant="secondary">{prefix} {who ?? "?"}</Badge>;
-  if (status === "offered") return <Badge variant="outline">{prefix} offered</Badge>;
-  return <Badge variant="outline" className="border-transparent bg-heat/15 text-heat">{prefix} open</Badge>;
+function SlotBadge({ n, status, who }: { n: 1 | 2; status: string; who: string | null }) {
+  const t = useTranslations("refereeHub.openSlots.slotBadge");
+  if (status === "assigned") return <Badge variant="secondary">{t("assigned", { n, name: who ?? "?" })}</Badge>;
+  if (status === "offered") return <Badge variant="outline">{t("offered", { n })}</Badge>;
+  return <Badge variant="outline" className="border-transparent bg-heat/15 text-heat">{t("open", { n })}</Badge>;
 }

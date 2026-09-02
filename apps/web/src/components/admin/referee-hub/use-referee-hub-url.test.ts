@@ -14,7 +14,7 @@ describe("parseHubUrl", () => {
         league: [],
         dateFrom: null,
         dateTo: null,
-        gameType: "both",
+        gameType: "both", search: "",
       },
       scope: "own",
       search: "",
@@ -36,7 +36,7 @@ describe("parseHubUrl", () => {
         league: [],
         dateFrom: null,
         dateTo: null,
-        gameType: "both",
+        gameType: "both", search: "",
       },
       scope: "own",
       search: "",
@@ -76,7 +76,7 @@ describe("buildHubUrl", () => {
         gameId: null,
         refereeId: null,
         subtab: "profile",
-        filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both" },
+        filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both", search: "" },
         scope: "own",
         search: "",
         sort: "name",
@@ -91,7 +91,7 @@ describe("buildHubUrl", () => {
         gameId: null,
         refereeId: 42,
         subtab: "profile",
-        filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both" },
+        filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both", search: "" },
         scope: "own",
         search: "",
         sort: "name",
@@ -106,7 +106,7 @@ describe("buildHubUrl", () => {
         gameId: 4287,
         refereeId: null,
         subtab: "profile",
-        filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both" },
+        filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both", search: "" },
         scope: "own",
         search: "",
         sort: "name",
@@ -121,7 +121,7 @@ describe("buildHubUrl", () => {
         gameId: null,
         refereeId: 42,
         subtab: "history",
-        filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both" },
+        filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both", search: "" },
         scope: "own",
         search: "",
         sort: "name",
@@ -141,7 +141,7 @@ describe("hub URL state — open-slots filters", () => {
       league: ["OL", "BL"],
       dateFrom: "2026-05-18",
       dateTo: "2026-06-01",
-      gameType: "home",
+      gameType: "home", search: "",
     });
   });
 
@@ -159,7 +159,7 @@ describe("hub URL state — open-slots filters", () => {
       gameId: null,
       refereeId: null,
       subtab: "profile",
-      filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both" },
+      filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both", search: "" },
       scope: "own",
       search: "",
       sort: "name",
@@ -181,7 +181,7 @@ describe("hub URL state — search and sort", () => {
   });
 
   it("serializes only non-default search/sort under referees tab", () => {
-    const filters = { status: "open" as const, league: [], dateFrom: null, dateTo: null, gameType: "both" as const };
+    const filters = { status: "open" as const, league: [], dateFrom: null, dateTo: null, gameType: "both" as const, search: "" };
     const qs = buildHubUrl({
       tab: "referees",
       gameId: null,

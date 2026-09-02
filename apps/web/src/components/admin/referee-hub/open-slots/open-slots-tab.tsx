@@ -19,13 +19,13 @@ export function OpenSlotsTab() {
     label: l.name,
   }));
 
-  // Stacks below lg: the three-pane layout needs ~700px and was unusable on a
+  // Stacks below lg: the three-pane layout needs ~800px and was unusable on a
   // phone, which is where this hub gets opened on a match day.
   return (
-    <div className="bg-border/15 grid min-h-[600px] grid-cols-1 gap-px overflow-hidden rounded-md lg:grid-cols-[200px_320px_1fr]">
+    <div className="bg-border/15 grid min-h-[600px] grid-cols-1 gap-px overflow-hidden rounded-md lg:grid-cols-[220px_340px_1fr]">
       <SlotsFilterSidebar
         filters={state.filters}
-        onChange={(patch) => update({ filters: { ...state.filters, ...patch } })}
+        onChange={(patch) => update({ filters: patch })}
         leagueOptions={leagueOptions}
       />
       <div className="bg-surface-low">
@@ -33,6 +33,7 @@ export function OpenSlotsTab() {
           filters={state.filters}
           selectedGameId={state.gameId}
           onSelect={(gameId) => update({ gameId })}
+          onSearch={(search) => update({ filters: { search } })}
         />
       </div>
       <div className="bg-card">

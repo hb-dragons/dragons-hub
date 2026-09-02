@@ -81,9 +81,11 @@ describe("/admin/referees prefetch", () => {
           dateFrom: null,
           dateTo: null,
           gameType: "both",
+          search: "",
         }}
         selectedGameId={null}
         onSelect={() => {}}
+        onSearch={() => {}}
       />,
     );
 

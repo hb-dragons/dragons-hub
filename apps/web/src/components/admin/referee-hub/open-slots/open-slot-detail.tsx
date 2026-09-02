@@ -51,7 +51,15 @@ export function OpenSlotDetail({ selectedGameId }: Props) {
         <div className="text-xs text-muted-foreground">
           {formatKickoff(format, game.kickoffDate, game.kickoffTime)} · {game.leagueShort ?? ""} · #{game.matchNo}
         </div>
-        <h2 className="text-xl font-semibold">{game.homeTeamName} vs {game.guestTeamName}</h2>
+        <h2 className="font-display text-xl font-bold">
+          {t("matchup", { home: game.homeTeamName, guest: game.guestTeamName })}
+        </h2>
+        {game.venueName && (
+          <div className="text-sm text-muted-foreground">
+            {game.venueName}
+            {game.venueCity && `, ${game.venueCity}`}
+          </div>
+        )}
       </div>
       <SlotCard
         gameApiId={game.apiMatchId}
