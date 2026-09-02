@@ -47,3 +47,45 @@ _Avoid_: look-alike controls, custom chrome
 
 **Structural predictability**:
 The user always knows where they are, how they got there, and how to get back — no dead ends, no surprise modal stacks. Ranked above platform idiom when the two conflict.
+
+### Officiating
+
+**Referee game**:
+A game the club owes referees for, or one that a club referee is assigned to. The unit the referee surfaces list and open.
+_Avoid_: match (in referee context), officiating game
+
+**Foreign game**:
+A referee game in which no Dragons team plays; the club only owes the referees.
+_Avoid_: external game, neutral game
+
+**Slot**:
+One of the referee positions on a referee game (SR1, SR2; the federation's SR3 is never filled by the club). Open, offered, or assigned.
+_Avoid_: position, seat
+
+**Claim**:
+A club referee's request for an open slot, recorded in the app and handed to the federation. Becomes an assignment once the sync sees it.
+_Avoid_: intent, take-over
+
+**Assignment (Einsatz)**:
+A referee holding a slot on a referee game. Confirmed by the federation sync, never by the app alone.
+_Avoid_: booking, claim (a claim is the request, the assignment is the result)
+
+**Co-referee**:
+The referee holding the other slot on the same referee game.
+_Avoid_: partner, second referee, officials
+
+**Kampfgericht**:
+The Dragons team that supplies the table crew (Anschreiber, Zeitnehmer, Shotclock) for a home game. A team, not named persons.
+_Avoid_: table officials, scorer's table, officials
+
+**Team staff**:
+A person attached to a team entry in a staff role, with the contact data the club holds on them. Owned by the club, not synced from the federation. The only roles today are Trainer and Co-Trainer, so every staff member is a coach.
+_Avoid_: trainer (in code), ehrenamtliche, team member
+
+**Coach**:
+Team staff in the Trainer or Co-Trainer role. Today that is all team staff.
+_Avoid_: trainer (in code), head coach
+
+**Team contact**:
+The team staff an assigned referee reaches before a referee game: the members flagged as referee contact, or every coach of that team entry when none is flagged. Only exists for Dragons teams.
+_Avoid_: contact person, Ansprechpartner (in code)
