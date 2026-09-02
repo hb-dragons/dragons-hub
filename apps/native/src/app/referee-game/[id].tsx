@@ -191,6 +191,7 @@ export default function RefereeGameDetailScreen() {
   // the status badges — is decided in the lib and tested there (#307); the
   // screen only renders the result.
   const view = einsatzView(game);
+  const spielinfoRoute = view.spielinfoRoute;
   const venueName = game.venueName;
 
   return (
@@ -306,12 +307,10 @@ export default function RefereeGameDetailScreen() {
       </View>
 
       {/* ── 3. Spielinfo ── */}
-      {view.spielinfoRoute ? (
+      {spielinfoRoute ? (
         <Card
           style={{ marginBottom: spacing.md }}
-          onPress={() => {
-            if (view.spielinfoRoute) router.push(view.spielinfoRoute);
-          }}
+          onPress={() => router.push(spielinfoRoute)}
         >
           <View style={detailRowStyle}>
             <View style={{ flex: 1, gap: spacing.xs }}>

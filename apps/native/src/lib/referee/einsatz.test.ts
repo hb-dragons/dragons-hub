@@ -95,15 +95,15 @@ describe("einsatzView", () => {
     );
     expect(view.slots.map((s) => s.slot)).toEqual([1, 2]);
     expect(view.slots[0]).toMatchObject({
+      labelKey: "refereeGame.sr1",
       name: "Alex Ref",
       status: "assigned",
-      ourClub: true,
       isMine: false,
     });
     expect(view.slots[1]).toMatchObject({
+      labelKey: "refereeGame.sr2",
       name: null,
       status: "offered",
-      ourClub: false,
       isMine: false,
     });
   });

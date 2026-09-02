@@ -148,7 +148,12 @@ function bothSlotsFilled(row: {
   return row.sr1Status === "assigned" && row.sr2Status === "assigned";
 }
 
-function buildPayload(row: ReturnType<typeof mapApiResultToRow> & { matchId?: number | null }): RefereeSlotsPayload {
+function buildPayload(
+  row: ReturnType<typeof mapApiResultToRow> & {
+    matchId?: number | null;
+    refereeGameId: number;
+  },
+): RefereeSlotsPayload {
   const sr1Open = row.sr1OurClub === true && row.sr1Status !== "assigned";
   const sr2Open = row.sr2OurClub === true && row.sr2Status !== "assigned";
   const deepLink = row.matchId
@@ -156,6 +161,7 @@ function buildPayload(row: ReturnType<typeof mapApiResultToRow> & { matchId?: nu
     : `/referee/games?apiMatchId=${row.apiMatchId}`;
   return {
     matchId: row.matchId ?? null,
+    refereeGameId: row.refereeGameId,
     matchNo: row.matchNo,
     homeTeam: row.homeTeamName,
     guestTeam: row.guestTeamName,
@@ -479,7 +485,7 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
                 entityId: row.id,
                 entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
                 deepLinkPath: `/admin/referee-games`,
-                payload: { ...buildPayload({ ...mapped, matchId }) },
+                payload: { ...buildPayload({ ...mapped, matchId, refereeGameId: row.id }) },
               },
               tx,
             );
@@ -597,7 +603,9 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
                 entityId: existingId,
                 entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
                 deepLinkPath: `/admin/referee-games`,
-                payload: { ...buildPayload({ ...mapped, matchId }) },
+                payload: {
+                  ...buildPayload({ ...mapped, matchId, refereeGameId: existingId }),
+                },
               },
               tx,
             );

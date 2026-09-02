@@ -26,8 +26,6 @@ export interface EinsatzSlot {
   /** The assigned referee, or null when the slot is unfilled. */
   name: string | null;
   status: EinsatzSlotStatus;
-  /** The federation owes this slot to our club. */
-  ourClub: boolean;
   /** The referee reading the screen holds this slot. */
   isMine: boolean;
 }
@@ -95,7 +93,6 @@ export function einsatzView(game: RefereeGameListItem): EinsatzView {
         labelKey: "refereeGame.sr1",
         name: game.sr1Name,
         status: game.sr1Status,
-        ourClub: game.sr1OurClub,
         isMine: game.mySlot === 1,
       },
       {
@@ -103,7 +100,6 @@ export function einsatzView(game: RefereeGameListItem): EinsatzView {
         labelKey: "refereeGame.sr2",
         name: game.sr2Name,
         status: game.sr2Status,
-        ourClub: game.sr2OurClub,
         isMine: game.mySlot === 2,
       },
     ],

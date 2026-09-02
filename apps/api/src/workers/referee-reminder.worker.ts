@@ -81,6 +81,7 @@ export const refereeReminderWorker = new Worker<ReminderJobData>(
 
     const payload: RefereeSlotsPayload = {
       matchId: game.matchId,
+      refereeGameId: game.id,
       matchNo: game.matchNo,
       homeTeam: game.homeTeamName,
       guestTeam: game.guestTeamName,

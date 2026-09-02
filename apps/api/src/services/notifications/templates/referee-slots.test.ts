@@ -4,6 +4,7 @@ import type { RefereeSlotsPayload } from "@dragons/shared";
 
 const basePayload: RefereeSlotsPayload = {
   matchId: 42,
+  refereeGameId: 7,
   matchNo: 1001,
   homeTeam: "Dragons U16",
   guestTeam: "TSV Neustadt",

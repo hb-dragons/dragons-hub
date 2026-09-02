@@ -98,16 +98,14 @@ describe("followDeepLink while signed in", () => {
   );
 });
 
-// Every referee push carries `/referee-game/:id` (the assignment event builds
-// it from the referee game's own id), so a tapped referee push lands on the
-// Einsatz screen whether or not the game is linked to a synced match (#307).
+// Every referee push routes by the referee game's own id, linked to a synced
+// match or not — the API side of that is asserted in
+// `apps/api/src/services/notifications/templates/push/referee-slots.test.ts`.
+// This is the native half: such a link follows to the Einsatz screen (#307).
 describe("referee push deep links", () => {
-  it.each([
-    ["unlinked", { id: 7, matchId: null }],
-    ["linked", { id: 7, matchId: 99 }],
-  ])("follow a %s referee game to the Einsatz screen", (_label, game) => {
+  it("follows a referee push to the Einsatz screen", () => {
     setPushAuthState("signed-in");
-    followDeepLink(refereeGameRoute(game));
+    followDeepLink(refereeGameRoute({ id: 7 }));
     expect(router.push).toHaveBeenCalledWith("/referee-game/7");
   });
 });
