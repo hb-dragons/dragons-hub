@@ -162,13 +162,13 @@ const years =
     </div>
   </div>
 
-  {/* Live scoreboard (Task C6): renders nothing unless a game is live, so it
-      adds no layout when hidden. client:idle, not client:visible — the island
-      mounts empty (zero-size), so a viewport trigger might never fire, and it
-      must connect early to know whether there is anything to show at all. */}
-  <ScoreboardIsland client:idle />
-
   <HomeJoin {memberCount} {teamCount} {years} />
+
+  {/* Live board: renders nothing unless a broadcast is on, so it adds no
+      layout when hidden. client:idle, not client:visible — the island mounts
+      empty (zero-size), so a viewport trigger might never fire, and it must
+      connect early to know whether there is anything to show at all. */}
+  <ScoreboardIsland client:idle />
 
   {/* client:visible, not client:load: the band sits below the 100svh hero and
       already server-renders initialGames (shell builds render a sized

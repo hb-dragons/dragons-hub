@@ -56,10 +56,14 @@ export default defineConfig({
         // Ratcheted 2026-08-30: the Lighthouse/SEO fix round (fallbackWidth,
         // the shipped-OG-image assertion, JSON-LD address). Measured 84.71
         // statements / 80.94 branches / 76.94 functions / 85.10 lines.
-        branches: 80,
-        functions: 76,
-        lines: 85,
-        statements: 84,
+        //
+        // Ratcheted 2026-09-02: the broadcast-state live board (viewFromState/
+        // parseBroadcastState and the ScoreboardIsland render tests). Measured
+        // 86.33 statements / 83.46 branches / 79.55 functions / 86.80 lines.
+        branches: 83,
+        functions: 79,
+        lines: 86,
+        statements: 86,
       },
     },
   },

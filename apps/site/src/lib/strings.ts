@@ -231,10 +231,15 @@ export const strings = {
   scoreboard: {
     sectionLabel: "Live-Spielstand",
     liveBadge: "Live",
+    // CTA under the broadcast graphic while a stream is on.
+    twitchCta: "Live auf Twitch ansehen",
+    // Overtime notation on the period badge, same as the OBS overlay.
+    overtime: "OT",
+    // Shot-clock cap label while a timeout runs, same as the OBS overlay.
+    timeoutShort: "TO",
+    // Fallback labels when the bound match cannot be resolved.
     home: "Heim",
     guest: "Gast",
-    // Period prefix, same abbreviation the web scoreboard uses ("Q2").
-    periodPrefix: "Q",
   },
   seo: {
     // Meta descriptions (Task C8). Per-doc CMS overrides win; these are the

@@ -6,14 +6,17 @@ import {
   IDLE_RECHECK_MS,
   LIVE_STALE_MS,
   backoffDelay,
-  isLatestSnapshotLive,
-  latestUrl,
+  parseBroadcastState,
   parseSnapshot,
-  startScoreboardClient,
+  startLiveBoardClient,
+  stateUrl,
   streamUrl,
+  viewFromState,
+  type LiveBoardClientOptions,
+  type LiveBoardView,
   type LiveSnapshot,
-  type ScoreboardClientOptions,
   type ScoreboardEventSource,
+  type SiteBroadcastState,
 } from "./scoreboard";
 
 const BASE = "https://api.example";
@@ -21,8 +24,8 @@ const DEVICE = "d1";
 const FRAME_AT = "2026-08-02T12:00:00.000Z";
 const NEXT_FRAME_AT = "2026-08-02T12:00:01.000Z";
 
-/** A full wire row as GET /public/scoreboard/latest returns it. */
-function wire(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+/** The scoreboard slice of a wire state, as the API serializes it. */
+function wireSnapshot(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     deviceId: DEVICE,
     scoreHome: 12,
@@ -42,82 +45,183 @@ function wire(overrides: Record<string, unknown> = {}): Record<string, unknown> 
     timeoutDuration: "",
     panelName: DEVICE,
     lastFrameAt: FRAME_AT,
-    updatedAt: FRAME_AT,
     secondsSinceLastFrame: 2,
+    clockMs: 451_000,
     ...overrides,
   };
 }
 
-const PARSED: LiveSnapshot = {
+function wireMatch(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 7,
+    kickoffDate: "2026-08-02",
+    kickoffTime: "19:30:00",
+    league: { id: 3, name: "Bezirksliga Herren" },
+    home: { name: "Dragons 1", abbr: "DRA", color: "#0f9d58", clubId: 512 },
+    guest: { name: "TK Hannover", abbr: "TKH", color: "#c53929", clubId: 1026 },
+    ...overrides,
+  };
+}
+
+/** A full wire state as GET /public/broadcast/state returns it. */
+function wireState(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    deviceId: DEVICE,
+    isLive: true,
+    phase: "live",
+    match: wireMatch(),
+    scoreboard: wireSnapshot(),
+    stale: false,
+    startedAt: FRAME_AT,
+    endedAt: null,
+    updatedAt: FRAME_AT,
+    ...overrides,
+  };
+}
+
+const PARSED_SNAPSHOT: LiveSnapshot = {
   scoreHome: 12,
   scoreGuest: 8,
+  foulsHome: 1,
+  foulsGuest: 2,
+  timeoutsHome: 0,
+  timeoutsGuest: 1,
   period: 2,
   clockText: "07:31",
   clockRunning: true,
+  clockMs: 451_000,
+  shotClock: 14,
+  shotClockText: "14",
+  timeoutActive: false,
   lastFrameAt: FRAME_AT,
   secondsSinceLastFrame: 2,
 };
 
+const PARSED_MATCH = {
+  kickoffTime: "19:30:00",
+  leagueName: "Bezirksliga Herren",
+  home: { name: "Dragons 1", abbr: "DRA", color: "#0f9d58", clubId: 512 },
+  guest: { name: "TK Hannover", abbr: "TKH", color: "#c53929", clubId: 1026 },
+};
+
+const PARSED_STATE: SiteBroadcastState = {
+  phase: "live",
+  stale: false,
+  match: PARSED_MATCH,
+  scoreboard: PARSED_SNAPSHOT,
+};
+
 describe("parseSnapshot", () => {
   it("keeps exactly the rendered fields of a wire row", () => {
-    expect(parseSnapshot(wire())).toEqual(PARSED);
+    expect(parseSnapshot(wireSnapshot())).toEqual(PARSED_SNAPSHOT);
   });
 
   it("normalizes a missing secondsSinceLastFrame to null", () => {
-    const row = wire();
+    const row = wireSnapshot();
     delete row.secondsSinceLastFrame;
-    expect(parseSnapshot(row)).toEqual({ ...PARSED, secondsSinceLastFrame: null });
+    expect(parseSnapshot(row)).toEqual({ ...PARSED_SNAPSHOT, secondsSinceLastFrame: null });
   });
 
-  it("normalizes a non-numeric secondsSinceLastFrame to null", () => {
-    expect(parseSnapshot(wire({ secondsSinceLastFrame: "2" }))).toEqual({
-      ...PARSED,
-      secondsSinceLastFrame: null,
+  it("normalizes non-numeric shot clock and clockMs to null", () => {
+    expect(parseSnapshot(wireSnapshot({ shotClock: null, clockMs: undefined }))).toEqual({
+      ...PARSED_SNAPSHOT,
+      shotClock: null,
+      clockMs: null,
     });
   });
 
   it.each([
     ["null", null],
     ["a string", "snapshot"],
-    ["a number", 42],
     ["an empty object", {}],
-    ["a non-numeric scoreHome", wire({ scoreHome: "12" })],
-    ["a non-numeric scoreGuest", wire({ scoreGuest: null })],
-    ["a non-numeric period", wire({ period: "2" })],
-    ["a non-string clockText", wire({ clockText: 731 })],
-    ["a non-boolean clockRunning", wire({ clockRunning: "yes" })],
-    ["a non-string lastFrameAt", wire({ lastFrameAt: 1754000000 })],
+    ["a non-numeric scoreHome", wireSnapshot({ scoreHome: "12" })],
+    ["a non-numeric foulsHome", wireSnapshot({ foulsHome: "1" })],
+    ["a non-numeric timeoutsGuest", wireSnapshot({ timeoutsGuest: null })],
+    ["a non-boolean clockRunning", wireSnapshot({ clockRunning: "yes" })],
+    ["a non-boolean timeoutActive", wireSnapshot({ timeoutActive: "no" })],
+    ["a non-string shotClockText", wireSnapshot({ shotClockText: 14 })],
+    ["a non-string lastFrameAt", wireSnapshot({ lastFrameAt: 1754000000 })],
   ])("rejects %s", (_label, data) => {
     expect(parseSnapshot(data)).toBeNull();
   });
 });
 
-describe("isLatestSnapshotLive", () => {
-  const at = (seconds: number | null) => ({ ...PARSED, secondsSinceLastFrame: seconds });
-  const nowMs = Date.parse(FRAME_AT);
-
-  it("is live when the server-computed frame age is within the threshold", () => {
-    expect(isLatestSnapshotLive(at(2), nowMs)).toBe(true);
+describe("parseBroadcastState", () => {
+  it("keeps phase, staleness and the rendered match/scoreboard fields", () => {
+    expect(parseBroadcastState(wireState())).toEqual(PARSED_STATE);
   });
 
-  it("is live exactly at the threshold", () => {
-    expect(isLatestSnapshotLive(at(LIVE_STALE_MS / 1000), nowMs)).toBe(true);
+  it("carries a null match through (nothing bound in the admin)", () => {
+    expect(parseBroadcastState(wireState({ match: null }))).toEqual({
+      ...PARSED_STATE,
+      match: null,
+    });
   });
 
-  it("is not live when the server-computed frame age exceeds the threshold", () => {
-    expect(isLatestSnapshotLive(at(LIVE_STALE_MS / 1000 + 1), nowMs)).toBe(false);
+  it("carries a null scoreboard through (no frames yet)", () => {
+    expect(parseBroadcastState(wireState({ scoreboard: null }))).toEqual({
+      ...PARSED_STATE,
+      scoreboard: null,
+    });
   });
 
-  it("falls back to lastFrameAt when the server age is absent: fresh", () => {
-    expect(isLatestSnapshotLive(at(null), nowMs + LIVE_STALE_MS)).toBe(true);
+  it("normalizes a null league to a null league name", () => {
+    expect(parseBroadcastState(wireState({ match: wireMatch({ league: null }) }))).toEqual({
+      ...PARSED_STATE,
+      match: { ...PARSED_MATCH, leagueName: null },
+    });
   });
 
-  it("falls back to lastFrameAt when the server age is absent: stale", () => {
-    expect(isLatestSnapshotLive(at(null), nowMs + LIVE_STALE_MS + 1)).toBe(false);
+  it.each([
+    ["null", null],
+    ["a string", "state"],
+    ["an empty object", {}],
+    ["an unknown phase", wireState({ phase: "halftime" })],
+    ["a non-boolean stale", wireState({ stale: "no" })],
+    ["a malformed match", wireState({ match: { home: null } })],
+    ["a match with a non-string abbr", wireState({ match: wireMatch({ home: { name: "Dragons 1", abbr: 7, color: "#fff", clubId: 512 } }) })],
+    ["a match with a non-numeric clubId", wireState({ match: wireMatch({ guest: { name: "TKH", abbr: "TKH", color: "#fff", clubId: "1026" } }) })],
+    ["a league without a name", wireState({ match: wireMatch({ league: { id: 3 } }) })],
+    ["a malformed scoreboard", wireState({ scoreboard: { scoreHome: "12" } })],
+  ])("rejects %s", (_label, data) => {
+    expect(parseBroadcastState(data)).toBeNull();
+  });
+});
+
+describe("viewFromState", () => {
+  const state = (overrides: Partial<SiteBroadcastState>): SiteBroadcastState => ({
+    ...PARSED_STATE,
+    ...overrides,
   });
 
-  it("is not live when the server age is absent and lastFrameAt is unparseable", () => {
-    expect(isLatestSnapshotLive({ ...at(null), lastFrameAt: "not a date" }, nowMs)).toBe(false);
+  it("hides on idle even when a stale scoreboard row survives", () => {
+    expect(viewFromState(state({ phase: "idle" }))).toBeNull();
+  });
+
+  it("hides in pregame — the board exists only for a running game", () => {
+    expect(viewFromState(state({ phase: "pregame" }))).toBeNull();
+  });
+
+  it("shows the live board with the match while frames are fresh", () => {
+    expect(viewFromState(state({}))).toEqual({
+      match: PARSED_MATCH,
+      scoreboard: PARSED_SNAPSHOT,
+    });
+  });
+
+  it("keeps the live board without a match (bound match no longer resolves)", () => {
+    expect(viewFromState(state({ match: null }))).toEqual({
+      match: null,
+      scoreboard: PARSED_SNAPSHOT,
+    });
+  });
+
+  it("hides a live game whose frames went stale", () => {
+    expect(viewFromState(state({ stale: true }))).toBeNull();
+  });
+
+  it("hides a live phase without scoreboard data", () => {
+    expect(viewFromState(state({ scoreboard: null }))).toBeNull();
   });
 });
 
@@ -126,10 +230,7 @@ describe("backoffDelay", () => {
     [1, 1_000],
     [2, 2_000],
     [3, 4_000],
-    [4, 8_000],
-    [5, 16_000],
     [6, 30_000],
-    [7, 30_000],
     [40, 30_000],
   ])("attempt %i waits %i ms", (attempt, expected) => {
     expect(backoffDelay(attempt)).toBe(expected);
@@ -142,21 +243,19 @@ describe("backoffDelay", () => {
 });
 
 describe("endpoint URLs", () => {
-  it("builds the latest URL with the device id", () => {
-    expect(latestUrl(BASE, DEVICE)).toBe(
-      "https://api.example/public/scoreboard/latest?deviceId=d1",
-    );
+  it("builds the state URL with the device id", () => {
+    expect(stateUrl(BASE, DEVICE)).toBe("https://api.example/public/broadcast/state?deviceId=d1");
   });
 
   it("builds the stream URL with the device id", () => {
     expect(streamUrl(BASE, DEVICE)).toBe(
-      "https://api.example/public/scoreboard/stream?deviceId=d1",
+      "https://api.example/public/broadcast/stream?deviceId=d1",
     );
   });
 
   it("URL-encodes the device id", () => {
-    expect(latestUrl(BASE, "a b/c")).toBe(
-      "https://api.example/public/scoreboard/latest?deviceId=a%20b%2Fc",
+    expect(stateUrl(BASE, "a b/c")).toBe(
+      "https://api.example/public/broadcast/state?deviceId=a%20b%2Fc",
     );
   });
 
@@ -236,7 +335,7 @@ function okResponse(body: unknown): Pick<Response, "ok" | "json"> {
 function errorResponse(): Pick<Response, "ok" | "json"> {
   return {
     ok: false,
-    json: () => Promise.resolve({ error: "No data", code: "NO_DATA" }),
+    json: () => Promise.resolve({ error: "Unknown device", code: "UNKNOWN_DEVICE" }),
   } as Pick<Response, "ok" | "json">;
 }
 
@@ -245,65 +344,76 @@ function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+const LIVE_VIEW: LiveBoardView = {
+  match: PARSED_MATCH,
+  scoreboard: PARSED_SNAPSHOT,
+};
+
 function setup(responses: Array<Pick<Response, "ok" | "json"> | Error>) {
   const scheduler = makeScheduler();
   const sources: FakeEventSource[] = [];
-  const changes: Array<LiveSnapshot | null> = [];
+  const changes: Array<LiveBoardView | null> = [];
   const requested: string[] = [];
-  let nowMs = Date.parse(FRAME_AT);
-  const fetchImpl: ScoreboardClientOptions["fetchImpl"] = (url) => {
+  const fetchImpl: LiveBoardClientOptions["fetchImpl"] = (url) => {
     requested.push(url);
     const next = responses.shift() ?? errorResponse();
     if (next instanceof Error) return Promise.reject(next);
     return Promise.resolve(next as Response);
   };
-  const stop = startScoreboardClient({
+  const stop = startLiveBoardClient({
     baseUrl: BASE,
     deviceId: DEVICE,
-    onChange: (snapshot) => changes.push(snapshot),
+    onChange: (view) => changes.push(view),
     fetchImpl,
     createEventSource: (url) => {
       const source = new FakeEventSource(url);
       sources.push(source);
       return source;
     },
-    now: () => nowMs,
     schedule: scheduler.schedule,
     cancel: scheduler.cancel,
   });
-  return {
-    scheduler,
-    sources,
-    changes,
-    requested,
-    stop,
-    setNow: (value: number) => {
-      nowMs = value;
-    },
-  };
+  return { scheduler, sources, changes, requested, stop };
 }
 
-describe("startScoreboardClient", () => {
-  it("requests /latest for the device on start", async () => {
+describe("startLiveBoardClient", () => {
+  it("requests /state for the device on start", async () => {
     const harness = setup([errorResponse()]);
     await flush();
-    expect(harness.requested).toEqual([latestUrl(BASE, DEVICE)]);
+    expect(harness.requested).toEqual([stateUrl(BASE, DEVICE)]);
     harness.stop();
   });
 
-  it("shows the board and opens the stream when the latest snapshot is fresh", async () => {
-    const harness = setup([okResponse(wire())]);
+  it("shows the live board and opens the stream on a live state", async () => {
+    const harness = setup([okResponse(wireState())]);
     await flush();
-    expect(harness.changes).toEqual([PARSED]);
+    expect(harness.changes).toEqual([LIVE_VIEW]);
     expect(harness.sources.map((source) => source.url)).toEqual([streamUrl(BASE, DEVICE)]);
     harness.stop();
   });
 
-  it("stays hidden and schedules a recheck when /latest has no data", async () => {
-    const harness = setup([errorResponse()]);
+  it("stays hidden in pregame and keeps polling instead of streaming", async () => {
+    const harness = setup([okResponse(wireState({ phase: "pregame" }))]);
     await flush();
     expect(harness.changes).toEqual([null]);
     expect(harness.sources).toEqual([]);
+    expect(harness.scheduler.pending()).toEqual([IDLE_RECHECK_MS]);
+    harness.stop();
+  });
+
+  it("stays hidden and schedules a recheck on an idle state", async () => {
+    const harness = setup([okResponse(wireState({ phase: "idle", match: null }))]);
+    await flush();
+    expect(harness.changes).toEqual([null]);
+    expect(harness.sources).toEqual([]);
+    expect(harness.scheduler.pending()).toEqual([IDLE_RECHECK_MS]);
+    harness.stop();
+  });
+
+  it("stays hidden when /state answers an error", async () => {
+    const harness = setup([errorResponse()]);
+    await flush();
+    expect(harness.changes).toEqual([null]);
     expect(harness.scheduler.pending()).toEqual([IDLE_RECHECK_MS]);
     harness.stop();
   });
@@ -312,23 +422,10 @@ describe("startScoreboardClient", () => {
     const harness = setup([new Error("cors")]);
     await flush();
     expect(harness.changes).toEqual([null]);
-    expect(harness.scheduler.pending()).toEqual([IDLE_RECHECK_MS]);
     harness.stop();
   });
 
-  it("stays hidden when the body cannot be read as JSON", async () => {
-    const harness = setup([
-      {
-        ok: true,
-        json: () => Promise.reject(new Error("bad json")),
-      } as Pick<Response, "ok" | "json">,
-    ]);
-    await flush();
-    expect(harness.changes).toEqual([null]);
-    harness.stop();
-  });
-
-  it("stays hidden when the body is not a snapshot", async () => {
+  it("stays hidden when the body is not a broadcast state", async () => {
     const harness = setup([okResponse({ error: "nope" })]);
     await flush();
     expect(harness.changes).toEqual([null]);
@@ -336,88 +433,111 @@ describe("startScoreboardClient", () => {
     harness.stop();
   });
 
-  it("stays hidden when the latest snapshot is stale", async () => {
-    const harness = setup([okResponse(wire({ secondsSinceLastFrame: 4_270_551 }))]);
-    await flush();
-    expect(harness.changes).toEqual([null]);
-    expect(harness.sources).toEqual([]);
-    harness.stop();
-  });
-
-  it("goes live from the idle recheck once a game starts", async () => {
-    const harness = setup([errorResponse(), okResponse(wire())]);
+  it("goes live from the idle recheck once the broadcast starts", async () => {
+    const harness = setup([okResponse(wireState({ phase: "idle" })), okResponse(wireState())]);
     await flush();
     harness.scheduler.fire(IDLE_RECHECK_MS);
     await flush();
-    expect(harness.changes).toEqual([null, PARSED]);
+    expect(harness.changes).toEqual([null, LIVE_VIEW]);
     expect(harness.sources).toHaveLength(1);
     harness.stop();
   });
 
-  it("renders each streamed snapshot", async () => {
-    const harness = setup([okResponse(wire())]);
+  it("renders each streamed state", async () => {
+    const harness = setup([okResponse(wireState())]);
     await flush();
-    const updated = wire({ scoreHome: 14, lastFrameAt: NEXT_FRAME_AT });
-    delete updated.secondsSinceLastFrame;
-    harness.sources[0]!.emit("snapshot", JSON.stringify(updated));
+    harness.sources[0]!.emit(
+      "snapshot",
+      JSON.stringify(
+        wireState({ scoreboard: wireSnapshot({ scoreHome: 14, lastFrameAt: NEXT_FRAME_AT }) }),
+      ),
+    );
     expect(harness.changes.at(-1)).toEqual({
-      ...PARSED,
-      scoreHome: 14,
-      lastFrameAt: NEXT_FRAME_AT,
-      secondsSinceLastFrame: null,
+      ...LIVE_VIEW,
+      scoreboard: { ...PARSED_SNAPSHOT, scoreHome: 14, lastFrameAt: NEXT_FRAME_AT },
     });
     harness.stop();
   });
 
   it("ignores malformed stream events", async () => {
-    const harness = setup([okResponse(wire())]);
+    const harness = setup([okResponse(wireState())]);
     await flush();
     const source = harness.sources[0]!;
     source.emit("snapshot");
     source.emit("snapshot", "not json");
     source.emit("snapshot", JSON.stringify({ error: "nope" }));
-    expect(harness.changes).toEqual([PARSED]);
+    expect(harness.changes).toEqual([LIVE_VIEW]);
     harness.stop();
   });
 
-  it("hides and returns to polling when frames stop arriving", async () => {
-    const harness = setup([okResponse(wire())]);
+  it("hides and returns to polling when a streamed state goes idle", async () => {
+    const harness = setup([okResponse(wireState())]);
+    await flush();
+    harness.sources[0]!.emit("snapshot", JSON.stringify(wireState({ phase: "idle" })));
+    expect(harness.changes).toEqual([LIVE_VIEW, null]);
+    expect(harness.sources[0]!.closed).toBe(true);
+    expect(harness.scheduler.pending()).toEqual([IDLE_RECHECK_MS]);
+    harness.stop();
+  });
+
+  it("hides when a streamed state reports stale frames", async () => {
+    const harness = setup([okResponse(wireState())]);
+    await flush();
+    harness.sources[0]!.emit("snapshot", JSON.stringify(wireState({ stale: true })));
+    expect(harness.changes).toEqual([LIVE_VIEW, null]);
+    expect(harness.sources[0]!.closed).toBe(true);
+    expect(harness.scheduler.pending()).toEqual([IDLE_RECHECK_MS]);
+    harness.stop();
+  });
+
+  it("re-checks /state when frames stop arriving mid-game", async () => {
+    const harness = setup([
+      okResponse(wireState()),
+      okResponse(wireState({ stale: true })),
+    ]);
     await flush();
     harness.scheduler.fire(LIVE_STALE_MS);
-    expect(harness.sources[0]!.closed).toBe(true);
-    expect(harness.changes).toEqual([PARSED, null]);
+    await flush();
+    expect(harness.requested).toEqual([stateUrl(BASE, DEVICE), stateUrl(BASE, DEVICE)]);
+    expect(harness.changes).toEqual([LIVE_VIEW, null]);
+    expect(harness.scheduler.pending()).toEqual([IDLE_RECHECK_MS]);
+    harness.stop();
+  });
+
+  it("hides when frames stop and the API is unreachable", async () => {
+    const harness = setup([okResponse(wireState()), new Error("down")]);
+    await flush();
+    harness.scheduler.fire(LIVE_STALE_MS);
+    await flush();
+    expect(harness.changes).toEqual([LIVE_VIEW, null]);
     expect(harness.scheduler.pending()).toEqual([IDLE_RECHECK_MS]);
     harness.stop();
   });
 
   it("a fresh frame re-arms the staleness watchdog", async () => {
-    const harness = setup([okResponse(wire())]);
+    const harness = setup([okResponse(wireState())]);
     await flush();
     harness.sources[0]!.emit(
       "snapshot",
-      JSON.stringify(wire({ lastFrameAt: NEXT_FRAME_AT })),
+      JSON.stringify(wireState({ scoreboard: wireSnapshot({ lastFrameAt: NEXT_FRAME_AT }) })),
     );
-    const staleArms = harness.scheduler
-      .scheduledLog()
-      .filter((ms) => ms === LIVE_STALE_MS);
+    const staleArms = harness.scheduler.scheduledLog().filter((ms) => ms === LIVE_STALE_MS);
     expect(staleArms).toHaveLength(2);
     expect(harness.scheduler.pending()).toEqual([LIVE_STALE_MS]);
     harness.stop();
   });
 
   it("a replayed frame with an unchanged timestamp does not extend liveness", async () => {
-    const harness = setup([okResponse(wire())]);
+    const harness = setup([okResponse(wireState())]);
     await flush();
-    harness.sources[0]!.emit("snapshot", JSON.stringify(wire()));
-    const staleArms = harness.scheduler
-      .scheduledLog()
-      .filter((ms) => ms === LIVE_STALE_MS);
+    harness.sources[0]!.emit("snapshot", JSON.stringify(wireState()));
+    const staleArms = harness.scheduler.scheduledLog().filter((ms) => ms === LIVE_STALE_MS);
     expect(staleArms).toHaveLength(1);
     harness.stop();
   });
 
   it("reconnects with exponential backoff and resets it once the stream reopens", async () => {
-    const harness = setup([okResponse(wire())]);
+    const harness = setup([okResponse(wireState())]);
     await flush();
 
     harness.sources[0]!.emit("error");
@@ -431,14 +551,17 @@ describe("startScoreboardClient", () => {
 
     harness.scheduler.fire(backoffDelay(2));
     expect(harness.sources).toHaveLength(3);
-    harness.sources[2]!.emit("snapshot", JSON.stringify(wire({ lastFrameAt: NEXT_FRAME_AT })));
+    harness.sources[2]!.emit(
+      "snapshot",
+      JSON.stringify(wireState({ scoreboard: wireSnapshot({ lastFrameAt: NEXT_FRAME_AT }) })),
+    );
     harness.sources[2]!.emit("error");
     expect(harness.scheduler.pending()).toContain(backoffDelay(1));
     harness.stop();
   });
 
   it("an open that never delivers data does not reset the backoff", async () => {
-    const harness = setup([okResponse(wire())]);
+    const harness = setup([okResponse(wireState())]);
     await flush();
     harness.sources[0]!.emit("error");
     harness.scheduler.fire(backoffDelay(1));
@@ -449,7 +572,7 @@ describe("startScoreboardClient", () => {
   });
 
   it("a duplicate error event does not schedule a second reconnect", async () => {
-    const harness = setup([okResponse(wire())]);
+    const harness = setup([okResponse(wireState())]);
     await flush();
     harness.sources[0]!.emit("error");
     harness.sources[0]!.emit("error");
@@ -458,36 +581,28 @@ describe("startScoreboardClient", () => {
     harness.stop();
   });
 
-  it("keeps the last score visible through a transient disconnect", async () => {
-    const harness = setup([okResponse(wire())]);
+  it("keeps the last board visible through a transient disconnect", async () => {
+    const harness = setup([okResponse(wireState())]);
     await flush();
     harness.sources[0]!.emit("error");
-    expect(harness.changes).toEqual([PARSED]);
-    harness.stop();
-  });
-
-  it("hides even while disconnected once the watchdog fires", async () => {
-    const harness = setup([okResponse(wire())]);
-    await flush();
-    harness.sources[0]!.emit("error");
-    harness.scheduler.fire(LIVE_STALE_MS);
-    expect(harness.changes).toEqual([PARSED, null]);
-    // The pending reconnect was cancelled; only the idle recheck remains.
-    expect(harness.scheduler.pending()).toEqual([IDLE_RECHECK_MS]);
+    expect(harness.changes).toEqual([LIVE_VIEW]);
     harness.stop();
   });
 
   it("stop() closes the stream, cancels timers and mutes late events", async () => {
-    const harness = setup([okResponse(wire())]);
+    const harness = setup([okResponse(wireState())]);
     await flush();
     harness.stop();
     expect(harness.sources[0]!.closed).toBe(true);
     expect(harness.scheduler.pending()).toEqual([]);
     const source = harness.sources[0]!;
-    source.emit("snapshot", JSON.stringify(wire({ lastFrameAt: NEXT_FRAME_AT })));
+    source.emit(
+      "snapshot",
+      JSON.stringify(wireState({ scoreboard: wireSnapshot({ lastFrameAt: NEXT_FRAME_AT }) })),
+    );
     source.emit("error");
     source.emit("open");
-    expect(harness.changes).toEqual([PARSED]);
+    expect(harness.changes).toEqual([LIVE_VIEW]);
     expect(harness.scheduler.pending()).toEqual([]);
   });
 
@@ -495,11 +610,11 @@ describe("startScoreboardClient", () => {
     let resolveFetch: ((value: Pick<Response, "ok" | "json">) => void) | undefined;
     const scheduler = makeScheduler();
     const sources: FakeEventSource[] = [];
-    const changes: Array<LiveSnapshot | null> = [];
-    const stop = startScoreboardClient({
+    const changes: Array<LiveBoardView | null> = [];
+    const stop = startLiveBoardClient({
       baseUrl: BASE,
       deviceId: DEVICE,
-      onChange: (snapshot) => changes.push(snapshot),
+      onChange: (view) => changes.push(view),
       fetchImpl: () =>
         new Promise((resolve) => {
           resolveFetch = resolve as (value: Pick<Response, "ok" | "json">) => void;
@@ -509,12 +624,11 @@ describe("startScoreboardClient", () => {
         sources.push(source);
         return source;
       },
-      now: () => Date.parse(FRAME_AT),
       schedule: scheduler.schedule,
       cancel: scheduler.cancel,
     });
     stop();
-    resolveFetch!(okResponse(wire()));
+    resolveFetch!(okResponse(wireState()));
     await flush();
     expect(changes).toEqual([]);
     expect(sources).toEqual([]);
@@ -530,7 +644,7 @@ describe("startScoreboardClient", () => {
   });
 
   it("stop() is idempotent", async () => {
-    const harness = setup([okResponse(wire())]);
+    const harness = setup([okResponse(wireState())]);
     await flush();
     harness.stop();
     expect(() => harness.stop()).not.toThrow();

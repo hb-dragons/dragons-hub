@@ -18,6 +18,8 @@
  *   --max=<n>          same as MAX_FRAMES
  *   --device=<id>      same as DEVICE_ID
  *   --url=<url>        same as INGEST_URL
+ *   --skip=pregame     fast-forward to the first running-game frame
+ *   --skip=<n>         drop the first n state changes
  *
  * Examples:
  *   node replay-fixture.mjs --rate=10           # ten frames per second
@@ -177,6 +179,22 @@ async function main() {
     if (isDifferent(prev, snap)) {
       replay.push({ frame, snap });
       prev = snap;
+    }
+  }
+
+  // --skip=pregame fast-forwards to the first frame of the running game;
+  // --skip=<n> drops the first n state changes.
+  if (flags.skip === "pregame") {
+    const liveAt = replay.findIndex(({ snap }) => snap.period > 0 && snap.clockRunning);
+    if (liveAt > 0) {
+      replay.splice(0, liveAt);
+      console.log(`skipped ${liveAt} pregame state changes`);
+    }
+  } else if (flags.skip !== undefined) {
+    const n = Number.parseInt(flags.skip, 10);
+    if (Number.isFinite(n) && n > 0) {
+      replay.splice(0, n);
+      console.log(`skipped ${n} state changes`);
     }
   }
 

@@ -10,11 +10,12 @@ describe("BANNER_IMAGE", () => {
 });
 
 describe("SOCIAL_LINKS", () => {
-  it("carries the four club profiles", () => {
+  it("carries the five club profiles", () => {
     expect(SOCIAL_LINKS.instagram).toContain("instagram.com/hb_dragons");
     expect(SOCIAL_LINKS.facebook).toContain("facebook.com/hbdragonsev");
     expect(SOCIAL_LINKS.youtube).toContain("youtube.com/@HanoverBasketballDragons");
     expect(SOCIAL_LINKS.linkedin).toContain("linkedin.com/company/hanover-basketball-dragons-e-v");
+    expect(SOCIAL_LINKS.twitch).toContain("twitch.tv/hb_dragons");
   });
 });
 

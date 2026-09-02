@@ -15,6 +15,7 @@ export const SOCIAL_LINKS = {
   facebook: "https://www.facebook.com/hbdragonsev/",
   youtube: "https://www.youtube.com/@HanoverBasketballDragons",
   linkedin: "https://www.linkedin.com/company/hanover-basketball-dragons-e-v",
+  twitch: "https://twitch.tv/hb_dragons",
 } as const;
 
 /** Nuxt UI "soft" button, classes lifted from prod hbdragons.de markup. */
