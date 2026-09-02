@@ -18,6 +18,7 @@ import { useRefresh } from "@/hooks/useRefresh";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { RefereeGameCard } from "@/components/RefereeGameCard";
 import { openAssignRefereeSheet } from "@/lib/nav/referee-sheets";
+import { refereeGameRoute } from "@/lib/referee/einsatz";
 import { authClient } from "@/lib/auth-client";
 import { refereeApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
@@ -346,14 +347,9 @@ export default function OfficiatingScreen() {
                     }
                   : undefined
               }
-              onPress={() => {
-                const isOwnClubGame = item.isHomeGame || item.isGuestGame;
-                if (isOwnClubGame && item.matchId !== null) {
-                  router.push(`/game/${String(item.matchId)}`);
-                } else {
-                  router.push(`/referee-game/${String(item.id)}`);
-                }
-              }}
+              // Every referee game opens the Einsatz screen, own-club or not
+              // (#307); the fan match screen is a link from there.
+              onPress={() => router.push(refereeGameRoute(item))}
             />
           </View>
         )}

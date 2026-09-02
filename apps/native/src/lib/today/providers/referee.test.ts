@@ -83,8 +83,8 @@ describe("refereeProvider.useItems", () => {
 
   it("emits the earliest assigned game as the next assignment", () => {
     setData([
-      game({ id: 5, mySlot: "sr1", kickoffDate: "2999-05-05", matchId: 99 }),
-      game({ id: 6, mySlot: "sr1", kickoffDate: "2999-02-02", matchId: null }),
+      game({ id: 5, mySlot: 1, kickoffDate: "2999-05-05", matchId: 99 }),
+      game({ id: 6, mySlot: 1, kickoffDate: "2999-02-02", matchId: null }),
     ]);
     const next = refereeProvider
       .useItems(user)
@@ -94,13 +94,23 @@ describe("refereeProvider.useItems", () => {
     expect(next?.urgency).toBe(80);
   });
 
+  // The own-club branch into `/game/:matchId` is gone (#307): a linked match
+  // is a "Spielinfo" link on the Einsatz screen, not a different destination.
+  it("routes a linked assignment at the Einsatz screen, not the fan screen", () => {
+    setData([game({ id: 6, mySlot: 1, kickoffDate: "2999-02-02", matchId: 99 })]);
+    const next = refereeProvider
+      .useItems(user)
+      .find((i) => i.id.startsWith("assignment-"));
+    expect(next?.route).toBe("/referee-game/6");
+  });
+
   // A Today item is pressable, so its route has to be a screen. The field is a
   // typed href, but the id comes from the API at runtime — this catches a
   // provider building a path shape no route matches.
   it("routes every item it emits at a real screen", () => {
     setData([
       game({ sr1OurClub: true, sr1Status: "open" }),
-      game({ id: 6, mySlot: "sr1", kickoffDate: "2999-02-02", matchId: 42 }),
+      game({ id: 6, mySlot: 1, kickoffDate: "2999-02-02", matchId: 42 }),
     ]);
     const items = refereeProvider.useItems(user);
     expect(items.length).toBeGreaterThan(0);

@@ -18,6 +18,7 @@ import {
   subscribeToTaps,
 } from "@/lib/push/handler";
 import { NOT_FOUND_ROUTE } from "@/lib/nav/href";
+import { refereeGameRoute } from "@/lib/referee/einsatz";
 
 type Tap = Parameters<Parameters<typeof Notifications.addNotificationResponseReceivedListener>[0]>[0];
 
@@ -95,6 +96,20 @@ describe("followDeepLink while signed in", () => {
       expect(router.push).toHaveBeenCalledWith(NOT_FOUND_ROUTE);
     },
   );
+});
+
+// Every referee push carries `/referee-game/:id` (the assignment event builds
+// it from the referee game's own id), so a tapped referee push lands on the
+// Einsatz screen whether or not the game is linked to a synced match (#307).
+describe("referee push deep links", () => {
+  it.each([
+    ["unlinked", { id: 7, matchId: null }],
+    ["linked", { id: 7, matchId: 99 }],
+  ])("follow a %s referee game to the Einsatz screen", (_label, game) => {
+    setPushAuthState("signed-in");
+    followDeepLink(refereeGameRoute(game));
+    expect(router.push).toHaveBeenCalledWith("/referee-game/7");
+  });
 });
 
 describe("followDeepLink while signed out", () => {

@@ -169,6 +169,10 @@
     "sr1Short": "R1",
     "sr2Short": "R2",
     "unassigned": "Not yet assigned",
+    "matchNo": "Game number",
+    "matchInfo": "Match info",
+    "matchInfoHint": "Score, quarters and form",
+    "open": "Open",
     "mine": "You",
     "status": {
       "open": "Open",
