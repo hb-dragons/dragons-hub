@@ -15,7 +15,8 @@
     "generate:importmap": "payload generate:importmap",
     "migrate": "payload migrate",
     "migrate:create": "payload migrate:create",
-    "migrate:strapi": "tsx scripts/migrate-strapi/index.ts"
+    "migrate:strapi": "tsx scripts/migrate-strapi/index.ts",
+    "migrate:cms-staff": "tsx scripts/import-staff/index.ts"
   },
   "dependencies": {
     "@payloadcms/db-postgres": "3.87.0",
@@ -30,11 +31,14 @@
     "sharp": "^0.35.0"
   },
   "devDependencies": {
+    "@dragons/db": "workspace:*",
+    "@dragons/shared": "workspace:*",
     "@types/node": "^25.8.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^4.1.6",
     "eslint": "^9.28.0",
+    "drizzle-orm": "^0.45.2",
     "eslint-config-next": "16.2.6",
     "jsdom": "^26.1.0",
     "tsx": "^4.21.0",
