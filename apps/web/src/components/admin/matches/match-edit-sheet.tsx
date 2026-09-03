@@ -53,7 +53,7 @@ import {
 import { AlertTriangle, Loader2, RotateCcw, Save, X, Users } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
-import { can, clubDayAnchor } from "@dragons/shared";
+import { can, clubDayAnchor, teamDisplayName } from "@dragons/shared";
 import type { OwnClubTeam } from "@dragons/shared";
 import { api } from "@/lib/api";
 import { resolveVenueId, type SelectedVenue } from "@/lib/venue-selection";
@@ -156,14 +156,6 @@ function getDefaultValues(match: MatchDetail): MatchFormValues {
     internalNotes: match.internalNotes,
     publicComment: match.publicComment,
   };
-}
-
-// ---------------------------------------------------------------------------
-// Team types & helpers
-// ---------------------------------------------------------------------------
-
-function getTeamDisplayName(team: OwnClubTeam): string {
-  return team.customName ?? team.nameShort ?? team.name;
 }
 
 // ---------------------------------------------------------------------------
@@ -836,7 +828,7 @@ export function MatchEditSheet({
                   </PopoverTrigger>
                   <PopoverContent align="start" className="w-48 p-1">
                     {ownClubTeams.map((team) => {
-                      const displayName = getTeamDisplayName(team);
+                      const displayName = teamDisplayName(team);
                       return (
                         <button
                           key={team.id}
@@ -886,7 +878,7 @@ export function MatchEditSheet({
                               </SelectTrigger>
                               <SelectContent>
                                 {ownClubTeams.map((team) => {
-                                  const displayName = getTeamDisplayName(team);
+                                  const displayName = teamDisplayName(team);
                                   return (
                                     <SelectItem key={team.id} value={displayName}>
                                       {displayName}

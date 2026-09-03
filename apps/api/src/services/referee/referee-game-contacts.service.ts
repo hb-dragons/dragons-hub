@@ -10,6 +10,7 @@ import {
 import { and, eq, inArray } from "drizzle-orm";
 import {
   KAMPFGERICHT_ROLES,
+  teamDisplayName,
   type KampfgerichtEntry,
   type KampfgerichtRole,
   type RefereeContactGroup,
@@ -52,15 +53,6 @@ interface EntryRow {
   name: string;
   nameShort: string | null;
   customName: string | null;
-}
-
-/**
- * How the admin match editor writes a team into `anschreiber` and friends —
- * the Kampfgericht columns hold a display name, not an id, so matching one
- * back to a team entry means spelling the name the same way the editor did.
- */
-function displayName(team: Pick<EntryRow, "name" | "nameShort" | "customName">): string {
-  return team.customName ?? team.nameShort ?? team.name;
 }
 
 /**
@@ -177,7 +169,7 @@ export async function getRefereeGameContacts(
   const contacts: RefereeContactGroup[] = playingEntries
     .map((entry) => ({
       teamEntryId: entry.entryId,
-      teamName: displayName(entry),
+      teamName: teamDisplayName(entry),
       contacts: contactsOf(entry.entryId, staff),
     }))
     // A team with nobody on it contributes no block rather than an empty one.
@@ -188,7 +180,11 @@ export async function getRefereeGameContacts(
   const kampfgericht: KampfgerichtEntry[] =
     game.isHomeGame && game.matchId !== null
       ? groupKampfgericht(game).map(({ teamName, roles }) => {
-          const entry = entries.find((e) => displayName(e) === teamName);
+          // The column holds a name, so the match is by name — and a name that
+          // fits two entries in one season identifies neither. Naming the team
+          // without contacts is honest; guessing one of the two is not.
+          const matched = entries.filter((e) => teamDisplayName(e) === teamName);
+          const entry = matched.length === 1 ? matched[0]! : undefined;
           const alreadyListed =
             entry !== undefined &&
             contacts.some((group) => group.teamEntryId === entry.entryId);

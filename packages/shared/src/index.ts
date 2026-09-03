@@ -48,7 +48,7 @@ export type {
   TeamStaffMember,
   TeamStaffRole,
 } from "./teams";
-export { TEAM_STAFF_ROLES } from "./teams";
+export { TEAM_STAFF_ROLES, teamDisplayName } from "./teams";
 
 export type {
   BookingListItem,

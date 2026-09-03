@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { View, Text, ActivityIndicator, Platform, Pressable } from "react-native";
 import { useLocalSearchParams, Stack, router } from "expo-router";
 import useSWR from "swr";
@@ -115,6 +116,42 @@ function ContactRow({ contact }: { contact: EinsatzContact }) {
             <Text style={[textStyles.body, { color: colors.primary }]}>{email.label}</Text>
           </Pressable>
         ) : null}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * A labelled panel on the surface the Officials block already uses. Both
+ * contact blocks (#313) have the same shape, and a third copy of the label,
+ * radius, padding and gap is a third place to keep them in step.
+ */
+function Section({ label, children }: { label: string; children: ReactNode }) {
+  const { colors, spacing, radius } = useTheme();
+
+  return (
+    <View style={{ marginBottom: spacing.md }}>
+      <Text
+        style={{
+          fontSize: 11,
+          textTransform: "uppercase",
+          letterSpacing: 0.5,
+          color: colors.mutedForeground,
+          fontFamily: fontFamilies.displayMedium,
+          marginBottom: spacing.sm,
+        }}
+      >
+        {label}
+      </Text>
+      <View
+        style={{
+          backgroundColor: colors.surfaceLowest,
+          borderRadius: radius.md,
+          padding: spacing.lg,
+          gap: spacing.md,
+        }}
+      >
+        {children}
       </View>
     </View>
   );
@@ -421,76 +458,52 @@ export default function RefereeGameDetailScreen() {
       {/* Home games with a linked match only, and only for a caller who holds
           the game — the lib returns an empty list for everyone else. */}
       {view.kampfgericht.length > 0 ? (
-        <View style={{ marginBottom: spacing.md }}>
-          <Text style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
-            {i18n.t("refereeGame.kampfgericht")}
-          </Text>
-          <View
-            style={{
-              backgroundColor: colors.surfaceLowest,
-              borderRadius: radius.md,
-              padding: spacing.lg,
-              gap: spacing.md,
-            }}
-          >
-            {view.kampfgericht.map((line) => (
-              <View key={line.key} style={{ gap: spacing.sm }}>
-                <View style={detailRowStyle}>
-                  <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
-                    {line.roleKeys.map((key) => i18n.t(key)).join(" · ")}
-                  </Text>
-                  <Text
-                    style={[
-                      textStyles.body,
-                      {
-                        color: colors.foreground,
-                        flex: 1,
-                        textAlign: "right",
-                        marginLeft: spacing.md,
-                      },
-                    ]}
-                    numberOfLines={2}
-                  >
-                    {line.teamName}
-                  </Text>
-                </View>
-                {line.contacts.map((contact) => (
-                  <ContactRow key={contact.key} contact={contact} />
-                ))}
+        <Section label={i18n.t("refereeGame.kampfgericht")}>
+          {view.kampfgericht.map((line) => (
+            <View key={line.key} style={{ gap: spacing.sm }}>
+              <View style={detailRowStyle}>
+                <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
+                  {line.roleKeys.map((key) => i18n.t(key)).join(" · ")}
+                </Text>
+                <Text
+                  style={[
+                    textStyles.body,
+                    {
+                      color: colors.foreground,
+                      flex: 1,
+                      textAlign: "right",
+                      marginLeft: spacing.md,
+                    },
+                  ]}
+                  numberOfLines={2}
+                >
+                  {line.teamName}
+                </Text>
               </View>
-            ))}
-          </View>
-        </View>
+              {line.contacts.map((contact) => (
+                <ContactRow key={contact.key} contact={contact} />
+              ))}
+            </View>
+          ))}
+        </Section>
       ) : null}
 
       {/* ── 2e. Kontakt (#313) ── */}
       {/* The Dragons team playing — both of them in a derby. A foreign game
           has nobody of ours in it, and shows no block at all. */}
       {view.contacts.length > 0 ? (
-        <View style={{ marginBottom: spacing.md }}>
-          <Text style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
-            {i18n.t("refereeGame.contacts")}
-          </Text>
-          <View
-            style={{
-              backgroundColor: colors.surfaceLowest,
-              borderRadius: radius.md,
-              padding: spacing.lg,
-              gap: spacing.md,
-            }}
-          >
-            {view.contacts.map((group) => (
-              <View key={group.key} style={{ gap: spacing.sm }}>
-                <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
-                  {group.teamName}
-                </Text>
-                {group.contacts.map((contact) => (
-                  <ContactRow key={contact.key} contact={contact} />
-                ))}
-              </View>
-            ))}
-          </View>
-        </View>
+        <Section label={i18n.t("refereeGame.contacts")}>
+          {view.contacts.map((group) => (
+            <View key={group.key} style={{ gap: spacing.sm }}>
+              <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
+                {group.teamName}
+              </Text>
+              {group.contacts.map((contact) => (
+                <ContactRow key={contact.key} contact={contact} />
+              ))}
+            </View>
+          ))}
+        </Section>
       ) : null}
 
       {/* ── 3. Spielinfo ── */}

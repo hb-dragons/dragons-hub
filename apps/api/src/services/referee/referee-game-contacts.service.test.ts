@@ -338,6 +338,49 @@ describe("getRefereeGameContacts", () => {
     ]);
   });
 
+  // Two entries answering to the same display name identify neither, so the
+  // line names the team and stops there rather than guessing one of them.
+  it("attaches no contacts when the Kampfgericht name fits two entries", async () => {
+    const seasonId = await seedSeason("2026/27", "active");
+    const leagueId = await seedLeague(seasonId);
+    const playing = await seedTeam({ name: "Dragons 1", isOwnClub: true });
+    const guest = await seedTeam({ name: "Titans 1", isOwnClub: false });
+    const twinA = await seedTeam({ name: "Dragons U16 (m)", isOwnClub: true });
+    const twinB = await seedTeam({ name: "Dragons U16 (w)", isOwnClub: true });
+
+    await seedEntry({ teamId: playing.teamId, seasonId });
+    const entryA = await seedEntry({
+      teamId: twinA.teamId,
+      seasonId,
+      customName: "Dragons U16",
+    });
+    const entryB = await seedEntry({
+      teamId: twinB.teamId,
+      seasonId,
+      customName: "Dragons U16",
+    });
+    await seedStaff({ teamEntryId: entryA, firstName: "Ana", lastName: "Berger" });
+    await seedStaff({ teamEntryId: entryB, firstName: "Kim", lastName: "Draak" });
+
+    const matchId = await seedMatch({
+      leagueId,
+      homeTeamApiId: playing.apiTeamPermanentId,
+      guestTeamApiId: guest.apiTeamPermanentId,
+      anschreiber: "Dragons U16",
+    });
+    const gameId = await seedRefereeGame({
+      matchId,
+      homeTeamId: playing.teamId,
+      guestTeamId: guest.teamId,
+    });
+
+    const result = await getRefereeGameContacts(gameId);
+
+    expect(result.kampfgericht).toEqual([
+      { roles: ["anschreiber"], teamName: "Dragons U16", contacts: [] },
+    ]);
+  });
+
   it("skips a role the match leaves unset", async () => {
     const { gameId } = await seedHomeGame({ zeitnehmer: null, shotclock: null });
 

@@ -526,6 +526,12 @@ export function getVisibleRefereeGameByMatchId(
  * referee browsing an open game they could claim gets neither key — and the
  * queries behind them are never run, so the data does not reach the process
  * only to be stripped on the way out.
+ *
+ * `refereeId === null` is the unscoped read, and it is exactly the assignment
+ * view permission: `requireRefereeSelfOrAdminRole` sets `refereeId` on the
+ * context only for a caller who did *not* satisfy one of the admin roles it
+ * gates on. Widening this reader's access therefore means widening that
+ * middleware, not this line.
  */
 export async function getVisibleRefereeGameById(
   refereeId: number | null,
