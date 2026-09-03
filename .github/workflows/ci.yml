@@ -196,8 +196,11 @@ jobs:
       - name: Check for lockfile poisoning
         run: |
           if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q 'pnpm-lock.yaml'; then
-            if ! git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -qE '(^|/)package\.json$'; then
-              echo "::error::pnpm-lock.yaml changed without any package.json changes. This could indicate lockfile poisoning."
+            # pnpm-workspace.yaml counts as a manifest: its `overrides` block is the
+            # sanctioned way to lift a transitive dependency past an advisory, and
+            # that changes the lockfile without touching any package.json.
+            if ! git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -qE '(^|/)package\.json$|^pnpm-workspace\.yaml$'; then
+              echo "::error::pnpm-lock.yaml changed without any package.json or pnpm-workspace.yaml change. This could indicate lockfile poisoning."
               exit 1
             fi
           fi
