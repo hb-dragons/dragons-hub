@@ -2,6 +2,7 @@ import type {
   AssignRefereeResponse,
   CandidateSearchResponse,
   PaginatedResponse,
+  RefereeGameDetail,
   RefereeGameListItem,
   UnassignRefereeResponse,
 } from "@dragons/shared";
@@ -46,7 +47,8 @@ export function refereeEndpoints(client: ApiClient) {
         params as Record<string, string | number | boolean | undefined>,
       );
     },
-    getGame(id: number): Promise<RefereeGameListItem> {
+    // The Einsatz screen's reader: the list item plus the `brief` block (#309).
+    getGame(id: number): Promise<RefereeGameDetail> {
       return client.get(`/referee/games/${id}`);
     },
     getGameByMatchId(matchId: number): Promise<RefereeGameListItem> {

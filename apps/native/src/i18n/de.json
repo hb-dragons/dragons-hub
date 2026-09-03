@@ -170,6 +170,14 @@
     "sr2Short": "SR2",
     "unassigned": "Noch nicht zugewiesen",
     "matchNo": "Spielnummer",
+    "tentative": "Vorläufig",
+    "address": "Anfahrt",
+    "route": "Route",
+    "changed": {
+      "venueChanged": "Halle wurde nachträglich geändert",
+      "timeChanged": "Uhrzeit wurde nachträglich geändert"
+    },
+    "federationLink": "Auf basketball-bund.net öffnen",
     "matchInfo": "Spielinfo",
     "matchInfoHint": "Ergebnis, Viertel und Form",
     "open": "Öffnen",

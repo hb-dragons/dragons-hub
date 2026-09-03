@@ -1,7 +1,8 @@
 import { getDb } from "../../config/database";
 import { refereeGames } from "@dragons/db/schema";
 import { and, eq, gte, isNull, lte, or, ilike, sql, asc, inArray } from "drizzle-orm";
-import type { RefereeGameListItem } from "@dragons/shared";
+import type { RefereeGameBrief, RefereeGameListItem } from "@dragons/shared";
+import { federationGameUrl } from "@dragons/shared";
 
 const isTrackedLeagueExpr = sql<boolean>`${refereeGames.matchId} IS NOT NULL`.as("is_tracked_league");
 
@@ -38,6 +39,56 @@ const refereeGameColumns = {
 export { refereeGameColumns };
 
 /**
+ * The columns behind the Einsatz brief (#309), selected only by the readers
+ * that build a `RefereeGameDetail`. They are deliberately not part of
+ * `refereeGameColumns`: the list endpoint's shape is unchanged, and a referee
+ * scanning a list of games does not need the hall's street.
+ *
+ * `apiMatchId` is not repeated here — it is already in `refereeGameColumns`, and
+ * `toRefereeGameBrief` reads it off the same row to build the federation link.
+ */
+const refereeGameBriefColumns = {
+  venueStreet: refereeGames.venueStreet,
+  venuePostalCode: refereeGames.venuePostalCode,
+  sr1Tentative: refereeGames.sr1Tentative,
+  sr2Tentative: refereeGames.sr2Tentative,
+  venueChanged: refereeGames.venueChanged,
+  timeChanged: refereeGames.timeChanged,
+} as const;
+
+export { refereeGameBriefColumns };
+
+/** What `toRefereeGameBrief` needs off a row selected with both column sets. */
+interface RefereeGameBriefRow {
+  apiMatchId: number;
+  venueStreet: string | null;
+  venuePostalCode: string | null;
+  sr1Tentative: boolean;
+  sr2Tentative: boolean;
+  venueChanged: boolean;
+  timeChanged: boolean;
+}
+
+/**
+ * Build the brief from a row selected with both column sets.
+ *
+ * Rows synced before the columns existed carry `null` street and postal code,
+ * and the screen drops the address line rather than rendering blanks — so the
+ * nulls travel to the client as nulls instead of being papered over here.
+ */
+function toRefereeGameBrief(row: RefereeGameBriefRow): RefereeGameBrief {
+  return {
+    venueStreet: row.venueStreet,
+    venuePostalCode: row.venuePostalCode,
+    sr1Tentative: row.sr1Tentative,
+    sr2Tentative: row.sr2Tentative,
+    venueChanged: row.venueChanged,
+    timeChanged: row.timeChanged,
+    federationUrl: federationGameUrl(row.apiMatchId),
+  };
+}
+
+/**
  * A row as `refereeGameColumns` selects it, before decoration.
  *
  * It differs from the wire shape in exactly one place: `last_synced_at` is a
@@ -67,6 +118,33 @@ export function toRefereeGameListItem(
     ...decoration,
     lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
   };
+}
+
+/** The columns `refereeGameBriefColumns` adds on top of `refereeGameColumns`. */
+type BriefOnlyColumn = keyof typeof refereeGameBriefColumns;
+
+/**
+ * Take a row selected with both column sets apart: the brief-only columns come
+ * off into a built `RefereeGameBrief`, and what is left is the list-item row.
+ *
+ * Those columns have to come off before the row reaches
+ * `toRefereeGameListItem`, which spreads whatever it is handed — leave them on
+ * and `RefereeGameListItem` silently grows six fields it does not declare, on
+ * the one endpoint that is supposed to keep its list shape.
+ */
+export function splitRefereeGameBrief<T extends RefereeGameBriefRow>(
+  row: T,
+): { listRow: Omit<T, BriefOnlyColumn>; brief: RefereeGameBrief } {
+  const {
+    venueStreet: _venueStreet,
+    venuePostalCode: _venuePostalCode,
+    sr1Tentative: _sr1Tentative,
+    sr2Tentative: _sr2Tentative,
+    venueChanged: _venueChanged,
+    timeChanged: _timeChanged,
+    ...listRow
+  } = row;
+  return { listRow, brief: toRefereeGameBrief(row) };
 }
 
 /**

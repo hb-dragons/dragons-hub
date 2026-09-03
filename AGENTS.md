@@ -122,7 +122,7 @@ tables (`user`, `session`, `account`, `verification`) use text ids,
 | `matchReferees` | `packages/db/src/schema/referees.ts` | matchId FK (cascade), refereeId FK, roleId FK, slotNumber, removedAt (tombstone) — partial unique(matchId, slotNumber) WHERE removed_at IS NULL |
 | `refereeAssignmentIntents` | `packages/db/src/schema/referees.ts` | matchId FK (cascade), refereeId FK, slotNumber, clickedAt, confirmedBySyncAt |
 | `refereeAssignmentRules` | `packages/db/src/schema/referee-assignment-rules.ts` | refereeId FK (cascade), teamId FK (cascade), deny, allowSr1, allowSr2 — unique(refereeId, teamId) |
-| `refereeGames` | `packages/db/src/schema/referee-games.ts` | apiMatchId (unique), matchId FK, homeTeamId FK, guestTeamId FK, homeClubId, guestClubId, isHomeGame, sr1/sr2OurClub, sr1/sr2Status, sr1/sr2Name, leagueName, kickoffDate/Time, dataHash, removedAt (tombstone) |
+| `refereeGames` | `packages/db/src/schema/referee-games.ts` | apiMatchId (unique), matchId FK, homeTeamId FK, guestTeamId FK, homeClubId, guestClubId, isHomeGame, sr1/sr2OurClub, sr1/sr2Status, sr1/sr2Name, leagueName, kickoffDate/Time, venueName/City/Street/PostalCode, sr1/sr2Tentative, venueChanged, timeChanged, dataHash, removedAt (tombstone) |
 | `matchRemoteVersions` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), versionNumber, snapshot JSONB, dataHash |
 | `matchLocalVersions` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), versionNumber, changedBy, snapshot JSONB |
 | `matchChanges` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), track (remote/local), fieldName, oldValue, newValue |
@@ -806,7 +806,7 @@ their own games via `c.get("refereeId")`. The native app depends on `/referee/ga
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/referee/games` | referee/admin | List games the caller may see. Query: `search`, `league`, `status`, `dateFrom`, `dateTo`, `limit`, `offset` |
-| GET | `/referee/games/:id` | referee/admin | Single game by `refereeGames.id` |
+| GET | `/referee/games/:id` | referee/admin | Single game by `refereeGames.id`, as `RefereeGameDetail` — the list item plus a `brief` block (venue street/PLZ/city, per-slot `tentative`, venue/time-changed flags, basketball-bund.net game link) |
 | GET | `/referee/games/by-api-match/:apiMatchId` | referee/admin | Single game by Basketball-Bund `apiMatchId` (deep-link landing from take-intent URLs) |
 | GET | `/referee/matches/:matchId` | referee/admin | Single game by local `matches.id` |
 | POST | `/referee/games/:spielplanId/assign` | referee (self) | Assign self to a game slot in the federation. Requires `isOwnClub=true` and `refereeApiId` matching the caller. Body: `{ slotNumber: 1\|2, refereeApiId }` |

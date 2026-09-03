@@ -31,6 +31,11 @@ export const refereeGames = pgTable(
     leagueShort: varchar("league_short", { length: 50 }),
     venueName: varchar("venue_name", { length: 200 }),
     venueCity: varchar("venue_city", { length: 100 }),
+    // Street and postal code of the Spielfeld, so the Einsatz screen can show a
+    // full address and build a maps link (#309). Same widths as `venues`, which
+    // stores the same federation fields.
+    venueStreet: varchar("venue_street", { length: 200 }),
+    venuePostalCode: varchar("venue_postal_code", { length: 10 }),
     sr1OurClub: boolean("sr1_our_club").notNull(),
     sr2OurClub: boolean("sr2_our_club").notNull(),
     sr1Name: varchar("sr1_name", { length: 150 }),
@@ -41,6 +46,13 @@ export const refereeGames = pgTable(
       .$type<RefereeSlotStatus>(),
     sr2Status: varchar("sr2_status", { length: 20 }).notNull().default("open")
       .$type<RefereeSlotStatus>(),
+    // The federation's `tempeinteilung` marker per slot: the assignment is
+    // vorläufig, not fest, and can still be taken away (#309).
+    sr1Tentative: boolean("sr1_tentative").notNull().default(false),
+    sr2Tentative: boolean("sr2_tentative").notNull().default(false),
+    // The federation moved the venue or the time after publishing the fixture.
+    venueChanged: boolean("venue_changed").notNull().default(false),
+    timeChanged: boolean("time_changed").notNull().default(false),
     isCancelled: boolean("is_cancelled").notNull().default(false),
     isForfeited: boolean("is_forfeited").notNull().default(false),
     homeClubId: integer("home_club_id"),

@@ -1114,6 +1114,103 @@ describe("getVisibleRefereeGameById (admin mode)", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// The Einsatz brief (#309)
+// ---------------------------------------------------------------------------
+
+describe("getVisibleRefereeGameById — brief", () => {
+  const BRIEF_SEED = {
+    venueName: "Sporthalle West",
+    venueCity: "Berlin",
+    venueStreet: "Hauptstr. 1",
+    venuePostalCode: "12345",
+    sr1Tentative: true,
+    sr2Tentative: false,
+    venueChanged: true,
+    timeChanged: false,
+  } as const;
+
+  it("carries the address, slot state, change flags and federation link", async () => {
+    const id = await seedGame({ apiMatchId: 4242, ...BRIEF_SEED });
+    const refId = await seedReferee({
+      allowAllHomeGames: true,
+      allowAwayGames: false,
+      isOwnClub: true,
+    });
+
+    const result = await getVisibleRefereeGameById(refId, id);
+
+    expect(result?.brief).toEqual({
+      venueStreet: "Hauptstr. 1",
+      venuePostalCode: "12345",
+      sr1Tentative: true,
+      sr2Tentative: false,
+      venueChanged: true,
+      timeChanged: false,
+      federationUrl: "https://www.basketball-bund.net/static/#/spiel/4242",
+    });
+  });
+
+  it("carries the brief on the admin (unscoped) path too", async () => {
+    const id = await seedGame({ apiMatchId: 4243, ...BRIEF_SEED });
+
+    const result = await getVisibleRefereeGameById(null, id);
+
+    expect(result?.brief).toMatchObject({
+      venueStreet: "Hauptstr. 1",
+      federationUrl: "https://www.basketball-bund.net/static/#/spiel/4243",
+    });
+  });
+
+  // A row synced before the columns existed has no address at all. The nulls
+  // travel to the client so the screen can drop the address line, rather than
+  // being filled in with empty strings that would render as blanks.
+  it("reports a null address for a row synced before the columns existed", async () => {
+    const id = await seedGame({ apiMatchId: 4244 });
+    const refId = await seedReferee({
+      allowAllHomeGames: true,
+      allowAwayGames: false,
+      isOwnClub: true,
+    });
+
+    expect((await getVisibleRefereeGameById(refId, id))?.brief).toMatchObject({
+      venueStreet: null,
+      venuePostalCode: null,
+      sr1Tentative: false,
+      sr2Tentative: false,
+      venueChanged: false,
+      timeChanged: false,
+    });
+  });
+
+  // The list endpoint's shape is deliberately unchanged: only the single-game
+  // Einsatz reader pays for the brief.
+  it("leaves the list item shape alone — no brief columns leak into it", async () => {
+    const id = await seedGame({ apiMatchId: 4245, ...BRIEF_SEED });
+    const refId = await seedReferee({
+      allowAllHomeGames: true,
+      allowAwayGames: false,
+      isOwnClub: true,
+    });
+
+    const { brief: _brief, ...item } = (await getVisibleRefereeGameById(refId, id))!;
+    for (const key of [
+      "venueStreet",
+      "venuePostalCode",
+      "sr1Tentative",
+      "sr2Tentative",
+      "venueChanged",
+      "timeChanged",
+    ]) {
+      expect(item).not.toHaveProperty(key);
+    }
+
+    const listed = await getVisibleRefereeGames(refId, PAGE);
+    expect(listed.items[0]).not.toHaveProperty("brief");
+    expect(listed.items[0]).not.toHaveProperty("venueStreet");
+  });
+});
+
 describe("getVisibleRefereeGameByMatchId", () => {
   async function seedLinkedGame(apiMatchId: number, extra: Partial<GameSeed> = {}) {
     const homeApiId = 7000 + apiMatchId;

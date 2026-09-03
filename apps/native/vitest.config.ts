@@ -119,10 +119,16 @@ export default defineConfig({
         // link and the section logic the screen used to decide inline.
         // Measured 19.7/13.29/22.84/19.02 — statements and functions hold,
         // neither having cleared the next whole point.
+        //
+        // Ratcheted 2026-09-03 (#309): statements 19 -> 20, functions 22 -> 23,
+        // on the Einsatz brief — the venue address block and its platform maps
+        // link, the per-slot vorläufig marker and the federation change flags.
+        // Measured 20.05/13.6/23.06/19.33 — branches and lines hold, neither
+        // having cleared the next whole point.
         branches: 13,
-        functions: 22,
+        functions: 23,
         lines: 19,
-        statements: 19,
+        statements: 20,
       },
     },
   },

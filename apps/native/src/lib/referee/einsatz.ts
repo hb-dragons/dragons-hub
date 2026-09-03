@@ -1,4 +1,4 @@
-import type { RefereeGameListItem } from "@dragons/shared";
+import type { RefereeGameDetail, RefereeGameListItem } from "@dragons/shared";
 import type { RouteHref } from "@/lib/nav/href";
 
 /**
@@ -19,6 +19,13 @@ import type { RouteHref } from "@/lib/nav/href";
 
 type EinsatzSlotStatus = RefereeGameListItem["sr1Status"];
 
+/**
+ * Which maps app the device has — react-native's `Platform.OS`, spelled out so
+ * this module stays free of react-native and testable in the node-only setup.
+ * Passed in rather than read here so the view stays a pure function.
+ */
+export type EinsatzPlatform = "ios" | "android" | "windows" | "macos" | "web";
+
 export interface EinsatzSlot {
   slot: 1 | 2;
   /** i18n key for the slot's label, e.g. "Schiedsrichter 1". */
@@ -28,7 +35,30 @@ export interface EinsatzSlot {
   status: EinsatzSlotStatus;
   /** The referee reading the screen holds this slot. */
   isMine: boolean;
+  /**
+   * The federation still calls this assignment vorläufig (`tempeinteilung`):
+   * it is not fest and can still be taken away (#309).
+   */
+  tentative: boolean;
 }
+
+/**
+ * The hall's postal address, split the way a German address is written, plus a
+ * link that opens it in the device's maps app.
+ *
+ * `null` when the referee game carries no street: rows synced before #309 have
+ * no address at all, and a block with a blank line where the street belongs is
+ * worse than no block. The city then stays visible as an ordinary detail row.
+ */
+interface EinsatzAddress {
+  street: string;
+  /** "52134 Herzogenrath", or just the city when the postal code is unknown. */
+  cityLine: string;
+  mapsUrl: string;
+}
+
+/** A change the federation made after publishing the fixture (#309). */
+type EinsatzChange = "venueChanged" | "timeChanged";
 
 interface EinsatzDetailRow {
   key: "venue" | "address" | "matchNo";
@@ -45,6 +75,45 @@ export interface EinsatzView {
   spielinfoRoute: RouteHref | null;
   details: EinsatzDetailRow[];
   badges: EinsatzBadge[];
+  /** The full venue address, or null when the row predates #309. */
+  address: EinsatzAddress | null;
+  /** Venue or kickoff moved by the federation after publication. */
+  changes: EinsatzChange[];
+  /** The game's page on basketball-bund.net. */
+  federationUrl: string;
+}
+
+/**
+ * A maps link for a free-text address.
+ *
+ * Both schemes hand the query to whichever maps app the platform has, rather
+ * than to a browser: `maps://` is Apple Maps, `geo:` is the Android intent every
+ * maps app registers for. A device with no handler for either rejects the open,
+ * and `openExternal` reports that once, in one place.
+ */
+export function mapsUrl(query: string, platform: EinsatzPlatform): string {
+  const q = encodeURIComponent(query);
+  return platform === "ios" ? `maps://?q=${q}` : `geo:0,0?q=${q}`;
+}
+
+function einsatzAddress(
+  game: RefereeGameDetail,
+  platform: EinsatzPlatform,
+): EinsatzAddress | null {
+  const street = game.brief.venueStreet;
+  if (!street) return null;
+
+  const cityLine = [game.brief.venuePostalCode, game.venueCity]
+    .filter((part): part is string => Boolean(part))
+    .join(" ");
+
+  // The hall's name goes into the query too: federation street data is
+  // sometimes thin, and a named sports hall is the part a maps app resolves.
+  const query = [game.venueName, street, cityLine]
+    .filter((part) => Boolean(part))
+    .join(", ");
+
+  return { street, cityLine, mapsUrl: mapsUrl(query, platform) };
 }
 
 /** The route every referee game opens at — the Einsatz screen, always. */
@@ -59,16 +128,24 @@ export function spielinfoRoute(
   return game.matchId === null ? null : `/game/${String(game.matchId)}`;
 }
 
-export function einsatzView(game: RefereeGameListItem): EinsatzView {
+export function einsatzView(
+  game: RefereeGameDetail,
+  platform: EinsatzPlatform,
+): EinsatzView {
+  const address = einsatzAddress(game, platform);
+
+  // Both venue rows are fallbacks for a row with no address block: that block
+  // already names the hall and its city, and stating either again three inches
+  // below is the same fact twice.
   const details: EinsatzDetailRow[] = [];
-  if (game.venueName) {
+  if (address === null && game.venueName) {
     details.push({
       key: "venue",
       labelKey: "gameDetail.venue",
       value: game.venueName,
     });
   }
-  if (game.venueCity) {
+  if (address === null && game.venueCity) {
     details.push({
       key: "address",
       labelKey: "gameDetail.address",
@@ -85,6 +162,10 @@ export function einsatzView(game: RefereeGameListItem): EinsatzView {
   if (game.isCancelled) badges.push("cancelled");
   if (game.isForfeited) badges.push("forfeited");
 
+  const changes: EinsatzChange[] = [];
+  if (game.brief.venueChanged) changes.push("venueChanged");
+  if (game.brief.timeChanged) changes.push("timeChanged");
+
   return {
     title: `${game.homeTeamName} – ${game.guestTeamName}`,
     slots: [
@@ -94,6 +175,7 @@ export function einsatzView(game: RefereeGameListItem): EinsatzView {
         name: game.sr1Name,
         status: game.sr1Status,
         isMine: game.mySlot === 1,
+        tentative: game.brief.sr1Tentative,
       },
       {
         slot: 2,
@@ -101,10 +183,14 @@ export function einsatzView(game: RefereeGameListItem): EinsatzView {
         name: game.sr2Name,
         status: game.sr2Status,
         isMine: game.mySlot === 2,
+        tentative: game.brief.sr2Tentative,
       },
     ],
     spielinfoRoute: spielinfoRoute(game),
     details,
     badges,
+    address,
+    changes,
+    federationUrl: game.brief.federationUrl,
   };
 }
