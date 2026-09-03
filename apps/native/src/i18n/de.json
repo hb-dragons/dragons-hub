@@ -169,6 +169,10 @@
     "sr1Short": "SR1",
     "sr2Short": "SR2",
     "unassigned": "Noch nicht zugewiesen",
+    "matchNo": "Spielnummer",
+    "matchInfo": "Spielinfo",
+    "matchInfoHint": "Ergebnis, Viertel und Form",
+    "open": "Öffnen",
     "mine": "Du",
     "status": {
       "open": "Offen",

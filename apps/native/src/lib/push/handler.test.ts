@@ -18,6 +18,7 @@ import {
   subscribeToTaps,
 } from "@/lib/push/handler";
 import { NOT_FOUND_ROUTE } from "@/lib/nav/href";
+import { refereeGameRoute } from "@/lib/referee/einsatz";
 
 type Tap = Parameters<Parameters<typeof Notifications.addNotificationResponseReceivedListener>[0]>[0];
 
@@ -95,6 +96,18 @@ describe("followDeepLink while signed in", () => {
       expect(router.push).toHaveBeenCalledWith(NOT_FOUND_ROUTE);
     },
   );
+});
+
+// Every referee push routes by the referee game's own id, linked to a synced
+// match or not — the API side of that is asserted in
+// `apps/api/src/services/notifications/templates/push/referee-slots.test.ts`.
+// This is the native half: such a link follows to the Einsatz screen (#307).
+describe("referee push deep links", () => {
+  it("follows a referee push to the Einsatz screen", () => {
+    setPushAuthState("signed-in");
+    followDeepLink(refereeGameRoute({ id: 7 }));
+    expect(router.push).toHaveBeenCalledWith("/referee-game/7");
+  });
 });
 
 describe("followDeepLink while signed out", () => {
