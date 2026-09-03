@@ -7,6 +7,7 @@ import type { AppEnv } from "../../types";
 const mocks = vi.hoisted(() => ({
   listPublicTeams: vi.fn(),
   getTeamStats: vi.fn(),
+  getPublicStaffPortrait: vi.fn(),
 }));
 
 vi.mock("../../services/public/team-list.service", () => ({
@@ -15,6 +16,10 @@ vi.mock("../../services/public/team-list.service", () => ({
 
 vi.mock("../../services/public/team-stats.service", () => ({
   getTeamStats: mocks.getTeamStats,
+}));
+
+vi.mock("../../services/public/staff-portrait.service", () => ({
+  getPublicStaffPortrait: mocks.getPublicStaffPortrait,
 }));
 
 vi.mock("../../config/logger", () => ({
@@ -125,5 +130,39 @@ describe("GET /teams/:id/stats (public)", () => {
     expect(res.status).toBe(400);
     const body = await json(res);
     expect(body.code).toBe("VALIDATION_ERROR");
+  });
+});
+
+describe("GET /staff/:id/photo (public)", () => {
+  it("serves the stored bytes with a public, immutable cache header", async () => {
+    mocks.getPublicStaffPortrait.mockResolvedValue({
+      buffer: Buffer.from([1, 2, 3]),
+      contentType: "image/webp",
+    });
+
+    const res = await app.request("/staff/12/photo");
+
+    expect(res.status).toBe(200);
+    expect(mocks.getPublicStaffPortrait).toHaveBeenCalledWith(12);
+    expect(res.headers.get("Content-Type")).toBe("image/webp");
+    expect(res.headers.get("Content-Length")).toBe("3");
+    expect(res.headers.get("Cache-Control")).toBe("public, max-age=86400, immutable");
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  it("returns 404 when the member has no portrait", async () => {
+    mocks.getPublicStaffPortrait.mockResolvedValue(null);
+
+    const res = await app.request("/staff/12/photo");
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toEqual({ error: "Portrait not found", code: "NOT_FOUND" });
+  });
+
+  it("rejects a non-numeric staff id", async () => {
+    const res = await app.request("/staff/abc/photo");
+
+    expect(res.status).toBe(400);
+    expect(mocks.getPublicStaffPortrait).not.toHaveBeenCalled();
   });
 });

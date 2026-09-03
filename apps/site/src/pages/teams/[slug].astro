@@ -22,6 +22,7 @@ import { publishedOnly } from "../../lib/published";
 import { absoluteUrl, canonicalUrl, metaDescription } from "../../lib/seo";
 import { strings } from "../../lib/strings";
 import { primaryTrainer, toSiteImage } from "../../lib/team-detail";
+import { fetchTeamStaff, staffFor, teamStaffIndex } from "../../lib/team-staff";
 import { findTeamLeague, toStandingRows } from "../../lib/team-standings";
 import { fetchStandingsLeagues, leagueNameFor, teamLeagueNames } from "../../lib/team-league";
 
@@ -33,6 +34,9 @@ export async function getStaticPaths() {
   const leagues = teams.length > 0 ? await fetchStandingsLeagues(apiBase()) : [];
   const leagueNames = teamLeagueNames(leagues);
   const plan = teams.length > 0 ? await fetchBuildPlan(apiBase()) : null;
+  // Coaches live in the Hub (ADR 0008), joined to the CMS team by federation
+  // permanent id. One fetch for every team page, like the standings above.
+  const staff = teamStaffIndex(teams.length > 0 ? await fetchTeamStaff(apiBase()) : []);
   // Windowed with the build's clock; the islands re-query on the client, so a
   // stale prev/next split only ever survives until hydration.
   const today = todayInClubZone();
@@ -44,6 +48,7 @@ export async function getStaticPaths() {
       params: { slug: data.slug },
       props: {
         team: data,
+        staff: staffFor(staff, data.apiTeamPermanentId),
         leagueName: leagueNameFor(leagueNames, data.apiTeamPermanentId),
         initialGames: games,
         initialPrev: prev,
@@ -54,15 +59,12 @@ export async function getStaticPaths() {
   });
 }
 
-const { team, leagueName, initialGames, initialPrev, initialNext, initialStandings } = Astro.props;
+const { team, staff, leagueName, initialGames, initialPrev, initialNext, initialStandings } =
+  Astro.props;
 const cmsBase = cmsBaseUrl();
 
 const teamImage = toSiteImage(team.teamImage, cmsBase);
-const trainerData = primaryTrainer(team.trainers);
-const trainer =
-  trainerData === null
-    ? null
-    : { name: trainerData.name, image: toSiteImage(trainerData.image, cmsBase) };
+const trainer = primaryTrainer(staff);
 const teamApiId = team.apiTeamPermanentId ?? null;
 
 // SEO (Task C8): CMS override ?? a derived one-liner; the team photo is the

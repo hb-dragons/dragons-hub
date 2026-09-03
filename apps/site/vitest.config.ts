@@ -60,9 +60,13 @@ export default defineConfig({
         // Ratcheted 2026-09-02: the broadcast-state live board (viewFromState/
         // parseBroadcastState and the ScoreboardIsland render tests). Measured
         // 86.33 statements / 83.46 branches / 79.55 functions / 86.80 lines.
+        //
+        // Ratcheted 2026-09-03 (#314): the Hub team-staff lookup that replaced
+        // the CMS trainer join. Measured 86.90 statements / 83.89 branches /
+        // 81.34 functions / 87.47 lines.
         branches: 83,
-        functions: 79,
-        lines: 86,
+        functions: 81,
+        lines: 87,
         statements: 86,
       },
     },

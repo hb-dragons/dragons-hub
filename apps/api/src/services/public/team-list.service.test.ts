@@ -56,6 +56,43 @@ async function seedTeam(permanentId: number, name: string, own = true): Promise<
   return r.rows[0]!.id;
 }
 
+async function seedEntry(teamId: number, seasonId: number, displayOrder = 0): Promise<number> {
+  const r = await ctx.client.query<{ id: number }>(
+    `INSERT INTO team_entries (team_id, season_id, display_order) VALUES ($1, $2, $3) RETURNING id`,
+    [teamId, seasonId, displayOrder],
+  );
+  return r.rows[0]!.id;
+}
+
+async function seedStaff(
+  entryId: number,
+  member: {
+    firstName: string;
+    lastName: string;
+    role: string;
+    phone?: string | null;
+    email?: string | null;
+    licence?: string | null;
+    photoFilename?: string | null;
+  },
+): Promise<number> {
+  const r = await ctx.client.query<{ id: number }>(
+    `INSERT INTO team_staff (team_entry_id, first_name, last_name, role, phone, email, licence, photo_filename)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+    [
+      entryId,
+      member.firstName,
+      member.lastName,
+      member.role,
+      member.phone ?? null,
+      member.email ?? null,
+      member.licence ?? null,
+      member.photoFilename ?? null,
+    ],
+  );
+  return r.rows[0]!.id;
+}
+
 describe("listPublicTeams", () => {
   it("lists own-club teams from the active season's entries with entry-owned fields", async () => {
     const active = await seedSeason("2026/27", "active");
@@ -109,5 +146,120 @@ describe("listPublicTeams", () => {
 
   it("returns an empty array when no teams exist", async () => {
     expect(await listPublicTeams()).toEqual([]);
+  });
+
+  // The `PublicTeam` interface in @dragons/api-client is hand-written against
+  // this payload (apps/api does not depend on the client, so nothing checks it
+  // at compile time). Adding a column to `teams` fails this list first — update
+  // both together.
+  it("returns exactly the fields the api-client PublicTeam declares", async () => {
+    const active = await seedSeason("2026/27", "active");
+    await seedEntry(await seedTeam(7200, "Dragons Damen 2"), active);
+    await seedTeam(7201, "Rivals", false);
+
+    const [own, other] = await listPublicTeams();
+
+    const shared = [
+      "apiTeamPermanentId",
+      "badgeColor",
+      "clubId",
+      "createdAt",
+      "customName",
+      "dataHash",
+      "displayOrder",
+      "estimatedGameDuration",
+      "id",
+      "isOwnClub",
+      "name",
+      "nameShort",
+      "seasonTeamId",
+      "teamCompetitionId",
+      "updatedAt",
+      "verzicht",
+    ];
+    expect(Object.keys(own ?? {}).sort()).toEqual([...shared, "staff"].sort());
+    expect(Object.keys(other ?? {}).sort()).toEqual(shared);
+  });
+
+  it("carries the entry's staff on own-club rows, portraits as public paths", async () => {
+    const active = await seedSeason("2026/27", "active");
+    const squad = await seedTeam(7100, "Dragons Damen 1");
+    const entry = await seedEntry(squad, active);
+    const withPhoto = await seedStaff(entry, {
+      firstName: "Emily",
+      lastName: "Gust",
+      role: "trainer",
+      licence: "C-Lizenz",
+      photoFilename: "abc.webp",
+    });
+    const withoutPhoto = await seedStaff(entry, {
+      firstName: "Ben",
+      lastName: "Adler",
+      role: "co_trainer",
+    });
+
+    const [own] = await listPublicTeams();
+
+    expect(own?.staff).toEqual([
+      {
+        id: withPhoto,
+        firstName: "Emily",
+        lastName: "Gust",
+        role: "trainer",
+        licence: "C-Lizenz",
+        photoUrl: `/public/staff/${withPhoto}/photo?v=abc.webp`,
+      },
+      {
+        id: withoutPhoto,
+        firstName: "Ben",
+        lastName: "Adler",
+        role: "co_trainer",
+        licence: null,
+        photoUrl: null,
+      },
+    ]);
+  });
+
+  it("sorts staff Trainer first, then by name", async () => {
+    const active = await seedSeason("2026/27", "active");
+    const entry = await seedEntry(await seedTeam(7101, "Dragons Herren 1"), active);
+    await seedStaff(entry, { firstName: "Zoe", lastName: "Adler", role: "co_trainer" });
+    await seedStaff(entry, { firstName: "Nina", lastName: "Wolf", role: "trainer" });
+    await seedStaff(entry, { firstName: "Anton", lastName: "Wolf", role: "trainer" });
+
+    const [own] = await listPublicTeams();
+
+    expect(own?.staff?.map((s) => s.firstName)).toEqual(["Anton", "Nina", "Zoe"]);
+  });
+
+  it("leaves the key off non-own-club rows and never exposes phone or email", async () => {
+    const active = await seedSeason("2026/27", "active");
+    const entry = await seedEntry(await seedTeam(7102, "Dragons U16"), active);
+    await seedStaff(entry, {
+      firstName: "Emily",
+      lastName: "Gust",
+      role: "trainer",
+      phone: "+49 170 1234567",
+      email: "emily@example.de",
+    });
+    await seedTeam(7103, "Rivals", false);
+
+    const rows = await listPublicTeams();
+
+    const rival = rows.find((r) => !r.isOwnClub);
+    expect(rival).toBeDefined();
+    expect(rival && "staff" in rival).toBe(false);
+    const payload = JSON.stringify(rows);
+    expect(payload).not.toContain("+49 170 1234567");
+    expect(payload).not.toContain("emily@example.de");
+  });
+
+  it("gives an entry without staff an empty list", async () => {
+    const active = await seedSeason("2026/27", "active");
+    await seedEntry(await seedTeam(7104, "Dragons U14"), active);
+
+    const [own] = await listPublicTeams();
+
+    expect(own?.staff).toEqual([]);
   });
 });

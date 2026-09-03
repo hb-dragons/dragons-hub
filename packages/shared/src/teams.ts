@@ -46,3 +46,19 @@ export interface TeamStaffMember {
   /** Marks the member referees are pointed at as the team contact. */
   refereeContact: boolean;
 }
+
+/**
+ * A staff member as the public team list exposes them. Deliberately a subset of
+ * {@link TeamStaffMember}: the Website is a public page, so phone and email
+ * never leave the Hub through this endpoint (`team-list.service.ts` selects the
+ * columns explicitly, and a test asserts neither value appears in the payload).
+ */
+export interface PublicTeamStaff {
+  id: number;
+  firstName: string;
+  lastName: string;
+  role: TeamStaffRole;
+  licence: string | null;
+  /** Public API path of the portrait, or `null`. Relative to the API base. */
+  photoUrl: string | null;
+}

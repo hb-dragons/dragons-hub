@@ -3,6 +3,7 @@ import { teams, teamEntries, teamStaff } from "@dragons/db/schema";
 import { and, eq } from "drizzle-orm";
 import type { TeamStaffMember } from "@dragons/shared";
 import type { TeamStaffCreateBody, TeamStaffUpdateBody } from "@dragons/contracts";
+import { dispatchSiteRebuild } from "../site-rebuild.service";
 import {
   storeStaffPortrait,
   readStaffPortrait,
@@ -138,7 +139,9 @@ export async function createTeamStaff(
       refereeContact: body.refereeContact ?? false,
     })
     .returning(STAFF_COLUMNS);
-  return row ? toMember(row) : null;
+  if (!row) return null;
+  await dispatchSiteRebuild("team staff created");
+  return toMember(row);
 }
 
 export async function updateTeamStaff(
@@ -163,7 +166,9 @@ export async function updateTeamStaff(
     // through another team's URL.
     .where(and(eq(teamStaff.id, staffId), eq(teamStaff.teamEntryId, entryId)))
     .returning(STAFF_COLUMNS);
-  return row ? toMember(row) : null;
+  if (!row) return null;
+  await dispatchSiteRebuild("team staff updated");
+  return toMember(row);
 }
 
 export async function deleteTeamStaff(entryId: number, staffId: number): Promise<boolean> {
@@ -175,6 +180,7 @@ export async function deleteTeamStaff(entryId: number, staffId: number): Promise
   const removed = deleted[0];
   if (!removed) return false;
   await dropPortraitIfUnreferenced(removed.photoFilename);
+  await dispatchSiteRebuild("team staff deleted");
   return true;
 }
 
@@ -209,6 +215,7 @@ export async function setTeamStaffPhoto(
   }
 
   await dropPortraitIfUnreferenced(previous.photoFilename);
+  await dispatchSiteRebuild("team staff portrait changed");
   return toMember(row);
 }
 

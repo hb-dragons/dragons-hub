@@ -165,6 +165,14 @@ describe("deploy-site workflow content gates", () => {
     expect(DEPLOY_WORKFLOW).toContain("name: Deploy Site");
   });
 
+  // The API fires `hub-content-change` on every team staff mutation (issue
+  // #314, apps/api/src/services/site-rebuild.service.ts). A dispatch type the
+  // workflow does not listen for is silently dropped by GitHub, so the two
+  // halves are pinned to each other here.
+  it("listens for the staff-change dispatch the API sends", () => {
+    expect(DEPLOY_WORKFLOW).toMatch(/types: \[.*hub-content-change.*\]/);
+  });
+
   it("counts emitted team and news pages before uploading", () => {
     expect(DEPLOY_WORKFLOW).toMatch(/TEAMS=\$\(count_pages teams\)/);
     expect(DEPLOY_WORKFLOW).toMatch(/NEWS=\$\(count_pages news\)/);

@@ -4,6 +4,9 @@ import { idParamSchema } from "./common";
 
 export const publicTeamIdParamSchema = idParamSchema;
 
+/** `:id` of `GET /public/staff/:id/photo` — a team_staff row id. */
+export const publicStaffIdParamSchema = idParamSchema;
+
 export const publicScheduleIcsQuerySchema = z.object({
   teamApiId: z.coerce.number().int().positive().optional(),
   leagueId: z.coerce.number().int().positive().optional(),

@@ -195,6 +195,7 @@ export {
 
 export {
   publicTeamIdParamSchema,
+  publicStaffIdParamSchema,
   publicScheduleIcsQuerySchema,
   type PublicScheduleIcsQuery,
 } from "./public";

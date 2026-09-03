@@ -1,48 +1,38 @@
 import { describe, expect, it } from "vitest";
 
-import { primaryTrainer, toSiteImage, type TrainerLike } from "./team-detail";
+import { primaryTrainer, toSiteImage } from "./team-detail";
+import type { SiteStaffMember } from "./team-staff";
 
-const PERSON_IMAGE = { url: "/api/media/file/person.webp", blurhash: "p" };
-const TRAINER_IMAGE = { url: "/api/media/file/trainer.webp", blurhash: "t" };
-
-function trainer(overrides: Partial<TrainerLike> = {}): TrainerLike {
+function coach(overrides: Partial<SiteStaffMember> = {}): SiteStaffMember {
   return {
-    person: { name: "Emily Gust", image: PERSON_IMAGE },
-    image: null,
+    id: 1,
+    name: "Emily Gust",
+    role: "trainer",
+    licence: "C-Lizenz",
+    photoUrl: "https://api.example/public/staff/1/photo?v=abc.webp",
     ...overrides,
   };
 }
 
 describe("primaryTrainer", () => {
-  it("returns the first trainer's name and portrait", () => {
-    expect(primaryTrainer([trainer(), trainer({ person: { name: "Zweiter" } })])).toEqual({
+  it("shows the first staff member — the API orders Trainer first", () => {
+    expect(primaryTrainer([coach(), coach({ id: 2, name: "Ben Adler", role: "co_trainer" })])).toEqual({
       name: "Emily Gust",
-      image: PERSON_IMAGE,
+      image: { url: "https://api.example/public/staff/1/photo?v=abc.webp", alt: "Emily Gust" },
     });
   });
 
-  it("prefers the trainer's own image over the person portrait (legacy precedence)", () => {
-    expect(primaryTrainer([trainer({ image: TRAINER_IMAGE })])).toEqual({
+  it("keeps a coach without a portrait, so the hero falls back to the banner", () => {
+    expect(primaryTrainer([coach({ photoUrl: null })])).toEqual({
       name: "Emily Gust",
-      image: TRAINER_IMAGE,
-    });
-  });
-
-  it("carries a trainer without any image", () => {
-    expect(primaryTrainer([trainer({ person: { name: "Ohne Bild", image: null } })])).toEqual({
-      name: "Ohne Bild",
       image: null,
     });
   });
 
-  it("returns null when the team has no trainers", () => {
+  it("returns null when the team has no staff", () => {
     expect(primaryTrainer([])).toBeNull();
     expect(primaryTrainer(null)).toBeNull();
     expect(primaryTrainer(undefined)).toBeNull();
-  });
-
-  it("returns null when the trainer has no populated person", () => {
-    expect(primaryTrainer([trainer({ person: null })])).toBeNull();
   });
 });
 

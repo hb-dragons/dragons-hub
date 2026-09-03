@@ -787,8 +787,9 @@ for a device that does not exist.
 | GET | `/public/matches/:id/context` | H2H record and form for both teams (no auth) |
 | GET | `/public/schedule.ics` | ICS calendar subscription feed for own-club matches. Default window: 30 days back to 180 days forward (no auth) |
 | GET | `/public/standings` | League standings (no auth) |
-| GET | `/public/teams` | List teams (no auth) |
+| GET | `/public/teams` | List teams (no auth). Own-club rows carry `staff[]` (id, first/last name, role, licence, portrait path) — never phone or email |
 | GET | `/public/teams/:id/stats` | Season stats and recent form for a team (no auth) |
+| GET | `/public/staff/:id/photo` | Portrait of a team staff member as stored bytes, own-club entries only (no auth). Addressed by staff id alone, since the Website renders it from a static page |
 | GET | `/public/home/dashboard` | Aggregated home screen data: next game, recent results, upcoming games, club stats (no auth) |
 | GET | `/public/assets/clubs/:id` | Club logo as webp, proxied by club id. The route constrains `:id` to `[0-9]+\.webp` |
 | GET | `/public/notifications/unsubscribe` | Email unsubscribe confirmation page for a per-recipient token (no auth). **Safe** — renders a form and changes nothing, so a link scanner cannot opt a member out. Query: `token`, optional `locale`. 404 + a readable page for an unknown token. |

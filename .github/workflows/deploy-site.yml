@@ -31,7 +31,9 @@ on:
   repository_dispatch:
     # cms-publish: Payload publish/unpublish/delete hook (plan task A4).
     # sync-completed: api webhook notification channel (plan task B4).
-    types: [cms-publish, sync-completed]
+    # hub-content-change: api site-rebuild service, on a team staff change
+    # (issue #314) — the site reads coaches from /public/teams at build time.
+    types: [cms-publish, sync-completed, hub-content-change]
   workflow_dispatch:
     inputs:
       sha:
