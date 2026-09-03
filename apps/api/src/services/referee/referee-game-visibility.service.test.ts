@@ -36,7 +36,12 @@ import {
   refereeAssignmentRules,
   teams,
   matches,
+  seasons,
+  teamEntries,
+  teamStaff,
 } from "@dragons/db/schema";
+import { eq } from "drizzle-orm";
+import { invalidateActiveSeasonCache } from "../admin/season.service";
 import {
   setupTestDb,
   resetTestDb,
@@ -53,6 +58,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await resetTestDb(ctx);
+  // getActiveSeasonId() caches for 60s; each test starts with a clean DB.
+  invalidateActiveSeasonCache();
 });
 
 afterAll(async () => {
@@ -1208,6 +1215,110 @@ describe("getVisibleRefereeGameById — brief", () => {
     const listed = await getVisibleRefereeGames(refId, PAGE);
     expect(listed.items[0]).not.toHaveProperty("brief");
     expect(listed.items[0]).not.toHaveProperty("venueStreet");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Kampfgericht and team contacts (#313)
+// ---------------------------------------------------------------------------
+
+describe("getVisibleRefereeGameById — Kampfgericht and contacts", () => {
+  /**
+   * An own-club team with a coach, playing at home. `seedGame` sets
+   * `homeTeamId`, which is what the contact reader resolves the team from.
+   */
+  async function seedContactFixture(gameSeed: GameSeed) {
+    const [season] = await ctx.db
+      .insert(seasons)
+      .values({ name: "2026/27", status: "active" })
+      .returning({ id: seasons.id });
+    const teamId = await seedTeam(7001);
+    await ctx.db
+      .update(teams)
+      .set({ isOwnClub: true, name: "Dragons 1" })
+      .where(eq(teams.id, teamId));
+    const [entry] = await ctx.db
+      .insert(teamEntries)
+      .values({ teamId, seasonId: season!.id })
+      .returning({ id: teamEntries.id });
+    await ctx.db.insert(teamStaff).values({
+      teamEntryId: entry!.id,
+      firstName: "Ana",
+      lastName: "Berger",
+      role: "trainer",
+      phone: "+49 111",
+    });
+    const gameId = await seedGame({ homeTeamId: teamId, ...gameSeed });
+    return { gameId, teamId, entryId: entry!.id };
+  }
+
+  it("sends both blocks to the referee holding a slot", async () => {
+    const { gameId, entryId } = await seedContactFixture({
+      apiMatchId: 5301,
+      sr1RefereeApiId: REF_API_ID,
+      sr1Status: "assigned",
+    });
+    const refId = await seedReferee({
+      allowAllHomeGames: true,
+      allowAwayGames: false,
+      isOwnClub: true,
+    });
+
+    const result = await getVisibleRefereeGameById(refId, gameId);
+
+    expect(result?.mySlot).toBe(1);
+    expect(result?.contacts).toEqual([
+      {
+        teamEntryId: entryId,
+        teamName: "Dragons 1",
+        contacts: [
+          {
+            firstName: "Ana",
+            lastName: "Berger",
+            role: "trainer",
+            phone: "+49 111",
+            email: null,
+          },
+        ],
+      },
+    ]);
+    // No linked match, so no Kampfgericht — but the key is present, because
+    // this caller is allowed to see it.
+    expect(result?.kampfgericht).toEqual([]);
+  });
+
+  it("sends both blocks on the admin (unscoped) path", async () => {
+    const { gameId } = await seedContactFixture({ apiMatchId: 5302 });
+
+    const result = await getVisibleRefereeGameById(null, gameId);
+
+    expect(result?.contacts).toHaveLength(1);
+    expect(result?.kampfgericht).toEqual([]);
+  });
+
+  // An open game a referee could claim advertises teams, venue and slots. A
+  // coach's phone number is not part of that.
+  it("omits both keys for a referee who does not hold a slot", async () => {
+    const { gameId } = await seedContactFixture({ apiMatchId: 5303 });
+    const refId = await seedReferee({
+      allowAllHomeGames: true,
+      allowAwayGames: false,
+      isOwnClub: true,
+    });
+
+    const result = await getVisibleRefereeGameById(refId, gameId);
+
+    expect(result?.mySlot).toBeNull();
+    expect(result).not.toHaveProperty("contacts");
+    expect(result).not.toHaveProperty("kampfgericht");
+  });
+
+  it("keeps both keys off the other single-game readers", async () => {
+    const { gameId } = await seedContactFixture({ apiMatchId: 5304 });
+    const byApiMatch = await getVisibleRefereeGameByApiMatchId(null, 5304);
+
+    expect(byApiMatch).not.toHaveProperty("contacts");
+    expect(await getVisibleRefereeGameById(null, gameId)).toHaveProperty("contacts");
   });
 });
 

@@ -1,4 +1,9 @@
-import type { RefereeGameDetail, RefereeGameListItem } from "@dragons/shared";
+import type {
+  KampfgerichtRole,
+  RefereeGameDetail,
+  RefereeGameListItem,
+  RefereeTeamContact,
+} from "@dragons/shared";
 import type { RouteHref } from "@/lib/nav/href";
 
 /**
@@ -68,6 +73,42 @@ interface EinsatzDetailRow {
 
 type EinsatzBadge = "cancelled" | "forfeited";
 
+/** A tappable way to reach a person — `tel:` starts a call, `mailto:` opens mail. */
+interface EinsatzContactAction {
+  /** What the screen shows: the number or the address as the team wrote it. */
+  label: string;
+  /** What `openExternal` is handed. */
+  url: string;
+}
+
+/** One person on the Einsatz screen, ready to render. */
+export interface EinsatzContact {
+  /** Stable inside its block — name plus role, since a team has no person ids here. */
+  key: string;
+  name: string;
+  /** i18n key for the staff role, e.g. "teamStaff.role.trainer". */
+  roleKey: string;
+  phone: EinsatzContactAction | null;
+  email: EinsatzContactAction | null;
+}
+
+/** The contacts of one Dragons team playing the game. */
+interface EinsatzContactGroup {
+  key: string;
+  teamName: string;
+  contacts: EinsatzContact[];
+}
+
+/** One Kampfgericht line: the team, the roles it covers, and whom to call. */
+interface EinsatzKampfgerichtLine {
+  key: string;
+  teamName: string;
+  /** i18n keys of the roles this team covers, in `KAMPFGERICHT_ROLES` order. */
+  roleKeys: string[];
+  /** Empty when the team is already in `contacts` — one person, one place. */
+  contacts: EinsatzContact[];
+}
+
 export interface EinsatzView {
   title: string;
   slots: [EinsatzSlot, EinsatzSlot];
@@ -81,6 +122,40 @@ export interface EinsatzView {
   changes: EinsatzChange[];
   /** The game's page on basketball-bund.net. */
   federationUrl: string;
+  /**
+   * The Kampfgericht block (#313). Empty — and so hidden — on an away game, on
+   * a game with no linked match, and for a caller the API did not send it to
+   * (a referee looking at an open game they do not hold).
+   */
+  kampfgericht: EinsatzKampfgerichtLine[];
+  /** The team-contact block (#313). Empty on a foreign game, and hidden then. */
+  contacts: EinsatzContactGroup[];
+}
+
+/**
+ * `tel:` wants digits, not the spaces and slashes a German number is written
+ * with; the label keeps the spelling the team entered.
+ */
+export function telUrl(phone: string): string {
+  return `tel:${phone.replace(/[^+0-9]/g, "")}`;
+}
+
+export function mailtoUrl(email: string): string {
+  return `mailto:${email}`;
+}
+
+function toContact(contact: RefereeTeamContact, index: number): EinsatzContact {
+  return {
+    key: `${String(index)}:${contact.lastName}:${contact.role}`,
+    name: `${contact.firstName} ${contact.lastName}`,
+    roleKey: `teamStaff.role.${contact.role}`,
+    phone: contact.phone ? { label: contact.phone, url: telUrl(contact.phone) } : null,
+    email: contact.email ? { label: contact.email, url: mailtoUrl(contact.email) } : null,
+  };
+}
+
+function roleKey(role: KampfgerichtRole): string {
+  return `refereeGame.kampfgerichtRole.${role}`;
 }
 
 /**
@@ -192,5 +267,18 @@ export function einsatzView(
     address,
     changes,
     federationUrl: game.brief.federationUrl,
+    // Both keys are absent for a caller the API withheld them from, and the
+    // screen renders nothing for an empty list either way (#313).
+    kampfgericht: (game.kampfgericht ?? []).map((line, index) => ({
+      key: `${String(index)}:${line.teamName}`,
+      teamName: line.teamName,
+      roleKeys: line.roles.map(roleKey),
+      contacts: line.contacts.map(toContact),
+    })),
+    contacts: (game.contacts ?? []).map((group) => ({
+      key: String(group.teamEntryId),
+      teamName: group.teamName,
+      contacts: group.contacts.map(toContact),
+    })),
   };
 }

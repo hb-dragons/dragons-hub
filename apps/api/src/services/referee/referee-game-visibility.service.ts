@@ -24,6 +24,7 @@ import {
   toRefereeGameListItem,
 } from "./referee-games.service";
 import { resolveClaimableSlots } from "./referee-slot-resolver";
+import { getRefereeGameContacts } from "./referee-game-contacts.service";
 
 function buildAssignedToMe(refereeApiId: number | null) {
   if (refereeApiId == null) return null;
@@ -519,11 +520,23 @@ export function getVisibleRefereeGameByMatchId(
  * venue address, the per-slot federation state, the change flags and the
  * federation deep link. The list and the two other single-game readers stay on
  * `RefereeGameListItem`.
+ *
+ * It also carries the Kampfgericht and the team contacts (#313), but only for
+ * a caller who holds a slot on the game or reads it unscoped (an admin). A
+ * referee browsing an open game they could claim gets neither key — and the
+ * queries behind them are never run, so the data does not reach the process
+ * only to be stripped on the way out.
  */
 export async function getVisibleRefereeGameById(
   refereeId: number | null,
   id: number,
 ): Promise<RefereeGameDetail | null> {
   const found = await findVisibleRefereeGame(refereeId, eq(refereeGames.id, id));
-  return found === null ? null : { ...found.item, brief: found.brief };
+  if (found === null) return null;
+
+  const detail: RefereeGameDetail = { ...found.item, brief: found.brief };
+  if (refereeId !== null && found.item.mySlot === null) return detail;
+
+  const { kampfgericht, contacts } = await getRefereeGameContacts(id);
+  return { ...detail, kampfgericht, contacts };
 }

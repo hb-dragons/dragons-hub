@@ -114,8 +114,12 @@ export type {
   RefereeGameListItem,
   RefereeGameBrief,
   RefereeGameDetail,
+  RefereeTeamContact,
+  RefereeContactGroup,
+  KampfgerichtEntry,
+  KampfgerichtRole,
 } from "./referee-games";
-export { federationGameUrl } from "./referee-games";
+export { federationGameUrl, KAMPFGERICHT_ROLES } from "./referee-games";
 export type {
   RefereeListItem,
   RefereeRule,

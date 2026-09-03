@@ -227,7 +227,16 @@
       "nearby": "In der Nähe",
       "further": "Weiter weg",
       "distant": "Weit entfernt"
-    }
+    },
+    "kampfgericht": "Kampfgericht",
+    "kampfgerichtRole": {
+      "anschreiber": "Anschreiber",
+      "zeitnehmer": "Zeitnehmer",
+      "shotclock": "Shotclock"
+    },
+    "contacts": "Kontakt",
+    "call": "Anrufen",
+    "mail": "E-Mail schreiben"
   },
   "auth": {
     "signIn": "Anmelden",
@@ -482,5 +491,11 @@
     "pickedUpTask": "Aufgabe aufgenommen: %{title}",
     "droppedTaskInColumn": "Aufgabe in Spalte abgelegt: %{column}",
     "dropCancelled": "Ablegen abgebrochen"
+  },
+  "teamStaff": {
+    "role": {
+      "trainer": "Trainer",
+      "co_trainer": "Co-Trainer"
+    }
   }
 }

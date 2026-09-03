@@ -135,6 +135,8 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = {
     "a component of STORED_EVENT_TYPE_VALUES, which is what guards the column; kept separate so the manual trigger and watch rules cannot name admin.test_push",
   SYSTEM_EVENT_ENTITY_TYPES:
     "likewise a component of STORED_EVENT_ENTITY_TYPES rather than a column's governing array in its own right",
+  KAMPFGERICHT_ROLES:
+    "the three matches columns (anschreiber/zeitnehmer/shotclock) are the roles; the array names them for the Einsatz response and stores nothing (#313)",
 };
 
 /** Every export of `@dragons/shared` that is an array of strings. */
