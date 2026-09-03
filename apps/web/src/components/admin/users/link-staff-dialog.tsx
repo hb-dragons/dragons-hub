@@ -52,9 +52,13 @@ export function LinkStaffDialog({
     open ? "link-staff-teams" : null,
     () => api.teams.list(),
   )
+  // The entry id is read back off the SWR key, not off the state, so the
+  // fetcher can never be typed around a `teamId` that is still null — and the
+  // id sent is the team *entry* id (`OwnClubTeam.id`), which is what the staff
+  // endpoints are scoped by, not the season-stable squad id.
   const { data: staff, isLoading: staffLoading } = useSWR<TeamStaffMember[]>(
-    open && teamId !== null ? ["link-staff-members", teamId] : null,
-    () => api.teamStaff.list(teamId as number),
+    open && teamId !== null ? (["link-staff-members", teamId] as const) : null,
+    ([, entryId]: readonly [string, number]) => api.teamStaff.list(entryId),
   )
 
   useEffect(() => {

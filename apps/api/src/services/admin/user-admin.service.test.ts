@@ -288,6 +288,25 @@ describe("setUserStaffLink", () => {
     expect((await userRow("u2"))?.staffId).toBe(staffId);
   });
 
+  // The holder check is a read followed by a write, so two admins linking the
+  // same staff record at once both pass it and the unique constraint settles
+  // it. Whichever way the two calls interleave, the loser must see the same
+  // 409 as a caller who lost the up-front check.
+  it("answers 409 for the loser of two concurrent links on one staff record", async () => {
+    const staffId = await seedStaff(await seedTeamEntry(), "Eins");
+    await seedUser("u1");
+    await seedUser("u2");
+
+    const results = await Promise.allSettled([
+      setUserStaffLink("u1", staffId, false),
+      setUserStaffLink("u2", staffId, false),
+    ]);
+
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find((r) => r.status === "rejected");
+    expect(rejected?.reason).toMatchObject({ code: "STAFF_ALREADY_LINKED" });
+  });
+
   // Re-sending the same link for the account that already holds it must not
   // trip the conflict guard — the dialog can submit twice.
   it("is idempotent for the account that already holds the link", async () => {

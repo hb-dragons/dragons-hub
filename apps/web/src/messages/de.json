@@ -745,7 +745,6 @@
       "title": "Staff verknüpfen",
       "description": "Wählen Sie einen Staff-Eintrag für {name}",
       "teamLabel": "Team",
-      "teamPlaceholder": "Team auswählen...",
       "noResults": "Für dieses Team ist kein Staff hinterlegt",
       "grantCoachRole": "Rolle Coach vergeben",
       "linking": "Verknüpfe...",

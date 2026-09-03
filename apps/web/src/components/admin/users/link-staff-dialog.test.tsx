@@ -37,26 +37,29 @@ const ada: TeamStaffMember = {
 
 // The component keys its two fetches by a literal ("link-staff-teams") and a
 // tuple (["link-staff-members", entryId]); the stub answers by shape so the
-// team list and the staff list cannot be confused for one another.
+// team list and the staff list cannot be confused for one another. It also
+// *calls* each fetcher, so the arguments the component passes to the API — the
+// team entry id in particular — are observable rather than stubbed away.
 const swrState = vi.hoisted(() => ({
   staff: [] as unknown[],
 }));
 
 vi.mock("swr", () => ({
-  default: (key: unknown, fetcher: () => Promise<unknown>) => {
+  default: (key: unknown, fetcher: (key: unknown) => Promise<unknown>) => {
     if (key === null) return { data: undefined, isLoading: false };
+    void fetcher(key);
     if (Array.isArray(key)) return { data: swrState.staff, isLoading: false };
-    void fetcher;
     return { data: teams, isLoading: false };
   },
 }));
 
 const linkStaff = vi.fn();
+const listStaff = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   api: {
-    teams: { list: vi.fn() },
-    teamStaff: { list: vi.fn() },
+    teams: { list: vi.fn().mockResolvedValue([]) },
+    teamStaff: { list: (...args: unknown[]) => listStaff(...args) },
     users: { linkStaff: (...args: unknown[]) => linkStaff(...args) },
   },
 }));
@@ -89,6 +92,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   swrState.staff = [ada];
   linkStaff.mockResolvedValue({ id: "u1", staffId: 3, role: "coach" });
+  listStaff.mockResolvedValue([ada]);
 });
 
 function renderDialog(onOpenChange = vi.fn(), onLinked = vi.fn()) {
@@ -126,6 +130,18 @@ describe("<LinkStaffDialog>", () => {
     renderDialog();
 
     expect(screen.queryByRole("button", { name: /Lovelace, Ada/ })).toBeNull();
+    expect(listStaff).not.toHaveBeenCalled();
+  });
+
+  // The staff endpoints are scoped by team *entry* id (`OwnClubTeam.id`, 11
+  // here), not by the season-stable squad id (`teamId`, 1) — passing the wrong
+  // one would list another season's staff, or none.
+  it("fetches the staff of the picked team by its entry id", () => {
+    renderDialog();
+
+    fireEvent.click(screen.getByRole("button", { name: "Dragons U16" }));
+
+    expect(listStaff).toHaveBeenCalledWith(11);
   });
 
   it("sends the staff id with the coach grant on by default", async () => {

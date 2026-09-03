@@ -745,7 +745,6 @@
       "title": "Link Staff Record",
       "description": "Select a staff record for {name}",
       "teamLabel": "Team",
-      "teamPlaceholder": "Select a team...",
       "noResults": "No staff recorded for this team",
       "grantCoachRole": "Grant the coach role",
       "linking": "Linking...",

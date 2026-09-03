@@ -99,15 +99,7 @@ export async function setUserStaffLink(
   const role =
     staffId !== null && grantCoachRole ? withCoachRole(existing.role) : existing.role;
 
-  const [updated] = await getDb()
-    .update(userTable)
-    .set({ staffId, role, updatedAt: new Date() })
-    .where(eq(userTable.id, userId))
-    .returning({
-      id: userTable.id,
-      staffId: userTable.staffId,
-      role: userTable.role,
-    });
+  const [updated] = await runStaffUpdate(userId, staffId, role);
 
   // The row was read a statement earlier, so this only fires if it vanished in
   // between. Keeping the guard means the return type stays non-optional.
@@ -116,6 +108,46 @@ export async function setUserStaffLink(
   }
 
   return updated;
+}
+
+/**
+ * Runs the link update, translating the unique violation on `user.staff_id`
+ * into the same 409 the up-front holder check produces. That check is a read
+ * followed by a write, so two admins linking the same staff record at once can
+ * both pass it; without this the loser would get a 500 for what is, to them,
+ * exactly the conflict the first caller was told about.
+ */
+async function runStaffUpdate(userId: string, staffId: number | null, role: string | null) {
+  try {
+    return await getDb()
+      .update(userTable)
+      .set({ staffId, role, updatedAt: new Date() })
+      .where(eq(userTable.id, userId))
+      .returning({
+        id: userTable.id,
+        staffId: userTable.staffId,
+        role: userTable.role,
+      });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new UserAdminError(
+        "Staff member is already linked to another account",
+        "STAFF_ALREADY_LINKED",
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Postgres `unique_violation` (23505). Drizzle wraps driver errors in a
+ * `DrizzleQueryError` and hangs the original off `cause`, so the code is looked
+ * for along the whole chain rather than on the thrown object alone.
+ */
+function isUniqueViolation(error: unknown): boolean {
+  const code = (error as { code?: unknown; cause?: { code?: unknown } } | null)?.code;
+  const causeCode = (error as { cause?: { code?: unknown } } | null)?.cause?.code;
+  return code === "23505" || causeCode === "23505";
 }
 
 /** Appends `coach` to a comma-joined role string, leaving the rest in order. */
