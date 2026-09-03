@@ -100,6 +100,49 @@ describe("team staff request bodies satisfy @dragons/contracts schemas", () => {
   });
 });
 
+/** The upload is multipart, so its body is recorded as-is rather than JSON-parsed. */
+function formRecordingClient() {
+  const calls: { url: string; method: string; body: unknown; headers: HeadersInit | undefined }[] =
+    [];
+  const fetchFn = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push({
+      url: String(url),
+      method: init?.method ?? "GET",
+      body: init?.body,
+      headers: init?.headers,
+    });
+    return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+  });
+  const client = new ApiClient({
+    baseUrl: "https://example.test",
+    fetchFn: fetchFn as unknown as typeof fetch,
+  });
+  return { api: teamStaffEndpoints(client), calls };
+}
+
+describe("the portrait upload posts multipart to the photo path", () => {
+  it("sends the file under the `file` field the route reads", async () => {
+    const { api, calls } = formRecordingClient();
+    const file = new File([new Uint8Array([1, 2, 3])], "portrait.png", { type: "image/png" });
+
+    await api.uploadPhoto(7, 12, file);
+
+    const call = calls[0]!;
+    expect(call.url).toContain("/admin/teams/7/staff/12/photo");
+    expect(call.method).toBe("POST");
+    expect(call.body).toBeInstanceOf(FormData);
+    expect((call.body as FormData).get("file")).toBe(file);
+  });
+
+  it("leaves Content-Type unset so the runtime writes the multipart boundary", async () => {
+    const { api, calls } = formRecordingClient();
+
+    await api.uploadPhoto(7, 12, new File([], "p.png", { type: "image/png" }));
+
+    expect(calls[0]!.headers).not.toHaveProperty("Content-Type");
+  });
+});
+
 describe("team staff read and delete endpoints target the right path + verb", () => {
   it("list targets the staff collection with GET", async () => {
     const { api, calls } = recordingClient();

@@ -14,7 +14,7 @@ const ada: TeamStaffMember = {
   phone: "+49 170 1234567",
   email: "ada@example.de",
   licence: "C-Lizenz",
-  photoFilename: null,
+  photoUrl: null,
   refereeContact: false,
 };
 
@@ -32,7 +32,12 @@ vi.mock("swr", () => ({
 
 vi.mock("@/lib/api", () => ({
   api: {
-    teamStaff: { create: vi.fn(), update: vi.fn(), remove: vi.fn() },
+    teamStaff: {
+      create: vi.fn(),
+      update: vi.fn(),
+      remove: vi.fn(),
+      uploadPhoto: vi.fn(),
+    },
   },
 }));
 
@@ -181,5 +186,63 @@ describe("TeamStaffDialog without manage permission", () => {
     expect(
       screen.queryByRole("button", { name: "Add staff member" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("TeamStaffDialog portrait", () => {
+  const portraitUrl = "/admin/teams/1/staff/3/photo?v=abc.png";
+
+  function pickFile(): File {
+    const file = new File([new Uint8Array([1, 2, 3])], "ada.png", { type: "image/png" });
+    fireEvent.change(screen.getByLabelText("Portrait"), { target: { files: [file] } });
+    return file;
+  }
+
+  it("offers an upload and shows a placeholder while the member has no portrait", () => {
+    swrState.staff = [ada];
+    open();
+
+    expect(screen.getByRole("button", { name: "Upload portrait" })).toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+
+  it("shows the stored portrait and offers to replace it", () => {
+    swrState.staff = [{ ...ada, photoUrl: portraitUrl }];
+    open();
+
+    const img = screen.getByAltText("Portrait of Ada Lovelace");
+    expect(img).toHaveAttribute("src", `http://localhost:3001${portraitUrl}`);
+    expect(screen.getByRole("button", { name: "Replace portrait" })).toBeInTheDocument();
+  });
+
+  it("uploads the picked file and refreshes the list", async () => {
+    swrState.staff = [ada];
+    vi.mocked(api.teamStaff.uploadPhoto).mockResolvedValue({ ...ada, photoUrl: portraitUrl });
+    open();
+
+    const file = pickFile();
+
+    await waitFor(() => {
+      expect(api.teamStaff.uploadPhoto).toHaveBeenCalledWith(1, 3, file);
+    });
+    expect(swrState.mutate).toHaveBeenCalled();
+  });
+
+  it("reports a rejected upload instead of failing silently", async () => {
+    swrState.staff = [ada];
+    vi.mocked(api.teamStaff.uploadPhoto).mockRejectedValue(new Error("Invalid request data"));
+    open();
+
+    pickFile();
+
+    expect(await screen.findByText("The portrait could not be uploaded.")).toBeInTheDocument();
+  });
+
+  it("disables the upload without manage permission", () => {
+    swrState.staff = [ada];
+    renderDialog(false);
+    fireEvent.click(screen.getByRole("button", { name: "Staff" }));
+
+    expect(screen.getByRole("button", { name: "Upload portrait" })).toBeDisabled();
   });
 });

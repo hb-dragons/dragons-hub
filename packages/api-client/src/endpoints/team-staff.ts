@@ -20,5 +20,15 @@ export function teamStaffEndpoints(client: ApiClient) {
     remove(entryId: number, staffId: number): Promise<{ success: boolean }> {
       return client.delete(`/admin/teams/${entryId}/staff/${staffId}`);
     },
+    /**
+     * Uploads or replaces a portrait. Multipart, so there is no zod request
+     * body to share — the API validates the bytes themselves and answers with
+     * the updated member, whose `photoUrl` points at the new object.
+     */
+    uploadPhoto(entryId: number, staffId: number, file: File): Promise<TeamStaffMember> {
+      const form = new FormData();
+      form.set("file", file);
+      return client.postForm(`/admin/teams/${entryId}/staff/${staffId}/photo`, form);
+    },
   };
 }

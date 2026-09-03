@@ -5,7 +5,10 @@ import {
   createTeamStaff,
   updateTeamStaff,
   deleteTeamStaff,
+  setTeamStaffPhoto,
+  getTeamStaffPhoto,
 } from "../../services/admin/team-staff.service";
+import { PortraitRejected } from "../../services/admin/team-staff-photo.service";
 import { requirePermission } from "../../middleware/rbac";
 import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
@@ -20,6 +23,15 @@ const teamStaffRoutes = new Hono<AppEnv>();
 
 const entryNotFound = { error: "Team entry not found", code: "NOT_FOUND" } as const;
 const staffNotFound = { error: "Staff member not found", code: "NOT_FOUND" } as const;
+const photoNotFound = { error: "Portrait not found", code: "NOT_FOUND" } as const;
+
+/** The central 400 envelope, so a rejected upload reads like a failed validator. */
+const invalidFile = (message: string) => ({
+  error: "Invalid request data",
+  code: "VALIDATION_ERROR",
+  details: [{ path: "file", message }],
+});
+const fileRequired = invalidFile("A file field is required");
 
 // GET /admin/teams/:id/staff - List the staff of a team entry
 teamStaffRoutes.get(
@@ -101,6 +113,68 @@ teamStaffRoutes.delete(
     const { id, staffId } = c.req.valid("param");
     if (!(await deleteTeamStaff(id, staffId))) return c.json(staffNotFound, 404);
     return c.json({ success: true });
+  },
+);
+
+// POST /admin/teams/:id/staff/:staffId/photo - Upload or replace a portrait
+teamStaffRoutes.post(
+  "/teams/:id/staff/:staffId/photo",
+  requirePermission("team", "manage"),
+  validator("param", teamStaffParamSchema, validationHook),
+  describeRoute({
+    description: "Upload or replace the portrait of a staff member",
+    tags: ["Teams"],
+    responses: {
+      200: { description: "Success" },
+      400: { description: "Not a storable image" },
+      404: { description: "Team entry or staff member not found" },
+    },
+  }),
+  async (c) => {
+    const { id, staffId } = c.req.valid("param");
+    const file = (await c.req.parseBody())["file"];
+    if (!(file instanceof File)) return c.json(fileRequired, 400);
+
+    try {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const updated = await setTeamStaffPhoto(id, staffId, buffer, file.type);
+      if (!updated) return c.json(staffNotFound, 404);
+      return c.json(updated);
+    } catch (error) {
+      // Anything else - a bucket outage, a missing GCS_BUCKET_NAME - is not the
+      // caller's fault and belongs in the 500 the error middleware produces.
+      if (!(error instanceof PortraitRejected)) throw error;
+      return c.json(invalidFile(error.message), 400);
+    }
+  },
+);
+
+// GET /admin/teams/:id/staff/:staffId/photo - Serve a stored portrait
+teamStaffRoutes.get(
+  "/teams/:id/staff/:staffId/photo",
+  requirePermission("team", "view"),
+  validator("param", teamStaffParamSchema, validationHook),
+  describeRoute({
+    description: "Get the portrait of a staff member",
+    tags: ["Teams"],
+    responses: {
+      200: { description: "Image" },
+      404: { description: "No portrait for this staff member" },
+    },
+  }),
+  async (c) => {
+    const { id, staffId } = c.req.valid("param");
+    const portrait = await getTeamStaffPhoto(id, staffId);
+    if (!portrait) return c.json(photoNotFound, 404);
+    return new Response(new Uint8Array(portrait.buffer), {
+      headers: {
+        "Content-Type": portrait.contentType,
+        "Content-Length": String(portrait.buffer.length),
+        // Safe to cache: `photoUrl` carries the object name, so a replaced
+        // portrait is requested under a different URL.
+        "Cache-Control": "private, max-age=3600",
+      },
+    });
   },
 );
 
