@@ -15,8 +15,14 @@ import {
   not,
 } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
-import type { RefereeGameListItem } from "@dragons/shared";
-import { refereeGameColumns, computeMySlot, toRefereeGameListItem } from "./referee-games.service";
+import type { RefereeGameDetail, RefereeGameListItem } from "@dragons/shared";
+import {
+  refereeGameColumns,
+  refereeGameBriefColumns,
+  computeMySlot,
+  splitRefereeGameBrief,
+  toRefereeGameListItem,
+} from "./referee-games.service";
 import { resolveClaimableSlots } from "./referee-slot-resolver";
 
 function buildAssignedToMe(refereeApiId: number | null) {
@@ -378,26 +384,38 @@ function buildAwayVisibility(
 /**
  * Fetch the one referee game matching `lookup`, if the referee may see it.
  *
- * The three exported readers below differ only in which column they look the
- * game up by; everything else — the anonymous short circuit, the own-club
- * check, the assignment rules, the visibility/assigned-to-me access condition
- * and the row decoration — was duplicated verbatim across all three.
+ * The exported readers below differ only in which column they look the game up
+ * by, and whether they return the Einsatz brief; everything else — the
+ * anonymous short circuit, the own-club check, the assignment rules, the
+ * visibility/assigned-to-me access condition and the row decoration — was
+ * duplicated verbatim across all three.
  *
  * `refereeId === null` means "no referee scoping" (an admin-side caller), which
  * skips the access condition entirely but still honours the tombstone filter.
+ *
+ * It always selects the brief columns (#309) and returns the list item and the
+ * brief side by side. Splitting them here rather than letting the brief columns
+ * ride along on the row is what keeps `RefereeGameListItem` exactly as wide as
+ * it was: `toRefereeGameListItem` spreads whatever row it is handed.
  */
-async function getVisibleRefereeGame(
+async function findVisibleRefereeGame(
   refereeId: number | null,
   lookup: SQL,
-): Promise<RefereeGameListItem | null> {
+): Promise<{ item: RefereeGameListItem; brief: RefereeGameDetail["brief"] } | null> {
+  const columns = { ...refereeGameColumns, ...refereeGameBriefColumns };
+
   if (refereeId === null) {
     const [row] = await getDb()
-      .select(refereeGameColumns)
+      .select(columns)
       .from(refereeGames)
       .where(and(lookup, isNull(refereeGames.removedAt)))
       .limit(1);
     if (!row) return null;
-    return toRefereeGameListItem(row, { mySlot: null, claimableSlots: [] });
+    const { listRow, brief } = splitRefereeGameBrief(row);
+    return {
+      item: toRefereeGameListItem(listRow, { mySlot: null, claimableSlots: [] }),
+      brief,
+    };
   }
 
   const [referee] = await getDb()
@@ -446,16 +464,29 @@ async function getVisibleRefereeGame(
     : or(...accessParts)!;
 
   const [row] = await getDb()
-    .select(refereeGameColumns)
+    .select(columns)
     .from(refereeGames)
     .where(and(lookup, isNull(refereeGames.removedAt), accessCondition)!)
     .limit(1);
 
   if (!row) return null;
-  return toRefereeGameListItem(row, {
-    mySlot: computeMySlot(row, referee.apiId ?? null),
-    claimableSlots: resolveClaimableSlots(row, referee, rules),
-  });
+  const { listRow, brief } = splitRefereeGameBrief(row);
+  return {
+    item: toRefereeGameListItem(listRow, {
+      mySlot: computeMySlot(row, referee.apiId ?? null),
+      claimableSlots: resolveClaimableSlots(row, referee, rules),
+    }),
+    brief,
+  };
+}
+
+/** The list item alone, for the readers that do not serve the Einsatz screen. */
+async function getVisibleRefereeGame(
+  refereeId: number | null,
+  lookup: SQL,
+): Promise<RefereeGameListItem | null> {
+  const found = await findVisibleRefereeGame(refereeId, lookup);
+  return found?.item ?? null;
 }
 
 /**
@@ -483,10 +514,16 @@ export function getVisibleRefereeGameByMatchId(
 /**
  * Fetch a single referee game by id if it matches the referee's visibility rules.
  * Returns null when the game does not exist or the referee cannot see it.
+ *
+ * This is the Einsatz screen's reader, so it carries the brief (#309) — the
+ * venue address, the per-slot federation state, the change flags and the
+ * federation deep link. The list and the two other single-game readers stay on
+ * `RefereeGameListItem`.
  */
-export function getVisibleRefereeGameById(
+export async function getVisibleRefereeGameById(
   refereeId: number | null,
   id: number,
-): Promise<RefereeGameListItem | null> {
-  return getVisibleRefereeGame(refereeId, eq(refereeGames.id, id));
+): Promise<RefereeGameDetail | null> {
+  const found = await findVisibleRefereeGame(refereeId, eq(refereeGames.id, id));
+  return found === null ? null : { ...found.item, brief: found.brief };
 }

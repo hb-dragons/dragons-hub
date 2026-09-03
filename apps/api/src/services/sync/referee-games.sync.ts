@@ -35,6 +35,12 @@ export function computeRefereeGameHash(row: {
   kickoffTime: string;
   isCancelled: boolean;
   isForfeited: boolean;
+  venueStreet: string | null;
+  venuePostalCode: string | null;
+  sr1Tentative: boolean;
+  sr2Tentative: boolean;
+  venueChanged: boolean;
+  timeChanged: boolean;
 }): string {
   const data = [
     row.sr1Status,
@@ -45,6 +51,15 @@ export function computeRefereeGameHash(row: {
     row.kickoffTime,
     row.isCancelled,
     row.isForfeited,
+    // The Einsatz brief (#309). A federation move of the hall or the kickoff
+    // changes nothing above, so without these six the row would hash the same
+    // and the sync would skip it.
+    row.venueStreet,
+    row.venuePostalCode,
+    row.sr1Tentative,
+    row.sr2Tentative,
+    row.venueChanged,
+    row.timeChanged,
   ];
   return createHash("sha256").update(JSON.stringify(data)).digest("hex");
 }
@@ -98,6 +113,15 @@ function extractRefereeApiId(sr: SdkSpielleitung | null): number | null {
   return sr.schiedsrichter.schiedsrichterId;
 }
 
+/**
+ * Whether the federation still calls this slot's assignment vorläufig
+ * (`tempeinteilung`). An empty slot has no assignment to qualify, so it is
+ * never tentative.
+ */
+function isSlotTentative(sr: SdkSpielleitung | null): boolean {
+  return sr?.tempeinteilung ?? false;
+}
+
 export function mapApiResultToRow(result: SdkOffeneSpielResult) {
   const { sp, sr1, sr2, sr1MeinVerein, sr2MeinVerein, sr1OffenAngeboten, sr2OffenAngeboten } = result;
   const { date: kickoffDate, time: kickoffTime } = epochMsToBerlin(sp.spieldatum);
@@ -114,6 +138,8 @@ export function mapApiResultToRow(result: SdkOffeneSpielResult) {
     leagueShort: sp.liga.srKurzname ?? sp.liga.ligaKurzname,
     venueName: sp.spielfeld?.bezeichnung ?? null,
     venueCity: sp.spielfeld?.ort ?? null,
+    venueStreet: sp.spielfeld?.strasse ?? null,
+    venuePostalCode: sp.spielfeld?.plz ?? null,
     sr1OurClub: sr1MeinVerein,
     sr2OurClub: sr2MeinVerein,
     sr1Name: extractRefereeName(sr1),
@@ -122,8 +148,12 @@ export function mapApiResultToRow(result: SdkOffeneSpielResult) {
     sr2RefereeApiId: extractRefereeApiId(sr2),
     sr1Status: deriveSrStatus(sr1, sr1OffenAngeboten),
     sr2Status: deriveSrStatus(sr2, sr2OffenAngeboten),
+    sr1Tentative: isSlotTentative(sr1),
+    sr2Tentative: isSlotTentative(sr2),
     isCancelled: sp.abgesagt,
     isForfeited: sp.verzicht,
+    venueChanged: sp.spielortGeandert,
+    timeChanged: sp.spielzeitGeandert,
     homeClubId: sp.heimMannschaftLiga.mannschaft.verein.vereinId,
     guestClubId: sp.gastMannschaftLiga.mannschaft.verein.vereinId,
   };

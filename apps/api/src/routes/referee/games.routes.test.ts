@@ -174,6 +174,32 @@ describe("GET /games/:id", () => {
     expect(mocks.getVisibleRefereeGameById).toHaveBeenCalledWith(42, 7);
   });
 
+  // The Einsatz screen's endpoint: the list item plus the brief (#309). The
+  // route hands the service's detail through untouched, so the contract worth
+  // pinning here is that `brief` survives serialization.
+  it("passes the Einsatz brief through to the client", async () => {
+    const row = {
+      id: 7,
+      apiMatchId: 2000,
+      matchId: null,
+      brief: {
+        venueStreet: "Hauptstr. 1",
+        venuePostalCode: "12345",
+        sr1Tentative: true,
+        sr2Tentative: false,
+        venueChanged: false,
+        timeChanged: true,
+        federationUrl: "https://www.basketball-bund.net/static/#/spiel/2000",
+      },
+    };
+    mocks.getVisibleRefereeGameById.mockResolvedValue(row);
+
+    const res = await app.request("/games/7");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(row);
+  });
+
   it("returns 404 when referee cannot see the game", async () => {
     mocks.getVisibleRefereeGameById.mockResolvedValue(null);
 

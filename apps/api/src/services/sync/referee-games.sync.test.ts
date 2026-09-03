@@ -253,18 +253,30 @@ describe("deriveSrStatus", () => {
   });
 });
 
+/** Every field `computeRefereeGameHash` reads, with somewhere to start from. */
+function hashRow(overrides: Partial<Parameters<typeof computeRefereeGameHash>[0]> = {}) {
+  return {
+    sr1Status: "open",
+    sr2Status: "open",
+    sr1Name: null as string | null,
+    sr2Name: null as string | null,
+    kickoffDate: "2026-04-25",
+    kickoffTime: "14:00",
+    isCancelled: false,
+    isForfeited: false,
+    venueStreet: "Hauptstr. 1" as string | null,
+    venuePostalCode: "12345" as string | null,
+    sr1Tentative: false,
+    sr2Tentative: false,
+    venueChanged: false,
+    timeChanged: false,
+    ...overrides,
+  };
+}
+
 describe("computeRefereeGameHash", () => {
   it("returns consistent hash for same input", () => {
-    const row = {
-      sr1Status: "assigned" as const,
-      sr2Status: "open" as const,
-      sr1Name: "Hans Müller",
-      sr2Name: null,
-      kickoffDate: "2026-04-25",
-      kickoffTime: "14:00",
-      isCancelled: false,
-      isForfeited: false,
-    };
+    const row = hashRow({ sr1Status: "assigned", sr1Name: "Hans Müller" });
     const hash1 = computeRefereeGameHash(row);
     const hash2 = computeRefereeGameHash(row);
     expect(hash1).toBe(hash2);
@@ -272,18 +284,27 @@ describe("computeRefereeGameHash", () => {
   });
 
   it("returns different hash when sr status changes", () => {
-    const row1 = {
-      sr1Status: "open" as const,
-      sr2Status: "open" as const,
-      sr1Name: null,
-      sr2Name: null,
-      kickoffDate: "2026-04-25",
-      kickoffTime: "14:00",
-      isCancelled: false,
-      isForfeited: false,
-    };
-    const row2 = { ...row1, sr1Status: "assigned" as const, sr1Name: "Hans Müller" };
+    const row1 = hashRow({ venueStreet: null, venuePostalCode: null });
+    const row2 = { ...row1, sr1Status: "assigned", sr1Name: "Hans Müller" };
     expect(computeRefereeGameHash(row1)).not.toBe(computeRefereeGameHash(row2));
+  });
+
+  // The brief's six fields are change-detection inputs like every other synced
+  // value (#309). Left out of the hash, a federation move of the hall — the one
+  // change a referee most needs to see — would hash identically and the sync
+  // would skip the row.
+  it.each([
+    ["venueStreet", { venueStreet: "Nebenstr. 9" }],
+    ["venuePostalCode", { venuePostalCode: "54321" }],
+    ["sr1Tentative", { sr1Tentative: true }],
+    ["sr2Tentative", { sr2Tentative: true }],
+    ["venueChanged", { venueChanged: true }],
+    ["timeChanged", { timeChanged: true }],
+  ])("returns a different hash when %s alone changes", (_label, change) => {
+    const row = hashRow();
+    expect(computeRefereeGameHash(row)).not.toBe(
+      computeRefereeGameHash({ ...row, ...change }),
+    );
   });
 });
 
@@ -329,6 +350,41 @@ describe("mapApiResultToRow", () => {
     const row = mapApiResultToRow(result);
     expect(row.venueName).toBeNull();
     expect(row.venueCity).toBeNull();
+    expect(row.venueStreet).toBeNull();
+    expect(row.venuePostalCode).toBeNull();
+  });
+
+  it("maps the Spielfeld street and postal code (#309)", () => {
+    const row = mapApiResultToRow(makeApiResult());
+    expect(row.venueStreet).toBe("Hauptstr. 1");
+    expect(row.venuePostalCode).toBe("12345");
+  });
+
+  it("maps the federation's per-slot tentative marker (#309)", () => {
+    const row = mapApiResultToRow(
+      makeApiResult({
+        sr1: makeSr({ tempeinteilung: true }),
+        sr2: makeSr({ tempeinteilung: false }),
+      }),
+    );
+    expect(row.sr1Tentative).toBe(true);
+    expect(row.sr2Tentative).toBe(false);
+  });
+
+  // An unfilled slot has no assignment to call vorläufig.
+  it("reports an empty slot as not tentative (#309)", () => {
+    const row = mapApiResultToRow(makeApiResult({ sr1: null, sr2: null }));
+    expect(row.sr1Tentative).toBe(false);
+    expect(row.sr2Tentative).toBe(false);
+  });
+
+  it("maps the venue-changed and time-changed flags (#309)", () => {
+    const result = makeApiResult();
+    result.sp.spielortGeandert = true;
+    result.sp.spielzeitGeandert = true;
+    const row = mapApiResultToRow(result);
+    expect(row.venueChanged).toBe(true);
+    expect(row.timeChanged).toBe(true);
   });
 
   it("extracts referee name when assigned", () => {
@@ -736,6 +792,45 @@ describe("syncRefereeGames", () => {
     const after = await gameRow();
     expect(after.updatedAt.getTime()).toBe(before.updatedAt.getTime());
     expect(after.lastSyncedAt!.getTime()).toBe(before.lastSyncedAt!.getTime());
+  });
+
+  // The AC for #309: the brief's fields are real change-detection inputs, not
+  // decoration. A hall that moved to a new street changes nothing else on the
+  // row, so if the hash ignored it the sync would report "unchanged".
+  it("updates the row when only the venue street changed (#309)", async () => {
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult()));
+    await syncRefereeGames();
+    vi.clearAllMocks();
+
+    const moved = makeApiResult();
+    moved.sp.spielfeld = {
+      ...moved.sp.spielfeld!,
+      strasse: "Nebenstr. 9",
+    };
+    mockFetchOffeneSpiele.mockResolvedValue(feed(moved));
+
+    const counts = await syncRefereeGames();
+
+    expect(counts).toMatchObject({ created: 0, updated: 1, unchanged: 0 });
+    expect(await gameRow()).toMatchObject({ venueStreet: "Nebenstr. 9" });
+  });
+
+  it("stores the whole Einsatz brief on insert (#309)", async () => {
+    const result = makeApiResult({ sr1: makeSr({ tempeinteilung: true }) });
+    result.sp.spielortGeandert = true;
+    result.sp.spielzeitGeandert = true;
+    mockFetchOffeneSpiele.mockResolvedValue(feed(result));
+
+    await syncRefereeGames();
+
+    expect(await gameRow()).toMatchObject({
+      venueStreet: "Hauptstr. 1",
+      venuePostalCode: "12345",
+      sr1Tentative: true,
+      sr2Tentative: false,
+      venueChanged: true,
+      timeChanged: true,
+    });
   });
 
   it("updates the row and cancels reminders when both slots fill", async () => {

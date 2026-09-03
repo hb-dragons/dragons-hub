@@ -112,7 +112,10 @@ export type {
 
 export type {
   RefereeGameListItem,
+  RefereeGameBrief,
+  RefereeGameDetail,
 } from "./referee-games";
+export { federationGameUrl } from "./referee-games";
 export type {
   RefereeListItem,
   RefereeRule,

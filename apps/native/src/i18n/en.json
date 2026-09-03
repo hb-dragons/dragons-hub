@@ -170,6 +170,14 @@
     "sr2Short": "R2",
     "unassigned": "Not yet assigned",
     "matchNo": "Game number",
+    "tentative": "Tentative",
+    "address": "Directions",
+    "route": "Route",
+    "changed": {
+      "venueChanged": "The venue was changed after publication",
+      "timeChanged": "The time was changed after publication"
+    },
+    "federationLink": "Open on basketball-bund.net",
     "matchInfo": "Match info",
     "matchInfoHint": "Score, quarters and form",
     "open": "Open",

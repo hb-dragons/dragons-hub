@@ -1,4 +1,4 @@
-import { View, Text, ActivityIndicator, Pressable } from "react-native";
+import { View, Text, ActivityIndicator, Platform, Pressable } from "react-native";
 import { useLocalSearchParams, Stack, router } from "expo-router";
 import useSWR from "swr";
 import { APIError } from "@dragons/api-client";
@@ -8,6 +8,7 @@ import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { ClaimGameButton } from "@/components/ClaimGameButton";
+import { openExternal } from "@/lib/legal/open-external";
 import { refereeApi } from "@/lib/api";
 import { einsatzView, type EinsatzSlot } from "@/lib/referee/einsatz";
 import { i18n } from "@/lib/i18n";
@@ -49,6 +50,9 @@ function OfficialSlot({ slot }: { slot: EinsatzSlot }) {
         >
           {slot.isMine ? (
             <Badge label={i18n.t("refereeGame.mine")} variant="default" />
+          ) : null}
+          {slot.tentative ? (
+            <Badge label={i18n.t("refereeGame.tentative")} variant="heat" />
           ) : null}
           <Badge
             label={i18n.t(`refereeGame.status.${slot.status}`)}
@@ -110,7 +114,7 @@ export default function RefereeGameDetailScreen() {
   const header = (
     <Stack.Screen
       options={{
-        headerTitle: game ? einsatzView(game).title : "",
+        headerTitle: game ? einsatzView(game, Platform.OS).title : "",
       }}
     />
   );
@@ -190,8 +194,9 @@ export default function RefereeGameDetailScreen() {
   // Which sections this Einsatz carries — the Spielinfo link, the detail rows,
   // the status badges — is decided in the lib and tested there (#307); the
   // screen only renders the result.
-  const view = einsatzView(game);
+  const view = einsatzView(game, Platform.OS);
   const spielinfoRoute = view.spielinfoRoute;
+  const address = view.address;
   const venueName = game.venueName;
 
   return (
@@ -268,6 +273,30 @@ export default function RefereeGameDetailScreen() {
         </View>
       </Card>
 
+      {/* ── 1b. What the federation changed after publishing (#309) ── */}
+      {view.changes.length > 0 ? (
+        <View
+          style={{
+            backgroundColor: colors.surfaceLowest,
+            borderRadius: radius.md,
+            borderLeftWidth: 3,
+            borderLeftColor: colors.primary,
+            padding: spacing.lg,
+            marginBottom: spacing.md,
+            gap: spacing.xs,
+          }}
+        >
+          {view.changes.map((change) => (
+            <Text
+              key={change}
+              style={[textStyles.caption, { color: colors.foreground }]}
+            >
+              {i18n.t(`refereeGame.changed.${change}`)}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+
       {/* ── 2. Officials ── */}
       <View style={{ marginBottom: spacing.md }}>
         <Text style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
@@ -305,6 +334,45 @@ export default function RefereeGameDetailScreen() {
           }}
         />
       </View>
+
+      {/* ── 2c. Anfahrt (#309) ── */}
+      {/* Absent for rows synced before the address columns existed; the city
+          then stays in the detail rows below instead of showing as a blank. */}
+      {address ? (
+        <Card
+          style={{ marginBottom: spacing.md }}
+          onPress={() => openExternal(address.mapsUrl)}
+        >
+          <View style={detailRowStyle}>
+            <View style={{ flex: 1, gap: spacing.xs }}>
+              <Text style={[sectionLabelStyle, { marginBottom: spacing.xs }]}>
+                {i18n.t("refereeGame.address")}
+              </Text>
+              {venueName ? (
+                <Text style={[textStyles.body, { color: colors.foreground }]}>
+                  {venueName}
+                </Text>
+              ) : null}
+              <Text style={[textStyles.body, { color: colors.foreground }]}>
+                {address.street}
+              </Text>
+              {address.cityLine ? (
+                <Text style={[textStyles.body, { color: colors.foreground }]}>
+                  {address.cityLine}
+                </Text>
+              ) : null}
+            </View>
+            <Text
+              style={[
+                textStyles.body,
+                { color: colors.primary, marginLeft: spacing.md },
+              ]}
+            >
+              {i18n.t("refereeGame.route")}
+            </Text>
+          </View>
+        </Card>
+      ) : null}
 
       {/* ── 3. Spielinfo ── */}
       {spielinfoRoute ? (
@@ -396,6 +464,26 @@ export default function RefereeGameDetailScreen() {
           ) : null}
         </View>
       </View>
+
+      {/* ── 5. The game on basketball-bund.net (#309) ── */}
+      <Card
+        style={{ marginBottom: spacing.md }}
+        onPress={() => openExternal(view.federationUrl)}
+      >
+        <View style={[detailRowStyle, { alignItems: "center" }]}>
+          <Text style={[textStyles.body, { color: colors.foreground, flex: 1 }]}>
+            {i18n.t("refereeGame.federationLink")}
+          </Text>
+          <Text
+            style={[
+              textStyles.body,
+              { color: colors.primary, marginLeft: spacing.md },
+            ]}
+          >
+            {i18n.t("refereeGame.open")}
+          </Text>
+        </View>
+      </Card>
       </Screen>
     </>
   );
