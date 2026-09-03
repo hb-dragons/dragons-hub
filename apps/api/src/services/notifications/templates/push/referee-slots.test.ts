@@ -3,6 +3,7 @@ import { renderRefereeSlotsPush } from "./referee-slots";
 
 const payload = {
   matchId: 99,
+  refereeGameId: 7,
   homeTeam: "Dragons U18",
   guestTeam: "TV Buchholz",
   kickoffDate: "2026-05-10",
@@ -21,18 +22,28 @@ describe("renderRefereeSlotsPush", () => {
     expect(out.title).toContain("Schiedsrichter");
     expect(out.body).toContain("Dragons U18");
     expect(out.data.eventType).toBe("referee.slots.needed");
-    // /game/:id is a declared expo-router route and renders <ClaimGameButton>
-    // for referees, so the tap lands on the claimable game.
-    expect(out.data.deepLink).toBe("/game/99");
+    // Every referee game opens the Einsatz screen (#307), which is a declared
+    // expo-router route and renders <ClaimGameButton>, so the tap lands on the
+    // claimable game whether or not a match row is linked.
+    expect(out.data.deepLink).toBe("/referee-game/7");
   });
 
   it("reminder deep-links to the claimable game too", () => {
     const out = renderRefereeSlotsPush(payload, "de", "reminder");
-    expect(out.data.deepLink).toBe("/game/99");
+    expect(out.data.deepLink).toBe("/referee-game/7");
   });
 
-  it("falls back to /officiating when the match row is not linked yet", () => {
+  it("deep-links to the Einsatz screen even with no linked match row", () => {
     const out = renderRefereeSlotsPush({ ...payload, matchId: null }, "de", "needed");
+    expect(out.data.deepLink).toBe("/referee-game/7");
+  });
+
+  it("falls back to /officiating for an event stored without the game id", () => {
+    const out = renderRefereeSlotsPush(
+      { ...payload, refereeGameId: undefined },
+      "de",
+      "needed",
+    );
     expect(out.data.deepLink).toBe("/officiating");
     expect(String(out.data.deepLink)).not.toContain("null");
   });

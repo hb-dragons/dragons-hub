@@ -1,5 +1,5 @@
 import { View, Text, ActivityIndicator, Pressable } from "react-native";
-import { useLocalSearchParams, Stack } from "expo-router";
+import { useLocalSearchParams, Stack, router } from "expo-router";
 import useSWR from "swr";
 import { APIError } from "@dragons/api-client";
 import type { RefereeGameListItem } from "@dragons/shared";
@@ -9,6 +9,7 @@ import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { ClaimGameButton } from "@/components/ClaimGameButton";
 import { refereeApi } from "@/lib/api";
+import { einsatzView, type EinsatzSlot } from "@/lib/referee/einsatz";
 import { i18n } from "@/lib/i18n";
 import { kickoffCompact } from "@/lib/format/kickoff";
 import { fontFamilies } from "@/theme/typography";
@@ -21,16 +22,14 @@ function slotStatusVariant(
   return "secondary";
 }
 
-interface OfficialSlotProps {
-  label: string;
-  name: string | null;
-  status: RefereeGameListItem["sr1Status"];
-}
-
-function OfficialSlot({ label, name, status }: OfficialSlotProps) {
+function OfficialSlot({ slot }: { slot: EinsatzSlot }) {
   const { colors, textStyles, spacing } = useTheme();
-  const displayName = name ?? i18n.t("refereeGame.unassigned");
-  const nameColor = name ? colors.foreground : colors.mutedForeground;
+  const displayName = slot.name ?? i18n.t("refereeGame.unassigned");
+  const nameColor = slot.name
+    ? slot.isMine
+      ? colors.primary
+      : colors.foreground
+    : colors.mutedForeground;
 
   return (
     <View style={{ gap: spacing.xs }}>
@@ -43,14 +42,31 @@ function OfficialSlot({ label, name, status }: OfficialSlotProps) {
         }}
       >
         <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
-          {label}
+          {i18n.t(slot.labelKey)}
         </Text>
-        <Badge
-          label={i18n.t(`refereeGame.status.${status}`)}
-          variant={slotStatusVariant(status)}
-        />
+        <View
+          style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}
+        >
+          {slot.isMine ? (
+            <Badge label={i18n.t("refereeGame.mine")} variant="default" />
+          ) : null}
+          <Badge
+            label={i18n.t(`refereeGame.status.${slot.status}`)}
+            variant={slotStatusVariant(slot.status)}
+          />
+        </View>
       </View>
-      <Text style={[textStyles.body, { color: nameColor }]}>
+      <Text
+        style={[
+          textStyles.body,
+          {
+            color: nameColor,
+            fontFamily: slot.isMine
+              ? fontFamilies.bodySemiBold
+              : textStyles.body.fontFamily,
+          },
+        ]}
+      >
         {displayName}
       </Text>
     </View>
@@ -94,7 +110,7 @@ export default function RefereeGameDetailScreen() {
   const header = (
     <Stack.Screen
       options={{
-        headerTitle: game ? `${game.homeTeamName} – ${game.guestTeamName}` : "",
+        headerTitle: game ? einsatzView(game).title : "",
       }}
     />
   );
@@ -171,8 +187,12 @@ export default function RefereeGameDetailScreen() {
     );
   }
 
+  // Which sections this Einsatz carries — the Spielinfo link, the detail rows,
+  // the status badges — is decided in the lib and tested there (#307); the
+  // screen only renders the result.
+  const view = einsatzView(game);
+  const spielinfoRoute = view.spielinfoRoute;
   const venueName = game.venueName;
-  const address = game.venueCity;
 
   return (
     <>
@@ -261,11 +281,7 @@ export default function RefereeGameDetailScreen() {
             gap: spacing.md,
           }}
         >
-          <OfficialSlot
-            label={i18n.t("refereeGame.sr1")}
-            name={game.sr1Name}
-            status={game.sr1Status}
-          />
+          <OfficialSlot slot={view.slots[0]} />
 
           <View
             style={{
@@ -275,11 +291,7 @@ export default function RefereeGameDetailScreen() {
             }}
           />
 
-          <OfficialSlot
-            label={i18n.t("refereeGame.sr2")}
-            name={game.sr2Name}
-            status={game.sr2Status}
-          />
+          <OfficialSlot slot={view.slots[1]} />
         </View>
       </View>
 
@@ -294,7 +306,34 @@ export default function RefereeGameDetailScreen() {
         />
       </View>
 
-      {/* ── 3. Details ── */}
+      {/* ── 3. Spielinfo ── */}
+      {spielinfoRoute ? (
+        <Card
+          style={{ marginBottom: spacing.md }}
+          onPress={() => router.push(spielinfoRoute)}
+        >
+          <View style={detailRowStyle}>
+            <View style={{ flex: 1, gap: spacing.xs }}>
+              <Text style={[textStyles.body, { color: colors.foreground }]}>
+                {i18n.t("refereeGame.matchInfo")}
+              </Text>
+              <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
+                {i18n.t("refereeGame.matchInfoHint")}
+              </Text>
+            </View>
+            <Text
+              style={[
+                textStyles.body,
+                { color: colors.primary, marginLeft: spacing.md },
+              ]}
+            >
+              {i18n.t("refereeGame.open")}
+            </Text>
+          </View>
+        </Card>
+      ) : null}
+
+      {/* ── 4. Details ── */}
       <View style={{ marginBottom: spacing.md }}>
         <Text style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
           {i18n.t("gameDetail.details")}
@@ -307,10 +346,10 @@ export default function RefereeGameDetailScreen() {
             gap: spacing.sm,
           }}
         >
-          {venueName ? (
-            <View style={detailRowStyle}>
+          {view.details.map((row) => (
+            <View key={row.key} style={detailRowStyle}>
               <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
-                {i18n.t("gameDetail.venue")}
+                {i18n.t(row.labelKey)}
               </Text>
               <Text
                 style={[
@@ -324,59 +363,33 @@ export default function RefereeGameDetailScreen() {
                 ]}
                 numberOfLines={2}
               >
-                {venueName}
+                {row.value}
               </Text>
             </View>
-          ) : null}
+          ))}
 
-          {address ? (
-            <View style={detailRowStyle}>
-              <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
-                {i18n.t("gameDetail.address")}
-              </Text>
-              <Text
-                style={[
-                  textStyles.body,
-                  {
-                    color: colors.foreground,
-                    flex: 1,
-                    textAlign: "right",
-                    marginLeft: spacing.md,
-                  },
-                ]}
-                numberOfLines={2}
-              >
-                {address}
-              </Text>
-            </View>
-          ) : null}
-
-          {(game.isCancelled || game.isForfeited) ? (
+          {view.badges.length > 0 ? (
             <>
-              {(venueName || address) ? (
-                <View
-                  style={{
-                    height: 1,
-                    backgroundColor: colors.border,
-                    opacity: 0.25,
-                    marginVertical: spacing.xs,
-                  }}
-                />
-              ) : null}
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: colors.border,
+                  opacity: 0.25,
+                  marginVertical: spacing.xs,
+                }}
+              />
               <View style={[detailRowStyle, { alignItems: "center" }]}>
                 <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
                   {i18n.t("gameDetail.status")}
                 </Text>
                 <View style={{ flexDirection: "row", gap: spacing.sm }}>
-                  {game.isCancelled ? (
+                  {view.badges.map((badge) => (
                     <Badge
-                      label={i18n.t("gameDetail.cancelled")}
-                      variant="destructive"
+                      key={badge}
+                      label={i18n.t(`gameDetail.${badge}`)}
+                      variant={badge === "cancelled" ? "destructive" : "heat"}
                     />
-                  ) : null}
-                  {game.isForfeited ? (
-                    <Badge label={i18n.t("gameDetail.forfeited")} variant="heat" />
-                  ) : null}
+                  ))}
                 </View>
               </View>
             </>
