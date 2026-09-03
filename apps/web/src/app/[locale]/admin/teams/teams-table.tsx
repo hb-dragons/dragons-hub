@@ -27,6 +27,7 @@ import { SWR_KEYS } from "@/lib/swr-keys";
 import { queries } from "@/lib/swr-queries";
 import { api } from "@/lib/api";
 import { SeasonContextSelect } from "@/components/admin/seasons/season-context-select";
+import { TeamStaffDialog } from "./team-staff-dialog";
 import { COLOR_PRESET_KEYS, getColorPreset } from "@dragons/shared";
 import type { OwnClubTeam } from "@dragons/shared";
 import { Button } from "@dragons/ui/components/button";
@@ -220,6 +221,17 @@ function TeamRowContent(props: TeamRowProps & TeamRowContentExtras) {
         </div>
       </TableCell>
       <TableCell>
+        {/* Staff editing is a dialog of its own, so it stays available while a
+            row's inline drafts are dirty, but not while rows are being dragged. */}
+        {reorderMode ? null : (
+          <TeamStaffDialog
+            entryId={team.id}
+            teamName={team.customName ?? team.name}
+            canManage={canManage}
+          />
+        )}
+      </TableCell>
+      <TableCell>
         <Button
           size="sm"
           disabled={interactiveDisabled || !isDirty || saving}
@@ -403,6 +415,7 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
         <TableHead>{t("teams.columns.customName")}</TableHead>
         <TableHead>{t("teams.gameDuration")}</TableHead>
         <TableHead>{t("teams.badgeColor")}</TableHead>
+        <TableHead>{t("teams.staff.column")}</TableHead>
         <TableHead className="w-24" />
       </TableRow>
     </TableHeader>

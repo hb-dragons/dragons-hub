@@ -145,6 +145,14 @@ export {
 } from "./team";
 
 export {
+  teamStaffParamSchema,
+  teamStaffCreateBodySchema,
+  teamStaffUpdateBodySchema,
+  type TeamStaffCreateBody,
+  type TeamStaffUpdateBody,
+} from "./team-staff";
+
+export {
   venueSearchQuerySchema,
   type VenueSearchQuery,
 } from "./venue";

@@ -65,6 +65,7 @@ const ENUM_COLUMNS: readonly EnumColumn[] = [
   { table: "channel_configs", column: "digest_mode", constant: "DIGEST_MODES" },
   { table: "sync_runs", column: "status", constant: "SYNC_STATUSES" },
   { table: "seasons", column: "status", constant: "SEASON_STATUSES" },
+  { table: "team_staff", column: "role", constant: "TEAM_STAFF_ROLES" },
   { table: "sync_run_entries", column: "entity_type", constant: "ENTITY_TYPES" },
   { table: "sync_run_entries", column: "action", constant: "ENTRY_ACTIONS" },
   { table: "tasks", column: "priority", constant: "TASK_PRIORITIES" },

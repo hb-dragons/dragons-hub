@@ -21,3 +21,23 @@ export interface TeamReorderItem {
   name: string;
   displayOrder: number;
 }
+
+/** The roles a Team staff member can hold. Widen when Betreuer/Teammanager arrive (ADR 0008). */
+export const TEAM_STAFF_ROLES = ["trainer", "co_trainer"] as const;
+export type TeamStaffRole = (typeof TEAM_STAFF_ROLES)[number];
+
+/** One staff member of a team entry, as the admin endpoints return them. */
+export interface TeamStaffMember {
+  id: number;
+  teamEntryId: number;
+  firstName: string;
+  lastName: string;
+  role: TeamStaffRole;
+  phone: string | null;
+  email: string | null;
+  licence: string | null;
+  /** Object name of the portrait in the media bucket; the upload lands in a later slice. */
+  photoFilename: string | null;
+  /** Marks the member referees are pointed at as the team contact. */
+  refereeContact: boolean;
+}
