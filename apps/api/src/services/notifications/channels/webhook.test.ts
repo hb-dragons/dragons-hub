@@ -112,6 +112,9 @@ describe("WebhookChannelAdapter", () => {
           event_type: "sync-completed",
           client_payload: { eventId: "evt-001" },
         }),
+        // The shared dispatch helper bounds the request; the deadline itself is
+        // asserted in github-dispatch.test.ts.
+        signal: expect.any(AbortSignal),
       },
     );
 

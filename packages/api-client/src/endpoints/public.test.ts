@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { publicEndpoints } from "./public";
+import { publicEndpoints, type PublicTeam } from "./public";
 import type { ApiClient } from "../client";
 
 function mockClient() {
@@ -73,6 +73,72 @@ describe("publicEndpoints", () => {
       await endpoints.getTeams();
 
       expect(client.get).toHaveBeenCalledWith("/public/teams");
+    });
+
+    /**
+     * `PublicTeam` is hand-written against the API's response (this package
+     * cannot import apps/api), so it is pinned from both sides: the API asserts
+     * its payload's key set in `team-list.service.test.ts`, and this fixture —
+     * typed as `PublicTeam`, with no `as` to paper over a mismatch — fails to
+     * compile if a field here is renamed, dropped or retyped.
+     */
+    it("types an own-club row, staff included, as the API returns it", async () => {
+      const team: PublicTeam = {
+        id: 10,
+        apiTeamPermanentId: 160402,
+        seasonTeamId: 1604020,
+        teamCompetitionId: 99,
+        name: "Dragons Herren 1",
+        nameShort: "Dragons H1",
+        customName: null,
+        clubId: 1,
+        isOwnClub: true,
+        verzicht: false,
+        dataHash: "abc",
+        badgeColor: "red",
+        estimatedGameDuration: 90,
+        displayOrder: 1,
+        createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: "2026-09-01T00:00:00.000Z",
+        staff: [
+          {
+            id: 1,
+            firstName: "Emily",
+            lastName: "Gust",
+            role: "trainer",
+            licence: "C-Lizenz",
+            photoUrl: "/public/staff/1/photo?v=abc.webp",
+          },
+        ],
+      };
+
+      const client = mockClient();
+      client.get.mockResolvedValue([team]);
+
+      expect(await publicEndpoints(client).getTeams()).toEqual([team]);
+    });
+
+    it("types a non-own-club row, which carries no staff key", () => {
+      const rival: PublicTeam = {
+        id: 11,
+        apiTeamPermanentId: 999,
+        seasonTeamId: 9990,
+        teamCompetitionId: 1,
+        name: "Rivals",
+        nameShort: null,
+        customName: null,
+        clubId: 2,
+        isOwnClub: false,
+        verzicht: null,
+        dataHash: null,
+        badgeColor: null,
+        estimatedGameDuration: null,
+        displayOrder: 0,
+        createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: "2026-09-01T00:00:00.000Z",
+      };
+
+      expect(rival.staff).toBeUndefined();
     });
   });
 

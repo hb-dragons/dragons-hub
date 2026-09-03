@@ -6,6 +6,7 @@ import { insertNotificationLogDeduped } from "../notification-log-dedup";
 import type { ChannelSendParams, DeliveryResult } from "./types";
 import { env } from "../../../config/env";
 import { logger } from "../../../config/logger";
+import { postRepositoryDispatch } from "../../github-dispatch";
 
 const log = logger.child({ service: "webhook-adapter" });
 
@@ -70,50 +71,46 @@ export class WebhookChannelAdapter {
       }
     };
 
-    const url = `https://api.github.com/repos/${config.owner}/${config.repo}/dispatches`;
+    const result = await postRepositoryDispatch({
+      owner: config.owner,
+      repo: config.repo,
+      token,
+      eventType: config.eventType,
+      clientPayload: { eventId: params.eventId },
+    });
+
+    if (!result.ok) {
+      log.error(
+        { status: result.status, errorText: result.error, owner: config.owner, repo: config.repo },
+        "GitHub repository_dispatch failed",
+      );
+      await releaseClaim();
+      // `status: 0` means the request never got an answer (timeout, DNS, a
+      // dropped connection), which is not a status GitHub returned.
+      return {
+        success: false,
+        error:
+          result.status === 0
+            ? result.error
+            : `GitHub dispatch error ${result.status}: ${result.error}`,
+      };
+    }
+
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          Accept: "application/vnd.github+json",
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          // GitHub rejects requests without a User-Agent; Node's fetch does
-          // not reliably send one, so it is set explicitly.
-          "User-Agent": "dragons-hub-api",
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
-        body: JSON.stringify({
-          event_type: config.eventType,
-          client_payload: { eventId: params.eventId },
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        log.error(
-          { status: response.status, errorText, owner: config.owner, repo: config.repo },
-          "GitHub repository_dispatch failed",
-        );
-        await releaseClaim();
-        return { success: false, error: `GitHub dispatch error ${response.status}: ${errorText}` };
-      }
-
       await getDb()
         .update(notificationLog)
         .set({ status: "sent", sentAt: new Date() })
         .where(eq(notificationLog.id, claimId));
-
-      log.info(
-        { owner: config.owner, repo: config.repo, eventType: config.eventType, eventId: params.eventId },
-        "Webhook repository_dispatch sent",
-      );
-      return { success: true };
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown error";
-      log.error({ err, owner: config.owner, repo: config.repo }, "Failed to send repository_dispatch");
-      await releaseClaim();
-      return { success: false, error: message };
+      // The dispatch is already out, so failing to mark the row strands it as
+      // `pending` but must not report the send as failed.
+      log.error({ err, claimId }, "Failed to mark webhook notification as sent");
     }
+
+    log.info(
+      { owner: config.owner, repo: config.repo, eventType: config.eventType, eventId: params.eventId },
+      "Webhook repository_dispatch sent",
+    );
+    return { success: true };
   }
 }

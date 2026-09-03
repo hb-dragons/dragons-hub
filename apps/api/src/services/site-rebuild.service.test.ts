@@ -30,7 +30,10 @@ afterEach(() => {
 });
 
 describe("dispatchSiteRebuild", () => {
-  it("posts a repository_dispatch carrying the reason", async () => {
+  // The request itself — endpoint, headers, timeout — is github-dispatch.ts's
+  // contract and is asserted there. What matters here is which repo, event type
+  // and payload this service asks for, and what it does with the answer.
+  it("dispatches the rebuild event to the hub repo, carrying the reason", async () => {
     mocks.env.GH_DISPATCH_TOKEN = "ghp_test";
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
 
@@ -39,9 +42,7 @@ describe("dispatchSiteRebuild", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://api.github.com/repos/hb-dragons/dragons-hub/dispatches");
-    expect(init.method).toBe("POST");
     expect(init.headers.Authorization).toBe("Bearer ghp_test");
-    expect(init.headers["User-Agent"]).toBe("dragons-hub-api");
     expect(JSON.parse(init.body)).toEqual({
       event_type: SITE_REBUILD_EVENT_TYPE,
       client_payload: { reason: "team staff change" },

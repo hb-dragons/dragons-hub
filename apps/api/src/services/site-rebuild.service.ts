@@ -1,9 +1,11 @@
 import { env } from "../config/env";
 import { logger } from "../config/logger";
+import { postRepositoryDispatch } from "./github-dispatch";
 
 const log = logger.child({ service: "site-rebuild" });
 
-const DISPATCH_URL = "https://api.github.com/repos/hb-dragons/dragons-hub/dispatches";
+const OWNER = "hb-dragons";
+const REPO = "dragons-hub";
 
 /**
  * Event type of the rebuild dispatch. `deploy-site.yml` listens for it
@@ -32,33 +34,20 @@ export async function dispatchSiteRebuild(reason: string): Promise<void> {
     return;
   }
 
-  try {
-    const response = await fetch(DISPATCH_URL, {
-      method: "POST",
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        // GitHub rejects requests without a User-Agent and Node's fetch does
-        // not reliably send one.
-        "User-Agent": "dragons-hub-api",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-      body: JSON.stringify({
-        event_type: SITE_REBUILD_EVENT_TYPE,
-        client_payload: { reason },
-      }),
-    });
+  const result = await postRepositoryDispatch({
+    owner: OWNER,
+    repo: REPO,
+    token,
+    eventType: SITE_REBUILD_EVENT_TYPE,
+    clientPayload: { reason },
+  });
 
-    if (!response.ok) {
-      log.error(
-        { status: response.status, errorText: await response.text(), reason },
-        "Site rebuild dispatch failed",
-      );
-      return;
-    }
-    log.info({ reason }, "Site rebuild dispatch sent");
-  } catch (err) {
-    log.error({ err, reason }, "Site rebuild dispatch failed");
+  if (!result.ok) {
+    log.error(
+      { status: result.status, errorText: result.error, reason },
+      "Site rebuild dispatch failed",
+    );
+    return;
   }
+  log.info({ reason }, "Site rebuild dispatch sent");
 }

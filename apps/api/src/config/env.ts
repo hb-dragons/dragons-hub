@@ -81,9 +81,11 @@ export const envSchema = z
     EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
     EXPO_PROJECT_ID: z.string().min(1).optional(),
 
-    // Fine-grained PAT for the `webhook` channel's repository_dispatch
-    // (channels/webhook.ts). Optional: without it the channel is reported as
-    // not configured and every dispatch is a logged skip.
+    // Fine-grained PAT for the repository_dispatch that rebuilds the public
+    // site — sent by the `webhook` channel (channels/webhook.ts) and by the
+    // site-rebuild service a team staff change goes through
+    // (services/site-rebuild.service.ts). Optional: without it the channel is
+    // reported as not configured and every dispatch is a logged skip.
     GH_DISPATCH_TOKEN: z.string().min(1).optional(),
 
     REFEREE_SDK_USERNAME: z.string().min(1).optional(),

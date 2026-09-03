@@ -11,7 +11,7 @@
  */
 
 import { mediaUrl, type SiteImage } from "./media";
-import { headCoach, type SiteStaffMember } from "./team-staff";
+import type { SiteStaffMember } from "./team-staff";
 
 interface MediaLike {
   url?: string | null | undefined;
@@ -41,14 +41,15 @@ export interface TrainerDisplay {
 
 /**
  * The coach the detail page's hero shows, or null when the team has none (the
- * overlay then falls back to the plain "Trainer" title, legacy behavior). A
- * coach without a portrait keeps the name and falls back to the club banner.
+ * overlay then falls back to the plain "Trainer" title, legacy behavior). The
+ * API orders Trainer before Co-Trainer, so the head coach is the first entry.
+ * A coach without a portrait keeps the name and falls back to the club banner.
  */
 export function primaryTrainer(
   staff: readonly SiteStaffMember[] | null | undefined,
 ): TrainerDisplay | null {
-  const coach = headCoach(staff ?? []);
-  if (coach === null) return null;
+  const coach = staff?.[0];
+  if (coach === undefined) return null;
   return {
     name: coach.name,
     image: coach.photoUrl === null ? null : { url: coach.photoUrl, alt: coach.name },

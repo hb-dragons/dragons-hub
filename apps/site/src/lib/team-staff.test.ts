@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   clubCoaches,
   fetchTeamStaff,
-  headCoach,
   staffFor,
   teamStaffIndex,
   type SiteTeamStaff,
@@ -28,7 +27,16 @@ const TEAMS = [
     name: "Dragons Herren 1",
     isOwnClub: true,
     displayOrder: 1,
-    staff: [member(), member({ id: 2, firstName: "Ben", lastName: "Adler", role: "co_trainer" })],
+    staff: [
+      member(),
+      member({
+        id: 2,
+        firstName: "Ben",
+        lastName: "Adler",
+        role: "co_trainer",
+        photoUrl: "/public/staff/2/photo?v=def.webp",
+      }),
+    ],
   },
   {
     id: 11,
@@ -66,7 +74,7 @@ describe("fetchTeamStaff", () => {
             name: "Ben Adler",
             role: "co_trainer",
             licence: "C-Lizenz",
-            photoUrl: "https://api.example/public/staff/1/photo?v=abc.webp",
+            photoUrl: "https://api.example/public/staff/2/photo?v=def.webp",
           },
         ],
       },
@@ -110,20 +118,6 @@ describe("staffFor", () => {
     expect(staffFor(index, 999)).toEqual([]);
     expect(staffFor(index, null)).toEqual([]);
     expect(staffFor(index, undefined)).toEqual([]);
-  });
-});
-
-describe("headCoach", () => {
-  it("takes the first entry, which the API orders Trainer first", () => {
-    const staff = [
-      { id: 1, name: "Emily Gust", role: "trainer", licence: null, photoUrl: null },
-      { id: 2, name: "Ben Adler", role: "co_trainer", licence: null, photoUrl: null },
-    ];
-    expect(headCoach(staff)?.name).toBe("Emily Gust");
-  });
-
-  it("returns null for a team without staff", () => {
-    expect(headCoach([])).toBeNull();
   });
 });
 

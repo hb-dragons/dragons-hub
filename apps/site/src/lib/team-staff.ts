@@ -102,15 +102,6 @@ export function staffFor(
 }
 
 /**
- * The coach a team page's hero shows, or null when the team has none — the API
- * orders Trainer before Co-Trainer, so the first entry is the head coach. The
- * hero then falls back to the plain "Trainer" title, as it did with the CMS.
- */
-export function headCoach(staff: readonly SiteStaffMember[]): SiteStaffMember | null {
-  return staff[0] ?? null;
-}
-
-/**
  * Every coach of the club for the Kontakt band, teams in display order. One
  * person coaching two teams has a staff row per team entry, but the band is a
  * list of people, so a repeat of the same name is dropped — the first row wins,
