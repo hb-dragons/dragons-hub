@@ -22,6 +22,9 @@ export default defineConfig({
         // migration. The orchestration it calls lives in migrate.ts and is
         // covered there.
         "scripts/migrate-strapi/index.ts",
+        // Same three-line runner shape for the one-off staff import; its
+        // orchestration lives in run.ts and is covered there.
+        "scripts/import-staff/index.ts",
       ],
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
@@ -41,8 +44,12 @@ export default defineConfig({
         // db adapter, whose init() exists precisely so it can never be
         // called — unreachable by construction, so functions cannot reach 100
         // under this scope. Ratchet up as tests grow; never lower.
-        branches: 90,
-        functions: 98,
+        //
+        // Ratcheted 2026-09-03 (issue #311): the CMS -> Hub staff import
+        // added ~200 covered lines. Measured statements 99.58,
+        // branches 92.48, functions 99.12, lines 99.52.
+        branches: 92,
+        functions: 99,
         lines: 99,
         statements: 99,
       },

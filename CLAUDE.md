@@ -255,6 +255,16 @@ but a different job: the site *reads* content at build time, the importer
 *writes* it once. All four are unset in normal development; the script
 throws by name when one is missing.
 
+A second one-off script, the CMS -> Hub trainer import
+(`pnpm --filter @dragons/cms migrate:cms-staff`, add `--dry-run` to print the
+planned rows without writing; issue #311), reads teams and trainers over the
+same `CMS_URL` + `CMS_API_TOKEN` pair and writes `team_staff` rows into the
+*Hub* database — so it is the one thing in `apps/cms` that needs
+`DATABASE_URL` (the Hub's connection string, not `DATABASE_URL_CMS`). It
+throws by name on a missing variable, and on a CMS team whose
+`apiTeamPermanentId` has no team entry in the active season; re-running it
+adds nothing it already imported.
+
 ### Production deployment plumbing
 
 `SCOREBOARD_DEVICE_ID` flows into two places that must stay in sync:
