@@ -1,6 +1,6 @@
 {
-  "id": "41010764-4545-4ef6-932d-423f5ec25c08",
-  "prevId": "876172c1-1b66-4c09-8961-b4853efe5b79",
+  "id": "38b203ea-ca6c-4783-9362-2fa740f0680d",
+  "prevId": "41010764-4545-4ef6-932d-423f5ec25c08",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5112,6 +5112,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "venue_street": {
+          "name": "venue_street",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "venue_postal_code": {
+          "name": "venue_postal_code",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "sr1_our_club": {
           "name": "sr1_our_club",
           "type": "boolean",
@@ -5161,6 +5173,34 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'open'"
+        },
+        "sr1_tentative": {
+          "name": "sr1_tentative",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "sr2_tentative": {
+          "name": "sr2_tentative",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "venue_changed": {
+          "name": "venue_changed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "time_changed": {
+          "name": "time_changed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "is_cancelled": {
           "name": "is_cancelled",

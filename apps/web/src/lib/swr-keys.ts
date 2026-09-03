@@ -22,6 +22,7 @@ export const SWR_KEYS = {
   // one shared cache entry.
   teams: (seasonId?: number) =>
     seasonId === undefined ? "/admin/teams" : `/admin/teams?seasonId=${seasonId}`,
+  teamStaff: (entryId: number) => `/admin/teams/${entryId}/staff`,
   refereesPaginated: (opts: {
     scope?: "own" | "all";
     search?: string;

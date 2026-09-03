@@ -42,7 +42,13 @@ export type {
   RefereeSlotInfo,
 } from "./matches";
 
-export type { OwnClubTeam, TeamReorderItem } from "./teams";
+export type {
+  OwnClubTeam,
+  TeamReorderItem,
+  TeamStaffMember,
+  TeamStaffRole,
+} from "./teams";
+export { TEAM_STAFF_ROLES } from "./teams";
 
 export type {
   BookingListItem,

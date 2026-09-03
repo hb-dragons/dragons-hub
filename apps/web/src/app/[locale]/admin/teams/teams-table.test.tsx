@@ -66,3 +66,10 @@ describe("TeamsTable save", () => {
     expect(body).toMatchObject({ customName: "New Name" });
   });
 });
+
+describe("TeamsTable staff column", () => {
+  it("offers a staff editor on the row", () => {
+    renderTable();
+    expect(screen.getByRole("button", { name: "Staff" })).toBeInTheDocument();
+  });
+});

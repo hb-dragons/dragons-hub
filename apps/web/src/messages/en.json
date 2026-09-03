@@ -610,7 +610,27 @@
     "gameDurationPlaceholder": "Default",
     "badgeColor": "Badge Color",
     "leagueNotConnected": "Not connected",
-    "leagueUntracked": "League no longer tracked"
+    "leagueUntracked": "League no longer tracked",
+    "staff": {
+      "column": "Staff",
+      "open": "Staff",
+      "title": "Team staff",
+      "subtitle": "Coaches of {team} for this season.",
+      "empty": "No staff for this team yet.",
+      "add": "Add staff member",
+      "remove": "Remove",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "role": "Role",
+      "phone": "Phone",
+      "email": "Email",
+      "licence": "Licence",
+      "refereeContact": "Contact for referees",
+      "roles": {
+        "trainer": "Coach",
+        "co_trainer": "Assistant coach"
+      }
+    }
   },
   "users": {
     "title": "Users",

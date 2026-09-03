@@ -610,7 +610,27 @@
     "gameDurationPlaceholder": "Standard",
     "badgeColor": "Badge-Farbe",
     "leagueNotConnected": "Nicht verknüpft",
-    "leagueUntracked": "Liga wird nicht mehr verfolgt"
+    "leagueUntracked": "Liga wird nicht mehr verfolgt",
+    "staff": {
+      "column": "Staff",
+      "open": "Staff",
+      "title": "Team-Staff",
+      "subtitle": "Trainerinnen und Trainer von {team} in dieser Saison.",
+      "empty": "Für dieses Team ist noch kein Staff hinterlegt.",
+      "add": "Staff hinzufügen",
+      "remove": "Entfernen",
+      "firstName": "Vorname",
+      "lastName": "Nachname",
+      "role": "Rolle",
+      "phone": "Telefon",
+      "email": "E-Mail",
+      "licence": "Lizenz",
+      "refereeContact": "Ansprechpartner für Schiedsrichter",
+      "roles": {
+        "trainer": "Trainer",
+        "co_trainer": "Co-Trainer"
+      }
+    }
   },
   "users": {
     "title": "Benutzer",
