@@ -66,7 +66,7 @@ overrides:
   # `@^N` selector so a v1 consumer is not dragged onto v5.
   'brace-expansion@^1': '>=1.1.18 <2'
   'brace-expansion@^5': '>=5.0.9 <6'
-  fast-uri: '>=3.1.5 <4'
+  fast-uri: '>=3.1.6 <4'
   'form-data@^2': '>=2.5.6 <3'
   ip-address: '>=10.3.1 <11'
   'js-yaml@^3': '>=3.15.1 <4'

@@ -31,6 +31,7 @@ describe("validateEventPayload", () => {
   it("accepts a referee-slots payload", () => {
     const r = validateEventPayload(EVENT_TYPES.REFEREE_SLOTS_NEEDED, {
       matchId: 1,
+      refereeGameId: 7,
       matchNo: 42,
       homeTeam: "Dragons",
       guestTeam: "Titans",

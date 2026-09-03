@@ -4,6 +4,7 @@ import type { NativeTodayItem } from "@/lib/today/types";
 import { refereeApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { kickoffToday } from "@/lib/format/kickoff";
+import { refereeGameRoute } from "@/lib/referee/einsatz";
 
 export const refereeProvider = {
   id: "referee",
@@ -51,10 +52,7 @@ export const refereeProvider = {
         }),
         subtitle: next.kickoffDate,
         urgency: 80,
-        route:
-          next.matchId !== null
-            ? `/game/${next.matchId}`
-            : `/referee-game/${next.id}`,
+        route: refereeGameRoute(next),
         icon: "whistle",
       });
     }

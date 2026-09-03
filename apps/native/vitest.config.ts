@@ -113,9 +113,15 @@ export default defineConfig({
         // reporting the ErrorBoundary shed into `global-error-handler.ts`.
         // Measured 19.27/12.89/22.6/18.63 — branches holds at 12, not having
         // cleared the next whole point.
-        branches: 12,
+        //
+        // Ratcheted 2026-09-02 (#307): branches 12 -> 13, lines 18 -> 19, on
+        // the referee Einsatz view model — the route resolver, the Spielinfo
+        // link and the section logic the screen used to decide inline.
+        // Measured 19.7/13.29/22.84/19.02 — statements and functions hold,
+        // neither having cleared the next whole point.
+        branches: 13,
         functions: 22,
-        lines: 18,
+        lines: 19,
         statements: 19,
       },
     },

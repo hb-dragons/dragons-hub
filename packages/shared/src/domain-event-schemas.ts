@@ -153,6 +153,13 @@ const refereeReassignedSchema = z.object({
 
 const refereeSlotsSchema = z.object({
   matchId: z.number().nullable(),
+  /**
+   * `referee_games.id` — what the push deep-links by, since every referee game
+   * opens the native Einsatz screen whether or not a `matches` row is linked
+   * (#307). Nullable only so an event stored before that field existed still
+   * validates; both emit sites always know the row id.
+   */
+  refereeGameId: z.number().nullable(),
   matchNo: z.number().nullable(),
   homeTeam: z.string(),
   guestTeam: z.string(),
