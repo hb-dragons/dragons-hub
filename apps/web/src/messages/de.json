@@ -626,6 +626,11 @@
       "email": "E-Mail",
       "licence": "Lizenz",
       "refereeContact": "Ansprechpartner für Schiedsrichter",
+      "portrait": "Portrait",
+      "portraitUpload": "Portrait hochladen",
+      "portraitReplace": "Portrait ersetzen",
+      "portraitAlt": "Portrait von {name}",
+      "portraitFailed": "Portrait konnte nicht hochgeladen werden.",
       "roles": {
         "trainer": "Trainer",
         "co_trainer": "Co-Trainer"

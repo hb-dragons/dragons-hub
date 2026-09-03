@@ -626,6 +626,11 @@
       "email": "Email",
       "licence": "Licence",
       "refereeContact": "Contact for referees",
+      "portrait": "Portrait",
+      "portraitUpload": "Upload portrait",
+      "portraitReplace": "Replace portrait",
+      "portraitAlt": "Portrait of {name}",
+      "portraitFailed": "The portrait could not be uploaded.",
       "roles": {
         "trainer": "Coach",
         "co_trainer": "Assistant coach"

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR from "swr";
-import { Loader2, Plus, Trash2, Users } from "lucide-react";
+import { ImagePlus, Loader2, Plus, Trash2, User, Users } from "lucide-react";
 import { TEAM_STAFF_ROLES } from "@dragons/shared";
 import type { TeamStaffMember, TeamStaffRole } from "@dragons/shared";
 import { Button } from "@dragons/ui/components/button";
@@ -38,6 +38,9 @@ interface StaffDraft {
   licence: string;
   refereeContact: boolean;
 }
+
+/** The three types the upload endpoint stores; anything else is a 400. */
+const ACCEPTED_PORTRAIT_TYPES = "image/png,image/jpeg,image/webp";
 
 const EMPTY_DRAFT: StaffDraft = {
   firstName: "",
@@ -173,14 +176,95 @@ function StaffFields({ idPrefix, draft, disabled, onChange }: StaffFieldsProps) 
   );
 }
 
+/**
+ * The portrait, and the control that replaces it. `photoUrl` is a path relative
+ * to the API, so it is prefixed here the way the social wizard prefixes its own
+ * image endpoints.
+ */
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+interface StaffPortraitProps {
+  member: TeamStaffMember;
+  canManage: boolean;
+  onUpload: (file: File) => Promise<void>;
+}
+
+function StaffPortrait({ member, canManage, onUpload }: StaffPortraitProps) {
+  const t = useTranslations();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const name = `${member.firstName} ${member.lastName}`.trim();
+
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    setUploading(true);
+    setFailed(false);
+    try {
+      await onUpload(file);
+    } catch {
+      setFailed(true);
+    } finally {
+      setUploading(false);
+      // Clear the input so re-picking the same file fires `change` again.
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-base">
+        {member.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`${API_BASE}${member.photoUrl}`}
+            alt={t("teams.staff.portraitAlt", { name })}
+            className="size-full object-cover"
+          />
+        ) : (
+          <User className="size-7 text-muted-foreground" aria-hidden="true" />
+        )}
+      </div>
+      <div className="space-y-1">
+        <input
+          ref={inputRef}
+          type="file"
+          className="hidden"
+          accept={ACCEPTED_PORTRAIT_TYPES}
+          aria-label={t("teams.staff.portrait")}
+          onChange={(e) => void pick(e.target.files?.[0])}
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={!canManage || uploading}
+          onClick={() => inputRef.current?.click()}
+        >
+          {uploading ? (
+            <Loader2 className="mr-2 size-4 animate-spin" />
+          ) : (
+            <ImagePlus className="mr-2 size-4" />
+          )}
+          {member.photoUrl ? t("teams.staff.portraitReplace") : t("teams.staff.portraitUpload")}
+        </Button>
+        {failed ? (
+          <p className="text-xs text-destructive">{t("teams.staff.portraitFailed")}</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 interface StaffRowProps {
   member: TeamStaffMember;
   canManage: boolean;
   onSave: (staffId: number, draft: StaffDraft) => Promise<void>;
   onDelete: (staffId: number) => Promise<void>;
+  onUploadPhoto: (staffId: number, file: File) => Promise<void>;
 }
 
-function StaffRow({ member, canManage, onSave, onDelete }: StaffRowProps) {
+function StaffRow({ member, canManage, onSave, onDelete, onUploadPhoto }: StaffRowProps) {
   const t = useTranslations();
   // Recomputed from the prop each render, so a row settles back to "clean" as
   // soon as the refreshed list arrives — no remount trick needed to reset it.
@@ -202,6 +286,11 @@ function StaffRow({ member, canManage, onSave, onDelete }: StaffRowProps) {
 
   return (
     <div className="space-y-3 rounded-md bg-surface-low p-4">
+      <StaffPortrait
+        member={member}
+        canManage={canManage}
+        onUpload={(file) => onUploadPhoto(member.id, file)}
+      />
       <StaffFields
         idPrefix={`staff-${member.id}`}
         draft={draft}
@@ -286,6 +375,11 @@ export function TeamStaffDialog({ entryId, teamName, canManage }: TeamStaffDialo
     await mutate();
   }
 
+  async function uploadPhoto(staffId: number, file: File) {
+    await api.teamStaff.uploadPhoto(entryId, staffId, file);
+    await mutate();
+  }
+
   async function remove(staffId: number) {
     await api.teamStaff.remove(entryId, staffId);
     await mutate();
@@ -318,6 +412,7 @@ export function TeamStaffDialog({ entryId, teamName, canManage }: TeamStaffDialo
                 canManage={canManage}
                 onSave={save}
                 onDelete={remove}
+                onUploadPhoto={uploadPhoto}
               />
             ))
           )}

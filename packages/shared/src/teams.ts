@@ -36,8 +36,13 @@ export interface TeamStaffMember {
   phone: string | null;
   email: string | null;
   licence: string | null;
-  /** Object name of the portrait in the media bucket; the upload lands in a later slice. */
-  photoFilename: string | null;
+  /**
+   * API path of the portrait, or `null` when the member has none. Relative to
+   * the API base so each caller prefixes its own origin, and stamped with the
+   * stored object name so replacing a portrait busts the cache the image route
+   * sets on the previous one.
+   */
+  photoUrl: string | null;
   /** Marks the member referees are pointed at as the team contact. */
   refereeContact: boolean;
 }

@@ -665,6 +665,8 @@ nested under their task.
 | POST | `/admin/teams/:id/staff` | Add a staff member to a team entry (`team:manage`) |
 | PATCH | `/admin/teams/:id/staff/:staffId` | Update a staff member, including the referee-contact flag (`team:manage`) |
 | DELETE | `/admin/teams/:id/staff/:staffId` | Remove a staff member from a team entry (`team:manage`) |
+| GET | `/admin/teams/:id/staff/:staffId/photo` | Serve a staff member's portrait (`team:view`) |
+| POST | `/admin/teams/:id/staff/:staffId/photo` | Upload or replace a staff member's portrait (`team:manage`) |
 
 ### Admin - Venues
 

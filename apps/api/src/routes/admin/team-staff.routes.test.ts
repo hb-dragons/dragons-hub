@@ -22,6 +22,34 @@ const mocks = vi.hoisted(() => ({
   userHasPermission: vi.fn(),
 }));
 
+// The bucket is the one thing the portrait tests cannot run for real. sharp is
+// left alone, so the uploads below are decoded and downscaled as they would be
+// in production and only the bytes' destination is a double.
+const gcs = vi.hoisted(() => ({
+  objects: new Map<string, Buffer>(),
+  uploadToGcs: vi.fn(),
+  downloadFromGcs: vi.fn(),
+  deleteFromGcs: vi.fn(),
+}));
+
+vi.mock("../../services/social/gcs-storage.service", () => ({
+  uploadToGcs: (path: string, buffer: Buffer, contentType: string) => {
+    gcs.uploadToGcs(path, buffer, contentType);
+    gcs.objects.set(path, buffer);
+    return Promise.resolve();
+  },
+  downloadFromGcs: (path: string) => {
+    gcs.downloadFromGcs(path);
+    const stored = gcs.objects.get(path);
+    return stored ? Promise.resolve(stored) : Promise.reject(new Error(`No such object: ${path}`));
+  },
+  deleteFromGcs: (path: string) => {
+    gcs.deleteFromGcs(path);
+    gcs.objects.delete(path);
+    return Promise.resolve();
+  },
+}));
+
 vi.mock("../../config/database", () => ({
   getDb: () =>
     new Proxy(
@@ -51,6 +79,8 @@ import { teamStaffRoutes } from "./team-staff.routes";
 import { errorHandler } from "../../middleware/error";
 import { seasons, teams, teamEntries, teamStaff } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
+import sharp from "sharp";
+import { MAX_PORTRAIT_BYTES } from "../../services/admin/team-staff-photo.service";
 
 const app = new Hono<AppEnv>();
 app.onError(errorHandler);
@@ -70,7 +100,7 @@ const staffMemberShape: TeamStaffMember = {
   phone: null,
   email: null,
   licence: null,
-  photoFilename: null,
+  photoUrl: null,
   refereeContact: false,
 };
 
@@ -84,6 +114,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await resetTestDb(ctx);
   vi.clearAllMocks();
+  gcs.objects.clear();
   mocks.getSession.mockResolvedValue({
     user: { id: "admin-1", role: "admin" },
     session: { id: "sess-admin" },
@@ -149,6 +180,48 @@ function patchStaff(entryId: number, staffId: number, body: unknown) {
   });
 }
 
+function postPhoto(entryId: number, staffId: number, file: File) {
+  const form = new FormData();
+  form.set("file", file);
+  return app.request(`/teams/${entryId}/staff/${staffId}/photo`, { method: "POST", body: form });
+}
+
+/** A real encoded image, so sharp decodes and downscales it the way it would in production. */
+async function imageFile(
+  format: "png" | "jpeg",
+  type: string,
+  name: string,
+  width = 800,
+  height = 800,
+): Promise<File> {
+  const bytes = await sharp({
+    create: { width, height, channels: 3, background: { r: 220, g: 40, b: 40 } },
+  })
+    .toFormat(format)
+    .toBuffer();
+  return new File([bytes], name, { type });
+}
+
+function pngFile(width = 800, height = 800): Promise<File> {
+  return imageFile("png", "image/png", "portrait.png", width, height);
+}
+
+/** The object name a member's `photoUrl` points at. */
+function storedObject(member: TeamStaffMember): string {
+  return new URL(`https://x${member.photoUrl!}`).searchParams.get("v")!;
+}
+
+/** An own-club entry with one staff member on it — the starting point of every portrait test. */
+async function staffWithEntry(): Promise<{ entryId: number; staff: TeamStaffMember }> {
+  const entryId = await seedEntry(10);
+  const staff = await createStaff(entryId, {
+    firstName: "Ada",
+    lastName: "Lovelace",
+    role: "trainer",
+  });
+  return { entryId, staff };
+}
+
 async function createStaff(
   entryId: number,
   body: Record<string, unknown>,
@@ -183,7 +256,7 @@ describe("POST /teams/:id/staff", () => {
       phone: "+49 170 1234567",
       email: "ada@example.de",
       licence: "C-Lizenz",
-      photoFilename: null,
+      photoUrl: null,
       refereeContact: true,
     });
   });
@@ -359,6 +432,199 @@ describe("PATCH /teams/:id/staff/:staffId", () => {
   });
 });
 
+describe("POST /teams/:id/staff/:staffId/photo", () => {
+  it("stores a portrait and answers with the member pointing at it", async () => {
+    const { entryId, staff } = await staffWithEntry();
+
+    const res = await postPhoto(entryId, staff.id, await pngFile(1200, 900));
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as TeamStaffMember;
+    expect(body.photoUrl).toMatch(
+      new RegExp(`^/admin/teams/${entryId}/staff/${staff.id}/photo\\?v=[0-9a-f-]{36}\\.png$`),
+    );
+    const [path, buffer, contentType] = gcs.uploadToGcs.mock.calls[0]!;
+    expect(path).toMatch(/^team-staff-photos\//);
+    expect(contentType).toBe("image/png");
+    // Stored downscaled, not at the 1200px the upload arrived at.
+    expect((await sharp(buffer as Buffer).metadata()).width).toBe(512);
+  });
+
+  it("puts the portrait on the staff read", async () => {
+    const { entryId, staff } = await staffWithEntry();
+    await postPhoto(entryId, staff.id, await pngFile());
+
+    const listed = (await (await app.request(`/teams/${entryId}/staff`)).json()) as TeamStaffMember[];
+
+    expect(listed[0]!.photoUrl).toContain(`/staff/${staff.id}/photo?v=`);
+  });
+
+  it("deletes the object a replacement portrait supersedes", async () => {
+    const { entryId, staff } = await staffWithEntry();
+    const first = (await (await postPhoto(entryId, staff.id, await pngFile())).json()) as TeamStaffMember;
+
+    const second = (await (
+      await postPhoto(entryId, staff.id, await pngFile(300, 300))
+    ).json()) as TeamStaffMember;
+
+    expect(second.photoUrl).not.toBe(first.photoUrl);
+    expect(gcs.deleteFromGcs).toHaveBeenCalledWith(`team-staff-photos/${storedObject(first)}`);
+    expect(gcs.objects.size).toBe(1);
+  });
+
+  it("rejects a file that is not one of the allowed image types", async () => {
+    const { entryId, staff } = await staffWithEntry();
+
+    const res = await postPhoto(
+      entryId,
+      staff.id,
+      new File([Buffer.from("not an image")], "cv.txt", { type: "text/plain" }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      error: "Invalid request data",
+      code: "VALIDATION_ERROR",
+      details: [{ path: "file" }],
+    });
+    expect(gcs.uploadToGcs).not.toHaveBeenCalled();
+  });
+
+  it("rejects bytes that only claim to be an image", async () => {
+    const { entryId, staff } = await staffWithEntry();
+
+    const res = await postPhoto(
+      entryId,
+      staff.id,
+      new File([Buffer.from("still not an image")], "x.png", { type: "image/png" }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(gcs.uploadToGcs).not.toHaveBeenCalled();
+  });
+
+  it("rejects a file over the size bound", async () => {
+    const { entryId, staff } = await staffWithEntry();
+    const oversized = new File([Buffer.alloc(MAX_PORTRAIT_BYTES + 1)], "big.png", {
+      type: "image/png",
+    });
+
+    const res = await postPhoto(entryId, staff.id, oversized);
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("rejects a request with no file field", async () => {
+    const { entryId, staff } = await staffWithEntry();
+    const form = new FormData();
+    form.set("notafile", "x");
+
+    const res = await app.request(`/teams/${entryId}/staff/${staff.id}/photo`, {
+      method: "POST",
+      body: form,
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("404s for a staff member of another entry", async () => {
+    const { staff } = await staffWithEntry();
+    const otherEntryId = await seedEntry(11);
+
+    const res = await postPhoto(otherEntryId, staff.id, await pngFile());
+
+    expect(res.status).toBe(404);
+    expect(gcs.uploadToGcs).not.toHaveBeenCalled();
+  });
+
+  it("404s for an entry that is not an own-club entry", async () => {
+    const { staff } = await staffWithEntry();
+    const foreignEntryId = await seedEntry(12, { isOwnClub: false });
+
+    expect((await postPhoto(foreignEntryId, staff.id, await pngFile())).status).toBe(404);
+  });
+
+  it("needs team:manage, not team:view", async () => {
+    const { entryId, staff } = await staffWithEntry();
+    grantOnly("team:view");
+
+    expect((await postPhoto(entryId, staff.id, await pngFile())).status).toBe(403);
+  });
+
+  it("keeps an object another season's row still points at", async () => {
+    const { entryId, staff } = await staffWithEntry();
+    const first = (await (
+      await postPhoto(entryId, staff.id, await pngFile())
+    ).json()) as TeamStaffMember;
+    const shared = storedObject(first);
+    // Season rollover copies the object name onto the next season's row rather
+    // than duplicating the object — see `copyStaffForward`.
+    const nextSeasonEntry = await seedEntry(11);
+    await ctx.db.insert(teamStaff).values({
+      teamEntryId: nextSeasonEntry,
+      firstName: "Ada",
+      lastName: "Lovelace",
+      role: "trainer",
+      photoFilename: shared,
+    });
+
+    await postPhoto(entryId, staff.id, await pngFile(300, 300));
+
+    expect(gcs.deleteFromGcs).not.toHaveBeenCalled();
+    expect(gcs.objects.has(`team-staff-photos/${shared}`)).toBe(true);
+  });
+});
+
+describe("GET /teams/:id/staff/:staffId/photo", () => {
+  it("serves the stored bytes with the type they were stored as", async () => {
+    const { entryId, staff } = await staffWithEntry();
+    await postPhoto(entryId, staff.id, await pngFile());
+
+    const res = await app.request(`/teams/${entryId}/staff/${staff.id}/photo`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/png");
+    const bytes = Buffer.from(await res.arrayBuffer());
+    expect(res.headers.get("Content-Length")).toBe(String(bytes.length));
+    expect((await sharp(bytes).metadata()).format).toBe("png");
+  });
+
+  it("serves a jpeg upload as image/jpeg", async () => {
+    const { entryId, staff } = await staffWithEntry();
+    await postPhoto(entryId, staff.id, await imageFile("jpeg", "image/jpeg", "p.jpg"));
+
+    const res = await app.request(`/teams/${entryId}/staff/${staff.id}/photo`);
+
+    expect(res.headers.get("Content-Type")).toBe("image/jpeg");
+  });
+
+  it("404s when the member has no portrait", async () => {
+    const { entryId, staff } = await staffWithEntry();
+
+    const res = await app.request(`/teams/${entryId}/staff/${staff.id}/photo`);
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("404s for a staff member of another entry", async () => {
+    const { entryId, staff } = await staffWithEntry();
+    await postPhoto(entryId, staff.id, await pngFile());
+    const otherEntryId = await seedEntry(11);
+
+    expect((await app.request(`/teams/${otherEntryId}/staff/${staff.id}/photo`)).status).toBe(404);
+  });
+
+  it("is readable with team:view alone", async () => {
+    const { entryId, staff } = await staffWithEntry();
+    await postPhoto(entryId, staff.id, await pngFile());
+    grantOnly("team:view");
+
+    expect((await app.request(`/teams/${entryId}/staff/${staff.id}/photo`)).status).toBe(200);
+  });
+});
+
 describe("DELETE /teams/:id/staff/:staffId", () => {
   it("removes the staff member", async () => {
     const entryId = await seedEntry(10);
@@ -397,6 +663,48 @@ describe("DELETE /teams/:id/staff/:staffId", () => {
     const entryId = await seedEntry(10);
     const res = await app.request(`/teams/${entryId}/staff/4242`, { method: "DELETE" });
     expect(res.status).toBe(404);
+  });
+
+  it("deletes the portrait along with the member", async () => {
+    const { entryId, staff } = await staffWithEntry();
+    const withPhoto = (await (
+      await postPhoto(entryId, staff.id, await pngFile())
+    ).json()) as TeamStaffMember;
+    const stored = storedObject(withPhoto);
+
+    await app.request(`/teams/${entryId}/staff/${staff.id}`, { method: "DELETE" });
+
+    expect(gcs.deleteFromGcs).toHaveBeenCalledWith(`team-staff-photos/${stored}`);
+    expect(gcs.objects.size).toBe(0);
+  });
+
+  it("keeps a portrait another season's row still points at", async () => {
+    const { entryId, staff } = await staffWithEntry();
+    const withPhoto = (await (
+      await postPhoto(entryId, staff.id, await pngFile())
+    ).json()) as TeamStaffMember;
+    const shared = storedObject(withPhoto);
+    const nextSeasonEntry = await seedEntry(11);
+    await ctx.db.insert(teamStaff).values({
+      teamEntryId: nextSeasonEntry,
+      firstName: "Ada",
+      lastName: "Lovelace",
+      role: "trainer",
+      photoFilename: shared,
+    });
+
+    await app.request(`/teams/${entryId}/staff/${staff.id}`, { method: "DELETE" });
+
+    expect(gcs.deleteFromGcs).not.toHaveBeenCalled();
+    expect(gcs.objects.has(`team-staff-photos/${shared}`)).toBe(true);
+  });
+
+  it("leaves the bucket alone for a member with no portrait", async () => {
+    const { entryId, staff } = await staffWithEntry();
+
+    await app.request(`/teams/${entryId}/staff/${staff.id}`, { method: "DELETE" });
+
+    expect(gcs.deleteFromGcs).not.toHaveBeenCalled();
   });
 });
 
