@@ -1,5 +1,6 @@
 import { pgTable, text, boolean, timestamp, integer, index } from "drizzle-orm/pg-core";
 import { referees } from "./referees";
+import { teamStaff } from "./team-staff";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -15,6 +16,12 @@ export const user = pgTable("user", {
   // Postgres NULLs are distinct, so any number of users may stay unlinked.
   refereeId: integer("referee_id")
     .references(() => referees.id)
+    .unique(),
+  // Same shape as `refereeId`: at most one account per staff record, any number
+  // of accounts unlinked. Deleting the staff row (a coach who left, or a season
+  // entry going away) drops the link and leaves the account and its roles alone.
+  staffId: integer("staff_id")
+    .references(() => teamStaff.id, { onDelete: "set null" })
     .unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

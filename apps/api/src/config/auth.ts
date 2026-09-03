@@ -143,10 +143,15 @@ export const auth = betterAuth({
     },
   },
   user: {
-    // Without this declaration, parseUserOutput strips refereeId from
-    // getSession / admin.listUsers responses.
+    // Without this declaration, parseUserOutput strips refereeId and staffId
+    // from getSession / admin.listUsers responses.
     additionalFields: {
       refereeId: {
+        type: "number",
+        required: false,
+        input: false,
+      },
+      staffId: {
         type: "number",
         required: false,
         input: false,

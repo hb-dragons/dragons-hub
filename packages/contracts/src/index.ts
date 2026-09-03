@@ -265,6 +265,8 @@ export {
 export {
   userRefereeLinkBodySchema,
   type UserRefereeLinkBody,
+  userStaffLinkBodySchema,
+  type UserStaffLinkBody,
   userIdParamSchema,
   type UserIdParam,
 } from "./user";

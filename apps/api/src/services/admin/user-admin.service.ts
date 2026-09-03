@@ -1,6 +1,7 @@
 import { getDb } from "../../config/database";
-import { user as userTable, referees } from "@dragons/db/schema";
+import { user as userTable, referees, teamStaff } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
+import { parseRoles } from "@dragons/shared";
 import { UserAdminError } from "./user-admin.errors";
 
 /**
@@ -38,4 +39,87 @@ export async function setUserRefereeLink(
   }
 
   return updated;
+}
+
+/**
+ * Links or unlinks a staff record from a user account, optionally granting the
+ * read-only `coach` role in the same step.
+ *
+ * Mirrors `setUserRefereeLink`, with two differences the staff link needs:
+ *
+ * - The unique constraint on `user.staff_id` is checked up front, so a second
+ *   account claiming the same staff record answers 409 instead of surfacing a
+ *   Postgres constraint violation as a 500. Re-linking the account that already
+ *   holds it is not a conflict.
+ * - `grantCoachRole` only ever *adds* the role, and only when linking. Roles are
+ *   a comma-joined string on `user.role`; unlinking touches none of them, so a
+ *   coach who stops being staff keeps whatever access an admin gave them until
+ *   an admin takes it away.
+ */
+export async function setUserStaffLink(
+  userId: string,
+  staffId: number | null,
+  grantCoachRole: boolean,
+): Promise<{ id: string; staffId: number | null; role: string | null }> {
+  if (staffId !== null) {
+    const [staff] = await getDb()
+      .select({ id: teamStaff.id })
+      .from(teamStaff)
+      .where(eq(teamStaff.id, staffId))
+      .limit(1);
+
+    if (!staff) {
+      throw new UserAdminError("Staff member not found", "STAFF_NOT_FOUND");
+    }
+
+    const [holder] = await getDb()
+      .select({ id: userTable.id })
+      .from(userTable)
+      .where(eq(userTable.staffId, staffId))
+      .limit(1);
+
+    if (holder && holder.id !== userId) {
+      throw new UserAdminError(
+        "Staff member is already linked to another account",
+        "STAFF_ALREADY_LINKED",
+      );
+    }
+  }
+
+  const [existing] = await getDb()
+    .select({ role: userTable.role })
+    .from(userTable)
+    .where(eq(userTable.id, userId))
+    .limit(1);
+
+  if (!existing) {
+    throw new UserAdminError("User not found", "USER_NOT_FOUND");
+  }
+
+  const role =
+    staffId !== null && grantCoachRole ? withCoachRole(existing.role) : existing.role;
+
+  const [updated] = await getDb()
+    .update(userTable)
+    .set({ staffId, role, updatedAt: new Date() })
+    .where(eq(userTable.id, userId))
+    .returning({
+      id: userTable.id,
+      staffId: userTable.staffId,
+      role: userTable.role,
+    });
+
+  // The row was read a statement earlier, so this only fires if it vanished in
+  // between. Keeping the guard means the return type stays non-optional.
+  if (!updated) {
+    throw new UserAdminError("User not found", "USER_NOT_FOUND");
+  }
+
+  return updated;
+}
+
+/** Appends `coach` to a comma-joined role string, leaving the rest in order. */
+function withCoachRole(role: string | null): string {
+  const roles = parseRoles(role);
+  return roles.includes("coach") ? roles.join(",") : [...roles, "coach"].join(",");
 }

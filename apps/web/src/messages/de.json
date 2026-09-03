@@ -673,7 +673,9 @@
       "unban": "Benutzer entsperren",
       "delete": "Benutzer löschen",
       "makeReferee": "Zum Schiedsrichter machen",
-      "removeReferee": "Schiedsrichterrolle entfernen"
+      "removeReferee": "Schiedsrichterrolle entfernen",
+      "linkStaff": "Mit Staff verknüpfen",
+      "unlinkStaff": "Staff-Verknüpfung entfernen"
     },
     "createDialog": {
       "title": "Benutzer erstellen",
@@ -739,6 +741,16 @@
       "linking": "Verknüpfe...",
       "link": "Verknüpfen"
     },
+    "linkStaffDialog": {
+      "title": "Staff verknüpfen",
+      "description": "Wählen Sie einen Staff-Eintrag für {name}",
+      "teamLabel": "Team",
+      "teamPlaceholder": "Team auswählen...",
+      "noResults": "Für dieses Team ist kein Staff hinterlegt",
+      "grantCoachRole": "Rolle Coach vergeben",
+      "linking": "Verknüpfe...",
+      "link": "Verknüpfen"
+    },
     "toast": {
       "created": "Benutzer erfolgreich erstellt",
       "updated": "Benutzer erfolgreich aktualisiert",
@@ -755,7 +767,10 @@
       "roleChangeFailed": "Rolle konnte nicht geändert werden",
       "passwordSetFailed": "Passwort konnte nicht gesetzt werden",
       "refereeLinked": "Schiedsrichter erfolgreich verknüpft",
-      "refereeLinkFailed": "Verknüpfung fehlgeschlagen"
+      "refereeLinkFailed": "Verknüpfung fehlgeschlagen",
+      "staffLinked": "Staff erfolgreich verknüpft",
+      "staffLinkFailed": "Staff-Verknüpfung fehlgeschlagen",
+      "staffUnlinked": "Staff-Verknüpfung entfernt"
     },
     "validation": {
       "nameRequired": "Name ist erforderlich",
