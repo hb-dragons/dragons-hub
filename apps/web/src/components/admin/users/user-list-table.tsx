@@ -161,6 +161,7 @@ async function fetchUsers(): Promise<UserListItem[]> {
     data?.users.map((u): UserListItem => {
       const refereeId =
         (u as { refereeId?: number | null }).refereeId ?? null;
+      const staffId = (u as { staffId?: number | null }).staffId ?? null;
       return {
         id: u.id,
         name: u.name,
@@ -168,6 +169,7 @@ async function fetchUsers(): Promise<UserListItem[]> {
         emailVerified: u.emailVerified,
         role: u.role ?? null,
         refereeId,
+        staffId,
         banned: u.banned ?? null,
         banReason: u.banReason ?? null,
         banExpires: u.banExpires instanceof Date ? u.banExpires.getTime() : u.banExpires ?? null,

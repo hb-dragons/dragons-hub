@@ -8,11 +8,19 @@
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { AppError } from "../../app-error";
 
-export type UserAdminErrorCode = "USER_NOT_FOUND" | "REFEREE_NOT_FOUND";
+export type UserAdminErrorCode =
+  | "USER_NOT_FOUND"
+  | "REFEREE_NOT_FOUND"
+  | "STAFF_NOT_FOUND"
+  | "STAFF_ALREADY_LINKED";
 
 const USER_ADMIN_ERROR_STATUS: Record<UserAdminErrorCode, ContentfulStatusCode> = {
   USER_NOT_FOUND: 404,
   REFEREE_NOT_FOUND: 404,
+  STAFF_NOT_FOUND: 404,
+  // A staff record holds at most one account, so a second claim is a conflict
+  // over an existing link, not a malformed request.
+  STAFF_ALREADY_LINKED: 409,
 };
 
 export class UserAdminError extends AppError {

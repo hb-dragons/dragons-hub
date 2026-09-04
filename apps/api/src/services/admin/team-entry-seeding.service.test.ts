@@ -340,6 +340,85 @@ describe("staff carry-forward", () => {
     expect(entry.rows[0]!.custom_name).toBeNull();
   });
 
+  // A coach's account points at the staff row, and rollover writes new rows —
+  // so the link has to follow the person, or the account would keep serving
+  // last season's contact details.
+  it("moves a linked user account onto the carried-forward staff row", async () => {
+    await seedClubConfig(100);
+    const old = await seedSeason("2025/26", "active", "2025-09-01");
+    const next = await seedSeason("2026/27", "upcoming", "2026-09-01");
+    const oldLeague = await seedLeague(50, "U14", old);
+    await seedLeague(51, "U16", next);
+    const squad = await seedTeam(9700, "Dragons U16");
+    const oldEntry = await ctx.client.query<{ id: number }>(
+      `INSERT INTO team_entries (team_id, season_id, league_id) VALUES ($1, $2, $3) RETURNING id`,
+      [squad, old, oldLeague],
+    );
+    const oldEntryId = oldEntry.rows[0]!.id;
+    // Two rows, so a mapping that pairs the lists up wrongly is visible.
+    await seedStaff(oldEntryId, { firstName: "Ada", lastName: "Lovelace", role: "trainer" });
+    await seedStaff(oldEntryId, { firstName: "Ben", lastName: "Byron", role: "co_trainer" });
+    const linkedStaff = await ctx.client.query<{ id: number }>(
+      `SELECT id FROM team_staff WHERE team_entry_id = $1 AND last_name = 'Byron'`,
+      [oldEntryId],
+    );
+    await ctx.client.query(
+      `INSERT INTO "user" (id, name, email, role, staff_id) VALUES ($1, $2, $3, $4, $5)`,
+      ["coach-1", "Ben Byron", "ben@example.de", "coach", linkedStaff.rows[0]!.id],
+    );
+    vi.mocked(fetchLeagueRoster).mockResolvedValue([ref(9700, "Dragons U16", 100)]);
+
+    await seedSeasonTeamEntries(next, [51]);
+
+    const newEntryId = await entryIdOf(squad, next);
+    const linked = await ctx.client.query<{
+      team_entry_id: number;
+      last_name: string;
+      role: string;
+    }>(
+      `SELECT s.team_entry_id, s.last_name, u.role
+       FROM "user" u JOIN team_staff s ON s.id = u.staff_id
+       WHERE u.id = 'coach-1'`,
+    );
+    expect(linked.rows[0]).toEqual({
+      team_entry_id: newEntryId,
+      last_name: "Byron",
+      role: "coach",
+    });
+  });
+
+  // Nothing links to these rows, so the mapping must simply do nothing rather
+  // than, say, claim the first account it finds.
+  it("carries staff forward unchanged when no account is linked", async () => {
+    await seedClubConfig(100);
+    const old = await seedSeason("2025/26", "active", "2025-09-01");
+    const next = await seedSeason("2026/27", "upcoming", "2026-09-01");
+    const oldLeague = await seedLeague(50, "U14", old);
+    await seedLeague(51, "U16", next);
+    const squad = await seedTeam(9700, "Dragons U16");
+    const oldEntry = await ctx.client.query<{ id: number }>(
+      `INSERT INTO team_entries (team_id, season_id, league_id) VALUES ($1, $2, $3) RETURNING id`,
+      [squad, old, oldLeague],
+    );
+    await seedStaff(oldEntry.rows[0]!.id, {
+      firstName: "Ada",
+      lastName: "Lovelace",
+      role: "trainer",
+    });
+    await ctx.client.query(
+      `INSERT INTO "user" (id, name, email) VALUES ('u-unlinked', 'Nobody', 'nobody@example.de')`,
+    );
+    vi.mocked(fetchLeagueRoster).mockResolvedValue([ref(9700, "Dragons U16", 100)]);
+
+    await seedSeasonTeamEntries(next, [51]);
+
+    const rows = await ctx.client.query<{ staff_id: number | null }>(
+      `SELECT staff_id FROM "user" WHERE id = 'u-unlinked'`,
+    );
+    expect(rows.rows[0]!.staff_id).toBeNull();
+    expect((await staffOfEntry(await entryIdOf(squad, next))).rows).toHaveLength(1);
+  });
+
   it("copies from the chronologically latest previous entry, not from every one", async () => {
     await seedClubConfig(100);
     const older = await seedSeason("2024/25", "archived", "2024-09-01");

@@ -1,5 +1,5 @@
 import { getDb } from "../../config/database";
-import { teams, teamEntries, teamStaff, leagues } from "@dragons/db/schema";
+import { teams, teamEntries, teamStaff, leagues, user } from "@dragons/db/schema";
 import { and, eq, sql, inArray } from "drizzle-orm";
 import { seasons } from "@dragons/db/schema";
 import { fetchLeagueRoster } from "./league-roster";
@@ -43,11 +43,17 @@ async function upsertSquad(ref: SdkTeamRef, isOwn: boolean): Promise<number> {
  * the coaches the club just had (ADR 0008) — same reasoning as badge color.
  * The portrait object name comes along; the object itself is shared, and the
  * upload path never deletes an object another row still references.
+ *
+ * A linked user account (`user.staffId`) follows its person onto the new row.
+ * Without that the account would keep pointing at last season's staff record —
+ * still readable, so nothing would fail loudly, while the coach's own contact
+ * details silently belonged to a season nobody edits any more.
  */
 async function copyStaffForward(fromEntryId: number, toEntryId: number): Promise<void> {
   const db = getDb();
   const previousStaff = await db
     .select({
+      id: teamStaff.id,
       firstName: teamStaff.firstName,
       lastName: teamStaff.lastName,
       role: teamStaff.role,
@@ -61,9 +67,22 @@ async function copyStaffForward(fromEntryId: number, toEntryId: number): Promise
     .where(eq(teamStaff.teamEntryId, fromEntryId));
   if (previousStaff.length === 0) return;
 
-  await db
+  const inserted = await db
     .insert(teamStaff)
-    .values(previousStaff.map((s) => ({ ...s, teamEntryId: toEntryId })));
+    .values(previousStaff.map(({ id: _previousId, ...s }) => ({ ...s, teamEntryId: toEntryId })))
+    .returning({ id: teamStaff.id });
+
+  // The insert preserves input order, so the two lists line up row for row.
+  // Each UPDATE matches at most one account (`user.staffId` is unique) and
+  // matches none for staff nobody has an account for.
+  for (const [index, previous] of previousStaff.entries()) {
+    const created = inserted[index];
+    if (!created) continue;
+    await db
+      .update(user)
+      .set({ staffId: created.id, updatedAt: new Date() })
+      .where(eq(user.staffId, previous.id));
+  }
 }
 
 export type UpsertEntryOutcome =

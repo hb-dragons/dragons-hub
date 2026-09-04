@@ -10,6 +10,8 @@ describe("UserAdminError", () => {
   const cases: [UserAdminErrorCode, number][] = [
     ["USER_NOT_FOUND", 404],
     ["REFEREE_NOT_FOUND", 404],
+    ["STAFF_NOT_FOUND", 404],
+    ["STAFF_ALREADY_LINKED", 409],
   ];
 
   it.each(cases)("maps %s to %i", (code, status) => {

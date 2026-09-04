@@ -15,6 +15,7 @@ export const authClient = createAuthClient({
     inferAdditionalFields({
       user: {
         refereeId: { type: "number", required: false },
+        staffId: { type: "number", required: false },
       },
     }),
     adminClient(adminPluginConfig),

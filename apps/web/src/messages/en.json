@@ -673,7 +673,9 @@
       "unban": "Unban User",
       "delete": "Delete User",
       "makeReferee": "Make Referee",
-      "removeReferee": "Remove Referee Role"
+      "removeReferee": "Remove Referee Role",
+      "linkStaff": "Link Staff Record",
+      "unlinkStaff": "Remove Staff Link"
     },
     "createDialog": {
       "title": "Create User",
@@ -739,6 +741,15 @@
       "linking": "Linking...",
       "link": "Link"
     },
+    "linkStaffDialog": {
+      "title": "Link Staff Record",
+      "description": "Select a staff record for {name}",
+      "teamLabel": "Team",
+      "noResults": "No staff recorded for this team",
+      "grantCoachRole": "Grant the coach role",
+      "linking": "Linking...",
+      "link": "Link"
+    },
     "toast": {
       "created": "User created successfully",
       "updated": "User updated successfully",
@@ -755,7 +766,10 @@
       "roleChangeFailed": "Failed to change role",
       "passwordSetFailed": "Failed to set password",
       "refereeLinked": "Referee linked successfully",
-      "refereeLinkFailed": "Failed to link referee"
+      "refereeLinkFailed": "Failed to link referee",
+      "staffLinked": "Staff record linked successfully",
+      "staffLinkFailed": "Failed to link staff record",
+      "staffUnlinked": "Staff link removed"
     },
     "validation": {
       "nameRequired": "Name is required",

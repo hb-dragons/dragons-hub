@@ -41,6 +41,7 @@ import { EditUserDialog } from "./edit-user-dialog"
 import { BanUserDialog } from "./ban-user-dialog"
 import { SetPasswordDialog } from "./set-password-dialog"
 import { LinkRefereeDialog } from "./link-referee-dialog"
+import { LinkStaffDialog } from "./link-staff-dialog"
 import type { UserListItem } from "./types"
 
 interface UserActionsProps {
@@ -63,6 +64,7 @@ export function UserActions({
   const [unbanOpen, setUnbanOpen] = useState(false)
   const [rolesOpen, setRolesOpen] = useState(false)
   const [linkRefereeOpen, setLinkRefereeOpen] = useState(false)
+  const [linkStaffOpen, setLinkStaffOpen] = useState(false)
   const [selectedRoles, setSelectedRoles] = useState<RoleName[]>(() =>
     parseRoles(user.role),
   )
@@ -139,6 +141,18 @@ export function UserActions({
     }
   }
 
+  // Unlinking leaves every role alone — an admin who also wants the coach role
+  // gone takes it away in the roles dialog.
+  async function handleUnlinkStaff() {
+    try {
+      await api.users.linkStaff(user.id, { staffId: null })
+      toast.success(t("users.toast.staffUnlinked"))
+      onMutated()
+    } catch {
+      toast.error(t("users.toast.staffLinkFailed"))
+    }
+  }
+
   async function handleRemoveReferee() {
     try {
       await api.users.linkReferee(user.id, { refereeId: null })
@@ -178,6 +192,16 @@ export function UserActions({
           {!isSelf && user.refereeId !== null && (
             <DropdownMenuItem onSelect={() => { void handleRemoveReferee(); }}>
               {t("users.actions.removeReferee")}
+            </DropdownMenuItem>
+          )}
+          {!isSelf && user.staffId === null && (
+            <DropdownMenuItem onSelect={() => setLinkStaffOpen(true)}>
+              {t("users.actions.linkStaff")}
+            </DropdownMenuItem>
+          )}
+          {!isSelf && user.staffId !== null && (
+            <DropdownMenuItem onSelect={() => { void handleUnlinkStaff(); }}>
+              {t("users.actions.unlinkStaff")}
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
@@ -300,6 +324,13 @@ export function UserActions({
         user={user}
         open={linkRefereeOpen}
         onOpenChange={setLinkRefereeOpen}
+        onLinked={onMutated}
+      />
+
+      <LinkStaffDialog
+        user={user}
+        open={linkStaffOpen}
+        onOpenChange={setLinkStaffOpen}
         onLinked={onMutated}
       />
     </>

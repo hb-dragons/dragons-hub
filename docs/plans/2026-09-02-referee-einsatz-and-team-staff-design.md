@@ -57,7 +57,7 @@ Carry-forward: `team-entry-seeding.service.ts` copies the staff rows of the prev
 | GET | `/admin/teams/:id/staff` | List staff of a team entry (`team:view`). |
 | POST/PATCH/DELETE | `/admin/teams/:id/staff[/:staffId]` | Manage staff (`team:manage`); PATCH also flips `refereeContact`. |
 | POST | `/admin/teams/:id/staff/:staffId/photo` | Multipart upload, same shape as player photos (`team:manage`). |
-| PATCH | `/admin/users/:id/link-staff` | Link/unlink a user to a staff record, optional `grantCoachRole` (mirror of the referee link). |
+| PATCH | `/admin/users/:id/staff-link` | Link/unlink a user to a staff record, optional `grantCoachRole` (mirror of the referee link). Built as `staff-link`, not the `link-staff` this row first named, so it reads as one family with `referee-link`. |
 | GET/PATCH | `/me/staff` | Coach reads and edits own phone, email, licence (`user.staffId` required). |
 | GET | `/public/teams` | Own-club rows gain `staff: { firstName, lastName, role, licence, photoUrl }[]`. Never phone or email. |
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { userRefereeLinkBodySchema } from "@dragons/contracts";
+import { userRefereeLinkBodySchema, userStaffLinkBodySchema } from "@dragons/contracts";
 import { ApiClient } from "../client";
 import { userEndpoints } from "./user";
 
@@ -47,6 +47,30 @@ describe("user request bodies satisfy @dragons/contracts schemas", () => {
     expect(new URL(calls[0]!.url).pathname).toBe(
       "/admin/users/user-123/referee-link",
     );
+    expect(calls[0]!.method).toBe("PATCH");
+  });
+
+  it("linkStaff body (linking, with the coach grant) parses against userStaffLinkBodySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.linkStaff("user-123", { staffId: 7, grantCoachRole: true });
+    const parsed = userStaffLinkBodySchema.safeParse(calls[0]!.body);
+    expect(
+      parsed.error?.issues,
+      "userStaffLinkBodySchema rejected the link body",
+    ).toBeUndefined();
+    expect(new URL(calls[0]!.url).pathname).toBe("/admin/users/user-123/staff-link");
+    expect(calls[0]!.method).toBe("PATCH");
+  });
+
+  it("linkStaff body (unlinking) parses against userStaffLinkBodySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.linkStaff("user-123", { staffId: null });
+    const parsed = userStaffLinkBodySchema.safeParse(calls[0]!.body);
+    expect(
+      parsed.error?.issues,
+      "userStaffLinkBodySchema rejected the unlink body",
+    ).toBeUndefined();
+    expect(new URL(calls[0]!.url).pathname).toBe("/admin/users/user-123/staff-link");
     expect(calls[0]!.method).toBe("PATCH");
   });
 });

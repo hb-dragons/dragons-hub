@@ -154,7 +154,7 @@ tables (`user`, `session`, `account`, `verification`) use text ids,
 | `pushDevices` | `packages/db/src/schema/push-devices.ts` | userId, token (unique), platform, locale, lastSeenAt |
 | `playerPhotos` | `packages/db/src/schema/player-photos.ts` | filename, originalName, width, height — uploaded player photos for social posts |
 | `socialBackgrounds` | `packages/db/src/schema/social-backgrounds.ts` | filename, originalName, width, height, isDefault — background images for social posts |
-| `user` | `packages/db/src/schema/auth.ts` | id (text PK), email (unique), name, role, refereeId FK, banned, banReason, banExpires |
+| `user` | `packages/db/src/schema/auth.ts` | id (text PK), email (unique), name, role, refereeId FK (unique), staffId FK (unique, set null on staff delete), banned, banReason, banExpires |
 | `session` | `packages/db/src/schema/auth.ts` | id (text PK), userId FK (cascade), token (unique), expiresAt, ipAddress, userAgent, impersonatedBy |
 | `account` | `packages/db/src/schema/auth.ts` | id (text PK), userId FK (cascade), providerId, accountId, password |
 | `verification` | `packages/db/src/schema/auth.ts` | id (text PK), identifier, value, expiresAt |
@@ -680,6 +680,7 @@ nested under their task.
 | Method | Path | Description |
 |--------|------|-------------|
 | PATCH | `/admin/users/:id/referee-link` | Link or unlink a referee record from a user account |
+| PATCH | `/admin/users/:id/staff-link` | Link or unlink a staff record from a user account; `grantCoachRole` also grants the `coach` role |
 
 User listing, role assignment and banning are served by better-auth's admin
 plugin under `/api/auth/*`, not by this route group.

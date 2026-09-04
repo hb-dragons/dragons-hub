@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { userIdParamSchema, userRefereeLinkBodySchema } from "./user";
+import {
+  userIdParamSchema,
+  userRefereeLinkBodySchema,
+  userStaffLinkBodySchema,
+} from "./user";
 
 describe("userRefereeLinkBodySchema", () => {
   it("accepts a positive integer refereeId", () => {
@@ -58,5 +62,56 @@ describe("userIdParamSchema", () => {
 
   it("does not coerce a numeric id, unlike the shared idParamSchema", () => {
     expect(userIdParamSchema.parse({ id: "5" })).toEqual({ id: "5" });
+  });
+});
+
+describe("userStaffLinkBodySchema", () => {
+  it("accepts a positive integer staffId", () => {
+    expect(userStaffLinkBodySchema.parse({ staffId: 7 })).toEqual({ staffId: 7 });
+  });
+
+  it("accepts staffId: null (unlink)", () => {
+    expect(userStaffLinkBodySchema.parse({ staffId: null })).toEqual({
+      staffId: null,
+    });
+  });
+
+  it("accepts the optional grantCoachRole flag", () => {
+    expect(userStaffLinkBodySchema.parse({ staffId: 7, grantCoachRole: true })).toEqual({
+      staffId: 7,
+      grantCoachRole: true,
+    });
+  });
+
+  it("leaves grantCoachRole undefined when omitted, so the service decides the default", () => {
+    expect(userStaffLinkBodySchema.parse({ staffId: 7 }).grantCoachRole).toBeUndefined();
+  });
+
+  it("rejects a missing staffId field", () => {
+    expect(userStaffLinkBodySchema.safeParse({}).success).toBe(false);
+  });
+
+  it("rejects zero", () => {
+    expect(userStaffLinkBodySchema.safeParse({ staffId: 0 }).success).toBe(false);
+  });
+
+  it("rejects a float", () => {
+    expect(userStaffLinkBodySchema.safeParse({ staffId: 1.5 }).success).toBe(false);
+  });
+
+  it("rejects a string staffId", () => {
+    expect(userStaffLinkBodySchema.safeParse({ staffId: "7" }).success).toBe(false);
+  });
+
+  it("rejects a non-boolean grantCoachRole", () => {
+    expect(
+      userStaffLinkBodySchema.safeParse({ staffId: 7, grantCoachRole: "yes" }).success,
+    ).toBe(false);
+  });
+
+  it("rejects unknown keys", () => {
+    expect(
+      userStaffLinkBodySchema.safeParse({ staffId: 7, role: "coach" }).success,
+    ).toBe(false);
   });
 });
