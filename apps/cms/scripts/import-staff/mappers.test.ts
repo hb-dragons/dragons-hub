@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { describeRow, newRows, planStaffRows, splitName, staffKey } from "./mappers";
-import type { CmsTeam, CmsTrainer } from "./cms";
+import {
+  describePortrait,
+  describeRow,
+  newRows,
+  planPortraits,
+  planStaffRows,
+  splitName,
+  staffKey,
+  type ExistingStaff,
+} from "./mappers";
+import type { CmsMedia, CmsTeam, CmsTrainer } from "./cms";
 
 function team(extra: Partial<CmsTeam> = {}): CmsTeam {
   return {
@@ -229,5 +238,200 @@ describe("newRows", () => {
 
   it("drops a row already on that entry, whatever the case", () => {
     expect(newRows([row], new Set([staffKey({ ...row, firstName: "MAX" })]))).toEqual([]);
+  });
+});
+
+describe("planPortraits", () => {
+  function media(id: number, extra: Partial<CmsMedia> = {}): CmsMedia {
+    return { id, url: `/api/media/file/${id}.jpg`, mimeType: "image/jpeg", ...extra };
+  }
+
+  function existing(extra: Partial<ExistingStaff> = {}): ExistingStaff {
+    return {
+      id: 42,
+      teamEntryId: 7,
+      firstName: "Max",
+      lastName: "Mustermann",
+      photoFilename: null,
+      ...extra,
+    };
+  }
+
+  it("copies the trainer's own image rather than the person's", () => {
+    const plan = planPortraits(
+      [
+        team({
+          trainers: [
+            trainer(1, {
+              image: media(1),
+              person: { id: 10, name: "Max Mustermann", image: media(2) },
+            }),
+          ],
+        }),
+      ],
+      entries,
+      [existing()],
+    );
+
+    expect(plan.copies).toEqual([
+      {
+        staffId: 42,
+        teamEntryId: 7,
+        name: "Max Mustermann",
+        sourceUrl: "/api/media/file/1.jpg",
+        contentType: "image/jpeg",
+      },
+    ]);
+    expect(plan.skipped).toEqual([]);
+    expect(plan.alreadyThere).toBe(0);
+  });
+
+  it("falls back to the person's image", () => {
+    const plan = planPortraits(
+      [team({ trainers: [trainer(1, { person: { id: 10, name: "Max Mustermann", image: media(2, { mimeType: "image/webp" }) } })] })],
+      entries,
+      [existing()],
+    );
+
+    expect(plan.copies).toMatchObject([{ sourceUrl: "/api/media/file/2.jpg", contentType: "image/webp" }]);
+  });
+
+  it("reports a trainer without any image and skips it", () => {
+    const plan = planPortraits([team({ trainers: [trainer(1)] })], entries, [existing()]);
+
+    expect(plan.copies).toEqual([]);
+    expect(plan.skipped).toEqual(["damen-1: Max Mustermann has no image — skipped"]);
+  });
+
+  it("leaves a row that already has a portrait alone", () => {
+    const plan = planPortraits(
+      [team({ trainers: [trainer(1, { image: media(1) })] })],
+      entries,
+      [existing({ photoFilename: "kept.jpg" })],
+    );
+
+    expect(plan.copies).toEqual([]);
+    expect(plan.skipped).toEqual([]);
+    expect(plan.alreadyThere).toBe(1);
+  });
+
+  it("reports a trainer whose staff row the hub does not hold", () => {
+    const plan = planPortraits([team({ trainers: [trainer(1, { image: media(1) })] })], entries, []);
+
+    expect(plan.copies).toEqual([]);
+    expect(plan.skipped).toEqual([
+      "damen-1: Max Mustermann has no staff row — run the staff import first",
+    ]);
+  });
+
+  it("matches the staff row by entry and name, whatever the case", () => {
+    const plan = planPortraits(
+      [team({ trainers: [trainer(1, { image: media(1) })] })],
+      entries,
+      [existing({ firstName: "MAX", lastName: "mustermann" })],
+    );
+
+    expect(plan.copies).toHaveLength(1);
+  });
+
+  it("plans one copy per team entry for a coach on two teams", () => {
+    const plan = planPortraits(
+      [
+        team({ trainers: [trainer(1, { image: media(1) })] }),
+        team({ id: 2, slug: "herren-1", apiTeamPermanentId: 200, trainers: [trainer(1, { image: media(1) })] }),
+      ],
+      new Map([
+        [100, 7],
+        [200, 8],
+      ]),
+      [existing(), existing({ id: 43, teamEntryId: 8 })],
+    );
+
+    expect(plan.copies.map((copy) => copy.staffId)).toEqual([42, 43]);
+  });
+
+  it("plans one copy for a name repeated on the same entry", () => {
+    const plan = planPortraits(
+      [team({ trainers: [trainer(1, { image: media(1) }), trainer(2, { image: media(3) })] })],
+      entries,
+      [existing()],
+    );
+
+    expect(plan.copies).toHaveLength(1);
+  });
+
+  it("reports a trainer it cannot name", () => {
+    const plan = planPortraits([team({ trainers: [{ id: 3, person: null }] })], entries, []);
+
+    expect(plan.skipped).toEqual(["damen-1: trainer 3 has no person — skipped"]);
+  });
+
+  it("skips an image type the hub does not store", () => {
+    const plan = planPortraits(
+      [team({ trainers: [trainer(1, { image: media(1, { mimeType: "image/gif" }) })] })],
+      entries,
+      [existing()],
+    );
+
+    expect(plan.copies).toEqual([]);
+    expect(plan.skipped).toEqual([
+      "damen-1: Max Mustermann has an image/gif image, which the hub does not store — skipped",
+    ]);
+  });
+
+  it("skips an image the CMS did not type", () => {
+    const plan = planPortraits(
+      [team({ trainers: [trainer(1, { image: media(1, { mimeType: null }) })] })],
+      entries,
+      [existing()],
+    );
+
+    expect(plan.skipped).toEqual([
+      "damen-1: Max Mustermann has an untyped image, which the hub does not store — skipped",
+    ]);
+  });
+
+  it("skips a media doc that carries no url", () => {
+    const plan = planPortraits(
+      [team({ trainers: [trainer(1, { image: media(1, { url: null }) })] })],
+      entries,
+      [existing()],
+    );
+
+    expect(plan.copies).toEqual([]);
+    expect(plan.skipped).toEqual(["damen-1: Max Mustermann has an image (media 1) without a url — skipped"]);
+  });
+
+  it("throws when an image arrived as a bare id", () => {
+    expect(() =>
+      planPortraits([team({ trainers: [trainer(1, { image: 5 })] })], entries, [existing()]),
+    ).toThrow(/depth/);
+    expect(() =>
+      planPortraits(
+        [team({ trainers: [trainer(1, { person: { id: 10, name: "Max Mustermann", image: 5 } })] })],
+        entries,
+        [existing()],
+      ),
+    ).toThrow(/depth/);
+  });
+
+  it("throws naming a team whose permanent id has no entry", () => {
+    expect(() => planPortraits([team({ trainers: [trainer(1)] })], new Map(), [])).toThrow(
+      /damen-1.*100/,
+    );
+  });
+});
+
+describe("describePortrait", () => {
+  it("names the row, the entry and the image type", () => {
+    expect(
+      describePortrait({
+        staffId: 42,
+        teamEntryId: 7,
+        name: "Max Mustermann",
+        sourceUrl: "/api/media/file/1.jpg",
+        contentType: "image/jpeg",
+      }),
+    ).toBe("staff 42 (entry 7, Max Mustermann, image/jpeg)");
   });
 });

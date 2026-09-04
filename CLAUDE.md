@@ -265,6 +265,26 @@ throws by name on a missing variable, and on a CMS team whose
 `apiTeamPermanentId` has no team entry in the active season; re-running it
 adds nothing it already imported.
 
+Its second pass, `migrate:cms-staff -- --portraits` (issue #329), copies each
+imported row's portrait out of the CMS media library: the trainer's own image
+first, else the person's, downscaled to fit 512 px the way the Hub's upload
+path does it, stored under the Hub's staff-portrait prefix with a fresh uuid
+name, and recorded on the row. It needs `GCS_BUCKET_NAME` — the *Hub's* asset
+bucket, the same variable the API reads, not the CMS's `GCS_MEDIA_BUCKET` —
+and Application Default Credentials that can write to it (`gcloud auth
+application-default login`); there is no `GCS_PROJECT_ID` to set, since the
+bucket name is global. Rows that already carry a portrait are skipped, so a
+rerun copies only what is still missing; trainers without an image, and rows
+the first pass never wrote, are reported and skipped. A coach on two team
+entries gets two independent copies, because each row owns and deletes its
+own object. `--dry-run` lists every planned copy with its source URL and
+writes neither objects nor rows. Run it in production before #316 removes the
+CMS trainers collection, then trigger a Website rebuild so the team pages and
+Kontakt page render the Hub portraits. The size and prefix constants are
+duplicated from `apps/api/src/services/admin/team-staff-photo.service.ts` on
+purpose (the script must not import the API's service layer), and the
+comment in `scripts/import-staff/storage.ts` says so.
+
 ### Production deployment plumbing
 
 `SCOREBOARD_DEVICE_ID` flows into two places that must stay in sync:
