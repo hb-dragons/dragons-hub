@@ -1,3 +1,26 @@
+/**
+ * What a club team is called on screen: the season's custom name if the club
+ * gave it one, else the federation's short name, else its full name.
+ *
+ * This lives in `@dragons/shared` because two sides have to spell it the same
+ * way. The admin match editor writes this string into
+ * `matches.anschreiber` / `zeitnehmer` / `shotclock` — the Kampfgericht columns
+ * hold a name, not an id — and the referee Einsatz reader matches that string
+ * back to a team entry to find its contacts (#313). Two private copies of the
+ * expression would drift the moment either side gained a fallback.
+ *
+ * A blank string counts as absent, not as a name: `teamUpdateBodySchema`
+ * accepts `customName: ""`, and a `??` chain would then render — and try to
+ * match — an empty name.
+ */
+export function teamDisplayName(team: {
+  name: string;
+  nameShort: string | null;
+  customName: string | null;
+}): string {
+  return team.customName?.trim() || team.nameShort?.trim() || team.name;
+}
+
 export interface OwnClubTeam {
   /** Team entry id (per season) — the id PATCH /admin/teams/:id addresses. */
   id: number;

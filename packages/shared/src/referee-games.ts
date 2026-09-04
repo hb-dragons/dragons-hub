@@ -1,4 +1,5 @@
 import type { RefereeSlotStatus } from "./constants";
+import type { TeamStaffRole } from "./teams";
 
 export interface RefereeGameListItem {
   id: number;
@@ -60,9 +61,62 @@ export interface RefereeGameBrief {
   federationUrl: string;
 }
 
-/** A single referee game, as `GET /referee/games/:id` returns it. */
+/** The three Kampfgericht roles a Dragons team is named for on a home game. */
+export const KAMPFGERICHT_ROLES = ["anschreiber", "zeitnehmer", "shotclock"] as const;
+export type KampfgerichtRole = (typeof KAMPFGERICHT_ROLES)[number];
+
+/**
+ * One person a referee can reach about a team (#313).
+ *
+ * Deliberately not `TeamStaffMember`: a referee gets the name, the role and the
+ * two ways to make contact, and never the portrait, the licence or the internal
+ * ids the admin editor works with.
+ */
+export interface RefereeTeamContact {
+  firstName: string;
+  lastName: string;
+  role: TeamStaffRole;
+  phone: string | null;
+  email: string | null;
+}
+
+/** The contacts of one Dragons team playing the game. */
+export interface RefereeContactGroup {
+  /** The team entry the contacts hang off — the dedupe key against `kampfgericht`. */
+  teamEntryId: number;
+  teamName: string;
+  contacts: RefereeTeamContact[];
+}
+
+/**
+ * One Kampfgericht line: the Dragons team named for one or more of the three
+ * roles. All three roles collapse into a single entry when the same team runs
+ * them, which is the normal case.
+ */
+export interface KampfgerichtEntry {
+  /** In `KAMPFGERICHT_ROLES` order, never empty. */
+  roles: KampfgerichtRole[];
+  teamName: string;
+  /**
+   * The team's contacts, or `[]` when that team is the team playing — its
+   * people are already under `contacts` and one person is listed once.
+   */
+  contacts: RefereeTeamContact[];
+}
+
+/**
+ * A single referee game, as `GET /referee/games/:id` returns it.
+ *
+ * `kampfgericht` and `contacts` are present only for a caller who holds a slot
+ * on the game or has assignment view permission (#313). For everyone else — a
+ * referee looking at an open game they could claim — the keys are absent, not
+ * empty: the phone number of a coach is not part of what an open fixture
+ * advertises.
+ */
 export interface RefereeGameDetail extends RefereeGameListItem {
   brief: RefereeGameBrief;
+  kampfgericht?: KampfgerichtEntry[];
+  contacts?: RefereeContactGroup[];
 }
 
 /**

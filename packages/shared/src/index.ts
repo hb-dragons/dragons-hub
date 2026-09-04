@@ -48,7 +48,7 @@ export type {
   TeamStaffMember,
   TeamStaffRole,
 } from "./teams";
-export { TEAM_STAFF_ROLES } from "./teams";
+export { TEAM_STAFF_ROLES, teamDisplayName } from "./teams";
 
 export type {
   BookingListItem,
@@ -114,8 +114,12 @@ export type {
   RefereeGameListItem,
   RefereeGameBrief,
   RefereeGameDetail,
+  RefereeTeamContact,
+  RefereeContactGroup,
+  KampfgerichtEntry,
+  KampfgerichtRole,
 } from "./referee-games";
-export { federationGameUrl } from "./referee-games";
+export { federationGameUrl, KAMPFGERICHT_ROLES } from "./referee-games";
 export type {
   RefereeListItem,
   RefereeRule,

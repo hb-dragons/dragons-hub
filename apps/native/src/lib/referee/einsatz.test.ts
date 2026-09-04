@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { RefereeGameDetail } from "@dragons/shared";
+import type { RefereeGameDetail, RefereeTeamContact } from "@dragons/shared";
 import {
   einsatzView,
+  mailtoUrl,
   mapsUrl,
   refereeGameRoute,
   spielinfoRoute,
+  telUrl,
 } from "@/lib/referee/einsatz";
 import { resolveDeepLink } from "@/lib/nav/href";
 
@@ -238,5 +240,163 @@ describe("einsatzView — brief (#309)", () => {
     expect(einsatzView(game(), "ios").federationUrl).toBe(
       "https://www.basketball-bund.net/static/#/spiel/12345",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Kampfgericht and team contacts (#313)
+// ---------------------------------------------------------------------------
+
+describe("telUrl / mailtoUrl", () => {
+  it("strips the spelling out of a phone number but keeps it in the label", () => {
+    expect(telUrl("+49 2406 / 123 45")).toBe("tel:+49240612345");
+    expect(telUrl("0170-1234567")).toBe("tel:01701234567");
+  });
+
+  it("hands an address straight to mailto:", () => {
+    expect(mailtoUrl("ana@example.de")).toBe("mailto:ana@example.de");
+  });
+});
+
+describe("einsatzView — Kampfgericht and contacts", () => {
+  const ANA: RefereeTeamContact = {
+    firstName: "Ana",
+    lastName: "Berger",
+    role: "trainer",
+    phone: "+49 2406 123",
+    email: "ana@example.de",
+  };
+  const KIM: RefereeTeamContact = {
+    firstName: "Kim",
+    lastName: "Draak",
+    role: "co_trainer",
+    phone: null,
+    email: null,
+  };
+
+  // A referee looking at an open game they do not hold: the API sends neither
+  // key, and both blocks are simply empty rather than undefined.
+  it("shows neither block when the API withheld both keys", () => {
+    const view = einsatzView(game(), "ios");
+
+    expect(view.kampfgericht).toEqual([]);
+    expect(view.contacts).toEqual([]);
+  });
+
+  it("turns each contact into a callable and mailable row", () => {
+    const view = einsatzView(
+      game({
+        contacts: [{ teamEntryId: 3, teamName: "Dragons 1", contacts: [ANA] }],
+      }),
+      "ios",
+    );
+
+    expect(view.contacts).toEqual([
+      {
+        key: "3",
+        teamName: "Dragons 1",
+        contacts: [
+          {
+            key: "0:Berger:trainer",
+            name: "Ana Berger",
+            roleKey: "teamStaff.role.trainer",
+            phone: { label: "+49 2406 123", url: "tel:+492406123" },
+            email: { label: "ana@example.de", url: "mailto:ana@example.de" },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("leaves out the action a contact has no value for", () => {
+    const view = einsatzView(
+      game({ contacts: [{ teamEntryId: 3, teamName: "Dragons 1", contacts: [KIM] }] }),
+      "ios",
+    );
+
+    expect(view.contacts[0]?.contacts[0]).toMatchObject({ phone: null, email: null });
+  });
+
+  it("lists both teams of a derby", () => {
+    const view = einsatzView(
+      game({
+        contacts: [
+          { teamEntryId: 3, teamName: "Dragons 1", contacts: [ANA] },
+          { teamEntryId: 4, teamName: "Dragons 2", contacts: [KIM] },
+        ],
+      }),
+      "ios",
+    );
+
+    expect(view.contacts.map((g) => g.teamName)).toEqual(["Dragons 1", "Dragons 2"]);
+    expect(view.contacts.map((g) => g.key)).toEqual(["3", "4"]);
+  });
+
+  it("renders one collapsed Kampfgericht line when one team runs all three roles", () => {
+    const view = einsatzView(
+      game({
+        kampfgericht: [
+          {
+            roles: ["anschreiber", "zeitnehmer", "shotclock"],
+            teamName: "Dragons 2",
+            contacts: [KIM],
+          },
+        ],
+      }),
+      "ios",
+    );
+
+    expect(view.kampfgericht).toEqual([
+      {
+        key: "0:Dragons 2",
+        teamName: "Dragons 2",
+        roleKeys: [
+          "refereeGame.kampfgerichtRole.anschreiber",
+          "refereeGame.kampfgerichtRole.zeitnehmer",
+          "refereeGame.kampfgerichtRole.shotclock",
+        ],
+        contacts: [
+          expect.objectContaining({ name: "Kim Draak", phone: null, email: null }),
+        ],
+      },
+    ]);
+  });
+
+  it("renders one line per team when the roles are split", () => {
+    const view = einsatzView(
+      game({
+        kampfgericht: [
+          { roles: ["anschreiber", "zeitnehmer"], teamName: "Dragons 2", contacts: [] },
+          { roles: ["shotclock"], teamName: "Dragons 3", contacts: [] },
+        ],
+      }),
+      "ios",
+    );
+
+    expect(view.kampfgericht.map((line) => [line.key, line.roleKeys.length])).toEqual([
+      ["0:Dragons 2", 2],
+      ["1:Dragons 3", 1],
+    ]);
+  });
+
+  // The API deduped: the Kampfgericht team is the team playing, so its people
+  // are under `contacts` and the Kampfgericht line names the team only.
+  it("shows a deduped Kampfgericht line without repeating the contact", () => {
+    const view = einsatzView(
+      game({
+        contacts: [{ teamEntryId: 3, teamName: "Dragons 1", contacts: [ANA] }],
+        kampfgericht: [
+          {
+            roles: ["anschreiber", "zeitnehmer", "shotclock"],
+            teamName: "Dragons 1",
+            contacts: [],
+          },
+        ],
+      }),
+      "ios",
+    );
+
+    expect(view.kampfgericht[0]?.contacts).toEqual([]);
+    expect(view.contacts[0]?.contacts).toHaveLength(1);
   });
 });

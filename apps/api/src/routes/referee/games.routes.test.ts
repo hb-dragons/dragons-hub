@@ -200,6 +200,50 @@ describe("GET /games/:id", () => {
     expect(await json(res)).toEqual(row);
   });
 
+  // The gate that decides whether these two keys exist lives in the service
+  // (#313); what the route owes is passing them through untouched — and,
+  // equally, not inventing them when the service left them off.
+  it("passes the Kampfgericht and contact blocks through to the client", async () => {
+    const row = {
+      id: 7,
+      apiMatchId: 2000,
+      matchId: 11,
+      kampfgericht: [
+        { roles: ["anschreiber", "zeitnehmer", "shotclock"], teamName: "Dragons 2", contacts: [] },
+      ],
+      contacts: [
+        {
+          teamEntryId: 3,
+          teamName: "Dragons 1",
+          contacts: [
+            {
+              firstName: "Ana",
+              lastName: "Berger",
+              role: "trainer",
+              phone: "+49 111",
+              email: "ana@example.de",
+            },
+          ],
+        },
+      ],
+    };
+    mocks.getVisibleRefereeGameById.mockResolvedValue(row);
+
+    const res = await app.request("/games/7");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(row);
+  });
+
+  it("leaves both keys off when the service withheld them", async () => {
+    mocks.getVisibleRefereeGameById.mockResolvedValue({ id: 7, apiMatchId: 2000, matchId: null });
+
+    const body = await json(await app.request("/games/7"));
+
+    expect(body).not.toHaveProperty("kampfgericht");
+    expect(body).not.toHaveProperty("contacts");
+  });
+
   it("returns 404 when referee cannot see the game", async () => {
     mocks.getVisibleRefereeGameById.mockResolvedValue(null);
 
