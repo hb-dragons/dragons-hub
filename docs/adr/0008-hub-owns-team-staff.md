@@ -10,4 +10,4 @@ Decision: team staff is a Hub entity (`team_staff`, attached to a team entry per
 
 Considered and rejected: the API reading the CMS at request time (a new runtime dependency and a public-read collection as the source of a referee-only phone number); a slim CMS `trainers` doc holding only a Hub id and the portrait (a hand-maintained join id per coach, and the first field someone forgets); matching CMS people to Hub staff by name (breaks on the first rename).
 
-Consequences: the split rule is "operational data about people in club roles lives in the Hub, page content lives in the CMS" — a future Jugendkoordinator or Betreuer belongs in `team_staff` with a new role value, not in the CMS. `people.phone` in the CMS is now unused by any surface and should go, or its read access should stop being `anyone`.
+Consequences: the split rule is "operational data about people in club roles lives in the Hub, page content lives in the CMS" — a future Jugendkoordinator or Betreuer belongs in `team_staff` with a new role value, not in the CMS. `people.phone` in the CMS is now unused by any surface and should go, or its read access should stop being `anyone` (issue #333).

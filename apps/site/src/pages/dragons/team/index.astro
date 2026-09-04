@@ -6,9 +6,9 @@
 // the referees collection directly, like the legacy page. Fully static — no
 // islands.
 //
-// The Coaches band reads the Hub's team staff (ADR 0008, issue #314) rather
-// than the CMS trainers collection, gated on a content build the way the other
-// build-time API fetches are (src/pages/spielplan/index.astro).
+// The Coaches band reads the Hub's team staff (ADR 0008, issue #314; the CMS
+// trainers collection is gone, issue #316), gated on a content build the way
+// the other build-time API fetches are (src/pages/spielplan/index.astro).
 import { getCollection } from "astro:content";
 
 import PersonCard from "../../../components/kontakt/PersonCard.astro";

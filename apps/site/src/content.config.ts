@@ -7,7 +7,7 @@
  *
  * Relationship depth per collection is chosen so every media/person field the
  * site renders arrives populated (Payload returns bare ids past the requested
- * depth): e.g. teams needs depth 3 for teams → trainers → person → image.
+ * depth): e.g. vorstand needs depth 2 for vorstand → person → image.
  */
 import { defineCollection } from "astro:content";
 import { z } from "astro/zod";
@@ -40,14 +40,6 @@ const person = z.object({
   name: z.string(),
   email: z.string().nullish(),
   phone: z.string().nullish(),
-  image: media.nullish(),
-});
-
-const trainer = z.object({
-  id: z.number(),
-  person: person.nullish(),
-  licence: z.string().nullish(),
-  email: z.string().nullish(),
   image: media.nullish(),
 });
 
@@ -119,7 +111,6 @@ const team = z.object({
   _order: z.string(),
   teamImage: media.nullish(),
   apiTeamPermanentId: z.number().nullish(),
-  trainers: z.array(trainer).nullish(),
   trainingTimes: z.array(trainingTime).nullish(),
   seoDescription: z.string().nullish(),
   ogImage: media.nullish(),
@@ -136,7 +127,10 @@ export const collections = {
     schema: page,
   }),
   teams: defineCollection({
-    loader: payloadLoader("teams", { depth: 3, sort: "_order", required: true }),
+    // depth 1: teamImage and ogImage populated. Coaches come from the Hub
+    // (src/lib/team-staff.ts) and the league from the sync data, so the team
+    // document itself no longer carries a relation graph to walk.
+    loader: payloadLoader("teams", { depth: 1, sort: "_order", required: true }),
     schema: team,
   }),
   partners: defineCollection({
@@ -230,11 +224,6 @@ export const collections = {
       email: z.string().nullish(),
       _status: status,
     }),
-  }),
-  trainers: defineCollection({
-    // depth 2: trainers → person → person.image populated.
-    loader: payloadLoader("trainers", { depth: 2 }),
-    schema: trainer,
   }),
   referees: defineCollection({
     // depth 2: referees → person → person.image populated.

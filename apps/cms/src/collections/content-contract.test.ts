@@ -20,7 +20,6 @@ import { Referees } from "./referees";
 import { ShopItems } from "./shop-items";
 import { Teams } from "./teams";
 import { TimelineItems } from "./timeline-items";
-import { Trainers } from "./trainers";
 import { Vorstand } from "./vorstand";
 
 const fieldNames = (fields: Field[]): string[] =>
@@ -46,14 +45,13 @@ describe("drafted collections", () => {
     expect(collection.access?.read).toBe(publishedOrAuthed);
   });
 
-  // people, trainers and media are reached through relations from published
-  // parents (people → vorstand/positions/trainers at depth 2, trainers → teams
-  // at depth 3, media → everything). The site filters _status only on the
-  // collection it loads, and the build user's API key sees drafts, so a draft
-  // here would render live. Drafting them needs relation-level filtering first.
+  // people and media are reached through relations from published parents
+  // (people → vorstand/positions at depth 2, media → everything). The site
+  // filters _status only on the collection it loads, and the build user's API
+  // key sees drafts, so a draft here would render live. Drafting them needs
+  // relation-level filtering first.
   it.each([
     { slug: "people", collection: People },
-    { slug: "trainers", collection: Trainers },
     { slug: "media", collection: Media },
   ])("$slug deliberately has no drafts", ({ collection }) => {
     expect(collection.versions).toBeUndefined();
@@ -128,9 +126,6 @@ describe("teams", () => {
       "slug",
       "teamImage",
       "apiTeamPermanentId",
-      "leagueName",
-      "leagueId",
-      "trainers",
       "trainingTimes",
       ...SEO_FIELDS,
     ]);
@@ -154,7 +149,6 @@ describe("teams", () => {
 describe("people graph and flat collections", () => {
   const contracts: { slug: string; collection: CollectionConfig; fields: string[] }[] = [
     { slug: "people", collection: People, fields: ["name", "email", "phone", "image"] },
-    { slug: "trainers", collection: Trainers, fields: ["person", "licence", "email", "image"] },
   ];
 
   it.each(contracts)(

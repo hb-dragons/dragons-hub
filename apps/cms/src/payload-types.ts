@@ -75,7 +75,6 @@ export interface Config {
     people: Person;
     vorstand: Vorstand;
     positions: Position;
-    trainers: Trainer;
     referees: Referee;
     partners: Partner;
     projects: Project;
@@ -97,7 +96,6 @@ export interface Config {
     people: PeopleSelect<false> | PeopleSelect<true>;
     vorstand: VorstandSelect<false> | VorstandSelect<true>;
     positions: PositionsSelect<false> | PositionsSelect<true>;
-    trainers: TrainersSelect<false> | TrainersSelect<true>;
     referees: RefereesSelect<false> | RefereesSelect<true>;
     partners: PartnersSelect<false> | PartnersSelect<true>;
     projects: ProjectsSelect<false> | ProjectsSelect<true>;
@@ -297,9 +295,6 @@ export interface Team {
    * Join-Key zu /public/teams (Sync-Daten)
    */
   apiTeamPermanentId?: number | null;
-  leagueName?: string | null;
-  leagueId?: string | null;
-  trainers?: (number | Trainer)[] | null;
   trainingTimes?:
     | {
         day: string;
@@ -322,16 +317,18 @@ export interface Team {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "trainers".
+ * via the `definition` "vorstand".
  */
-export interface Trainer {
+export interface Vorstand {
   id: number;
+  role: string;
+  tasks?: string | null;
   person?: (number | null) | Person;
-  licence?: string | null;
-  email?: string | null;
+  orderIndex: number;
   image?: (number | null) | Media;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -345,21 +342,6 @@ export interface Person {
   image?: (number | null) | Media;
   updatedAt: string;
   createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "vorstand".
- */
-export interface Vorstand {
-  id: number;
-  role: string;
-  tasks?: string | null;
-  person?: (number | null) | Person;
-  orderIndex: number;
-  image?: (number | null) | Media;
-  updatedAt: string;
-  createdAt: string;
-  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -515,10 +497,6 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'positions';
         value: number | Position;
-      } | null)
-    | ({
-        relationTo: 'trainers';
-        value: number | Trainer;
       } | null)
     | ({
         relationTo: 'referees';
@@ -708,9 +686,6 @@ export interface TeamsSelect<T extends boolean = true> {
   slug?: T;
   teamImage?: T;
   apiTeamPermanentId?: T;
-  leagueName?: T;
-  leagueId?: T;
-  trainers?: T;
   trainingTimes?:
     | T
     | {
@@ -767,18 +742,6 @@ export interface PositionsSelect<T extends boolean = true> {
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "trainers_select".
- */
-export interface TrainersSelect<T extends boolean = true> {
-  person?: T;
-  licence?: T;
-  email?: T;
-  image?: T;
-  updatedAt?: T;
-  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

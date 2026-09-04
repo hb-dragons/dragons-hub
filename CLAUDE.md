@@ -244,16 +244,13 @@ root `.env.example`, which is drift-locked to `apps/api`): `CMS_URL` +
 
 `apps/cms` likewise has its own contract in `apps/cms/.env.example`
 (`DATABASE_URL_CMS`, `PAYLOAD_SECRET`, and the prod-only `GCS_MEDIA_*` /
-`CMS_PUBLIC_URL` / `GH_DISPATCH_TOKEN`). Four more are read *only* by the
-one-off Strapi importer (`pnpm --filter @dragons/cms migrate:strapi`, issue
-#165) and by nothing else in the app: `STRAPI_URL` + `STRAPI_TOKEN` are the
-legacy Strapi origin and its read token — the URL is a LAN address, since
-the migration deliberately does not depend on public DNS — and `CMS_URL` +
-`CMS_API_TOKEN` are the target Payload REST origin and an API-key user's
-token. Same names as the `apps/site` pair and the same values in practice,
-but a different job: the site *reads* content at build time, the importer
-*writes* it once. All four are unset in normal development; the script
-throws by name when one is missing.
+`CMS_PUBLIC_URL` / `GH_DISPATCH_TOKEN`). That is the whole list. Two one-off
+importers used to add to it — the Strapi content import (#165) and the CMS ->
+Hub staff import with its portrait pass (#311, #329) — but both had run in
+production and read the CMS `trainers` collection #316 dropped, so they were
+deleted with it rather than kept as code nobody can run. Their story is in the
+git history and in ADR-0008; `apps/cms` no longer talks to the Hub database or
+to any bucket but its own media one.
 
 ### Production deployment plumbing
 
