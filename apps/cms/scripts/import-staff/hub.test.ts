@@ -2,7 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDb, type Database } from "@dragons/db";
 import type * as DbModule from "@dragons/db";
 
-import { activeSeasonEntries, existingStaffKeys, insertStaff, openHub } from "./hub";
+import {
+  activeSeasonEntries,
+  existingStaff,
+  existingStaffKeys,
+  insertStaff,
+  openHub,
+  setStaffPortrait,
+} from "./hub";
 
 vi.mock("@dragons/db", async (importOriginal) => ({
   ...(await importOriginal<typeof DbModule>()),
@@ -20,26 +27,39 @@ interface Chain {
   innerJoin: () => Chain;
   where: () => Chain;
   values: () => Chain;
+  set: (values: unknown) => Chain;
   returning: () => Chain;
   then: (resolve: (rows: unknown[]) => void) => void;
 }
 
-function queryStub(rows: unknown[]): Chain {
+function queryStub(rows: unknown[], calls: { set?: unknown } = {}): Chain {
   const chain: Chain = {
     from: () => chain,
     innerJoin: () => chain,
     where: () => chain,
     values: () => chain,
+    set: (values) => {
+      calls.set = values;
+      return chain;
+    },
     returning: () => chain,
     then: (resolve) => resolve(rows),
   };
   return chain;
 }
 
-function dbStub(rows: unknown[]): { db: Database; select: ReturnType<typeof vi.fn>; insert: ReturnType<typeof vi.fn> } {
-  const select = vi.fn(() => queryStub(rows));
-  const insert = vi.fn(() => queryStub(rows));
-  return { db: { select, insert } as unknown as Database, select, insert };
+function dbStub(rows: unknown[]): {
+  db: Database;
+  select: ReturnType<typeof vi.fn>;
+  insert: ReturnType<typeof vi.fn>;
+  update: ReturnType<typeof vi.fn>;
+  calls: { set?: unknown };
+} {
+  const calls: { set?: unknown } = {};
+  const select = vi.fn(() => queryStub(rows, calls));
+  const insert = vi.fn(() => queryStub(rows, calls));
+  const update = vi.fn(() => queryStub(rows, calls));
+  return { db: { select, insert, update } as unknown as Database, select, insert, update, calls };
 }
 
 describe("openHub", () => {
@@ -93,6 +113,42 @@ describe("existingStaffKeys", () => {
 
     expect(await existingStaffKeys(db, [])).toEqual(new Set());
     expect(select).not.toHaveBeenCalled();
+  });
+});
+
+describe("existingStaff", () => {
+  it("returns the rows the entries hold, with the portrait each carries", async () => {
+    const rows = [
+      { id: 42, teamEntryId: 7, firstName: "Max", lastName: "Mustermann", photoFilename: null },
+      { id: 43, teamEntryId: 8, firstName: "Max", lastName: "Mustermann", photoFilename: "a.jpg" },
+    ];
+    const { db } = dbStub(rows);
+
+    expect(await existingStaff(db, [7, 8])).toEqual(rows);
+  });
+
+  it("asks nothing when no entry is touched", async () => {
+    const { db, select } = dbStub([]);
+
+    expect(await existingStaff(db, [])).toEqual([]);
+    expect(select).not.toHaveBeenCalled();
+  });
+});
+
+describe("setStaffPortrait", () => {
+  it("records the object name on the row and touches updatedAt", async () => {
+    const { db, update, calls } = dbStub([{ id: 42 }]);
+
+    await setStaffPortrait(db, 42, "uuid.jpg");
+
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(calls.set).toMatchObject({ photoFilename: "uuid.jpg", updatedAt: expect.any(Date) });
+  });
+
+  it("throws when no row was updated", async () => {
+    const { db } = dbStub([]);
+
+    await expect(setStaffPortrait(db, 42, "uuid.jpg")).rejects.toThrow(/staff 42/);
   });
 });
 

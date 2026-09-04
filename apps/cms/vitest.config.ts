@@ -48,7 +48,11 @@ export default defineConfig({
         // Ratcheted 2026-09-03 (issue #311): the CMS -> Hub staff import
         // added ~200 covered lines. Measured statements 99.58,
         // branches 92.48, functions 99.12, lines 99.52.
-        branches: 92,
+        //
+        // Ratcheted 2026-09-04 (issue #329): the import's `--portraits` pass
+        // added ~200 covered lines. Measured statements 99.64,
+        // branches 93.23, functions 99.22, lines 99.6.
+        branches: 93,
         functions: 99,
         lines: 99,
         statements: 99,

@@ -7,21 +7,18 @@
  * Writes go straight through Drizzle rather than the admin endpoints: those
  * are session-authenticated for a human admin, and a one-off run has no
  * session to carry.
+ *
+ * Reads `DATABASE_URL`.
  */
 import { createDb, seasons, teamEntries, teamStaff, teams } from "@dragons/db";
 import type { Database } from "@dragons/db";
 import { eq, inArray } from "drizzle-orm";
 
-import { staffKey, type PlannedStaffRow } from "./mappers";
-
-function env(name: "DATABASE_URL"): string {
-  const value = process.env[name];
-  if (value === undefined || value === "") throw new Error(`${name} is not set`);
-  return value;
-}
+import { requireEnv } from "./env";
+import { staffKey, type ExistingStaff, type PlannedStaffRow } from "./mappers";
 
 export function openHub(): ReturnType<typeof createDb> {
-  return createDb(env("DATABASE_URL"));
+  return createDb(requireEnv("DATABASE_URL"));
 }
 
 /** `teams.apiTeamPermanentId` → the team entry id of the active season. */
@@ -35,18 +32,40 @@ export async function activeSeasonEntries(db: Database): Promise<Map<number, num
   return new Map(rows.map((row) => [row.permanentId, row.entryId]));
 }
 
-/** The idempotency keys already held for the entries the import plans to touch. */
-export async function existingStaffKeys(db: Database, entryIds: number[]): Promise<Set<string>> {
-  if (entryIds.length === 0) return new Set();
-  const rows = await db
+/** The staff rows already held for the entries the import plans to touch. */
+export async function existingStaff(db: Database, entryIds: number[]): Promise<ExistingStaff[]> {
+  if (entryIds.length === 0) return [];
+  return db
     .select({
+      id: teamStaff.id,
       teamEntryId: teamStaff.teamEntryId,
       firstName: teamStaff.firstName,
       lastName: teamStaff.lastName,
+      photoFilename: teamStaff.photoFilename,
     })
     .from(teamStaff)
     .where(inArray(teamStaff.teamEntryId, entryIds));
-  return new Set(rows.map(staffKey));
+}
+
+/** The idempotency keys already held for the entries the import plans to touch. */
+export async function existingStaffKeys(db: Database, entryIds: number[]): Promise<Set<string>> {
+  return new Set((await existingStaff(db, entryIds)).map(staffKey));
+}
+
+/**
+ * Point a staff row at the portrait object the `--portraits` pass stored.
+ * Throws when the row is gone: the object is already in the bucket by then,
+ * and a silent no-op would leave it orphaned without a word in the run log.
+ */
+export async function setStaffPortrait(db: Database, staffId: number, filename: string): Promise<void> {
+  const updated = await db
+    .update(teamStaff)
+    .set({ photoFilename: filename, updatedAt: new Date() })
+    .where(eq(teamStaff.id, staffId))
+    .returning({ id: teamStaff.id });
+  if (updated.length === 0) {
+    throw new Error(`import-staff: staff ${staffId} vanished before its portrait ${filename} was recorded`);
+  }
 }
 
 export async function insertStaff(db: Database, rows: PlannedStaffRow[]): Promise<number> {
