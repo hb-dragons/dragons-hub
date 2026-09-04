@@ -54,7 +54,11 @@ export async function setUserRefereeLink(
  * - `grantCoachRole` only ever *adds* the role, and only when linking. Roles are
  *   a comma-joined string on `user.role`; unlinking touches none of them, so a
  *   coach who stops being staff keeps whatever access an admin gave them until
- *   an admin takes it away.
+ *   an admin takes it away. The write goes straight to the column rather than
+ *   through better-auth's admin `setRole`, so a session whose cookie cache
+ *   already holds the old role keeps it for up to the 5 minutes
+ *   `config/auth.ts` sets — the grant is for someone else's account in
+ *   practice, and it heals on the next session refresh.
  */
 export async function setUserStaffLink(
   userId: string,

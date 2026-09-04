@@ -58,7 +58,7 @@ describe("user request bodies satisfy @dragons/contracts schemas", () => {
       parsed.error?.issues,
       "userStaffLinkBodySchema rejected the link body",
     ).toBeUndefined();
-    expect(new URL(calls[0]!.url).pathname).toBe("/admin/users/user-123/link-staff");
+    expect(new URL(calls[0]!.url).pathname).toBe("/admin/users/user-123/staff-link");
     expect(calls[0]!.method).toBe("PATCH");
   });
 
@@ -70,7 +70,7 @@ describe("user request bodies satisfy @dragons/contracts schemas", () => {
       parsed.error?.issues,
       "userStaffLinkBodySchema rejected the unlink body",
     ).toBeUndefined();
-    expect(new URL(calls[0]!.url).pathname).toBe("/admin/users/user-123/link-staff");
+    expect(new URL(calls[0]!.url).pathname).toBe("/admin/users/user-123/staff-link");
     expect(calls[0]!.method).toBe("PATCH");
   });
 });

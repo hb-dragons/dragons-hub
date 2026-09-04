@@ -680,7 +680,7 @@ nested under their task.
 | Method | Path | Description |
 |--------|------|-------------|
 | PATCH | `/admin/users/:id/referee-link` | Link or unlink a referee record from a user account |
-| PATCH | `/admin/users/:id/link-staff` | Link or unlink a staff record from a user account; `grantCoachRole` also grants the `coach` role |
+| PATCH | `/admin/users/:id/staff-link` | Link or unlink a staff record from a user account; `grantCoachRole` also grants the `coach` role |
 
 User listing, role assignment and banning are served by better-auth's admin
 plugin under `/api/auth/*`, not by this route group.

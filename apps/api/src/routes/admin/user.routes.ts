@@ -37,7 +37,7 @@ userRoutes.patch(
 );
 
 userRoutes.patch(
-  "/users/:id/link-staff",
+  "/users/:id/staff-link",
   requireAnyRole("admin"),
   validator("param", userIdParamSchema, validationHook),
   validator("json", userStaffLinkBodySchema, validationHook),

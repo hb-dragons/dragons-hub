@@ -51,7 +51,7 @@ function patch(userId: string, body: unknown) {
 }
 
 function patchStaff(userId: string, body: unknown) {
-  return request(`/users/${userId}/link-staff`, body);
+  return request(`/users/${userId}/staff-link`, body);
 }
 
 beforeEach(() => {
@@ -110,7 +110,7 @@ describe("PATCH /users/:id/referee-link", () => {
   });
 });
 
-describe("PATCH /users/:id/link-staff", () => {
+describe("PATCH /users/:id/staff-link", () => {
   it("links a staff record and passes the grant flag through", async () => {
     mocks.setUserStaffLink.mockResolvedValue({ id: "user-1", staffId: 7, role: "coach" });
 

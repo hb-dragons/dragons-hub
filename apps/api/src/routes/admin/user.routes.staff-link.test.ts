@@ -74,7 +74,7 @@ afterAll(async () => {
 });
 
 function linkStaff(userId: string, body: unknown) {
-  return app.request(`/users/${userId}/link-staff`, {
+  return app.request(`/users/${userId}/staff-link`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -127,7 +127,7 @@ async function userRow(id: string) {
   return row;
 }
 
-describe("PATCH /admin/users/:id/link-staff over HTTP", () => {
+describe("PATCH /admin/users/:id/staff-link over HTTP", () => {
   it("grants the coach role only when the flag is set", async () => {
     await seedUser("u1");
     await seedUser("u2");

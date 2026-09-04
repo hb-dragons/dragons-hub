@@ -33,7 +33,7 @@ export function userEndpoints(client: ApiClient) {
       return client.patch(`/admin/users/${id}/referee-link`, body);
     },
     linkStaff(id: string, body: UserStaffLinkBody): Promise<UserStaffLinkResult> {
-      return client.patch(`/admin/users/${id}/link-staff`, body);
+      return client.patch(`/admin/users/${id}/staff-link`, body);
     },
   };
 }
