@@ -510,6 +510,14 @@ module "worker" {
       secret_name = "google-generative-ai-api-key-production"
       version     = "latest"
     }
+    # This is the service that runs the event worker, so it is the one that
+    # sends the `webhook` channel's sync-completed dispatch. Without the token
+    # every one of those was a logged skip and the site only ever rebuilt from
+    # the daily cron (issue #326).
+    GH_DISPATCH_TOKEN = {
+      secret_name = "gh-dispatch-token-production"
+      version     = "latest"
+    }
     }, local.expo_access_token_enabled ? {
     EXPO_ACCESS_TOKEN = {
       secret_name = "expo-access-token-production"
@@ -520,7 +528,15 @@ module "worker" {
   cloudsql_instances = [module.database.connection_name]
   ingress            = "INGRESS_TRAFFIC_ALL"
 
-  depends_on = [module.secrets, google_project_service.apis]
+  # The worker runs under the API's service account, so the accessor grant on
+  # the dispatch token covers it; only the version has to exist before the
+  # first apply can mount it.
+  depends_on = [
+    module.secrets,
+    google_project_service.apis,
+    google_secret_manager_secret_version.gh_dispatch_token_placeholder,
+    google_secret_manager_secret_iam_member.gh_dispatch_token_api_access,
+  ]
 }
 
 # Cloud Run - Web
