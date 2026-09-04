@@ -4,6 +4,9 @@ import { seoFields } from "../fields/seo";
 import { dispatchOnDelete, dispatchOnPublish } from "../hooks/dispatch-rebuild";
 import { publishedOrAuthed } from "../lib/access";
 
+// Coaches and the league are deliberately absent: the Hub owns club staff
+// (`team_staff`, ADR-0008) and the league comes from the sync data, so the site
+// joins both on apiTeamPermanentId instead of reading a CMS copy (issue #316).
 export const Teams: CollectionConfig = {
   slug: "teams",
   versions: { drafts: true },
@@ -24,12 +27,6 @@ export const Teams: CollectionConfig = {
       unique: true,
       admin: { description: "Join-Key zu /public/teams (Sync-Daten)" },
     },
-    // Strapi team.leagueName / team.leagueId. Text, not number: leagueId
-    // identifies the *league* on basketball-bund.net, not the team — it is not
-    // interchangeable with apiTeamPermanentId above.
-    { name: "leagueName", type: "text" },
-    { name: "leagueId", type: "text" },
-    { name: "trainers", type: "relationship", relationTo: "trainers", hasMany: true },
     {
       name: "trainingTimes",
       type: "array",
