@@ -111,56 +111,56 @@ describe("PATCH /users/:id/referee-link", () => {
 });
 
 describe("PATCH /users/:id/staff-link", () => {
-  it("links a staff record and passes the grant flag through", async () => {
-    mocks.setUserStaffLink.mockResolvedValue({ id: "user-1", staffId: 7, role: "coach" });
+  it("links a staff person and passes the grant flag through", async () => {
+    mocks.setUserStaffLink.mockResolvedValue({ id: "user-1", personId: 7, role: "coach" });
 
-    const res = await patchStaff("user-1", { staffId: 7, grantCoachRole: true });
+    const res = await patchStaff("user-1", { personId: 7, grantCoachRole: true });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ id: "user-1", staffId: 7, role: "coach" });
+    expect(await res.json()).toEqual({ id: "user-1", personId: 7, role: "coach" });
     expect(mocks.setUserStaffLink).toHaveBeenCalledWith("user-1", 7, true);
   });
 
   it("defaults an omitted grant flag to false", async () => {
-    mocks.setUserStaffLink.mockResolvedValue({ id: "user-1", staffId: 7, role: null });
+    mocks.setUserStaffLink.mockResolvedValue({ id: "user-1", personId: 7, role: null });
 
-    const res = await patchStaff("user-1", { staffId: 7 });
+    const res = await patchStaff("user-1", { personId: 7 });
 
     expect(res.status).toBe(200);
     expect(mocks.setUserStaffLink).toHaveBeenCalledWith("user-1", 7, false);
   });
 
-  it("unlinks a staff record from a user", async () => {
+  it("unlinks a staff person from a user", async () => {
     mocks.setUserStaffLink.mockResolvedValue({
       id: "user-1",
-      staffId: null,
+      personId: null,
       role: "coach",
     });
 
-    const res = await patchStaff("user-1", { staffId: null });
+    const res = await patchStaff("user-1", { personId: null });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ id: "user-1", staffId: null, role: "coach" });
+    expect(await res.json()).toEqual({ id: "user-1", personId: null, role: "coach" });
     expect(mocks.setUserStaffLink).toHaveBeenCalledWith("user-1", null, false);
   });
 
-  it("returns 404 with the STAFF_NOT_FOUND code when the staff record does not exist", async () => {
+  it("returns 404 with the STAFF_NOT_FOUND code when the staff person does not exist", async () => {
     mocks.setUserStaffLink.mockRejectedValue(
       new UserAdminError("Staff member not found", "STAFF_NOT_FOUND"),
     );
 
-    const res = await patchStaff("user-1", { staffId: 4242 });
+    const res = await patchStaff("user-1", { personId: 4242 });
 
     expect(res.status).toBe(404);
     expect(await res.json()).toMatchObject({ code: "STAFF_NOT_FOUND" });
   });
 
-  it("returns 409 when the staff record is already linked to another account", async () => {
+  it("returns 409 when the staff person is already linked to another account", async () => {
     mocks.setUserStaffLink.mockRejectedValue(
       new UserAdminError("Staff member is already linked", "STAFF_ALREADY_LINKED"),
     );
 
-    const res = await patchStaff("user-1", { staffId: 7 });
+    const res = await patchStaff("user-1", { personId: 7 });
 
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ code: "STAFF_ALREADY_LINKED" });
@@ -171,14 +171,14 @@ describe("PATCH /users/:id/staff-link", () => {
       new UserAdminError("User not found", "USER_NOT_FOUND"),
     );
 
-    const res = await patchStaff("nonexistent", { staffId: null });
+    const res = await patchStaff("nonexistent", { personId: null });
 
     expect(res.status).toBe(404);
     expect(await res.json()).toMatchObject({ code: "USER_NOT_FOUND" });
   });
 
   it("rejects an unknown key with 400 without calling the service", async () => {
-    const res = await patchStaff("user-1", { staffId: 7, role: "coach" });
+    const res = await patchStaff("user-1", { personId: 7, role: "coach" });
 
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ code: "VALIDATION_ERROR" });

@@ -151,6 +151,16 @@ export {
   type TeamStaffCreateBody,
   type TeamStaffUpdateBody,
 } from "./team-staff";
+export {
+  staffPersonIdParamSchema,
+  staffPersonCreateBodySchema,
+  staffPersonUpdateBodySchema,
+  staffPersonListQuerySchema,
+  type StaffPersonIdParam,
+  type StaffPersonCreateBody,
+  type StaffPersonUpdateBody,
+  type StaffPersonListQuery,
+} from "./staff-people";
 
 export {
   venueSearchQuerySchema,

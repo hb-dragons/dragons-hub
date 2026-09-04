@@ -1,5 +1,5 @@
 import { asc, eq, and, inArray } from "drizzle-orm";
-import { teams, teamEntries, teamStaff, type Team } from "@dragons/db/schema";
+import { teams, teamEntries, teamStaff, staffPeople, type Team } from "@dragons/db/schema";
 import type { PublicTeamStaff } from "@dragons/shared";
 import { getDb } from "../../config/database";
 import { withActiveSeason } from "../season-scope";
@@ -28,9 +28,11 @@ export type PublicTeam = Team & {
 const ROLE_RANK: Record<PublicTeamStaff["role"], number> = { trainer: 0, co_trainer: 1 };
 
 /**
- * Staff of the given entries, grouped by entry id. Selects the five public
- * columns by name: phone and email are not merely dropped downstream, they are
- * never read, so no later spread can leak them onto a public page.
+ * Staff of the given entries, grouped by entry id. Selects the public columns
+ * by name: phone and email are not merely dropped downstream, they are never
+ * read, so no later spread can leak them onto a public page. The name, licence
+ * and portrait come from the person (ADR 0009), so a coach on two teams shows
+ * the same photo on both pages.
  */
 async function staffByEntry(entryIds: number[]): Promise<Map<number, PublicTeamStaff[]>> {
   const grouped = new Map<number, PublicTeamStaff[]>(entryIds.map((id) => [id, []]));
@@ -40,13 +42,15 @@ async function staffByEntry(entryIds: number[]): Promise<Map<number, PublicTeamS
     .select({
       id: teamStaff.id,
       teamEntryId: teamStaff.teamEntryId,
-      firstName: teamStaff.firstName,
-      lastName: teamStaff.lastName,
+      personId: teamStaff.personId,
+      firstName: staffPeople.firstName,
+      lastName: staffPeople.lastName,
       role: teamStaff.role,
-      licence: teamStaff.licence,
-      photoFilename: teamStaff.photoFilename,
+      licence: staffPeople.licence,
+      photoFilename: staffPeople.photoFilename,
     })
     .from(teamStaff)
+    .innerJoin(staffPeople, eq(teamStaff.personId, staffPeople.id))
     .where(inArray(teamStaff.teamEntryId, entryIds));
 
   for (const { teamEntryId, photoFilename, ...member } of rows) {

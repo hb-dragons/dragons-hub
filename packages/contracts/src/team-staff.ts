@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { TEAM_STAFF_ROLES } from "@dragons/shared";
 import { idParamSchema } from "./common";
+import { staffPersonCreateBodySchema } from "./staff-people";
 
-/** `/admin/teams/:id/staff/:staffId` — the entry id plus the staff row it addresses. */
+/** `/admin/teams/:id/staff/:staffId` — the entry id plus the assignment it addresses. */
 export const teamStaffParamSchema = idParamSchema.extend({
   staffId: z.coerce.number().int().positive(),
 });
@@ -10,40 +11,37 @@ export const teamStaffParamSchema = idParamSchema.extend({
 /** Derived from the shared array, never restated — the value set is decided once. */
 const teamStaffRoleSchema = z.enum(TEAM_STAFF_ROLES);
 
-/**
- * An optional, nullable contact field. The editor sends a cleared input as `""`
- * rather than dropping the key, so an empty string means "clear it" — without
- * this the email validator would reject a cleared email field outright.
- */
-function contactField(schema: z.ZodType<string>) {
-  return z
-    .preprocess((v) => (typeof v === "string" && v.trim() === "" ? null : v), schema.nullable())
-    .optional();
-}
-
-const nameSchema = z.string().trim().min(1).max(100);
-const phoneSchema = z.string().trim().max(50);
-const emailSchema = z.email().max(255);
-const licenceSchema = z.string().trim().max(100);
-
-export const teamStaffCreateBodySchema = z.strictObject({
-  firstName: nameSchema,
-  lastName: nameSchema,
+/** The two fields the assignment itself owns, shared by both create shapes. */
+const assignmentFields = {
   role: teamStaffRoleSchema,
-  phone: contactField(phoneSchema),
-  email: contactField(emailSchema),
-  licence: contactField(licenceSchema),
   refereeContact: z.boolean().optional(),
-});
+};
+
+/**
+ * Attaching a person to a team entry (ADR 0009): either a person the club
+ * already knows, or a new one filled in during the same step. A union rather
+ * than one object with two optional keys, so "both" and "neither" are rejected
+ * by the shape itself and the server narrows on the key instead of asserting.
+ *
+ * The contact data of an *existing* person is deliberately not writable here —
+ * it belongs to the person and is edited through `/admin/staff-people/:id`, so
+ * one team can never overwrite what another team's admin corrected.
+ */
+export const teamStaffCreateBodySchema = z.union([
+  z.strictObject({ personId: z.number().int().positive(), ...assignmentFields }),
+  z.strictObject({ person: staffPersonCreateBodySchema, ...assignmentFields }),
+]);
 
 export type TeamStaffCreateBody = z.infer<typeof teamStaffCreateBodySchema>;
 
 /**
- * The create body with every field optional: a patch that omits a key leaves it
- * alone, and `null` (or `""`) on a contact field clears it. Derived rather than
- * restated so the two bodies cannot drift apart field by field — the NOT NULL
- * columns stay non-nullable here, they are only made omissible.
+ * The assignment's own two fields. Not derived from the create body: a patch
+ * may not move an assignment to a different person — removing it and adding
+ * the other person is the operation that means that.
  */
-export const teamStaffUpdateBodySchema = teamStaffCreateBodySchema.partial();
+export const teamStaffUpdateBodySchema = z.strictObject({
+  role: teamStaffRoleSchema.optional(),
+  refereeContact: z.boolean().optional(),
+});
 
 export type TeamStaffUpdateBody = z.infer<typeof teamStaffUpdateBodySchema>;

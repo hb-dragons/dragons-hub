@@ -1,6 +1,6 @@
 import { pgTable, text, boolean, timestamp, integer, index } from "drizzle-orm/pg-core";
 import { referees } from "./referees";
-import { teamStaff } from "./team-staff";
+import { staffPeople } from "./staff-people";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -17,11 +17,12 @@ export const user = pgTable("user", {
   refereeId: integer("referee_id")
     .references(() => referees.id)
     .unique(),
-  // Same shape as `refereeId`: at most one account per staff record, any number
-  // of accounts unlinked. Deleting the staff row (a coach who left, or a season
-  // entry going away) drops the link and leaves the account and its roles alone.
-  staffId: integer("staff_id")
-    .references(() => teamStaff.id, { onDelete: "set null" })
+  // Same shape as `refereeId`: at most one account per staff person, any number
+  // of accounts unlinked. The link is to the person, not to one team's
+  // assignment, so it survives the coach changing teams (ADR 0009). Deleting
+  // the person drops the link and leaves the account and its roles alone.
+  personId: integer("person_id")
+    .references(() => staffPeople.id, { onDelete: "set null" })
     .unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

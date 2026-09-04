@@ -26,6 +26,7 @@ export const SURFACES: readonly Surface[] = [
   { id: "matches", group: "league", visible: (u) => can(u, "match", "view") },
   { id: "standings", group: "league", visible: (u) => can(u, "standing", "view") },
   { id: "teams", group: "league", visible: (u) => can(u, "team", "view") },
+  { id: "staffPeople", group: "league", visible: (u) => can(u, "team", "view") },
   { id: "boards", group: "operations", visible: (u) => can(u, "board", "view") },
   { id: "bookings", group: "operations", visible: (u) => can(u, "booking", "view") },
   { id: "venues", group: "operations", visible: (u) => can(u, "venue", "view") },

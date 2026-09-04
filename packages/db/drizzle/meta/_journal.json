@@ -365,6 +365,20 @@
       "when": 1788438251957,
       "tag": "0051_woozy_chronomancer",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1788517732755,
+      "tag": "0052_worthless_skrulls",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1788517773470,
+      "tag": "0053_minor_gamora",
+      "breakpoints": true
     }
   ]
 }

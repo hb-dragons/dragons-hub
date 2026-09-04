@@ -6,6 +6,7 @@ import {
   teams,
   teamEntries,
   teamStaff,
+  staffPeople,
 } from "@dragons/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import {
@@ -144,14 +145,15 @@ export async function getRefereeGameContacts(
   const staff: StaffRow[] = await getDb()
     .select({
       teamEntryId: teamStaff.teamEntryId,
-      firstName: teamStaff.firstName,
-      lastName: teamStaff.lastName,
+      firstName: staffPeople.firstName,
+      lastName: staffPeople.lastName,
       role: teamStaff.role,
-      phone: teamStaff.phone,
-      email: teamStaff.email,
+      phone: staffPeople.phone,
+      email: staffPeople.email,
       refereeContact: teamStaff.refereeContact,
     })
     .from(teamStaff)
+    .innerJoin(staffPeople, eq(teamStaff.personId, staffPeople.id))
     .where(
       inArray(
         teamStaff.teamEntryId,

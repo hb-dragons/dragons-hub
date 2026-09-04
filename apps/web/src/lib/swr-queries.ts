@@ -77,6 +77,10 @@ export function makeQueries(api: Api) {
       key: SWR_KEYS.teams(seasonId),
       fetcher: () => api.teams.list(seasonId === undefined ? undefined : { seasonId }),
     }),
+    staffPeople: (search = "") => ({
+      key: SWR_KEYS.staffPeople(search),
+      fetcher: () => api.staffPeople.list(search || undefined),
+    }),
     teamStaff: (entryId: number) => ({
       key: SWR_KEYS.teamStaff(entryId),
       fetcher: () => api.teamStaff.list(entryId),

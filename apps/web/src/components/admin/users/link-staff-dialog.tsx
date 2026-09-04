@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl"
 import useSWR from "swr"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
+import { queries } from "@/lib/swr-queries"
 
 import { Button } from "@dragons/ui/components/button"
 import { Checkbox } from "@dragons/ui/components/checkbox"
@@ -16,9 +17,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@dragons/ui/components/dialog"
+import { Input } from "@dragons/ui/components/input"
 
 import type { UserListItem } from "./types"
-import type { OwnClubTeam, TeamStaffMember } from "@dragons/shared"
+import type { StaffPersonWithAssignments } from "@dragons/shared"
 
 interface LinkStaffDialogProps {
   user: UserListItem | null
@@ -28,13 +30,13 @@ interface LinkStaffDialogProps {
 }
 
 /**
- * Links a user account to a `team_staff` record, optionally granting the
- * read-only `coach` role in the same request.
+ * Links a user account to a staff person, optionally granting the read-only
+ * `coach` role in the same request.
  *
- * Staff belong to a team entry and have no cross-team listing endpoint, so the
- * picker is a team list feeding the per-entry staff list, rather than the flat
- * search the referee dialog uses. Picking the team first also keeps two coaches
- * with the same name apart.
+ * The link is to the person, not to one team's assignment (ADR 0009), so this
+ * is the flat search the referee dialog uses rather than a team-then-member
+ * drill-down. Each row lists the person's teams this season, which is what
+ * tells two coaches of the same name apart.
  */
 export function LinkStaffDialog({
   user,
@@ -43,42 +45,29 @@ export function LinkStaffDialog({
   onLinked,
 }: LinkStaffDialogProps) {
   const t = useTranslations()
-  const [teamId, setTeamId] = useState<number | null>(null)
-  const [selected, setSelected] = useState<TeamStaffMember | null>(null)
+  const [search, setSearch] = useState("")
+  const [selected, setSelected] = useState<StaffPersonWithAssignments | null>(null)
   const [grantCoachRole, setGrantCoachRole] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
-  const { data: teams, isLoading: teamsLoading } = useSWR<OwnClubTeam[]>(
-    open ? "link-staff-teams" : null,
-    () => api.teams.list(),
-  )
-  // The entry id is read back off the SWR key, not off the state, so the
-  // fetcher can never be typed around a `teamId` that is still null — and the
-  // id sent is the team *entry* id (`OwnClubTeam.id`), which is what the staff
-  // endpoints are scoped by, not the season-stable squad id.
-  const { data: staff, isLoading: staffLoading } = useSWR<TeamStaffMember[]>(
-    open && teamId !== null ? (["link-staff-members", teamId] as const) : null,
-    ([, entryId]: readonly [string, number]) => api.teamStaff.list(entryId),
-  )
+  // The pool's shared SWR key, so an edit made on the staff page revalidates
+  // this list too rather than leaving a second, stale cache entry behind.
+  const poolQ = queries.staffPeople(search)
+  const { data: people, isLoading } = useSWR(open ? poolQ.key : null, poolQ.fetcher)
 
   useEffect(() => {
     if (!open) {
-      setTeamId(null)
+      setSearch("")
       setSelected(null)
       setGrantCoachRole(true)
     }
   }, [open])
 
-  function selectTeam(id: number) {
-    setTeamId(id)
-    setSelected(null)
-  }
-
   async function handleLink() {
     if (!user || !selected) return
     setSubmitting(true)
     try {
-      await api.users.linkStaff(user.id, { staffId: selected.id, grantCoachRole })
+      await api.users.linkStaff(user.id, { personId: selected.id, grantCoachRole })
       toast.success(t("users.toast.staffLinked"))
       onOpenChange(false)
       onLinked()
@@ -99,64 +88,43 @@ export function LinkStaffDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <div>
-            <p className="mb-1 text-sm font-medium">
-              {t("users.linkStaffDialog.teamLabel")}
-            </p>
-            <div className="max-h-40 overflow-y-auto rounded-md border">
-              {teamsLoading && (
-                <p className="p-3 text-sm text-muted-foreground">
-                  {t("common.loading")}
-                </p>
-              )}
-              {teams?.map((team) => (
-                <button
-                  key={team.id}
-                  type="button"
-                  aria-pressed={teamId === team.id}
-                  className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-accent ${
-                    teamId === team.id ? "bg-accent" : ""
-                  }`}
-                  onClick={() => selectTeam(team.id)}
-                >
-                  {team.customName ?? team.name}
-                </button>
-              ))}
-            </div>
-          </div>
+          <Input
+            placeholder={t("users.linkStaffDialog.searchPlaceholder")}
+            aria-label={t("users.linkStaffDialog.searchPlaceholder")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
 
-          {teamId !== null && (
-            <div className="max-h-48 overflow-y-auto rounded-md border">
-              {staffLoading && (
-                <p className="p-3 text-sm text-muted-foreground">
-                  {t("common.loading")}
-                </p>
-              )}
-              {staff?.length === 0 && !staffLoading && (
-                <p className="p-3 text-sm text-muted-foreground">
-                  {t("users.linkStaffDialog.noResults")}
-                </p>
-              )}
-              {staff?.map((member) => (
-                <button
-                  key={member.id}
-                  type="button"
-                  aria-pressed={selected?.id === member.id}
-                  className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-accent ${
-                    selected?.id === member.id ? "bg-accent" : ""
-                  }`}
-                  onClick={() => setSelected(member)}
-                >
-                  <span className="font-medium">
-                    {member.lastName}, {member.firstName}
-                  </span>
-                  <span className="ml-2 text-muted-foreground">
-                    {t(`teams.staff.roles.${member.role}`)}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="max-h-56 space-y-1 overflow-y-auto rounded-md bg-surface-low p-1">
+            {isLoading && (
+              <p className="p-3 text-sm text-muted-foreground">{t("common.loading")}</p>
+            )}
+            {people?.length === 0 && !isLoading && (
+              <p className="p-3 text-sm text-muted-foreground">
+                {t("users.linkStaffDialog.noResults")}
+              </p>
+            )}
+            {people?.map((person) => (
+              <button
+                key={person.id}
+                type="button"
+                aria-pressed={selected?.id === person.id}
+                className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-accent ${
+                  selected?.id === person.id ? "bg-accent" : ""
+                }`}
+                onClick={() => setSelected(person)}
+              >
+                <span className="font-medium">
+                  {person.lastName}, {person.firstName}
+                </span>
+                <span className="ml-2 text-muted-foreground">
+                  {person.assignments.length === 0
+                    ? t("users.linkStaffDialog.noTeams")
+                    : person.assignments.map((a) => a.teamName).join(", ")}
+                </span>
+              </button>
+            ))}
+          </div>
 
           <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent">
             <Checkbox

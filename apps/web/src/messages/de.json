@@ -29,7 +29,8 @@
     "domainEvents": "Events",
     "pushTest": "Push-Test",
     "groupSystem": "System",
-    "broadcast": "Übertragung"
+    "broadcast": "Übertragung",
+    "staffPeople": "Staff"
   },
   "dashboard": {
     "title": "Kommandozentrale",
@@ -634,7 +635,13 @@
       "roles": {
         "trainer": "Trainer",
         "co_trainer": "Co-Trainer"
-      }
+      },
+      "noContactData": "Keine Kontaktdaten hinterlegt.",
+      "editPerson": "Person {name} bearbeiten",
+      "newPerson": "Neue Person",
+      "pickExisting": "Vorhandene Person",
+      "contactHint": "Telefon, E-Mail und Lizenz werden bei der Person gepflegt.",
+      "noCandidates": "Keine passende Person gefunden."
     }
   },
   "users": {
@@ -743,12 +750,13 @@
     },
     "linkStaffDialog": {
       "title": "Staff verknüpfen",
-      "description": "Wählen Sie einen Staff-Eintrag für {name}",
-      "teamLabel": "Team",
-      "noResults": "Für dieses Team ist kein Staff hinterlegt",
+      "description": "Wählen Sie eine Person für {name}",
+      "noResults": "Keine Person gefunden",
       "grantCoachRole": "Rolle Coach vergeben",
       "linking": "Verknüpfe...",
-      "link": "Verknüpfen"
+      "link": "Verknüpfen",
+      "searchPlaceholder": "Name suchen",
+      "noTeams": "Keinem Team zugeordnet"
     },
     "toast": {
       "created": "Benutzer erfolgreich erstellt",
@@ -1798,5 +1806,21 @@
     "uploadImageAria": "Bild hochladen",
     "deleteImageTitle": "Bild löschen?",
     "deleteImageDescription": "„{name}“ wird dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+  },
+  "staffPeople": {
+    "title": "Staff",
+    "subtitle": "Alle Personen, zu denen der Verein Staff-Daten hält, mit ihren Teams in dieser Saison.",
+    "searchPlaceholder": "Name suchen",
+    "add": "Person anlegen",
+    "empty": "Es sind noch keine Personen hinterlegt.",
+    "noTeams": "Keinem Team zugeordnet",
+    "createTitle": "Person anlegen",
+    "editTitle": "Person bearbeiten",
+    "dialogSubtitle": "Diese Daten gelten für alle Teams, die diese Person betreut.",
+    "editPerson": "Person {name} bearbeiten",
+    "deletePerson": "Person {name} löschen",
+    "deleteBlocked": "Person konnte nicht gelöscht werden — sie ist noch einem Team zugeordnet.",
+    "saveFailed": "Person konnte nicht gespeichert werden.",
+    "deleteFailed": "Person konnte nicht gelöscht werden."
   }
 }

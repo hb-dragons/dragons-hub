@@ -2,6 +2,10 @@ import type { TeamStaffMember } from "@dragons/shared";
 import type { TeamStaffCreateBody, TeamStaffUpdateBody } from "@dragons/contracts";
 import type { ApiClient } from "../client";
 
+/**
+ * The assignments of one team entry. The people themselves — including their
+ * portraits — are `staffPeopleEndpoints` (ADR 0009).
+ */
 export function teamStaffEndpoints(client: ApiClient) {
   return {
     list(entryId: number): Promise<TeamStaffMember[]> {
@@ -19,16 +23,6 @@ export function teamStaffEndpoints(client: ApiClient) {
     },
     remove(entryId: number, staffId: number): Promise<{ success: boolean }> {
       return client.delete(`/admin/teams/${entryId}/staff/${staffId}`);
-    },
-    /**
-     * Uploads or replaces a portrait. Multipart, so there is no zod request
-     * body to share — the API validates the bytes themselves and answers with
-     * the updated member, whose `photoUrl` points at the new object.
-     */
-    uploadPhoto(entryId: number, staffId: number, file: File): Promise<TeamStaffMember> {
-      const form = new FormData();
-      form.set("file", file);
-      return client.postForm(`/admin/teams/${entryId}/staff/${staffId}/photo`, form);
     },
   };
 }

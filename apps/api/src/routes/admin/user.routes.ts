@@ -42,21 +42,21 @@ userRoutes.patch(
   validator("param", userIdParamSchema, validationHook),
   validator("json", userStaffLinkBodySchema, validationHook),
   describeRoute({
-    description: "Link or unlink a staff record from a user account",
+    description: "Link or unlink a staff person from a user account",
     tags: ["Users"],
     responses: {
       200: { description: "Success" },
       400: { description: "Invalid body" },
-      404: { description: "Staff member or user not found" },
-      409: { description: "Staff member already linked to another account" },
+      404: { description: "Staff person or user not found" },
+      409: { description: "Staff person already linked to another account" },
     },
   }),
   async (c) => {
     const { id } = c.req.valid("param");
-    const { staffId, grantCoachRole } = c.req.valid("json");
+    const { personId, grantCoachRole } = c.req.valid("json");
     // An omitted flag grants nothing: the dialog defaults the checkbox on and
     // sends it either way, so the API's own default stays the conservative one.
-    return c.json(await setUserStaffLink(id, staffId, grantCoachRole ?? false));
+    return c.json(await setUserStaffLink(id, personId, grantCoachRole ?? false));
   },
 );
 
