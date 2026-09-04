@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { View, Text, Pressable, ActivityIndicator, Alert } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  ActivityIndicator,
+  Alert,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import { mutate as globalMutate } from "swr";
 import { APIError } from "@dragons/api-client";
 import type { RefereeGameListItem } from "@dragons/shared";
@@ -14,6 +22,17 @@ interface ClaimGameButtonProps {
   revalidateKeys?: string[];
   /** Callback after a successful claim or drop, fired before the success alert. */
   onChanged?: () => void | Promise<void>;
+  /**
+   * Render only one of the two actions. The Einsatz screen keeps "übernehmen"
+   * next to the slots and pushes "abgeben" to the foot of the page, so the
+   * destructive one is not the first thing a thumb lands on.
+   */
+  action?: "take" | "drop";
+  /**
+   * Applied to the rendered button only. A wrapper `View` in the caller keeps
+   * its margins when the button decides to render nothing; this does not.
+   */
+  style?: StyleProp<ViewStyle>;
 }
 
 function slotLabelKey(slotNumber: 1 | 2): "refereeGame.takeSr1" | "refereeGame.takeSr2" {
@@ -59,6 +78,8 @@ export function ClaimGameButton({
   game,
   revalidateKeys,
   onChanged,
+  action,
+  style,
 }: ClaimGameButtonProps) {
   const { colors, textStyles, spacing, radius } = useTheme();
   const [busy, setBusy] = useState<1 | 2 | "drop" | null>(null);
@@ -135,6 +156,7 @@ export function ClaimGameButton({
   }
 
   if (isAssigned) {
+    if (action === "take") return null;
     if (game.isCancelled || game.isForfeited) return null;
 
     const isBusy = busy === "drop";
@@ -145,6 +167,7 @@ export function ClaimGameButton({
         onPress={confirmDrop}
         disabled={disabled}
         style={({ pressed }) => [
+          style,
           {
             backgroundColor: "transparent",
             borderRadius: radius.md,
@@ -168,6 +191,7 @@ export function ClaimGameButton({
     );
   }
 
+  if (action === "drop") return null;
   if (game.isCancelled || game.isForfeited) return null;
 
   const candidateSlots = openOurClubSlots(game);
@@ -215,12 +239,16 @@ export function ClaimGameButton({
 
   if (candidateSlots.length > 1) {
     return (
-      <View style={{ flexDirection: "row", gap: spacing.sm }}>
+      <View style={[style, { flexDirection: "row", gap: spacing.sm }]}>
         <SlotButton slotNumber={1} />
         <SlotButton slotNumber={2} />
       </View>
     );
   }
 
-  return <SlotButton slotNumber={candidateSlots[0]!} />;
+  return (
+    <View style={style}>
+      <SlotButton slotNumber={candidateSlots[0]!} />
+    </View>
+  );
 }

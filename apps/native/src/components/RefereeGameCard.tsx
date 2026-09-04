@@ -3,6 +3,7 @@ import type { RefereeGameListItem } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
 import { kickoffCompact } from "../lib/format/kickoff";
+import { refereeGameTeamNames } from "../lib/referee/einsatz";
 import { fontFamilies } from "../theme/typography";
 
 interface RefereeGameCardProps {
@@ -191,6 +192,7 @@ export function RefereeGameCard({
   onAdminUnassign,
 }: RefereeGameCardProps) {
   const { colors, radius, spacing, isDark } = useTheme();
+  const teamNames = refereeGameTeamNames(game);
 
   const isAssignedToMe = game.mySlot !== null;
 
@@ -249,7 +251,7 @@ export function RefereeGameCard({
           }}
           numberOfLines={1}
         >
-          {game.homeTeamName}
+          {teamNames.home}
         </Text>
         <Text
           style={{
@@ -271,7 +273,7 @@ export function RefereeGameCard({
           }}
           numberOfLines={1}
         >
-          {game.guestTeamName}
+          {teamNames.guest}
         </Text>
       </View>
 

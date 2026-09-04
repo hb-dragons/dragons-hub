@@ -1,7 +1,7 @@
 import { View, Text, ActivityIndicator, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import useSWR from "swr";
-import { getNativeTeamColor, isReferee } from "@dragons/shared";
+import { getNativeTeamColor } from "@dragons/shared";
 import { APIError } from "@dragons/api-client";
 import { useTheme } from "@/hooks/useTheme";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
@@ -10,10 +10,8 @@ import { Badge } from "@/components/Badge";
 import { QuarterTable } from "@/components/QuarterTable";
 import { HeadToHead } from "@/components/HeadToHead";
 import { FormStrip } from "@/components/FormStrip";
-import { ClaimGameButton } from "@/components/ClaimGameButton";
 import { ClubLogo } from "@/components/brand/ClubLogo";
-import { authClient } from "@/lib/auth-client";
-import { publicApi, refereeApi } from "@/lib/api";
+import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { kickoffCompact } from "@/lib/format/kickoff";
 import { fontFamilies } from "@/theme/typography";
@@ -38,17 +36,6 @@ export default function GameDetailScreen() {
   const { data: context, mutate: mutateContext } = useSWR(
     hasValidId && match ? `match:${id}:context` : null,
     () => publicApi.getMatchContext(numericId),
-  );
-
-  const { data: session } = authClient.useSession();
-  const sessionUserIsReferee = isReferee(
-    session?.user as { refereeId?: number | null } | undefined,
-  );
-
-  const { data: refereeGame, mutate: mutateRefereeGame } = useSWR(
-    hasValidId && sessionUserIsReferee ? `referee-match:${id}` : null,
-    () => refereeApi.getGameByMatchId(numericId),
-    { shouldRetryOnError: false },
   );
 
   const homeName = match
@@ -191,11 +178,7 @@ export default function GameDetailScreen() {
       {header}
       <Screen
         edges={UNDER_NATIVE_HEADER}
-        onRefresh={[
-          () => mutateMatch(),
-          () => mutateContext(),
-          ...(sessionUserIsReferee ? [() => mutateRefereeGame()] : []),
-        ]}
+        onRefresh={[() => mutateMatch(), () => mutateContext()]}
       >
       {/* ── 1. Score Header ── */}
         <Card
@@ -332,19 +315,6 @@ export default function GameDetailScreen() {
             ) : null}
           </View>
         </Card>
-
-        {/* ── 1b. Claim action (referees only) ── */}
-        {refereeGame ? (
-          <View style={{ marginBottom: spacing.md }}>
-            <ClaimGameButton
-              game={refereeGame}
-              revalidateKeys={["referee:games"]}
-              onChanged={async () => {
-                await mutateRefereeGame();
-              }}
-            />
-          </View>
-        ) : null}
 
         {/* ── 2. Quarter Breakdown ── */}
         <View style={{ marginBottom: spacing.md }}>

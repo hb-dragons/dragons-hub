@@ -5,6 +5,7 @@ import {
   mailtoUrl,
   mapsUrl,
   refereeGameRoute,
+  refereeGameTeamNames,
   spielinfoRoute,
   telUrl,
 } from "@/lib/referee/einsatz";
@@ -41,6 +42,10 @@ function game(overrides: Partial<RefereeGameDetail> = {}): RefereeGameDetail {
     venueName: "Sporthalle",
     venueCity: "Herzogenrath",
     homeTeamId: 1,
+    homeClubId: 1000,
+    guestClubId: 2000,
+    homeTeamCustomName: null,
+    guestTeamCustomName: null,
     sr1OurClub: true,
     sr2OurClub: false,
     sr1Name: null,
@@ -82,6 +87,17 @@ describe("refereeGameRoute", () => {
   });
 });
 
+describe("refereeGameTeamNames", () => {
+  it("prefers the club's own names and falls back to the federation's per side", () => {
+    expect(
+      refereeGameTeamNames(
+        game({ homeTeamName: "Hanover Basketball Dragons I", homeTeamCustomName: "Herren 1" }),
+      ),
+    ).toEqual({ home: "Herren 1", guest: "Gäste" });
+    expect(refereeGameTeamNames(game())).toEqual({ home: "Dragons", guest: "Gäste" });
+  });
+});
+
 describe("spielinfoRoute", () => {
   it("points at the fan match screen when a match is linked", () => {
     expect(spielinfoRoute(game({ matchId: 99 }))).toBe("/game/99");
@@ -109,6 +125,42 @@ function legacy(overrides: Partial<RefereeGameDetail> = {}): RefereeGameDetail {
 describe("einsatzView", () => {
   it("titles the screen with both teams", () => {
     expect(einsatzView(game(), "ios").title).toBe("Dragons – Gäste");
+  });
+
+  it("prefers the club's own team names in the title and header", () => {
+    const view = einsatzView(
+      game({ homeTeamName: "Hanover Basketball Dragons I", homeTeamCustomName: "Herren 1" }),
+      "ios",
+    );
+    expect(view.title).toBe("Herren 1 – Gäste");
+    expect(view.teams.home.name).toBe("Herren 1");
+    expect(view.teams.guest.name).toBe("Gäste");
+  });
+
+  it("hands the header both crests and marks the Dragons side", () => {
+    expect(einsatzView(game(), "ios").teams).toEqual({
+      home: { name: "Dragons", clubId: 1000, isOwnClub: true },
+      guest: { name: "Gäste", clubId: 2000, isOwnClub: false },
+    });
+  });
+
+  it("marks the guest side on an away game and neither on a foreign one", () => {
+    const away = einsatzView(
+      game({ isHomeGame: false, isGuestGame: true }),
+      "ios",
+    ).teams;
+    expect([away.home.isOwnClub, away.guest.isOwnClub]).toEqual([false, true]);
+
+    const foreign = einsatzView(
+      game({ isHomeGame: false, isGuestGame: false }),
+      "ios",
+    ).teams;
+    expect([foreign.home.isOwnClub, foreign.guest.isOwnClub]).toEqual([false, false]);
+  });
+
+  it("passes a missing crest through as null rather than a placeholder id", () => {
+    const { teams } = einsatzView(game({ homeClubId: null, guestClubId: null }), "ios");
+    expect([teams.home.clubId, teams.guest.clubId]).toEqual([null, null]);
   });
 
   it("lists both slots in order with their federation status", () => {

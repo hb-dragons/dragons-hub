@@ -109,8 +109,19 @@ interface EinsatzKampfgerichtLine {
   contacts: EinsatzContact[];
 }
 
+/** One side of the fixture, as the header card draws it. */
+export interface EinsatzTeam {
+  name: string;
+  /** Federation club id behind the crest; null on rows synced before the columns existed. */
+  clubId: number | null;
+  /** A Dragons team — drawn in the club colour; the opponent stays neutral. */
+  isOwnClub: boolean;
+}
+
 export interface EinsatzView {
   title: string;
+  /** Crest, name and colour for each side; the league line sits under both. */
+  teams: { home: EinsatzTeam; guest: EinsatzTeam };
   slots: [EinsatzSlot, EinsatzSlot];
   /** The fan match screen, when the referee game is linked to a synced match. */
   spielinfoRoute: RouteHref | null;
@@ -197,6 +208,24 @@ export function refereeGameRoute(game: Pick<RefereeGameListItem, "id">): RouteHr
 }
 
 /** The fan match screen for a referee game, or null when nothing is linked. */
+/**
+ * The names a referee game is shown under: the club's own ("Herren 1") where
+ * the linked match carries them, as the fan screens show them, and the
+ * federation's otherwise. One place, so the list cards and the Einsatz screen
+ * cannot disagree about what a game is called.
+ */
+export function refereeGameTeamNames(
+  game: Pick<
+    RefereeGameListItem,
+    "homeTeamName" | "guestTeamName" | "homeTeamCustomName" | "guestTeamCustomName"
+  >,
+): { home: string; guest: string } {
+  return {
+    home: game.homeTeamCustomName ?? game.homeTeamName,
+    guest: game.guestTeamCustomName ?? game.guestTeamName,
+  };
+}
+
 export function spielinfoRoute(
   game: Pick<RefereeGameListItem, "matchId">,
 ): RouteHref | null {
@@ -241,8 +270,22 @@ export function einsatzView(
   if (game.brief.venueChanged) changes.push("venueChanged");
   if (game.brief.timeChanged) changes.push("timeChanged");
 
+  const { home: homeName, guest: guestName } = refereeGameTeamNames(game);
+
   return {
-    title: `${game.homeTeamName} – ${game.guestTeamName}`,
+    title: `${homeName} – ${guestName}`,
+    teams: {
+      home: {
+        name: homeName,
+        clubId: game.homeClubId,
+        isOwnClub: game.isHomeGame,
+      },
+      guest: {
+        name: guestName,
+        clubId: game.guestClubId,
+        isOwnClub: game.isGuestGame,
+      },
+    },
     slots: [
       {
         slot: 1,

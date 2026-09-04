@@ -6,6 +6,42 @@ import { federationGameUrl } from "@dragons/shared";
 
 const isTrackedLeagueExpr = sql<boolean>`${refereeGames.matchId} IS NOT NULL`.as("is_tracked_league");
 
+/**
+ * The club-facing name of one side of the linked match: `team_entries.custom_name`
+ * for that team's entry in the match's season, the same lookup the match
+ * reader does. NULL when the game has no linked match, the team has no entry
+ * for that season, or the entry carries no custom name.
+ *
+ * A correlated subselect rather than a join, because every referee reader
+ * selects `refereeGameColumns` straight off `referee_games` and a column
+ * expression rides along without each of them growing four joins. It goes
+ * through the linked match's federation team id, not `home_team_id` /
+ * `guest_team_id`: the sync resolves those per *club*, so on a club with
+ * several teams they name the wrong one.
+ */
+function teamCustomNameExpr(
+  teamApiIdColumn: "home_team_api_id" | "guest_team_api_id",
+  alias: string,
+) {
+  // Written out rather than composed from the drizzle column objects: inside a
+  // single-table select drizzle renders `${matches.id}` as a bare `"id"`, which
+  // in this subselect would resolve against the wrong table. The outer column
+  // is qualified for the same reason — a bare `match_id` would only work for as
+  // long as no table in the subselect has one. Every referee reader selects
+  // straight `from referee_games`, never through an alias.
+  return sql<string | null>`(
+    select te.custom_name
+    from matches m
+    join leagues l on l.id = m.league_id
+    join teams t on t.api_team_permanent_id = m.${sql.raw(teamApiIdColumn)}
+    join team_entries te on te.team_id = t.id and te.season_id = l.season_ref_id
+    where m.id = referee_games.match_id
+    limit 1
+  )`.as(alias);
+}
+const homeTeamCustomNameExpr = teamCustomNameExpr("home_team_api_id", "home_team_custom_name");
+const guestTeamCustomNameExpr = teamCustomNameExpr("guest_team_api_id", "guest_team_custom_name");
+
 const refereeGameColumns = {
   id: refereeGames.id,
   apiMatchId: refereeGames.apiMatchId,
@@ -20,6 +56,10 @@ const refereeGameColumns = {
   venueName: refereeGames.venueName,
   venueCity: refereeGames.venueCity,
   homeTeamId: refereeGames.homeTeamId,
+  homeClubId: refereeGames.homeClubId,
+  guestClubId: refereeGames.guestClubId,
+  homeTeamCustomName: homeTeamCustomNameExpr,
+  guestTeamCustomName: guestTeamCustomNameExpr,
   sr1OurClub: refereeGames.sr1OurClub,
   sr2OurClub: refereeGames.sr2OurClub,
   sr1Name: refereeGames.sr1Name,
