@@ -2,6 +2,7 @@ import type { ApiClient } from "./client";
 import {
   publicEndpoints,
   deviceEndpoints,
+  meEndpoints,
   refereeEndpoints,
   refereeAdminEndpoints,
   adminBoardEndpoints,
@@ -30,6 +31,7 @@ export function createApi(client: ApiClient) {
   return {
     public: publicEndpoints(client),
     devices: deviceEndpoints(client),
+    me: meEndpoints(client),
     referees: refereeEndpoints(client),
     refereeAdmin: refereeAdminEndpoints(client),
     boards: adminBoardEndpoints(client),

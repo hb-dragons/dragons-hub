@@ -80,6 +80,11 @@ type _EveryPatchableFieldListed = keyof StaffPersonUpdateBody extends
 const _patchableFieldsAreExhaustive: _EveryPatchableFieldListed = true;
 void _patchableFieldsAreExhaustive;
 
+/** The patchable fields the public site renders. */
+const PUBLIC_FIELDS = ["firstName", "lastName", "licence"] as const satisfies readonly (
+  typeof PATCHABLE_FIELDS
+)[number][];
+
 function byName(a: { lastName: string; firstName: string }, b: typeof a): number {
   return a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
 }
@@ -169,6 +174,15 @@ export async function listStaffPeople(search?: string): Promise<StaffPersonWithA
     .sort(byName);
 }
 
+/** One person with the teams they hold this season, or `null` when they are gone. */
+export async function getStaffPersonWithAssignments(
+  id: number,
+): Promise<StaffPersonWithAssignments | null> {
+  const [row] = await getDb().select(PERSON_COLUMNS).from(staffPeople).where(eq(staffPeople.id, id));
+  if (!row) return null;
+  return { ...toPerson(row), assignments: (await assignmentsByPerson([id])).get(id) ?? [] };
+}
+
 /**
  * The insert itself, against any executor. Taking the handle lets a caller run
  * it inside its own transaction — `createTeamStaff` creates the inline person
@@ -216,8 +230,14 @@ export async function updateStaffPerson(
     .where(eq(staffPeople.id, id))
     .returning(PERSON_COLUMNS);
   if (!row) return null;
-  // The name and the licence show on the Website's team pages.
-  await dispatchSiteRebuild("staff person updated");
+  // Only the name and the licence show on the Website's team pages (#314), so
+  // only those are worth a rebuild. Phone and email never leave the Hub through
+  // the public endpoints, and a coach correcting their own number (#315) would
+  // otherwise spend a dispatch and a full site build on a page that cannot
+  // change.
+  if (PUBLIC_FIELDS.some((field) => body[field] !== undefined)) {
+    await dispatchSiteRebuild("staff person updated");
+  }
   return toPerson(row);
 }
 

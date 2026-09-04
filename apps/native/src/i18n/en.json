@@ -95,7 +95,22 @@
     "roleVenueManager": "Venue Manager",
     "roleTeamManager": "Team Manager",
     "roleCoach": "Coach",
-    "roleReferee": "Referee"
+    "roleReferee": "Referee",
+    "contact": {
+      "title": "My contact details",
+      "hint": "Referees see these details before your games.",
+      "phone": "Phone",
+      "email": "Email",
+      "licence": "Licence",
+      "notSet": "Not provided",
+      "teams": "My teams",
+      "editTitle": "Edit contact details",
+      "editHint": "The club office maintains your name, team and photo.",
+      "phonePlaceholder": "0170 1234567",
+      "emailPlaceholder": "name@example.de",
+      "licencePlaceholder": "C licence",
+      "loadFailed": "Could not load your contact details"
+    }
   },
   "legal": {
     "title": "Legal",

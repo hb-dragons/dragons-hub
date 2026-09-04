@@ -665,6 +665,14 @@ describe("site rebuild dispatch", () => {
     expect(mocks.dispatchSiteRebuild).toHaveBeenCalledTimes(2);
   });
 
+  it("fires no dispatch for a contact change the Website never renders", async () => {
+    const person = await createPerson();
+
+    await patchPerson(person.id, { phone: "+49 170 9999999", email: "ada@example.de" });
+
+    expect(mocks.dispatchSiteRebuild).not.toHaveBeenCalled();
+  });
+
   it("fires no dispatch when a mutation changes nothing", async () => {
     await patchPerson(4242, { licence: "C-Lizenz" });
     await postPhoto(4242, await pngFile());

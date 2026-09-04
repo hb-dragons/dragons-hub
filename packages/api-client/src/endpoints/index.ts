@@ -3,6 +3,10 @@ export type { MatchQueryParams, PublicTeam } from "./public";
 
 export { deviceEndpoints } from "./devices";
 
+export { meEndpoints } from "./me";
+export type { MeStaffUpdateBody } from "@dragons/contracts";
+export { STAFF_PERSON_MAX_LENGTHS } from "@dragons/contracts";
+
 export { refereeEndpoints } from "./referee";
 export type { RefereeGamesQueryParams } from "./referee";
 

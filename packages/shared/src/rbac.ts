@@ -126,6 +126,18 @@ export function isReferee<U extends { refereeId?: number | null }>(
   return typeof user?.refereeId === "number";
 }
 
+/**
+ * Whether the account is linked to a staff person (ADR 0009) — the same shape
+ * as {@link isReferee}, and the same question: does this session own a record
+ * in that half of the club. The API gates `/me/staff` on it and the app decides
+ * from it whether to draw the "Meine Kontaktdaten" section (#315).
+ */
+export function isStaff<U extends { personId?: number | null }>(
+  user: U | null | undefined,
+): user is U & { personId: number } {
+  return typeof user?.personId === "number";
+}
+
 export function canViewOpenGames(
   user:
     | { role?: string | null; refereeId?: number | null }

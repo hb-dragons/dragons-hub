@@ -50,6 +50,7 @@ export type {
   StaffPerson,
   StaffPersonAssignment,
   StaffPersonWithAssignments,
+  MyStaffProfile,
   TeamStaffRole,
 } from "./teams";
 export { TEAM_STAFF_ROLES, teamDisplayName } from "./teams";
@@ -225,6 +226,7 @@ export {
   can,
   satisfiesRole,
   isReferee,
+  isStaff,
   canViewOpenGames,
 } from "./rbac";
 export type { RoleName, Resource, Action, GateUser } from "./rbac";

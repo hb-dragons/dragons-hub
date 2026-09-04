@@ -85,6 +85,14 @@ export interface StaffPersonWithAssignments extends StaffPerson {
 }
 
 /**
+ * What a coach reads and edits about themselves through `/me/staff` (#315):
+ * their own person record plus the teams they are attached to, which they see
+ * but do not change. The portrait is deliberately absent — it is served from an
+ * admin-gated route, so a coach could not fetch the URL.
+ */
+export type MyStaffProfile = Omit<StaffPersonWithAssignments, "photoUrl">;
+
+/**
  * One staff member of a team entry, as the admin endpoints return them: the
  * assignment joined to its person, so the name and contact fields are the
  * person's and are shared by every team that member is attached to.

@@ -17,10 +17,25 @@ function contactField(schema: z.ZodType<string>) {
     .optional();
 }
 
-const nameSchema = z.string().trim().min(1).max(100);
-const phoneSchema = z.string().trim().max(50);
-const emailSchema = z.email().max(255);
-const licenceSchema = z.string().trim().max(100);
+/**
+ * How long each stored value may be, matching the column widths in
+ * `packages/db/src/schema/staff-people.ts`. Exported because a form that lets
+ * someone type past the cap only to have the request rejected is a worse
+ * experience than one that stops at it — the native contact form caps its
+ * inputs from these numbers rather than restating them (#315).
+ */
+export const STAFF_PERSON_MAX_LENGTHS = {
+  firstName: 100,
+  lastName: 100,
+  phone: 50,
+  email: 255,
+  licence: 100,
+} as const;
+
+const nameSchema = z.string().trim().min(1).max(STAFF_PERSON_MAX_LENGTHS.firstName);
+const phoneSchema = z.string().trim().max(STAFF_PERSON_MAX_LENGTHS.phone);
+const emailSchema = z.email().max(STAFF_PERSON_MAX_LENGTHS.email);
+const licenceSchema = z.string().trim().max(STAFF_PERSON_MAX_LENGTHS.licence);
 
 /**
  * The person: name plus the contact data the club holds on them (ADR 0009).

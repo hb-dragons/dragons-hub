@@ -95,7 +95,22 @@
     "roleVenueManager": "Hallenverwaltung",
     "roleTeamManager": "Team-Manager",
     "roleCoach": "Trainer",
-    "roleReferee": "Schiri"
+    "roleReferee": "Schiri",
+    "contact": {
+      "title": "Meine Kontaktdaten",
+      "hint": "Diese Daten sehen Schiedsrichter vor deinen Spielen.",
+      "phone": "Telefon",
+      "email": "E-Mail",
+      "licence": "Lizenz",
+      "notSet": "Nicht hinterlegt",
+      "teams": "Meine Teams",
+      "editTitle": "Kontaktdaten bearbeiten",
+      "editHint": "Name, Team und Foto pflegt die Geschäftsstelle.",
+      "phonePlaceholder": "0170 1234567",
+      "emailPlaceholder": "name@example.de",
+      "licencePlaceholder": "C-Lizenz",
+      "loadFailed": "Kontaktdaten konnten nicht geladen werden"
+    }
   },
   "legal": {
     "title": "Rechtliches",

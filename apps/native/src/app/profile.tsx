@@ -10,10 +10,12 @@ import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { SectionHeader } from "@/components/SectionHeader";
 import { PushSettingsRow } from "@/components/PushSettingsRow";
+import { StaffContactSection } from "@/components/StaffContactSection";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { Segmented } from "@/components/ui/Segmented";
 import { Logo } from "@/components/brand/Logo";
 import { LegalRow, LegalSection } from "@/components/LegalSection";
+import { showsStaffContact } from "@/lib/staff/my-staff";
 import { i18n } from "@/lib/i18n";
 import { appVersionLabel, buildDeletionMailto } from "@/lib/legal/links";
 import { readAppVersion } from "@/lib/legal/app-version";
@@ -165,6 +167,10 @@ export default function ProfileScreen() {
             );
           })()}
         </Card>
+
+        {/* Meine Kontaktdaten (#315) — only for an account linked to a staff
+            person, which is what the session's `personId` says. */}
+        {showsStaffContact(session) ? <StaffContactSection /> : null}
 
         {/* Notifications (#237) */}
         <View>

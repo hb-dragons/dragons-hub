@@ -156,11 +156,13 @@ export {
   staffPersonCreateBodySchema,
   staffPersonUpdateBodySchema,
   staffPersonListQuerySchema,
+  STAFF_PERSON_MAX_LENGTHS,
   type StaffPersonIdParam,
   type StaffPersonCreateBody,
   type StaffPersonUpdateBody,
   type StaffPersonListQuery,
 } from "./staff-people";
+export { meStaffUpdateBodySchema, type MeStaffUpdateBody } from "./me";
 
 export {
   venueSearchQuerySchema,
