@@ -44,6 +44,7 @@ export type {
 
 export type {
   OwnClubTeam,
+  PublicTeamStaff,
   TeamReorderItem,
   TeamStaffMember,
   TeamStaffRole,

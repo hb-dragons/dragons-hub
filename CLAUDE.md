@@ -198,7 +198,7 @@ REFEREE_SDK_USERNAME=<separate federation account for referee assignment>
 REFEREE_SDK_PASSWORD=<separate federation account for referee assignment>
 EXPO_ACCESS_TOKEN=<enables the authenticated Expo Push send tier: higher rate limits + better receipt SLA>
 EXPO_PROJECT_ID=<EAS project id; validated as a non-empty string at boot and not read anywhere else>
-GH_DISPATCH_TOKEN=<fine-grained PAT for the webhook channel's repository_dispatch; unset makes every dispatch a logged skip>
+GH_DISPATCH_TOKEN=<fine-grained PAT for the repository_dispatch that rebuilds the public site: the webhook notification channel, and the site-rebuild service a team staff change goes through; unset makes every dispatch a logged skip>
 GOOGLE_GENERATIVE_AI_API_KEY=<google ai studio key; required when ASSISTANT_ENABLED or CHATBOT_ENABLED is true>
 MCP_TOKEN=<random string min 32 chars; bearer token for the /mcp endpoint>
 ```

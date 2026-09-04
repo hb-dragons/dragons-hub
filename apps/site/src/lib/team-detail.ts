@@ -1,12 +1,17 @@
 /**
  * Static helpers for the team detail page (`/teams/[slug]`), ported from
- * dragons-app `app/components/teams/TeamTrainer.vue`: the legacy overlay
- * showed `trainer.ehrenamtliche.name` with the `trainer.image ||
- * ehrenamtliche.image` portrait. The new CMS models that as `teams.trainers`
- * (hasMany) → trainer → person; the page renders the first trainer.
+ * dragons-app `app/components/teams/TeamTrainer.vue`: the legacy overlay showed
+ * the trainer's name over their portrait.
+ *
+ * The coach now comes from the Hub rather than the CMS (ADR 0008): the page
+ * looks the team's staff up by federation permanent id (src/lib/team-staff.ts)
+ * and this shapes the head coach into what the hero renders. The portrait is a
+ * plain API URL, so it carries no blurhash — BlurImage falls back to a solid
+ * placeholder, the same as for any CMS upload without one.
  */
 
 import { mediaUrl, type SiteImage } from "./media";
+import type { SiteStaffMember } from "./team-staff";
 
 interface MediaLike {
   url?: string | null | undefined;
@@ -29,29 +34,24 @@ export function toSiteImage(
   return { url, blurhash: media?.blurhash, alt: media?.alt };
 }
 
-export interface TrainerLike {
-  person?: { name: string; image?: MediaLike | null | undefined } | null | undefined;
-  image?: MediaLike | null | undefined;
-}
-
 export interface TrainerDisplay {
   name: string;
-  image: MediaLike | null;
+  image: SiteImage | null;
 }
 
 /**
- * The trainer the detail page shows, or null when the team has none (the
- * overlay then falls back to the plain "Trainer" title, legacy behavior).
- * A trainer whose person relation is unpopulated counts as none — there is
- * no name to show.
+ * The coach the detail page's hero shows, or null when the team has none (the
+ * overlay then falls back to the plain "Trainer" title, legacy behavior). The
+ * API orders Trainer before Co-Trainer, so the head coach is the first entry.
+ * A coach without a portrait keeps the name and falls back to the club banner.
  */
 export function primaryTrainer(
-  trainers: readonly TrainerLike[] | null | undefined,
+  staff: readonly SiteStaffMember[] | null | undefined,
 ): TrainerDisplay | null {
-  const first = trainers?.[0];
-  if (first?.person == null) return null;
+  const coach = staff?.[0];
+  if (coach === undefined) return null;
   return {
-    name: first.person.name,
-    image: first.image ?? first.person.image ?? null,
+    name: coach.name,
+    image: coach.photoUrl === null ? null : { url: coach.photoUrl, alt: coach.name },
   };
 }

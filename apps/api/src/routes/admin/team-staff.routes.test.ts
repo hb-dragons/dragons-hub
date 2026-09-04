@@ -18,6 +18,7 @@ import type { TeamStaffMember } from "@dragons/shared";
 
 const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 const mocks = vi.hoisted(() => ({
+  dispatchSiteRebuild: vi.fn(),
   getSession: vi.fn(),
   userHasPermission: vi.fn(),
 }));
@@ -71,6 +72,10 @@ vi.mock("../../config/auth", () => ({
 
 vi.mock("../../config/logger", () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}));
+
+vi.mock("../../services/site-rebuild.service", () => ({
+  dispatchSiteRebuild: mocks.dispatchSiteRebuild,
 }));
 
 // --- Imports (after mocks) ---
@@ -745,5 +750,46 @@ describe("permission gating", () => {
     const entryId = await seedEntry(10);
     mocks.getSession.mockResolvedValue(null);
     expect((await app.request(`/teams/${entryId}/staff`)).status).toBe(401);
+  });
+});
+
+describe("site rebuild dispatch", () => {
+  /** The Website reads coaches from `/public/teams` at build time (issue #314). */
+  it("fires exactly one dispatch per successful staff mutation", async () => {
+    const entryId = await seedEntry(40);
+
+    const created = (await (await postStaff(entryId, {
+      firstName: "Emily",
+      lastName: "Gust",
+      role: "trainer",
+    })).json()) as TeamStaffMember;
+    expect(mocks.dispatchSiteRebuild).toHaveBeenCalledTimes(1);
+
+    await patchStaff(entryId, created.id, { licence: "C-Lizenz" });
+    expect(mocks.dispatchSiteRebuild).toHaveBeenCalledTimes(2);
+
+    await postPhoto(entryId, created.id, await pngFile());
+    expect(mocks.dispatchSiteRebuild).toHaveBeenCalledTimes(3);
+
+    await app.request(`/teams/${entryId}/staff/${created.id}`, { method: "DELETE" });
+    expect(mocks.dispatchSiteRebuild).toHaveBeenCalledTimes(4);
+  });
+
+  it("fires no dispatch when a mutation changes nothing", async () => {
+    const entryId = await seedEntry(41);
+    const foreignEntryId = await seedEntry(42, { isOwnClub: false });
+
+    await postStaff(foreignEntryId, { firstName: "Emily", lastName: "Gust", role: "trainer" });
+    await patchStaff(entryId, 9_999, { licence: "C-Lizenz" });
+    await app.request(`/teams/${entryId}/staff/9999`, { method: "DELETE" });
+    await postPhoto(entryId, 9_999, await pngFile());
+
+    expect(mocks.dispatchSiteRebuild).not.toHaveBeenCalled();
+  });
+
+  it("reads a staff list without dispatching", async () => {
+    const entryId = await seedEntry(43);
+    await app.request(`/teams/${entryId}/staff`);
+    expect(mocks.dispatchSiteRebuild).not.toHaveBeenCalled();
   });
 });
