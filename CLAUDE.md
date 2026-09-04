@@ -244,47 +244,13 @@ root `.env.example`, which is drift-locked to `apps/api`): `CMS_URL` +
 
 `apps/cms` likewise has its own contract in `apps/cms/.env.example`
 (`DATABASE_URL_CMS`, `PAYLOAD_SECRET`, and the prod-only `GCS_MEDIA_*` /
-`CMS_PUBLIC_URL` / `GH_DISPATCH_TOKEN`). Four more are read *only* by the
-one-off Strapi importer (`pnpm --filter @dragons/cms migrate:strapi`, issue
-#165) and by nothing else in the app: `STRAPI_URL` + `STRAPI_TOKEN` are the
-legacy Strapi origin and its read token — the URL is a LAN address, since
-the migration deliberately does not depend on public DNS — and `CMS_URL` +
-`CMS_API_TOKEN` are the target Payload REST origin and an API-key user's
-token. Same names as the `apps/site` pair and the same values in practice,
-but a different job: the site *reads* content at build time, the importer
-*writes* it once. All four are unset in normal development; the script
-throws by name when one is missing.
-
-A second one-off script, the CMS -> Hub trainer import
-(`pnpm --filter @dragons/cms migrate:cms-staff`, add `--dry-run` to print the
-planned rows without writing; issue #311). It has run, and #316 has since
-dropped the CMS trainers collection it reads, so what follows is the record of
-how the data reached the Hub, not a recipe. It read teams and trainers over the
-same `CMS_URL` + `CMS_API_TOKEN` pair and wrote `team_staff` rows into the
-*Hub* database — so it is the one thing in `apps/cms` that needs
-`DATABASE_URL` (the Hub's connection string, not `DATABASE_URL_CMS`). It
-throws by name on a missing variable, and on a CMS team whose
-`apiTeamPermanentId` has no team entry in the active season; re-running it
-adds nothing it already imported.
-
-Its second pass, `migrate:cms-staff -- --portraits` (issue #329), copies each
-imported row's portrait out of the CMS media library: the trainer's own image
-first, else the person's, checked and downscaled to fit 512 px the way the
-Hub's upload path does it, stored under the Hub's staff-portrait prefix with
-a fresh uuid name, and recorded on the row. It needs `GCS_BUCKET_NAME` — the *Hub's* asset
-bucket, the same variable the API reads, not the CMS's `GCS_MEDIA_BUCKET` —
-and Application Default Credentials that can write to it (`gcloud auth
-application-default login`); there is no `GCS_PROJECT_ID` to set, since the
-bucket name is global. Rows that already carry a portrait are skipped, so a
-rerun copies only what is still missing; trainers without an image, and rows
-the first pass never wrote, are reported and skipped. A coach on two team
-entries gets two independent copies, because each row owns and deletes its
-own object. `--dry-run` lists every planned copy with its source URL and
-writes neither objects nor rows. The prefix, size and type rules are
-duplicated from `apps/api/src/services/admin/team-staff-photo.service.ts` on
-purpose (the script must not import the API's service layer);
-`scripts/import-staff/portrait-rules.ts` holds them, says so, and its test
-pins the values.
+`CMS_PUBLIC_URL` / `GH_DISPATCH_TOKEN`). That is the whole list. Two one-off
+importers used to add to it — the Strapi content import (#165) and the CMS ->
+Hub staff import with its portrait pass (#311, #329) — but both had run in
+production and read the CMS `trainers` collection #316 dropped, so they were
+deleted with it rather than kept as code nobody can run. Their story is in the
+git history and in ADR-0008; `apps/cms` no longer talks to the Hub database or
+to any bucket but its own media one.
 
 ### Production deployment plumbing
 
