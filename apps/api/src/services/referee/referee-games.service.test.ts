@@ -29,7 +29,9 @@ import {
   getRefereeGameById,
   computeMySlot,
 } from "./referee-games.service";
-import { refereeGames, matches, teams } from "@dragons/db/schema";
+import { eq } from "drizzle-orm";
+import { refereeGames, matches, teams, leagues, teamEntries, seasons } from "@dragons/db/schema";
+import { seedActiveSeason } from "../../test/seed-season";
 import {
   setupTestDb,
   resetTestDb,
@@ -82,7 +84,7 @@ async function seedGame(seed: GameSeed): Promise<number> {
 }
 
 /** Seed a real `matches` row (plus its FK dependencies) and return its id. */
-async function seedMatch(apiMatchId: number): Promise<number> {
+async function seedMatch(apiMatchId: number, leagueId: number | null = null): Promise<number> {
   for (const apiTeamPermanentId of [7001, 7002]) {
     await ctx.db.insert(teams).values({
       apiTeamPermanentId,
@@ -102,6 +104,7 @@ async function seedMatch(apiMatchId: number): Promise<number> {
       kickoffTime: "14:00:00",
       homeTeamApiId: 7001,
       guestTeamApiId: 7002,
+      leagueId,
     })
     .returning({ id: matches.id });
   return row!.id;
@@ -114,7 +117,77 @@ function apiIds(result: { items: Array<{ apiMatchId: number }> }): number[] {
 
 const PAGE = { limit: 50, offset: 0 } as const;
 
+/** A league in `seasonRefId`, for the custom-name lookup that walks match → league → season. */
+async function seedLeague(seasonRefId: number): Promise<number> {
+  const [row] = await ctx.db
+    .insert(leagues)
+    .values({
+      apiLigaId: 501,
+      ligaNr: 501,
+      name: "Kreisliga Nord",
+      seasonId: 501,
+      seasonName: "2026/27",
+      seasonRefId,
+    })
+    .returning({ id: leagues.id });
+  return row!.id;
+}
+
+async function teamIdByApiId(apiTeamPermanentId: number): Promise<number> {
+  const [row] = await ctx.db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.apiTeamPermanentId, apiTeamPermanentId));
+  return row!.id;
+}
+
 // --- Tests ---
+
+describe("custom team names", () => {
+  it("resolves each side through the linked match's team entry for that season", async () => {
+    const seasonId = await seedActiveSeason(ctx);
+    const matchId = await seedMatch(1, await seedLeague(seasonId));
+    await ctx.db.insert(teamEntries).values({
+      teamId: await teamIdByApiId(7001),
+      seasonId,
+      customName: "Herren 1",
+    });
+    // The guest has an entry but no custom name — that side stays null.
+    await ctx.db.insert(teamEntries).values({
+      teamId: await teamIdByApiId(7002),
+      seasonId,
+    });
+    const id = await seedGame({ apiMatchId: 1, matchId });
+
+    const item = await getRefereeGameById(id);
+    expect(item).toMatchObject({ homeTeamCustomName: "Herren 1", guestTeamCustomName: null });
+  });
+
+  it("is null without a linked match", async () => {
+    const id = await seedGame({ apiMatchId: 1 });
+
+    const item = await getRefereeGameById(id);
+    expect(item).toMatchObject({ homeTeamCustomName: null, guestTeamCustomName: null });
+  });
+
+  it("ignores an entry from another season", async () => {
+    const seasonId = await seedActiveSeason(ctx);
+    const [old] = await ctx.db
+      .insert(seasons)
+      .values({ name: "2024/25", status: "archived" })
+      .returning({ id: seasons.id });
+    const matchId = await seedMatch(1, await seedLeague(seasonId));
+    await ctx.db.insert(teamEntries).values({
+      teamId: await teamIdByApiId(7001),
+      seasonId: old!.id,
+      customName: "Herren 1 (alt)",
+    });
+    const id = await seedGame({ apiMatchId: 1, matchId });
+
+    const item = await getRefereeGameById(id);
+    expect(item).toMatchObject({ homeTeamCustomName: null });
+  });
+});
 
 describe("getRefereeGames", () => {
   it("returns an empty page when the table is empty", async () => {

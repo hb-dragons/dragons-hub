@@ -15,6 +15,16 @@ export interface RefereeGameListItem {
   venueName: string | null;
   venueCity: string | null;
   homeTeamId: number | null;
+  /** Federation club ids behind the crests; null on rows synced before the columns existed. */
+  homeClubId: number | null;
+  guestClubId: number | null;
+  /**
+   * The club-facing name ("Herren 1") from the linked match's team entry, the
+   * same one the fan match screen shows; null without a linked match, an entry
+   * for the match's season, or a custom name on it.
+   */
+  homeTeamCustomName: string | null;
+  guestTeamCustomName: string | null;
   sr1OurClub: boolean;
   sr2OurClub: boolean;
   sr1Name: string | null;

@@ -9,12 +9,14 @@ import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { ClaimGameButton } from "@/components/ClaimGameButton";
+import { ClubLogo } from "@/components/brand/ClubLogo";
 import { openExternal } from "@/lib/legal/open-external";
 import { refereeApi } from "@/lib/api";
 import {
   einsatzView,
   type EinsatzContact,
   type EinsatzSlot,
+  type EinsatzTeam,
 } from "@/lib/referee/einsatz";
 import { i18n } from "@/lib/i18n";
 import { kickoffCompact } from "@/lib/format/kickoff";
@@ -117,6 +119,36 @@ function ContactRow({ contact }: { contact: EinsatzContact }) {
           </Pressable>
         ) : null}
       </View>
+    </View>
+  );
+}
+
+/**
+ * One side of the header card: crest, then the name — the same column the
+ * fan match screen draws, so a referee sees the fixture the way the club does.
+ */
+function TeamSide({ team }: { team: EinsatzTeam }) {
+  const { colors, textStyles, spacing } = useTheme();
+
+  return (
+    <View style={{ flex: 1, alignItems: "center" }}>
+      <ClubLogo clubId={team.clubId} size={48} variant="chip" />
+      <Text
+        style={[
+          textStyles.cardTitle,
+          {
+            color: team.isOwnClub ? colors.primary : colors.foreground,
+            fontFamily: team.isOwnClub
+              ? fontFamilies.bodySemiBold
+              : fontFamilies.body,
+            textAlign: "center",
+            marginTop: spacing.sm,
+          },
+        ]}
+        numberOfLines={2}
+      >
+        {team.name}
+      </Text>
     </View>
   );
 }
@@ -307,17 +339,7 @@ export default function RefereeGameDetailScreen() {
               width: "100%",
             }}
           >
-            <View style={{ flex: 1, alignItems: "center" }}>
-              <Text
-                style={[
-                  textStyles.cardTitle,
-                  { color: colors.foreground, textAlign: "center" },
-                ]}
-                numberOfLines={2}
-              >
-                {game.homeTeamName}
-              </Text>
-            </View>
+            <TeamSide team={view.teams.home} />
 
             <View style={{ alignItems: "center", paddingHorizontal: spacing.md }}>
               <Text
@@ -327,17 +349,7 @@ export default function RefereeGameDetailScreen() {
               </Text>
             </View>
 
-            <View style={{ flex: 1, alignItems: "center" }}>
-              <Text
-                style={[
-                  textStyles.cardTitle,
-                  { color: colors.foreground, textAlign: "center" },
-                ]}
-                numberOfLines={2}
-              >
-                {game.guestTeamName}
-              </Text>
-            </View>
+            <TeamSide team={view.teams.guest} />
           </View>
 
           {game.leagueName ? (
@@ -404,16 +416,18 @@ export default function RefereeGameDetailScreen() {
         </View>
       </View>
 
-      {/* ── 2b. Claim action ── */}
-      <View style={{ marginBottom: spacing.md }}>
-        <ClaimGameButton
-          game={game}
-          revalidateKeys={["referee:games"]}
-          onChanged={async () => {
-            await mutate();
-          }}
-        />
-      </View>
+      {/* ── 2b. Take an open slot ── */}
+      {/* Renders nothing once the caller holds a slot; "abgeben" is at the
+          foot of the page (section 6), out of the way of a scrolling thumb. */}
+      <ClaimGameButton
+        game={game}
+        action="take"
+        style={{ marginBottom: spacing.md }}
+        revalidateKeys={["referee:games"]}
+        onChanged={async () => {
+          await mutate();
+        }}
+      />
 
       {/* ── 2c. Anfahrt (#309) ── */}
       {/* Absent for rows synced before the address columns existed; the city
@@ -616,6 +630,20 @@ export default function RefereeGameDetailScreen() {
           </Text>
         </View>
       </Card>
+
+      {/* ── 6. Give the game back ── */}
+      {/* Last on purpose: the one destructive action on the screen sits below
+          everything a referee reads, not under the header where it was tapped
+          by accident. Renders nothing unless the caller holds a slot. */}
+      <ClaimGameButton
+        game={game}
+        action="drop"
+        style={{ marginTop: spacing.lg, marginBottom: spacing.md }}
+        revalidateKeys={["referee:games"]}
+        onChanged={async () => {
+          await mutate();
+        }}
+      />
       </Screen>
     </>
   );
