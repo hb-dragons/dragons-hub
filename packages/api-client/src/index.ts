@@ -8,9 +8,11 @@ export type { Api } from "./create-api";
 export {
   publicEndpoints,
   deviceEndpoints,
+  meEndpoints,
   refereeEndpoints,
   adminBoardEndpoints,
 } from "./endpoints";
+export { STAFF_PERSON_MAX_LENGTHS } from "./endpoints";
 export type {
   MatchQueryParams,
   PublicTeam,
@@ -27,4 +29,5 @@ export type {
   TriggerEventBody,
   BroadcastUpsertBody,
   TeamStaffCreateBody,
+  MeStaffUpdateBody,
 } from "./endpoints";

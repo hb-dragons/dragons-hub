@@ -827,6 +827,18 @@ their own games via `c.get("refereeId")`. The native app depends on `/referee/ga
 | POST | `/referee/games/:id/claim` | referee (self) | Record a local claim (take-intent) on a game. Optional body: `{ slotNumber?: 1\|2 }` |
 | DELETE | `/referee/games/:id/claim` | referee (self) | Release the caller's claim on a game |
 
+### Self-service staff record (any signed-in account)
+
+Mounted at `/me`. Signed in is the whole authorisation: the person id comes from
+`user.personId` (ADR 0009), so a caller reads and writes only themselves and no
+id appears in the path. An account with no staff link gets 404, which is what
+the app hides the "Meine Kontaktdaten" section on.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/me/staff` | The signed-in coach's own staff person plus the teams they are attached to this season. No `photoUrl`: the portrait route is admin-gated |
+| PATCH | `/me/staff` | Update own `phone`, `email`, `licence` — the three fields `meStaffUpdateBodySchema` allows; any other key is the central 400. Writes the person, so every team the coach trains shows the new value |
+
 ### Admin Referee Assignment (role: admin)
 
 | Method | Path | Auth | Description |

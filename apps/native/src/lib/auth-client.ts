@@ -23,6 +23,10 @@ export const authClient = createAuthClient({
     inferAdditionalFields({
       user: {
         refereeId: { type: "number", required: false },
+        // The linked staff person (ADR 0009). Declared here so the profile
+        // screen can ask the session whether to draw "Meine Kontaktdaten"
+        // (#315) without casting the user.
+        personId: { type: "number", required: false },
       },
     }),
     adminClient(adminPluginConfig),

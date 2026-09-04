@@ -4,6 +4,7 @@ import {
   deviceEndpoints,
   refereeEndpoints,
   adminBoardEndpoints,
+  meEndpoints,
 } from "@dragons/api-client";
 import { authClient, resolveApiUrl } from "./auth-client";
 import { createOnceGuard } from "./auth/once-guard";
@@ -40,3 +41,4 @@ export const publicApi = publicEndpoints(apiClient);
 export const deviceApi = deviceEndpoints(apiClient);
 export const refereeApi = refereeEndpoints(apiClient);
 export const adminBoardApi = adminBoardEndpoints(apiClient);
+export const meApi = meEndpoints(apiClient);

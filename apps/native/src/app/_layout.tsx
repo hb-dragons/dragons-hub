@@ -110,6 +110,12 @@ function RootNavigator() {
         />
         {/* Push pre-permission (#237): a form sheet the sign-in flow opens once
             when the OS has not been asked yet; Profile can reopen it. */}
+        {/* Coach self-edit (#315): the profile section's form, a sheet for the
+            same reason as quick-create — the keyboard is up throughout. */}
+        <Stack.Screen
+          name="profile-contact"
+          options={formSheetOptions({ name: "profile-contact", detents: [1] })}
+        />
         <Stack.Screen
           name="push-permission"
           options={formSheetOptions({ name: "push-permission", detents: [0.5, 1] })}

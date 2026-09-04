@@ -5,6 +5,7 @@ import {
   canViewOpenGames,
   hasRole,
   isReferee,
+  isStaff,
   parseRoles,
   roles,
   satisfiesRole,
@@ -139,6 +140,19 @@ describe("isReferee", () => {
     expect(isReferee({ refereeId: undefined })).toBe(false);
     expect(isReferee({})).toBe(false);
     expect(isReferee(null)).toBe(false);
+  });
+});
+
+describe("isStaff", () => {
+  it("returns true when personId is a number", () => {
+    expect(isStaff({ personId: 3 })).toBe(true);
+  });
+
+  it("returns false when personId is null, undefined, or absent", () => {
+    expect(isStaff({ personId: null })).toBe(false);
+    expect(isStaff({ personId: undefined })).toBe(false);
+    expect(isStaff({})).toBe(false);
+    expect(isStaff(null)).toBe(false);
   });
 });
 

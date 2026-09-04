@@ -42,6 +42,7 @@ import { publicBroadcastRoutes } from "./public/broadcast.routes";
 import { adminBroadcastRoutes } from "./admin/broadcast.routes";
 import { assistantRoutes } from "./admin/assistant.routes";
 import { refereeEligibleGamesRoutes } from "./admin/referee-eligible-games.routes";
+import { meStaffRoutes } from "./me/staff.routes";
 import { qaRoutes } from "./qa.routes";
 
 const routes = new Hono();
@@ -89,6 +90,7 @@ routes.route("/public/broadcast", publicBroadcastRoutes);
 routes.route("/admin/broadcast", adminBroadcastRoutes);
 routes.route("/admin", assistantRoutes);
 routes.route("/admin", refereeEligibleGamesRoutes);
+routes.route("/me", meStaffRoutes);
 routes.route("/qa", qaRoutes);
 
 export { routes };

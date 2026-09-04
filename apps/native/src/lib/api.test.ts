@@ -11,6 +11,7 @@ vi.mock("@dragons/api-client", () => ({
   deviceEndpoints: vi.fn(() => ({})),
   refereeEndpoints: vi.fn(() => ({})),
   adminBoardEndpoints: vi.fn(() => ({})),
+  meEndpoints: vi.fn(() => ({})),
 }));
 vi.mock("expo-router", () => ({ router: { replace: vi.fn() } }));
 vi.mock("@/lib/auth-client", () => ({
