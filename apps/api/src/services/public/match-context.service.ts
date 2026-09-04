@@ -1,17 +1,28 @@
 import { getDb } from "../../config/database";
-import { matches, teams } from "@dragons/db/schema";
+import { matches, teams, leagues } from "@dragons/db/schema";
 import { eq, and, or, desc, isNotNull } from "drizzle-orm";
 import type { MatchContext, FormEntry, PreviousMeeting } from "@dragons/shared";
+import { NO_SEASON } from "../season-scope";
 
 export async function getMatchContext(matchId: number): Promise<MatchContext | null> {
   const [match] = await getDb()
-    .select({ homeTeamApiId: matches.homeTeamApiId, guestTeamApiId: matches.guestTeamApiId })
+    .select({
+      homeTeamApiId: matches.homeTeamApiId,
+      guestTeamApiId: matches.guestTeamApiId,
+      seasonRefId: leagues.seasonRefId,
+    })
     .from(matches)
+    .leftJoin(leagues, eq(matches.leagueId, leagues.id))
     .where(eq(matches.id, matchId))
     .limit(1);
   if (!match) return null;
 
   const { homeTeamApiId, guestTeamApiId } = match;
+
+  // Scoped to the match's own season, not the active one (ADR 0007): an
+  // archived match keeps a self-consistent context, and a match that belongs
+  // to no league scopes to nothing rather than to an all-time record.
+  const seasonId = match.seasonRefId ?? NO_SEASON;
 
   const h2hMatches = await getDb()
     .select({
@@ -23,8 +34,10 @@ export async function getMatchContext(matchId: number): Promise<MatchContext | n
       guestScore: matches.guestScore,
     })
     .from(matches)
+    .innerJoin(leagues, eq(matches.leagueId, leagues.id))
     .where(
       and(
+        eq(leagues.seasonRefId, seasonId),
         isNotNull(matches.homeScore),
         isNotNull(matches.guestScore),
         or(
@@ -87,8 +100,8 @@ export async function getMatchContext(matchId: number): Promise<MatchContext | n
   }
 
   const [homeForm, guestForm] = await Promise.all([
-    getTeamForm(homeTeamApiId),
-    getTeamForm(guestTeamApiId),
+    getTeamForm(homeTeamApiId, seasonId),
+    getTeamForm(guestTeamApiId, seasonId),
   ]);
 
   return {
@@ -98,7 +111,7 @@ export async function getMatchContext(matchId: number): Promise<MatchContext | n
   };
 }
 
-async function getTeamForm(teamApiId: number): Promise<FormEntry[]> {
+async function getTeamForm(teamApiId: number, seasonId: number): Promise<FormEntry[]> {
   const recent = await getDb()
     .select({
       id: matches.id,
@@ -107,8 +120,10 @@ async function getTeamForm(teamApiId: number): Promise<FormEntry[]> {
       guestScore: matches.guestScore,
     })
     .from(matches)
+    .innerJoin(leagues, eq(matches.leagueId, leagues.id))
     .where(
       and(
+        eq(leagues.seasonRefId, seasonId),
         isNotNull(matches.homeScore),
         isNotNull(matches.guestScore),
         or(eq(matches.homeTeamApiId, teamApiId), eq(matches.guestTeamApiId, teamApiId)),

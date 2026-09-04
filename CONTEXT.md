@@ -32,6 +32,14 @@ _Avoid_: selected league, subscribed league
 The club's three front doors, named this way in public-facing text and kept distinct: the **Website** is the public static site on hbdragons.de; the **Web-App** is the signed-in surface on app.hbdragons.de; the **Dragons App** is the native iOS/Android app. Fans meet the Website; Staff meet the Web-App and the Dragons App. One Datenschutzerklärung covers all three because they share one backend (ADR-0006).
 _Avoid_: the site vs. the app (ambiguous), frontend, portal
 
+**Season**:
+A federation playing year (e.g. 2025/26) that scopes leagues, team entries, fixtures, and results. Data is always read within one season; only a squad's identity carries across the boundary.
+_Avoid_: year, period
+
+**Current season**:
+The one season the club is operating in, designated centrally on the server and changed only through new-season onboarding — never computed by a client. The Dragons App shows the current season exclusively; past seasons are a Web-App concern.
+_Avoid_: active season, latest season
+
 **Vorabliga**:
 A preliminary league the federation publishes before promotion/relegation is settled. Carries a full schedule; superseded by a committed league whose fixtures replace it.
 

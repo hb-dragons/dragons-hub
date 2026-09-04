@@ -265,7 +265,7 @@ export default function TeamDetailScreen() {
             >
               {teamName}
             </Text>
-            {teamStats?.leagueName ? (
+            {teamStats?.leagueName || leagueStandings?.seasonName ? (
               <Text
                 style={{
                   fontSize: 14,
@@ -274,7 +274,9 @@ export default function TeamDetailScreen() {
                   marginTop: spacing.xs,
                 }}
               >
-                {teamStats.leagueName}
+                {[teamStats?.leagueName, leagueStandings?.seasonName]
+                  .filter(Boolean)
+                  .join(" · ")}
               </Text>
             ) : null}
           </View>
