@@ -229,13 +229,17 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
-      # The audit itself takes ~2s; anything near this budget means pnpm's
-      # local audit path traversal has blown up again (issue #136), not that
-      # the registry is slow. Bounding the step rather than the job makes that
+      # The audit itself takes ~2s once the registry answers. The budget has to
+      # hold pnpm's retry schedule for the advisories POST, which the registry
+      # sometimes drops after ~60s: attempt, 10s wait, attempt, 60s wait, attempt
+      # is ~4 minutes, and a 2-minute step timed out mid-retry on every PR on
+      # 2026-09-04 while the second attempt succeeds locally. Anything near
+      # 5 minutes still means pnpm's local audit path traversal has blown up
+      # again (issue #136). Bounding the step rather than the job keeps that
       # distinction legible: a step timeout points here, a job timeout points
       # at checkout/install.
       - name: Run vulnerability audit
-        timeout-minutes: 2
+        timeout-minutes: 5
         run: pnpm security:audit
 
   secret-scan:
