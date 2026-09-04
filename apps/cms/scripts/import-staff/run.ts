@@ -23,6 +23,8 @@
  * failed to record leaves an unreferenced object in the bucket, which the
  * rerun neither reuses nor removes.
  */
+import type { Database } from "@dragons/db";
+
 import { downloadMedia, fetchTeams, mediaUrl } from "./cms";
 import {
   activeSeasonEntries,
@@ -32,7 +34,6 @@ import {
   openHub,
   setStaffPortrait,
 } from "./hub";
-import type { Database } from "@dragons/db";
 import { describePortrait, describeRow, newRows, planPortraits, planStaffRows } from "./mappers";
 import { openBucket, storePortrait } from "./storage";
 

@@ -6,7 +6,10 @@
  * What arrives here is JSON off the wire from a *running* CMS, which may be a
  * release behind the generated types, and every field this script touches is
  * treated as possibly-absent anyway.
+ *
+ * Reads `CMS_URL` and `CMS_API_TOKEN`.
  */
+import { requireEnv } from "./env";
 
 /** A media doc as the portrait pass needs it: where the bytes are and what they are. */
 export interface CmsMedia {
@@ -43,12 +46,6 @@ export interface CmsTeam {
   trainers?: (number | CmsTrainer)[] | null;
 }
 
-function env(name: "CMS_URL" | "CMS_API_TOKEN"): string {
-  const value = process.env[name];
-  if (value === undefined || value === "") throw new Error(`${name} is not set`);
-  return value;
-}
-
 const PAGE_SIZE = 100;
 
 /** Exported for tests: teams with their trainers, each trainer's person, and both images. */
@@ -80,9 +77,9 @@ export function isLastPage(page: number, totalPages: unknown): boolean {
 export async function fetchTeams(): Promise<CmsTeam[]> {
   const teams: CmsTeam[] = [];
   for (let page = 1; ; page += 1) {
-    const url = buildTeamsUrl(env("CMS_URL"), page);
+    const url = buildTeamsUrl(requireEnv("CMS_URL"), page);
     const res = await fetch(url, {
-      headers: { Authorization: `users API-Key ${env("CMS_API_TOKEN")}` },
+      headers: { Authorization: `users API-Key ${requireEnv("CMS_API_TOKEN")}` },
     });
     if (!res.ok) throw new Error(`cms: HTTP ${res.status} for ${url}`);
     const body = (await res.json()) as { docs: CmsTeam[]; totalPages: unknown };
@@ -99,16 +96,21 @@ export async function fetchTeams(): Promise<CmsTeam[]> {
  * when the bucket is public — the same rule the Website's `mediaUrl` applies.
  */
 export function mediaUrl(url: string): string {
-  if (/^https?:\/\//.test(url)) return url;
-  return `${env("CMS_URL").replace(/\/$/, "")}${url}`;
+  if (isAbsoluteUrl(url)) return url;
+  return `${requireEnv("CMS_URL").replace(/\/$/, "")}${url}`;
+}
+
+function isAbsoluteUrl(url: string): boolean {
+  return /^https?:\/\//.test(url);
 }
 
 export async function downloadMedia(url: string): Promise<Buffer> {
   const absolute = mediaUrl(url);
   // The API key only means something to the CMS. A bucket URL is public by
   // construction, and an Authorization header GCS cannot parse is a 401.
-  const headers: Record<string, string> =
-    absolute === url ? {} : { Authorization: `users API-Key ${env("CMS_API_TOKEN")}` };
+  const headers: Record<string, string> = isAbsoluteUrl(url)
+    ? {}
+    : { Authorization: `users API-Key ${requireEnv("CMS_API_TOKEN")}` };
   const res = await fetch(absolute, { headers });
   if (!res.ok) throw new Error(`cms download: HTTP ${res.status} for ${absolute}`);
   return Buffer.from(await res.arrayBuffer());

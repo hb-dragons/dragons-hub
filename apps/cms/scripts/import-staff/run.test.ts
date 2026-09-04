@@ -146,7 +146,7 @@ describe("main --portraits", () => {
   const bucket = {} as ReturnType<typeof openBucket>;
   const staffRow = { id: 42, teamEntryId: 7, firstName: "Max", lastName: "Mustermann", photoFilename: null };
 
-  function coached(image: CmsTrainer["image"]): CmsTeam {
+  function teamWithPortrait(image: CmsTrainer["image"]): CmsTeam {
     return {
       id: 1,
       name: "Damen 1",
@@ -164,7 +164,7 @@ describe("main --portraits", () => {
     vi.mocked(activeSeasonEntries).mockResolvedValue(new Map([[100, 7]]));
     vi.mocked(existingStaff).mockResolvedValue([staffRow]);
     vi.mocked(fetchTeams).mockResolvedValue([
-      coached({ id: 5, url: "/api/media/file/max.jpg", mimeType: "image/jpeg" }),
+      teamWithPortrait({ id: 5, url: "/api/media/file/max.jpg", mimeType: "image/jpeg" }),
     ]);
     vi.mocked(downloadMedia).mockResolvedValue(Buffer.from("jpeg"));
     vi.mocked(storePortrait).mockResolvedValue("uuid.jpg");
@@ -208,7 +208,7 @@ describe("main --portraits", () => {
   });
 
   it("reports a trainer without an image", async () => {
-    vi.mocked(fetchTeams).mockResolvedValue([coached(null)]);
+    vi.mocked(fetchTeams).mockResolvedValue([teamWithPortrait(null)]);
 
     await main(["--portraits"]);
 
@@ -237,8 +237,8 @@ describe("main --portraits", () => {
 
   it("stops at the first copy that fails, leaving the rest for a rerun", async () => {
     vi.mocked(fetchTeams).mockResolvedValue([
-      coached({ id: 5, url: "/api/media/file/max.jpg", mimeType: "image/jpeg" }),
-      { ...coached({ id: 6, url: "/api/media/file/erika.jpg", mimeType: "image/jpeg" }), id: 2, slug: "herren-1", apiTeamPermanentId: 200 },
+      teamWithPortrait({ id: 5, url: "/api/media/file/max.jpg", mimeType: "image/jpeg" }),
+      { ...teamWithPortrait({ id: 6, url: "/api/media/file/erika.jpg", mimeType: "image/jpeg" }), id: 2, slug: "herren-1", apiTeamPermanentId: 200 },
     ]);
     vi.mocked(activeSeasonEntries).mockResolvedValue(new Map([[100, 7], [200, 8]]));
     vi.mocked(existingStaff).mockResolvedValue([staffRow, { ...staffRow, id: 43, teamEntryId: 8 }]);

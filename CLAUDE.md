@@ -267,9 +267,9 @@ adds nothing it already imported.
 
 Its second pass, `migrate:cms-staff -- --portraits` (issue #329), copies each
 imported row's portrait out of the CMS media library: the trainer's own image
-first, else the person's, downscaled to fit 512 px the way the Hub's upload
-path does it, stored under the Hub's staff-portrait prefix with a fresh uuid
-name, and recorded on the row. It needs `GCS_BUCKET_NAME` — the *Hub's* asset
+first, else the person's, checked and downscaled to fit 512 px the way the
+Hub's upload path does it, stored under the Hub's staff-portrait prefix with
+a fresh uuid name, and recorded on the row. It needs `GCS_BUCKET_NAME` — the *Hub's* asset
 bucket, the same variable the API reads, not the CMS's `GCS_MEDIA_BUCKET` —
 and Application Default Credentials that can write to it (`gcloud auth
 application-default login`); there is no `GCS_PROJECT_ID` to set, since the
@@ -280,10 +280,11 @@ entries gets two independent copies, because each row owns and deletes its
 own object. `--dry-run` lists every planned copy with its source URL and
 writes neither objects nor rows. Run it in production before #316 removes the
 CMS trainers collection, then trigger a Website rebuild so the team pages and
-Kontakt page render the Hub portraits. The size and prefix constants are
+Kontakt page render the Hub portraits. The prefix, size and type rules are
 duplicated from `apps/api/src/services/admin/team-staff-photo.service.ts` on
-purpose (the script must not import the API's service layer), and the
-comment in `scripts/import-staff/storage.ts` says so.
+purpose (the script must not import the API's service layer);
+`scripts/import-staff/portrait-rules.ts` holds them, says so, and its test
+pins the values.
 
 ### Production deployment plumbing
 

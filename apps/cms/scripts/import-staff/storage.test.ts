@@ -21,7 +21,8 @@ const { mockStorage, mockSharp, bucket, file, save, resize } = vi.hoisted(() => 
 vi.mock("@google-cloud/storage", () => ({ Storage: mockStorage }));
 vi.mock("sharp", () => ({ default: mockSharp }));
 
-import { MAX_PORTRAIT_DIMENSION, openBucket, storePortrait } from "./storage";
+import { openBucket, storePortrait } from "./storage";
+import { MAX_PORTRAIT_BYTES, MAX_PORTRAIT_DIMENSION } from "./portrait-rules";
 import type { Bucket } from "@google-cloud/storage";
 
 describe("openBucket", () => {
@@ -86,8 +87,10 @@ describe("storePortrait", () => {
     expect(first).not.toBe(second);
   });
 
-  it("refuses a type the hub does not store before touching sharp or the bucket", async () => {
-    await expect(storePortrait(target, bytes, "image/gif")).rejects.toThrow(/image\/gif/);
+  it("refuses bytes over the hub's bound before touching sharp or the bucket", async () => {
+    await expect(
+      storePortrait(target, Buffer.alloc(MAX_PORTRAIT_BYTES + 1), "image/jpeg"),
+    ).rejects.toThrow(/over the hub's/);
     expect(mockSharp).not.toHaveBeenCalled();
     expect(save).not.toHaveBeenCalled();
   });

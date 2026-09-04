@@ -50,8 +50,8 @@ export default defineConfig({
         // branches 92.48, functions 99.12, lines 99.52.
         //
         // Ratcheted 2026-09-04 (issue #329): the import's `--portraits` pass
-        // added ~150 covered lines. Measured statements 99.65,
-        // branches 93.46, functions 99.21, lines 99.6.
+        // added ~200 covered lines. Measured statements 99.64,
+        // branches 93.23, functions 99.22, lines 99.6.
         branches: 93,
         functions: 99,
         lines: 99,

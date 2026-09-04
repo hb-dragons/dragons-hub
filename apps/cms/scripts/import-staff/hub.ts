@@ -7,21 +7,18 @@
  * Writes go straight through Drizzle rather than the admin endpoints: those
  * are session-authenticated for a human admin, and a one-off run has no
  * session to carry.
+ *
+ * Reads `DATABASE_URL`.
  */
 import { createDb, seasons, teamEntries, teamStaff, teams } from "@dragons/db";
 import type { Database } from "@dragons/db";
 import { eq, inArray } from "drizzle-orm";
 
+import { requireEnv } from "./env";
 import { staffKey, type ExistingStaff, type PlannedStaffRow } from "./mappers";
 
-function env(name: "DATABASE_URL"): string {
-  const value = process.env[name];
-  if (value === undefined || value === "") throw new Error(`${name} is not set`);
-  return value;
-}
-
 export function openHub(): ReturnType<typeof createDb> {
-  return createDb(env("DATABASE_URL"));
+  return createDb(requireEnv("DATABASE_URL"));
 }
 
 /** `teams.apiTeamPermanentId` → the team entry id of the active season. */

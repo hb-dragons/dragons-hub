@@ -1,6 +1,7 @@
 import type { TeamStaffRole } from "@dragons/shared";
 
 import type { CmsMedia, CmsPerson, CmsTeam, CmsTrainer } from "./cms";
+import { isPortraitContentType, type PortraitContentType } from "./portrait-rules";
 
 /** One `team_staff` row the import intends to write. */
 export interface PlannedStaffRow {
@@ -35,7 +36,7 @@ export interface PlannedPortrait {
   name: string;
   /** The CMS media `url` as it arrived — relative or absolute, resolved at download time. */
   sourceUrl: string;
-  contentType: string;
+  contentType: PortraitContentType;
 }
 
 export interface PortraitPlan {
@@ -45,20 +46,6 @@ export interface PortraitPlan {
   /** Rows that already carry a portrait: left alone, so a rerun is a no-op for them. */
   alreadyThere: number;
 }
-
-/**
- * The image types the Hub stores as portraits, and the extension each gets.
- *
- * Duplicated on purpose from `apps/api/src/services/admin/team-staff-photo.service.ts`
- * (`EXT_BY_CONTENT_TYPE`): this script is a one-off in another package, and
- * the CMS app must not grow an import of the API's service layer for it.
- * Keep the two in step by hand if the API's set ever changes.
- */
-export const PORTRAIT_EXT_BY_CONTENT_TYPE: Readonly<Record<string, string>> = {
-  "image/png": ".png",
-  "image/jpeg": ".jpg",
-  "image/webp": ".webp",
-};
 
 /**
  * CMS people carry one `name` field; `team_staff` has two. Split on the *last*
@@ -104,17 +91,27 @@ function requireDoc<T>(value: number | T, what: string): T {
 }
 
 /** A trainer of a CMS team, matched to the active season's team entry and named. */
-interface MatchedTrainer {
+interface MatchedCmsTrainer {
   teamSlug: string;
   teamEntryId: number;
   trainer: CmsTrainer;
   person: CmsPerson | null;
-  /** Null when the trainer has no person, or the person no name. */
-  name: string | null;
+  name: string;
+  firstName: string;
+  lastName: string;
+}
+
+interface CmsTrainerMatches {
+  /** One per (entry, name): a name repeated on the same team is kept once. */
+  matched: MatchedCmsTrainer[];
+  /** Notes for the run log — a trainer neither pass can name. */
+  skipped: string[];
 }
 
 /**
- * Match every CMS team to its team entry and resolve each trainer's person.
+ * Match every CMS team to its team entry, resolve each trainer's person and
+ * drop what cannot be named or is a repeat — the walk both passes share, so
+ * the portrait pass lands on exactly the rows the staff pass wrote.
  *
  * Throws rather than skipping whenever a team *has* trainers but cannot be
  * matched: a silently dropped team is a team whose coaches never appear in the
@@ -122,9 +119,14 @@ interface MatchedTrainer {
  * unmatched team is named in one error — a draft team included, since the API
  * key the script uses sees drafts an anonymous reader does not.
  */
-function matchTrainers(teams: CmsTeam[], entryIdByPermanentId: Map<number, number>): MatchedTrainer[] {
-  const matched: MatchedTrainer[] = [];
+function matchCmsTrainers(
+  teams: CmsTeam[],
+  entryIdByPermanentId: Map<number, number>,
+): CmsTrainerMatches {
+  const matched: MatchedCmsTrainer[] = [];
+  const skipped: string[] = [];
   const unmatched: string[] = [];
+  const seen = new Set<string>();
 
   for (const team of teams) {
     const trainers = team.trainers ?? [];
@@ -151,7 +153,17 @@ function matchTrainers(teams: CmsTeam[], entryIdByPermanentId: Map<number, numbe
         trainer.person === null || trainer.person === undefined
           ? null
           : requireDoc<CmsPerson>(trainer.person, `the person of trainer ${trainer.id}`);
-      matched.push({ teamSlug: team.slug, teamEntryId, trainer, person, name: text(person?.name) });
+      const name = text(person?.name);
+      if (name === null) {
+        skipped.push(`${team.slug}: trainer ${trainer.id} has no person — skipped`);
+        continue;
+      }
+
+      const { firstName, lastName } = splitName(name);
+      const key = staffKey({ teamEntryId, firstName, lastName });
+      if (seen.has(key)) continue;
+      seen.add(key);
+      matched.push({ teamSlug: team.slug, teamEntryId, trainer, person, name, firstName, lastName });
     }
   }
 
@@ -163,7 +175,7 @@ function matchTrainers(teams: CmsTeam[], entryIdByPermanentId: Map<number, numbe
     );
   }
 
-  return matched;
+  return { matched, skipped };
 }
 
 /** Turn CMS teams into the staff rows for the active season's team entries. */
@@ -171,32 +183,20 @@ export function planStaffRows(
   teams: CmsTeam[],
   entryIdByPermanentId: Map<number, number>,
 ): StaffPlan {
-  const rows: PlannedStaffRow[] = [];
-  const skipped: string[] = [];
-  const seen = new Set<string>();
-
-  for (const { teamSlug, teamEntryId, trainer, person, name } of matchTrainers(teams, entryIdByPermanentId)) {
-    if (name === null) {
-      skipped.push(`${teamSlug}: trainer ${trainer.id} has no person — skipped`);
-      continue;
-    }
-
-    const row: PlannedStaffRow = {
+  const { matched, skipped } = matchCmsTrainers(teams, entryIdByPermanentId);
+  const rows = matched.map(
+    ({ teamEntryId, trainer, person, firstName, lastName }): PlannedStaffRow => ({
       teamEntryId,
-      ...splitName(name),
+      firstName,
+      lastName,
       role: "trainer",
       phone: text(person?.phone),
       // The trainer's own address wins; the person's is the fallback the
       // website already renders today.
       email: text(trainer.email) ?? text(person?.email),
       licence: text(trainer.licence),
-    };
-    const key = staffKey(row);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    rows.push(row);
-  }
-
+    }),
+  );
   return { rows, skipped };
 }
 
@@ -223,21 +223,12 @@ export function planPortraits(
   existing: ExistingStaff[],
 ): PortraitPlan {
   const rowByKey = new Map(existing.map((row) => [staffKey(row), row]));
+  const { matched, skipped } = matchCmsTrainers(teams, entryIdByPermanentId);
   const copies: PlannedPortrait[] = [];
-  const skipped: string[] = [];
-  const seen = new Set<string>();
   let alreadyThere = 0;
 
-  for (const { teamSlug, teamEntryId, trainer, person, name } of matchTrainers(teams, entryIdByPermanentId)) {
-    if (name === null) {
-      skipped.push(`${teamSlug}: trainer ${trainer.id} has no person — skipped`);
-      continue;
-    }
-    const key = staffKey({ teamEntryId, ...splitName(name) });
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    const row = rowByKey.get(key);
+  for (const { teamSlug, teamEntryId, trainer, person, name, firstName, lastName } of matched) {
+    const row = rowByKey.get(staffKey({ teamEntryId, firstName, lastName }));
     if (row === undefined) {
       skipped.push(`${teamSlug}: ${name} has no staff row — run the staff import first`);
       continue;
@@ -253,7 +244,7 @@ export function planPortraits(
       continue;
     }
     const contentType = image.mimeType ?? "";
-    if (!(contentType in PORTRAIT_EXT_BY_CONTENT_TYPE)) {
+    if (!isPortraitContentType(contentType)) {
       skipped.push(
         `${teamSlug}: ${name} has an ${contentType || "untyped"} image, which the hub does not store — skipped`,
       );
