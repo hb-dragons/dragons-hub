@@ -103,6 +103,21 @@ describe("Datenschutzerklärung", () => {
     expect(DATENSCHUTZ).toMatch(/<section id="app"/);
   });
 
+  it("discloses under #app that team staff contact data reaches assigned referees", () => {
+    // Issue #317: the Einsatz screen shows a coach's phone and email to the
+    // referees assigned to that team's game and to admins, and coaches hold
+    // an account to maintain the data themselves. That processing has to be
+    // stated inside the #app section the store records link to, not elsewhere.
+    const start = DATENSCHUTZ.indexOf('<section id="app"');
+    const end = DATENSCHUTZ.indexOf("<section", start + 1);
+    const app = DATENSCHUTZ.slice(start, end === -1 ? undefined : end).replace(/\s+/g, " ");
+    expect(app).toContain("Kontaktdaten der Trainerinnen und Trainer eines Teams");
+    expect(app).toContain(
+      "angesetzten Schiedsrichterinnen und Schiedsrichtern sowie der Vereinsverwaltung",
+    );
+    expect(app).toContain("um diese Daten selbst zu pflegen");
+  });
+
   it("records that no Datenschutzbeauftragter is appointed", () => {
     expect(DATENSCHUTZ).toContain("Ein Datenschutzbeauftragter ist nicht benannt");
   });
