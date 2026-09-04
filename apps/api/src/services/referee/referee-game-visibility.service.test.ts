@@ -39,6 +39,7 @@ import {
   seasons,
   teamEntries,
   teamStaff,
+  staffPeople,
 } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import { invalidateActiveSeasonCache } from "../admin/season.service";
@@ -1241,12 +1242,14 @@ describe("getVisibleRefereeGameById — Kampfgericht and contacts", () => {
       .insert(teamEntries)
       .values({ teamId, seasonId: season!.id })
       .returning({ id: teamEntries.id });
+    const [person] = await ctx.db
+      .insert(staffPeople)
+      .values({ firstName: "Ana", lastName: "Berger", phone: "+49 111" })
+      .returning({ id: staffPeople.id });
     await ctx.db.insert(teamStaff).values({
       teamEntryId: entry!.id,
-      firstName: "Ana",
-      lastName: "Berger",
+      personId: person!.id,
       role: "trainer",
-      phone: "+49 111",
     });
     const gameId = await seedGame({ homeTeamId: teamId, ...gameSeed });
     return { gameId, teamId, entryId: entry!.id };

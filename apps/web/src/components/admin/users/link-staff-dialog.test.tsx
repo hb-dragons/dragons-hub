@@ -3,63 +3,56 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import type { OwnClubTeam, TeamStaffMember, UserListItem } from "@dragons/shared";
+import type { StaffPersonWithAssignments, UserListItem } from "@dragons/shared";
 
-const teams: OwnClubTeam[] = [
-  {
-    id: 11,
-    teamId: 1,
-    name: "Dragons U16",
-    nameShort: null,
-    customName: null,
-    leagueId: null,
-    leagueName: null,
-    leagueTracked: true,
-    linkSource: "seeded",
-    estimatedGameDuration: null,
-    badgeColor: null,
-    displayOrder: 0,
-  },
-];
-
-const ada: TeamStaffMember = {
+const ada: StaffPersonWithAssignments = {
   id: 3,
-  teamEntryId: 11,
   firstName: "Ada",
   lastName: "Lovelace",
-  role: "trainer",
   phone: null,
   email: null,
   licence: null,
   photoUrl: null,
-  refereeContact: false,
+  assignments: [
+    {
+      id: 7,
+      teamEntryId: 11,
+      teamName: "Dragons U16",
+      role: "trainer",
+      refereeContact: false,
+    },
+  ],
 };
 
-// The component keys its two fetches by a literal ("link-staff-teams") and a
-// tuple (["link-staff-members", entryId]); the stub answers by shape so the
-// team list and the staff list cannot be confused for one another. It also
-// *calls* each fetcher, so the arguments the component passes to the API — the
-// team entry id in particular — are observable rather than stubbed away.
-const swrState = vi.hoisted(() => ({
-  staff: [] as unknown[],
-}));
+const ben: StaffPersonWithAssignments = {
+  id: 4,
+  firstName: "Ben",
+  lastName: "Byron",
+  phone: null,
+  email: null,
+  licence: null,
+  photoUrl: null,
+  assignments: [],
+};
+
+// The stub *calls* the fetcher, so the search fragment the component passes to
+// the API is observable rather than stubbed away.
+const swrState = vi.hoisted(() => ({ people: [] as unknown[] }));
 
 vi.mock("swr", () => ({
   default: (key: unknown, fetcher: (key: unknown) => Promise<unknown>) => {
     if (key === null) return { data: undefined, isLoading: false };
     void fetcher(key);
-    if (Array.isArray(key)) return { data: swrState.staff, isLoading: false };
-    return { data: teams, isLoading: false };
+    return { data: swrState.people, isLoading: false };
   },
 }));
 
 const linkStaff = vi.fn();
-const listStaff = vi.fn();
+const listPeople = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   api: {
-    teams: { list: vi.fn().mockResolvedValue([]) },
-    teamStaff: { list: (...args: unknown[]) => listStaff(...args) },
+    staffPeople: { list: (...args: unknown[]) => listPeople(...args) },
     users: { linkStaff: (...args: unknown[]) => linkStaff(...args) },
   },
 }));
@@ -77,7 +70,7 @@ const user: UserListItem = {
   emailVerified: true,
   role: null,
   refereeId: null,
-  staffId: null,
+  personId: null,
   banned: false,
   banReason: null,
   banExpires: null,
@@ -90,9 +83,9 @@ afterEach(cleanup);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  swrState.staff = [ada];
-  linkStaff.mockResolvedValue({ id: "u1", staffId: 3, role: "coach" });
-  listStaff.mockResolvedValue([ada]);
+  swrState.people = [ada, ben];
+  linkStaff.mockResolvedValue({ id: "u1", personId: 3, role: "coach" });
+  listPeople.mockResolvedValue([ada, ben]);
 });
 
 function renderDialog(onOpenChange = vi.fn(), onLinked = vi.fn()) {
@@ -109,14 +102,12 @@ function renderDialog(onOpenChange = vi.fn(), onLinked = vi.fn()) {
   return { onOpenChange, onLinked };
 }
 
-/** Pick the team, then the staff member — the staff list only exists after a team. */
 function pickAda() {
-  fireEvent.click(screen.getByRole("button", { name: "Dragons U16" }));
   fireEvent.click(screen.getByRole("button", { name: /Lovelace, Ada/ }));
 }
 
 describe("<LinkStaffDialog>", () => {
-  it("keeps the link button disabled until a staff member is picked", () => {
+  it("keeps the link button disabled until a person is picked", () => {
     renderDialog();
 
     expect(screen.getByRole("button", { name: "Link" })).toBeDisabled();
@@ -126,25 +117,35 @@ describe("<LinkStaffDialog>", () => {
     expect(screen.getByRole("button", { name: "Link" })).toBeEnabled();
   });
 
-  it("lists no staff before a team is picked", () => {
+  // Two coaches can share a name; the teams are what tells them apart.
+  it("shows each person's teams, and says so when they have none", () => {
     renderDialog();
 
-    expect(screen.queryByRole("button", { name: /Lovelace, Ada/ })).toBeNull();
-    expect(listStaff).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /Lovelace, Ada/ })).toHaveTextContent(
+      "Dragons U16",
+    );
+    expect(screen.getByRole("button", { name: /Byron, Ben/ })).toHaveTextContent(
+      en.users.linkStaffDialog.noTeams,
+    );
   });
 
-  // The staff endpoints are scoped by team *entry* id (`OwnClubTeam.id`, 11
-  // here), not by the season-stable squad id (`teamId`, 1) — passing the wrong
-  // one would list another season's staff, or none.
-  it("fetches the staff of the picked team by its entry id", () => {
+  it("searches the pool by the typed fragment", async () => {
     renderDialog();
 
-    fireEvent.click(screen.getByRole("button", { name: "Dragons U16" }));
+    fireEvent.change(screen.getByLabelText(en.users.linkStaffDialog.searchPlaceholder), {
+      target: { value: "love" },
+    });
 
-    expect(listStaff).toHaveBeenCalledWith(11);
+    await waitFor(() => expect(listPeople).toHaveBeenCalledWith("love"));
   });
 
-  it("sends the staff id with the coach grant on by default", async () => {
+  it("lists the whole pool before anything is typed", () => {
+    renderDialog();
+
+    expect(listPeople).toHaveBeenCalledWith(undefined);
+  });
+
+  it("sends the person id with the coach grant on by default", async () => {
     const { onLinked, onOpenChange } = renderDialog();
 
     pickAda();
@@ -152,7 +153,7 @@ describe("<LinkStaffDialog>", () => {
 
     await waitFor(() =>
       expect(linkStaff).toHaveBeenCalledWith("u1", {
-        staffId: 3,
+        personId: 3,
         grantCoachRole: true,
       }),
     );
@@ -170,7 +171,7 @@ describe("<LinkStaffDialog>", () => {
 
     await waitFor(() =>
       expect(linkStaff).toHaveBeenCalledWith("u1", {
-        staffId: 3,
+        personId: 3,
         grantCoachRole: false,
       }),
     );
@@ -188,25 +189,10 @@ describe("<LinkStaffDialog>", () => {
     expect(onLinked).not.toHaveBeenCalled();
   });
 
-  it("shows the empty state for a team with no staff", () => {
-    swrState.staff = [];
+  it("shows the empty state when the search matches nobody", () => {
+    swrState.people = [];
     renderDialog();
 
-    fireEvent.click(screen.getByRole("button", { name: "Dragons U16" }));
-
-    expect(
-      screen.getByText(en.users.linkStaffDialog.noResults),
-    ).toBeInTheDocument();
-  });
-
-  // Switching teams must drop a selection made in the previous team, or the
-  // link button would submit a staff member the admin can no longer see.
-  it("clears the picked staff member when the team changes", () => {
-    renderDialog();
-
-    pickAda();
-    fireEvent.click(screen.getByRole("button", { name: "Dragons U16" }));
-
-    expect(screen.getByRole("button", { name: "Link" })).toBeDisabled();
+    expect(screen.getByText(en.users.linkStaffDialog.noResults)).toBeInTheDocument();
   });
 });

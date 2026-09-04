@@ -103,6 +103,7 @@ describe("publicEndpoints", () => {
         staff: [
           {
             id: 1,
+            personId: 4,
             firstName: "Emily",
             lastName: "Gust",
             role: "trainer",

@@ -3,11 +3,12 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import type { TeamStaffMember } from "@dragons/shared";
+import type { StaffPersonWithAssignments, TeamStaffMember } from "@dragons/shared";
 
 const ada: TeamStaffMember = {
   id: 3,
   teamEntryId: 1,
+  personId: 20,
   firstName: "Ada",
   lastName: "Lovelace",
   role: "trainer",
@@ -18,16 +19,47 @@ const ada: TeamStaffMember = {
   refereeContact: false,
 };
 
+const ben: StaffPersonWithAssignments = {
+  id: 21,
+  firstName: "Ben",
+  lastName: "Byron",
+  phone: null,
+  email: null,
+  licence: null,
+  photoUrl: null,
+  assignments: [],
+};
+
+const adaPerson: StaffPersonWithAssignments = {
+  id: 20,
+  firstName: "Ada",
+  lastName: "Lovelace",
+  phone: "+49 170 1234567",
+  email: "ada@example.de",
+  licence: "C-Lizenz",
+  photoUrl: null,
+  assignments: [
+    { id: 3, teamEntryId: 1, teamName: "Dragons U16", role: "trainer", refereeContact: false },
+  ],
+};
+
+/**
+ * Two lists share one stub: the team's assignments, keyed by the staff URL, and
+ * the pool, keyed by the staff-people URL. Answering by key shape keeps the two
+ * from being confused for one another.
+ */
 const swrState = vi.hoisted(() => ({
-  staff: [] as TeamStaffMember[],
+  staff: [] as unknown[],
+  pool: [] as unknown[],
   mutate: vi.fn(),
 }));
 
 vi.mock("swr", () => ({
-  default: (key: string | null) =>
-    key === null
-      ? { data: undefined, mutate: swrState.mutate }
-      : { data: swrState.staff, mutate: swrState.mutate },
+  default: (key: string | null) => {
+    if (key === null) return { data: undefined, mutate: swrState.mutate };
+    if (key.includes("staff-people")) return { data: swrState.pool, mutate: swrState.mutate };
+    return { data: swrState.staff, mutate: swrState.mutate };
+  },
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -36,6 +68,11 @@ vi.mock("@/lib/api", () => ({
       create: vi.fn(),
       update: vi.fn(),
       remove: vi.fn(),
+    },
+    staffPeople: {
+      list: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
       uploadPhoto: vi.fn(),
     },
   },
@@ -50,6 +87,7 @@ afterEach(() => cleanup());
 beforeEach(() => {
   vi.clearAllMocks();
   swrState.staff = [];
+  swrState.pool = [adaPerson, ben];
   swrState.mutate.mockResolvedValue(undefined);
 });
 
@@ -62,109 +100,145 @@ function renderDialog(canManage = true) {
 }
 
 /** The dialog fetches nothing until it is open, so every test starts by opening it. */
-function open() {
-  renderDialog();
+function open(canManage = true) {
+  renderDialog(canManage);
   fireEvent.click(screen.getByRole("button", { name: "Staff" }));
 }
 
 describe("TeamStaffDialog add", () => {
-  it("posts the new staff member and refreshes the list", async () => {
-    vi.mocked(api.teamStaff.create).mockResolvedValue({ ...ada, id: 9 });
+  it("attaches a person picked from the pool", async () => {
     open();
 
-    fireEvent.change(screen.getByLabelText("First name"), { target: { value: " Ada " } });
-    fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Lovelace" } });
-    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "+49 170 1" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add staff member" }));
+    fireEvent.click(screen.getByRole("button", { name: /Byron, Ben/ }));
 
-    await waitFor(() => expect(api.teamStaff.create).toHaveBeenCalledTimes(1));
-    expect(api.teamStaff.create).toHaveBeenCalledWith(1, {
-      // The names are trimmed on the way out; the untouched contact fields go
-      // as empty strings, which the contract maps to null.
-      firstName: "Ada",
-      lastName: "Lovelace",
-      role: "trainer",
-      phone: "+49 170 1",
-      email: "",
-      licence: "",
-      refereeContact: false,
-    });
+    await waitFor(() =>
+      expect(api.teamStaff.create).toHaveBeenCalledWith(1, {
+        personId: 21,
+        role: "trainer",
+      }),
+    );
     expect(swrState.mutate).toHaveBeenCalled();
   });
 
-  it("keeps the add button disabled until both names are filled", () => {
+  // A coach already on this team must not be offered again — the API answers
+  // 409, and re-adding them is never what the admin meant.
+  it("leaves out people already attached to this team", () => {
+    swrState.staff = [ada];
     open();
-    const addButton = screen.getByRole("button", { name: "Add staff member" });
-    expect(addButton).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Ada" } });
-    expect(addButton).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Lovelace, Ada/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /Byron, Ben/ })).toBeInTheDocument();
+  });
 
-    fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Lovelace" } });
-    expect(addButton).toBeEnabled();
+  // Story 2 of the spec: entering a coach the club does not know yet — contact
+  // data included — stays one dialog.
+  it("creates a new person inline, with contact data, and attaches them in one call", async () => {
+    open();
+
+    fireEvent.click(screen.getByRole("button", { name: "New person" }));
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: " Zoe " } });
+    fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Zander" } });
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "+49 170 1" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "zoe@example.de" } });
+    fireEvent.change(screen.getByLabelText("Licence"), { target: { value: "C-Lizenz" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add staff member" }));
+
+    await waitFor(() =>
+      expect(api.teamStaff.create).toHaveBeenCalledWith(1, {
+        person: {
+          firstName: "Zoe",
+          lastName: "Zander",
+          phone: "+49 170 1",
+          email: "zoe@example.de",
+          licence: "C-Lizenz",
+        },
+        role: "trainer",
+      }),
+    );
+  });
+
+  it("keeps the inline add button disabled until both names are filled", () => {
+    open();
+    fireEvent.click(screen.getByRole("button", { name: "New person" }));
+
+    expect(screen.getByRole("button", { name: "Add staff member" })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Zoe" } });
+    expect(screen.getByRole("button", { name: "Add staff member" })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Zander" } });
+    expect(screen.getByRole("button", { name: "Add staff member" })).toBeEnabled();
   });
 
   it("shows the empty state when the team has no staff", () => {
     open();
-    expect(screen.getByText("No staff for this team yet.")).toBeInTheDocument();
+    expect(screen.getByText(en.teams.staff.empty)).toBeInTheDocument();
   });
 });
 
-describe("TeamStaffDialog edit", () => {
-  beforeEach(() => {
+describe("TeamStaffDialog rows", () => {
+  it("patches the role and the flag, and nothing else", async () => {
     swrState.staff = [ada];
-  });
-
-  it("patches only after an edit and sends the whole editable row", async () => {
-    vi.mocked(api.teamStaff.update).mockResolvedValue({ ...ada, lastName: "Byron" });
     open();
 
-    const saveButtons = screen.getAllByRole("button", { name: "Save" });
-    expect(saveButtons[0]).toBeDisabled();
+    fireEvent.click(screen.getByRole("switch"));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    fireEvent.change(screen.getByDisplayValue("Lovelace"), { target: { value: "Byron" } });
-    expect(screen.getAllByRole("button", { name: "Save" })[0]).toBeEnabled();
-    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]!);
-
-    await waitFor(() => expect(api.teamStaff.update).toHaveBeenCalledTimes(1));
-    expect(api.teamStaff.update).toHaveBeenCalledWith(1, 3, {
-      firstName: "Ada",
-      lastName: "Byron",
-      role: "trainer",
-      phone: "+49 170 1234567",
-      email: "ada@example.de",
-      licence: "C-Lizenz",
-      refereeContact: false,
-    });
+    await waitFor(() =>
+      expect(api.teamStaff.update).toHaveBeenCalledWith(1, 3, {
+        role: "trainer",
+        refereeContact: true,
+      }),
+    );
+    expect(swrState.mutate).toHaveBeenCalled();
   });
 
-  it("sends the flipped referee-contact toggle", async () => {
-    vi.mocked(api.teamStaff.update).mockResolvedValue({ ...ada, refereeContact: true });
+  it("keeps Save disabled until something on the row changes", () => {
+    swrState.staff = [ada];
     open();
 
-    // Index 0 is the existing row; the add form below it carries the same label.
-    fireEvent.click(screen.getAllByLabelText("Contact for referees")[0]!);
-    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]!);
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
 
-    await waitFor(() => expect(api.teamStaff.update).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(api.teamStaff.update).mock.calls[0]![2]).toMatchObject({
-      refereeContact: true,
-    });
+    fireEvent.click(screen.getByRole("switch"));
+
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
   });
 
-  it("clears a contact field with an empty string", async () => {
-    vi.mocked(api.teamStaff.update).mockResolvedValue({ ...ada, phone: null });
+  it("shows the person's contact data read-only on the row", () => {
+    swrState.staff = [ada];
     open();
 
-    fireEvent.change(screen.getByDisplayValue("+49 170 1234567"), { target: { value: "" } });
-    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]!);
-
-    await waitFor(() => expect(api.teamStaff.update).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(api.teamStaff.update).mock.calls[0]![2]).toMatchObject({ phone: "" });
+    expect(screen.getByText(/\+49 170 1234567/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Phone")).toBeNull();
   });
 
-  it("removes a staff member and refreshes the list", async () => {
-    vi.mocked(api.teamStaff.remove).mockResolvedValue({ success: true });
+  // The phone number belongs to the person, so editing it is the shared editor
+  // — a team-local field would be exactly the duplication ADR 0009 removed.
+  it("opens the person editor for the row's person", async () => {
+    swrState.staff = [ada];
+    open();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit person Ada Lovelace" }));
+
+    expect(screen.getByLabelText("Phone")).toHaveValue("+49 170 1234567");
+
+    vi.mocked(api.staffPeople.update).mockResolvedValue({ ...adaPerson, phone: "+49 222" });
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "+49 222" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(api.staffPeople.update).toHaveBeenCalledWith(20, {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        phone: "+49 222",
+        email: "ada@example.de",
+        licence: "C-Lizenz",
+      }),
+    );
+  });
+
+  it("removes an assignment and refreshes the list", async () => {
+    swrState.staff = [ada];
     open();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
@@ -175,74 +249,14 @@ describe("TeamStaffDialog edit", () => {
 });
 
 describe("TeamStaffDialog without manage permission", () => {
-  it("shows the existing staff read-only and offers no add form", () => {
+  it("shows the staff read-only and offers no add form", () => {
     swrState.staff = [ada];
-    renderDialog(false);
-    fireEvent.click(screen.getByRole("button", { name: "Staff" }));
+    open(false);
 
-    expect(screen.getByDisplayValue("Lovelace")).toBeDisabled();
-    expect(screen.getAllByRole("button", { name: "Save" })[0]).toBeDisabled();
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "New person" })).toBeNull();
     expect(screen.getByRole("button", { name: "Remove" })).toBeDisabled();
-    expect(
-      screen.queryByRole("button", { name: "Add staff member" }),
-    ).not.toBeInTheDocument();
-  });
-});
-
-describe("TeamStaffDialog portrait", () => {
-  const portraitUrl = "/admin/teams/1/staff/3/photo?v=abc.png";
-
-  function pickFile(): File {
-    const file = new File([new Uint8Array([1, 2, 3])], "ada.png", { type: "image/png" });
-    fireEvent.change(screen.getByLabelText("Portrait"), { target: { files: [file] } });
-    return file;
-  }
-
-  it("offers an upload and shows a placeholder while the member has no portrait", () => {
-    swrState.staff = [ada];
-    open();
-
-    expect(screen.getByRole("button", { name: "Upload portrait" })).toBeInTheDocument();
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
-  });
-
-  it("shows the stored portrait and offers to replace it", () => {
-    swrState.staff = [{ ...ada, photoUrl: portraitUrl }];
-    open();
-
-    const img = screen.getByAltText("Portrait of Ada Lovelace");
-    expect(img).toHaveAttribute("src", `http://localhost:3001${portraitUrl}`);
-    expect(screen.getByRole("button", { name: "Replace portrait" })).toBeInTheDocument();
-  });
-
-  it("uploads the picked file and refreshes the list", async () => {
-    swrState.staff = [ada];
-    vi.mocked(api.teamStaff.uploadPhoto).mockResolvedValue({ ...ada, photoUrl: portraitUrl });
-    open();
-
-    const file = pickFile();
-
-    await waitFor(() => {
-      expect(api.teamStaff.uploadPhoto).toHaveBeenCalledWith(1, 3, file);
-    });
-    expect(swrState.mutate).toHaveBeenCalled();
-  });
-
-  it("reports a rejected upload instead of failing silently", async () => {
-    swrState.staff = [ada];
-    vi.mocked(api.teamStaff.uploadPhoto).mockRejectedValue(new Error("Invalid request data"));
-    open();
-
-    pickFile();
-
-    expect(await screen.findByText("The portrait could not be uploaded.")).toBeInTheDocument();
-  });
-
-  it("disables the upload without manage permission", () => {
-    swrState.staff = [ada];
-    renderDialog(false);
-    fireEvent.click(screen.getByRole("button", { name: "Staff" }));
-
-    expect(screen.getByRole("button", { name: "Upload portrait" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Edit person Ada Lovelace" })).toBeDisabled();
   });
 });

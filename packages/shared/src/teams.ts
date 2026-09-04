@@ -49,10 +49,51 @@ export interface TeamReorderItem {
 export const TEAM_STAFF_ROLES = ["trainer", "co_trainer"] as const;
 export type TeamStaffRole = (typeof TEAM_STAFF_ROLES)[number];
 
-/** One staff member of a team entry, as the admin endpoints return them. */
-export interface TeamStaffMember {
+/**
+ * A staff person: the human the club holds contact data on (ADR 0009). Exists
+ * once regardless of how many teams they are attached to — the attachment is a
+ * {@link TeamStaffMember}, which carries only the role and the flag.
+ */
+export interface StaffPerson {
+  id: number;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  email: string | null;
+  licence: string | null;
+  /**
+   * API path of the portrait, or `null`. Relative to the API base so each
+   * caller prefixes its own origin, and stamped with the stored object name so
+   * replacing a portrait busts the cache the image route sets on the old one.
+   */
+  photoUrl: string | null;
+}
+
+/** One team a person is attached to, as the staff pool lists it. */
+export interface StaffPersonAssignment {
+  /** The `team_staff` id — what the team-scoped endpoints address. */
   id: number;
   teamEntryId: number;
+  teamName: string;
+  role: TeamStaffRole;
+  refereeContact: boolean;
+}
+
+/** A pool entry: the person plus the teams they hold this season. */
+export interface StaffPersonWithAssignments extends StaffPerson {
+  assignments: StaffPersonAssignment[];
+}
+
+/**
+ * One staff member of a team entry, as the admin endpoints return them: the
+ * assignment joined to its person, so the name and contact fields are the
+ * person's and are shared by every team that member is attached to.
+ */
+export interface TeamStaffMember {
+  /** The assignment id. The person is {@link personId}. */
+  id: number;
+  teamEntryId: number;
+  personId: number;
   firstName: string;
   lastName: string;
   role: TeamStaffRole;
@@ -77,7 +118,10 @@ export interface TeamStaffMember {
  * columns explicitly, and a test asserts neither value appears in the payload).
  */
 export interface PublicTeamStaff {
+  /** The assignment id — what `/public/staff/:id/photo` is keyed by. */
   id: number;
+  /** The person behind the assignment, so a consumer can dedupe across teams. */
+  personId: number;
   firstName: string;
   lastName: string;
   role: TeamStaffRole;

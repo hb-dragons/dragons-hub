@@ -226,26 +226,30 @@ describe("staff carry-forward", () => {
       photoFilename?: string | null;
       refereeContact?: boolean;
     },
-  ) {
-    await ctx.client.query(
-      `INSERT INTO team_staff (team_entry_id, first_name, last_name, role, phone, email, licence, photo_filename, referee_contact)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+  ): Promise<number> {
+    const person = await ctx.client.query<{ id: number }>(
+      `INSERT INTO staff_people (first_name, last_name, phone, email, licence, photo_filename)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
       [
-        entryId,
         values.firstName,
         values.lastName,
-        values.role,
         values.phone ?? null,
         values.email ?? null,
         values.licence ?? null,
         values.photoFilename ?? null,
-        values.refereeContact ?? false,
       ],
     );
+    await ctx.client.query(
+      `INSERT INTO team_staff (team_entry_id, person_id, role, referee_contact)
+       VALUES ($1, $2, $3, $4)`,
+      [entryId, person.rows[0]!.id, values.role, values.refereeContact ?? false],
+    );
+    return person.rows[0]!.id;
   }
 
   interface StaffRow {
     team_entry_id: number;
+    person_id: number;
     first_name: string;
     last_name: string;
     role: string;
@@ -258,8 +262,10 @@ describe("staff carry-forward", () => {
 
   function staffOfEntry(entryId: number) {
     return ctx.client.query<StaffRow>(
-      `SELECT team_entry_id, first_name, last_name, role, phone, email, licence, photo_filename, referee_contact
-       FROM team_staff WHERE team_entry_id = $1 ORDER BY last_name`,
+      `SELECT ts.team_entry_id, ts.person_id, p.first_name, p.last_name, ts.role,
+              p.phone, p.email, p.licence, p.photo_filename, ts.referee_contact
+       FROM team_staff ts JOIN staff_people p ON p.id = ts.person_id
+       WHERE ts.team_entry_id = $1 ORDER BY p.last_name`,
       [entryId],
     );
   }
@@ -285,7 +291,7 @@ describe("staff carry-forward", () => {
       [squad, old, oldLeague],
     );
     const oldEntryId = oldEntry.rows[0]!.id;
-    await seedStaff(oldEntryId, {
+    const adaPersonId = await seedStaff(oldEntryId, {
       firstName: "Ada",
       lastName: "Lovelace",
       role: "trainer",
@@ -295,7 +301,7 @@ describe("staff carry-forward", () => {
       photoFilename: "staff/ada.jpg",
       refereeContact: true,
     });
-    await seedStaff(oldEntryId, {
+    const benPersonId = await seedStaff(oldEntryId, {
       firstName: "Ben",
       lastName: "Byron",
       role: "co_trainer",
@@ -309,6 +315,7 @@ describe("staff carry-forward", () => {
     expect(staff.rows).toEqual([
       {
         team_entry_id: newEntryId,
+        person_id: benPersonId,
         first_name: "Ben",
         last_name: "Byron",
         role: "co_trainer",
@@ -320,6 +327,7 @@ describe("staff carry-forward", () => {
       },
       {
         team_entry_id: newEntryId,
+        person_id: adaPersonId,
         first_name: "Ada",
         last_name: "Lovelace",
         role: "trainer",
@@ -340,10 +348,10 @@ describe("staff carry-forward", () => {
     expect(entry.rows[0]!.custom_name).toBeNull();
   });
 
-  // A coach's account points at the staff row, and rollover writes new rows —
-  // so the link has to follow the person, or the account would keep serving
-  // last season's contact details.
-  it("moves a linked user account onto the carried-forward staff row", async () => {
+  // The account points at the person, and rollover copies assignments — so the
+  // link needs no rewriting at all, and next season's row is the same human
+  // (ADR 0009), not a copy of their contact details.
+  it("keeps a linked account pointing at the person, now on the new entry", async () => {
     await seedClubConfig(100);
     const old = await seedSeason("2025/26", "active", "2025-09-01");
     const next = await seedSeason("2026/27", "upcoming", "2026-09-01");
@@ -355,16 +363,16 @@ describe("staff carry-forward", () => {
       [squad, old, oldLeague],
     );
     const oldEntryId = oldEntry.rows[0]!.id;
-    // Two rows, so a mapping that pairs the lists up wrongly is visible.
+    // Two rows, so a copy that duplicated people would be visible.
     await seedStaff(oldEntryId, { firstName: "Ada", lastName: "Lovelace", role: "trainer" });
-    await seedStaff(oldEntryId, { firstName: "Ben", lastName: "Byron", role: "co_trainer" });
-    const linkedStaff = await ctx.client.query<{ id: number }>(
-      `SELECT id FROM team_staff WHERE team_entry_id = $1 AND last_name = 'Byron'`,
-      [oldEntryId],
-    );
+    const benPersonId = await seedStaff(oldEntryId, {
+      firstName: "Ben",
+      lastName: "Byron",
+      role: "co_trainer",
+    });
     await ctx.client.query(
-      `INSERT INTO "user" (id, name, email, role, staff_id) VALUES ($1, $2, $3, $4, $5)`,
-      ["coach-1", "Ben Byron", "ben@example.de", "coach", linkedStaff.rows[0]!.id],
+      `INSERT INTO "user" (id, name, email, role, person_id) VALUES ($1, $2, $3, $4, $5)`,
+      ["coach-1", "Ben Byron", "ben@example.de", "coach", benPersonId],
     );
     vi.mocked(fetchLeagueRoster).mockResolvedValue([ref(9700, "Dragons U16", 100)]);
 
@@ -376,15 +384,23 @@ describe("staff carry-forward", () => {
       last_name: string;
       role: string;
     }>(
-      `SELECT s.team_entry_id, s.last_name, u.role
-       FROM "user" u JOIN team_staff s ON s.id = u.staff_id
+      `SELECT ts.team_entry_id, p.last_name, u.role
+       FROM "user" u
+       JOIN staff_people p ON p.id = u.person_id
+       JOIN team_staff ts ON ts.person_id = p.id AND ts.team_entry_id = $1
        WHERE u.id = 'coach-1'`,
+      [newEntryId],
     );
     expect(linked.rows[0]).toEqual({
       team_entry_id: newEntryId,
       last_name: "Byron",
       role: "coach",
     });
+    // One person per human, on both seasons' entries.
+    const people = await ctx.client.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM staff_people`,
+    );
+    expect(people.rows[0]!.count).toBe("2");
   });
 
   // Nothing links to these rows, so the mapping must simply do nothing rather
@@ -412,10 +428,10 @@ describe("staff carry-forward", () => {
 
     await seedSeasonTeamEntries(next, [51]);
 
-    const rows = await ctx.client.query<{ staff_id: number | null }>(
-      `SELECT staff_id FROM "user" WHERE id = 'u-unlinked'`,
+    const rows = await ctx.client.query<{ person_id: number | null }>(
+      `SELECT person_id FROM "user" WHERE id = 'u-unlinked'`,
     );
-    expect(rows.rows[0]!.staff_id).toBeNull();
+    expect(rows.rows[0]!.person_id).toBeNull();
     expect((await staffOfEntry(await entryIdOf(squad, next))).rows).toHaveLength(1);
   });
 

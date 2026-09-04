@@ -23,6 +23,7 @@ export const SWR_KEYS = {
   teams: (seasonId?: number) =>
     seasonId === undefined ? "/admin/teams" : `/admin/teams?seasonId=${seasonId}`,
   teamStaff: (entryId: number) => `/admin/teams/${entryId}/staff`,
+  staffPeople: (search: string) => `/admin/staff-people?q=${search}`,
   refereesPaginated: (opts: {
     scope?: "own" | "all";
     search?: string;

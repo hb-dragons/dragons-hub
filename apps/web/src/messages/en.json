@@ -29,7 +29,8 @@
     "domainEvents": "Events",
     "pushTest": "Push Test",
     "groupSystem": "System",
-    "broadcast": "Broadcast"
+    "broadcast": "Broadcast",
+    "staffPeople": "Staff people"
   },
   "dashboard": {
     "title": "Command Center",
@@ -634,7 +635,13 @@
       "roles": {
         "trainer": "Coach",
         "co_trainer": "Assistant coach"
-      }
+      },
+      "noContactData": "No contact data on file.",
+      "editPerson": "Edit person {name}",
+      "newPerson": "New person",
+      "pickExisting": "Existing person",
+      "contactHint": "Phone, email and licence are kept on the person.",
+      "noCandidates": "No matching person found."
     }
   },
   "users": {
@@ -743,12 +750,13 @@
     },
     "linkStaffDialog": {
       "title": "Link Staff Record",
-      "description": "Select a staff record for {name}",
-      "teamLabel": "Team",
-      "noResults": "No staff recorded for this team",
+      "description": "Pick a staff person for {name}",
+      "noResults": "No person found",
       "grantCoachRole": "Grant the coach role",
       "linking": "Linking...",
-      "link": "Link"
+      "link": "Link",
+      "searchPlaceholder": "Search by name",
+      "noTeams": "On no team"
     },
     "toast": {
       "created": "User created successfully",
@@ -1798,5 +1806,21 @@
     "uploadImageAria": "Upload image",
     "deleteImageTitle": "Delete image?",
     "deleteImageDescription": "“{name}” will be permanently deleted. This action cannot be undone."
+  },
+  "staffPeople": {
+    "title": "Staff people",
+    "subtitle": "Everyone the club holds staff data on, with the teams they hold this season.",
+    "searchPlaceholder": "Search by name",
+    "add": "Add person",
+    "empty": "No staff people yet.",
+    "noTeams": "On no team",
+    "createTitle": "Add person",
+    "editTitle": "Edit person",
+    "dialogSubtitle": "This data applies to every team this person works with.",
+    "editPerson": "Edit person {name}",
+    "deletePerson": "Delete person {name}",
+    "deleteBlocked": "Could not delete the person — they are still attached to a team.",
+    "saveFailed": "Could not save the person.",
+    "deleteFailed": "Could not delete the person."
   }
 }

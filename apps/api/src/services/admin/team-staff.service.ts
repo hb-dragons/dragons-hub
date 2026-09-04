@@ -1,72 +1,52 @@
 import { getDb } from "../../config/database";
-import { teams, teamEntries, teamStaff } from "@dragons/db/schema";
+import { teams, teamEntries, teamStaff, staffPeople } from "@dragons/db/schema";
 import { and, eq } from "drizzle-orm";
 import type { TeamStaffMember } from "@dragons/shared";
 import type { TeamStaffCreateBody, TeamStaffUpdateBody } from "@dragons/contracts";
 import { dispatchSiteRebuild } from "../site-rebuild.service";
-import {
-  storeStaffPortrait,
-  readStaffPortrait,
-  deleteStaffPortrait,
-  staffPortraitContentType,
-} from "./team-staff-photo.service";
+import { isUniqueViolation } from "../db-errors";
+import { insertStaffPerson } from "./staff-person.service";
+
+/**
+ * Assignments of staff people to team entries (ADR 0009). This module owns the
+ * role and the referee-contact flag; the name, contact data, licence and
+ * portrait belong to the person and are edited through `staff-person.service`.
+ */
 
 /** Trainer above Co-Trainer; alphabetical inside a role. */
 const ROLE_RANK: Record<TeamStaffMember["role"], number> = { trainer: 0, co_trainer: 1 };
 
-const STAFF_COLUMNS = {
+/** The assignment joined to its person — what the admin endpoints return. */
+const MEMBER_COLUMNS = {
   id: teamStaff.id,
   teamEntryId: teamStaff.teamEntryId,
-  firstName: teamStaff.firstName,
-  lastName: teamStaff.lastName,
+  personId: teamStaff.personId,
   role: teamStaff.role,
-  phone: teamStaff.phone,
-  email: teamStaff.email,
-  licence: teamStaff.licence,
-  photoFilename: teamStaff.photoFilename,
   refereeContact: teamStaff.refereeContact,
+  firstName: staffPeople.firstName,
+  lastName: staffPeople.lastName,
+  phone: staffPeople.phone,
+  email: staffPeople.email,
+  licence: staffPeople.licence,
+  photoFilename: staffPeople.photoFilename,
 };
 
-/** A selected row — `STAFF_COLUMNS` minus the mapping to `photoUrl`. */
-type StaffRow = Omit<TeamStaffMember, "photoUrl"> & { photoFilename: string | null };
+type MemberRow = Omit<TeamStaffMember, "photoUrl"> & { photoFilename: string | null };
 
 /**
- * Replaces the stored object name with the path the portrait is served from.
- * The object name rides along as `?v=` so a replaced portrait is fetched again
- * rather than read from the cache the image route sets on the old one.
+ * Replaces the stored object name with the path the portrait is served from —
+ * the person's route, since the object belongs to the person and not to this
+ * team's assignment.
  */
-function toMember({ photoFilename, ...rest }: StaffRow): TeamStaffMember {
+function toMember({ photoFilename, ...rest }: MemberRow): TeamStaffMember {
   return {
     ...rest,
     photoUrl:
       photoFilename === null
         ? null
-        : `/admin/teams/${rest.teamEntryId}/staff/${rest.id}/photo?v=${photoFilename}`,
+        : `/admin/staff-people/${rest.personId}/photo?v=${photoFilename}`,
   };
 }
-
-/**
- * The fields a PATCH may write. Typed as keys of the update body, so a field
- * added to the contract and forgotten here — or listed here after leaving the
- * contract — fails to compile rather than silently going unwritten.
- */
-const PATCHABLE_FIELDS = [
-  "firstName",
-  "lastName",
-  "role",
-  "phone",
-  "email",
-  "licence",
-  "refereeContact",
-] as const satisfies readonly (keyof TeamStaffUpdateBody)[];
-
-/** The other direction: every key of the update body must appear in the list above. */
-type _EveryPatchableFieldListed = keyof TeamStaffUpdateBody extends
-  (typeof PATCHABLE_FIELDS)[number]
-  ? true
-  : ["missing from PATCHABLE_FIELDS", Exclude<keyof TeamStaffUpdateBody, (typeof PATCHABLE_FIELDS)[number]>];
-const _patchableFieldsAreExhaustive: _EveryPatchableFieldListed = true;
-void _patchableFieldsAreExhaustive;
 
 function byRoleThenName(a: TeamStaffMember, b: TeamStaffMember): number {
   return (
@@ -92,58 +72,94 @@ async function isOwnClubEntry(entryId: number): Promise<boolean> {
   return entry !== undefined;
 }
 
-/**
- * Drops a portrait object once nothing points at it any more. Season rollover
- * copies `photoFilename` onto the new entry's row rather than duplicating the
- * object (`copyStaffForward` in `team-entry-seeding.service.ts`), so the same
- * object is routinely shared by one coach's rows across seasons — deleting it
- * on the strength of a single row would 404 the portrait on all the others.
- * Call this only after the row that pointed at the object has been repointed
- * or removed, so the check sees the state the caller is leaving behind.
- */
-async function dropPortraitIfUnreferenced(filename: string | null): Promise<void> {
-  if (!filename) return;
-  const [stillReferenced] = await getDb()
-    .select({ id: teamStaff.id })
+/** One assignment read back with its person, or `null` when it is gone. */
+async function readMember(assignmentId: number): Promise<TeamStaffMember | null> {
+  const [row] = await getDb()
+    .select(MEMBER_COLUMNS)
     .from(teamStaff)
-    .where(eq(teamStaff.photoFilename, filename))
-    .limit(1);
-  if (!stillReferenced) await deleteStaffPortrait(filename);
+    .innerJoin(staffPeople, eq(teamStaff.personId, staffPeople.id))
+    .where(eq(teamStaff.id, assignmentId));
+  return row ? toMember(row) : null;
 }
 
 /** Staff of one team entry, or `null` when the entry is not an own-club entry. */
 export async function listTeamStaff(entryId: number): Promise<TeamStaffMember[] | null> {
   if (!(await isOwnClubEntry(entryId))) return null;
   const rows = await getDb()
-    .select(STAFF_COLUMNS)
+    .select(MEMBER_COLUMNS)
     .from(teamStaff)
+    .innerJoin(staffPeople, eq(teamStaff.personId, staffPeople.id))
     .where(eq(teamStaff.teamEntryId, entryId));
   return rows.map(toMember).sort(byRoleThenName);
 }
 
+/**
+ * Why an assignment could not be created. Each maps to its own answer: an
+ * unknown entry and an unknown person are both 404 but name different things,
+ * and a person already on the team is a 409 rather than a second row.
+ */
+type CreateTeamStaffFailure = "entry-not-found" | "person-not-found" | "duplicate";
+
+export type CreateTeamStaffResult =
+  | { ok: true; member: TeamStaffMember }
+  | { ok: false; reason: CreateTeamStaffFailure };
+
+/**
+ * Attaches a person to a team entry, creating the person first when the caller
+ * sent an inline one — the common case of a coach the club does not know yet,
+ * kept to a single dialog. A person the club already knows is picked by id, so
+ * their phone number and portrait are shared rather than copied.
+ */
 export async function createTeamStaff(
   entryId: number,
   body: TeamStaffCreateBody,
-): Promise<TeamStaffMember | null> {
-  if (!(await isOwnClubEntry(entryId))) return null;
-  const [row] = await getDb()
-    .insert(teamStaff)
-    .values({
-      teamEntryId: entryId,
-      firstName: body.firstName,
-      lastName: body.lastName,
-      role: body.role,
-      phone: body.phone ?? null,
-      email: body.email ?? null,
-      licence: body.licence ?? null,
-      refereeContact: body.refereeContact ?? false,
-    })
-    .returning(STAFF_COLUMNS);
-  if (!row) return null;
+): Promise<CreateTeamStaffResult> {
+  if (!(await isOwnClubEntry(entryId))) return { ok: false, reason: "entry-not-found" };
+
+  if (!("person" in body)) {
+    const [person] = await getDb()
+      .select({ id: staffPeople.id })
+      .from(staffPeople)
+      .where(eq(staffPeople.id, body.personId))
+      .limit(1);
+    if (!person) return { ok: false, reason: "person-not-found" };
+  }
+
+  let assignmentId: number;
+  try {
+    // One transaction, so a rejected assignment takes an inline person with it
+    // rather than leaving a nameless half-entry in the pool.
+    assignmentId = await getDb().transaction(async (tx) => {
+      const personId =
+        "person" in body ? (await insertStaffPerson(tx, body.person)).id : body.personId;
+      const [row] = await tx
+        .insert(teamStaff)
+        .values({
+          teamEntryId: entryId,
+          personId,
+          role: body.role,
+          refereeContact: body.refereeContact ?? false,
+        })
+        .returning({ id: teamStaff.id });
+      // `returning` on a single-row insert always yields the row; the guard only
+      // keeps the id non-optional.
+      if (!row) throw new Error("Insert returned no team staff assignment");
+      return row.id;
+    });
+  } catch (error) {
+    // The unique constraint on (entry, person) is what keeps a team from
+    // showing the same human twice — a repeat pick is that, not a 500.
+    if (isUniqueViolation(error)) return { ok: false, reason: "duplicate" };
+    throw error;
+  }
+
+  const member = await readMember(assignmentId);
+  if (!member) return { ok: false, reason: "entry-not-found" };
   await dispatchSiteRebuild("team staff created");
-  return toMember(row);
+  return { ok: true, member };
 }
 
+/** Updates the role and the referee-contact flag. The person is not touched. */
 export async function updateTeamStaff(
   entryId: number,
   staffId: number,
@@ -152,99 +168,36 @@ export async function updateTeamStaff(
   if (!(await isOwnClubEntry(entryId))) return null;
 
   // Only the keys the caller actually sent are written, so an omitted field
-  // stays untouched while an explicit `null` on a contact field still clears it
-  // — `{...body}` would not tell those two apart.
+  // stays untouched.
   const set: Record<string, unknown> = { updatedAt: new Date() };
-  for (const field of PATCHABLE_FIELDS) {
-    if (body[field] !== undefined) set[field] = body[field];
-  }
+  if (body.role !== undefined) set["role"] = body.role;
+  if (body.refereeContact !== undefined) set["refereeContact"] = body.refereeContact;
 
   const [row] = await getDb()
     .update(teamStaff)
     .set(set)
-    // The entry predicate is what stops a staff id from one team being patched
-    // through another team's URL.
+    // The entry predicate is what stops an assignment id from one team being
+    // patched through another team's URL.
     .where(and(eq(teamStaff.id, staffId), eq(teamStaff.teamEntryId, entryId)))
-    .returning(STAFF_COLUMNS);
+    .returning({ id: teamStaff.id });
   if (!row) return null;
+  const member = await readMember(row.id);
+  if (!member) return null;
   await dispatchSiteRebuild("team staff updated");
-  return toMember(row);
+  return member;
 }
 
+/**
+ * Removes the assignment. The person stays in the pool with their contact data
+ * — a mid-season team change is not a reason to forget the human.
+ */
 export async function deleteTeamStaff(entryId: number, staffId: number): Promise<boolean> {
   if (!(await isOwnClubEntry(entryId))) return false;
   const deleted = await getDb()
     .delete(teamStaff)
     .where(and(eq(teamStaff.id, staffId), eq(teamStaff.teamEntryId, entryId)))
-    .returning({ id: teamStaff.id, photoFilename: teamStaff.photoFilename });
-  const removed = deleted[0];
-  if (!removed) return false;
-  await dropPortraitIfUnreferenced(removed.photoFilename);
+    .returning({ id: teamStaff.id });
+  if (!deleted[0]) return false;
   await dispatchSiteRebuild("team staff deleted");
   return true;
-}
-
-/**
- * Stores a new portrait for a staff member and points the row at it, dropping
- * the object it replaced. Returns `null` when the entry is not an own-club
- * entry or the staff id is not one of its rows; throws `PortraitRejected` when
- * the bytes are not a storable image.
- */
-export async function setTeamStaffPhoto(
-  entryId: number,
-  staffId: number,
-  buffer: Buffer,
-  contentType: string,
-): Promise<TeamStaffMember | null> {
-  const previous = await findStaffPhoto(entryId, staffId);
-  if (previous === null) return null;
-
-  // Store first: an upload that fails leaves the row pointing at the portrait
-  // it already had rather than at nothing.
-  const filename = await storeStaffPortrait(buffer, contentType);
-  const [row] = await getDb()
-    .update(teamStaff)
-    .set({ photoFilename: filename, updatedAt: new Date() })
-    .where(and(eq(teamStaff.id, staffId), eq(teamStaff.teamEntryId, entryId)))
-    .returning(STAFF_COLUMNS);
-  if (!row) {
-    // The row went away between the lookup and the write, so nothing will ever
-    // point at what we just uploaded.
-    await deleteStaffPortrait(filename);
-    return null;
-  }
-
-  await dropPortraitIfUnreferenced(previous.photoFilename);
-  await dispatchSiteRebuild("team staff portrait changed");
-  return toMember(row);
-}
-
-/** The stored portrait bytes plus the type to serve them as, or `null`. */
-export async function getTeamStaffPhoto(
-  entryId: number,
-  staffId: number,
-): Promise<{ buffer: Buffer; contentType: string } | null> {
-  const staff = await findStaffPhoto(entryId, staffId);
-  if (!staff?.photoFilename) return null;
-  return {
-    buffer: await readStaffPortrait(staff.photoFilename),
-    contentType: staffPortraitContentType(staff.photoFilename),
-  };
-}
-
-/**
- * The portrait pointer of one staff member, or `null` when the entry is not an
- * own-club entry or the staff id does not belong to it. Both photo paths funnel
- * through here so neither can skip the own-club scoping.
- */
-async function findStaffPhoto(
-  entryId: number,
-  staffId: number,
-): Promise<{ photoFilename: string | null } | null> {
-  if (!(await isOwnClubEntry(entryId))) return null;
-  const [row] = await getDb()
-    .select({ photoFilename: teamStaff.photoFilename })
-    .from(teamStaff)
-    .where(and(eq(teamStaff.id, staffId), eq(teamStaff.teamEntryId, entryId)));
-  return row ?? null;
 }

@@ -52,7 +52,7 @@ describe("user request bodies satisfy @dragons/contracts schemas", () => {
 
   it("linkStaff body (linking, with the coach grant) parses against userStaffLinkBodySchema", async () => {
     const { api, calls } = recordingClient();
-    await api.linkStaff("user-123", { staffId: 7, grantCoachRole: true });
+    await api.linkStaff("user-123", { personId: 7, grantCoachRole: true });
     const parsed = userStaffLinkBodySchema.safeParse(calls[0]!.body);
     expect(
       parsed.error?.issues,
@@ -64,7 +64,7 @@ describe("user request bodies satisfy @dragons/contracts schemas", () => {
 
   it("linkStaff body (unlinking) parses against userStaffLinkBodySchema", async () => {
     const { api, calls } = recordingClient();
-    await api.linkStaff("user-123", { staffId: null });
+    await api.linkStaff("user-123", { personId: null });
     const parsed = userStaffLinkBodySchema.safeParse(calls[0]!.body);
     expect(
       parsed.error?.issues,

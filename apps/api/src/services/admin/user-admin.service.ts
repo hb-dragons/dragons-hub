@@ -1,8 +1,9 @@
 import { getDb } from "../../config/database";
-import { user as userTable, referees, teamStaff } from "@dragons/db/schema";
+import { user as userTable, referees, staffPeople } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import { parseRoles } from "@dragons/shared";
 import { UserAdminError } from "./user-admin.errors";
+import { isUniqueViolation } from "../db-errors";
 
 /**
  * Links or unlinks a referee record from a user account.
@@ -42,13 +43,16 @@ export async function setUserRefereeLink(
 }
 
 /**
- * Links or unlinks a staff record from a user account, optionally granting the
+ * Links or unlinks a staff person from a user account, optionally granting the
  * read-only `coach` role in the same step.
+ *
+ * The link is to the person, not to one team's assignment (ADR 0009), so it
+ * survives the coach changing teams and a self-edit reaches every team at once.
  *
  * Mirrors `setUserRefereeLink`, with two differences the staff link needs:
  *
- * - The unique constraint on `user.staff_id` is checked up front, so a second
- *   account claiming the same staff record answers 409 instead of surfacing a
+ * - The unique constraint on `user.person_id` is checked up front, so a second
+ *   account claiming the same person answers 409 instead of surfacing a
  *   Postgres constraint violation as a 500. Re-linking the account that already
  *   holds it is not a conflict.
  * - `grantCoachRole` only ever *adds* the role, and only when linking. Roles are
@@ -62,29 +66,29 @@ export async function setUserRefereeLink(
  */
 export async function setUserStaffLink(
   userId: string,
-  staffId: number | null,
+  personId: number | null,
   grantCoachRole: boolean,
-): Promise<{ id: string; staffId: number | null; role: string | null }> {
-  if (staffId !== null) {
-    const [staff] = await getDb()
-      .select({ id: teamStaff.id })
-      .from(teamStaff)
-      .where(eq(teamStaff.id, staffId))
+): Promise<{ id: string; personId: number | null; role: string | null }> {
+  if (personId !== null) {
+    const [person] = await getDb()
+      .select({ id: staffPeople.id })
+      .from(staffPeople)
+      .where(eq(staffPeople.id, personId))
       .limit(1);
 
-    if (!staff) {
-      throw new UserAdminError("Staff member not found", "STAFF_NOT_FOUND");
+    if (!person) {
+      throw new UserAdminError("Staff person not found", "STAFF_NOT_FOUND");
     }
 
     const [holder] = await getDb()
       .select({ id: userTable.id })
       .from(userTable)
-      .where(eq(userTable.staffId, staffId))
+      .where(eq(userTable.personId, personId))
       .limit(1);
 
     if (holder && holder.id !== userId) {
       throw new UserAdminError(
-        "Staff member is already linked to another account",
+        "Staff person is already linked to another account",
         "STAFF_ALREADY_LINKED",
       );
     }
@@ -101,9 +105,9 @@ export async function setUserStaffLink(
   }
 
   const role =
-    staffId !== null && grantCoachRole ? withCoachRole(existing.role) : existing.role;
+    personId !== null && grantCoachRole ? withCoachRole(existing.role) : existing.role;
 
-  const [updated] = await runStaffUpdate(userId, staffId, role);
+  const [updated] = await runStaffUpdate(userId, personId, role);
 
   // The row was read a statement earlier, so this only fires if it vanished in
   // between. Keeping the guard means the return type stays non-optional.
@@ -115,43 +119,32 @@ export async function setUserStaffLink(
 }
 
 /**
- * Runs the link update, translating the unique violation on `user.staff_id`
+ * Runs the link update, translating the unique violation on `user.person_id`
  * into the same 409 the up-front holder check produces. That check is a read
- * followed by a write, so two admins linking the same staff record at once can
- * both pass it; without this the loser would get a 500 for what is, to them,
+ * followed by a write, so two admins linking the same person at once can both
+ * pass it; without this the loser would get a 500 for what is, to them,
  * exactly the conflict the first caller was told about.
  */
-async function runStaffUpdate(userId: string, staffId: number | null, role: string | null) {
+async function runStaffUpdate(userId: string, personId: number | null, role: string | null) {
   try {
     return await getDb()
       .update(userTable)
-      .set({ staffId, role, updatedAt: new Date() })
+      .set({ personId, role, updatedAt: new Date() })
       .where(eq(userTable.id, userId))
       .returning({
         id: userTable.id,
-        staffId: userTable.staffId,
+        personId: userTable.personId,
         role: userTable.role,
       });
   } catch (error) {
     if (isUniqueViolation(error)) {
       throw new UserAdminError(
-        "Staff member is already linked to another account",
+        "Staff person is already linked to another account",
         "STAFF_ALREADY_LINKED",
       );
     }
     throw error;
   }
-}
-
-/**
- * Postgres `unique_violation` (23505). Drizzle wraps driver errors in a
- * `DrizzleQueryError` and hangs the original off `cause`, so the code is looked
- * for along the whole chain rather than on the thrown object alone.
- */
-function isUniqueViolation(error: unknown): boolean {
-  const code = (error as { code?: unknown; cause?: { code?: unknown } } | null)?.code;
-  const causeCode = (error as { cause?: { code?: unknown } } | null)?.cause?.code;
-  return code === "23505" || causeCode === "23505";
 }
 
 /** Appends `coach` to a comma-joined role string, leaving the rest in order. */

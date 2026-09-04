@@ -28,6 +28,7 @@ import {
   teams,
   teamEntries,
   teamStaff,
+  staffPeople,
   user as userTable,
 } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
@@ -152,7 +153,7 @@ describe("setUserRefereeLink", () => {
   });
 });
 
-/** One season -> squad -> entry chain, reused by every staff row in a test. */
+/** One season -> squad -> entry chain, for the assignment a person can hold. */
 async function seedTeamEntry(): Promise<number> {
   const [season] = await ctx.db
     .insert(seasons)
@@ -176,17 +177,17 @@ async function seedTeamEntry(): Promise<number> {
   return entry!.id;
 }
 
-async function seedStaff(entryId: number, lastName: string): Promise<number> {
+async function seedPerson(lastName: string): Promise<number> {
   const [row] = await ctx.db
-    .insert(teamStaff)
-    .values({ teamEntryId: entryId, firstName: "Coach", lastName, role: "trainer" })
-    .returning({ id: teamStaff.id });
+    .insert(staffPeople)
+    .values({ firstName: "Coach", lastName })
+    .returning({ id: staffPeople.id });
   return row!.id;
 }
 
 async function userRow(id: string) {
   const [row] = await ctx.db
-    .select({ staffId: userTable.staffId, role: userTable.role })
+    .select({ personId: userTable.personId, role: userTable.role })
     .from(userTable)
     .where(eq(userTable.id, id));
   return row;
@@ -195,59 +196,59 @@ async function userRow(id: string) {
 describe("setUserStaffLink", () => {
   it("links a staff record to a user", async () => {
     await seedUser("u1");
-    const staffId = await seedStaff(await seedTeamEntry(), "Eins");
+    const personId = await seedPerson("Eins");
 
-    const result = await setUserStaffLink("u1", staffId, false);
+    const result = await setUserStaffLink("u1", personId, false);
 
-    expect(result).toEqual({ id: "u1", staffId, role: null });
-    expect(await userRow("u1")).toEqual({ staffId, role: null });
+    expect(result).toEqual({ id: "u1", personId, role: null });
+    expect(await userRow("u1")).toEqual({ personId, role: null });
   });
 
   it("grants the coach role when the flag is set", async () => {
     await seedUser("u1");
-    const staffId = await seedStaff(await seedTeamEntry(), "Eins");
+    const personId = await seedPerson("Eins");
 
-    const result = await setUserStaffLink("u1", staffId, true);
+    const result = await setUserStaffLink("u1", personId, true);
 
-    expect(result).toEqual({ id: "u1", staffId, role: "coach" });
+    expect(result).toEqual({ id: "u1", personId, role: "coach" });
   });
 
   it("appends coach to the existing roles rather than replacing them", async () => {
     await seedUser("u1", "teamManager");
-    const staffId = await seedStaff(await seedTeamEntry(), "Eins");
+    const personId = await seedPerson("Eins");
 
-    await setUserStaffLink("u1", staffId, true);
+    await setUserStaffLink("u1", personId, true);
 
     expect((await userRow("u1"))?.role).toBe("teamManager,coach");
   });
 
   it("does not duplicate the coach role when the user already has it", async () => {
     await seedUser("u1", "coach");
-    const staffId = await seedStaff(await seedTeamEntry(), "Eins");
+    const personId = await seedPerson("Eins");
 
-    await setUserStaffLink("u1", staffId, true);
+    await setUserStaffLink("u1", personId, true);
 
     expect((await userRow("u1"))?.role).toBe("coach");
   });
 
   it("leaves roles alone when the flag is not set", async () => {
     await seedUser("u1", "teamManager");
-    const staffId = await seedStaff(await seedTeamEntry(), "Eins");
+    const personId = await seedPerson("Eins");
 
-    await setUserStaffLink("u1", staffId, false);
+    await setUserStaffLink("u1", personId, false);
 
     expect((await userRow("u1"))?.role).toBe("teamManager");
   });
 
   it("unlinks and leaves every role untouched", async () => {
     await seedUser("u1");
-    const staffId = await seedStaff(await seedTeamEntry(), "Eins");
-    await setUserStaffLink("u1", staffId, true);
+    const personId = await seedPerson("Eins");
+    await setUserStaffLink("u1", personId, true);
 
     const result = await setUserStaffLink("u1", null, false);
 
-    expect(result).toEqual({ id: "u1", staffId: null, role: "coach" });
-    expect(await userRow("u1")).toEqual({ staffId: null, role: "coach" });
+    expect(result).toEqual({ id: "u1", personId: null, role: "coach" });
+    expect(await userRow("u1")).toEqual({ personId: null, role: "coach" });
   });
 
   // The grant flag only ever adds a role; unlinking never revokes one, so a
@@ -275,17 +276,16 @@ describe("setUserStaffLink", () => {
   });
 
   it("throws STAFF_ALREADY_LINKED when another account already holds the link", async () => {
-    const entryId = await seedTeamEntry();
-    const staffId = await seedStaff(entryId, "Eins");
+    const personId = await seedPerson("Eins");
     await seedUser("u1");
     await seedUser("u2");
-    await setUserStaffLink("u2", staffId, false);
+    await setUserStaffLink("u2", personId, false);
 
-    await expect(setUserStaffLink("u1", staffId, false)).rejects.toMatchObject({
+    await expect(setUserStaffLink("u1", personId, false)).rejects.toMatchObject({
       code: "STAFF_ALREADY_LINKED",
     });
-    expect((await userRow("u1"))?.staffId).toBeNull();
-    expect((await userRow("u2"))?.staffId).toBe(staffId);
+    expect((await userRow("u1"))?.personId).toBeNull();
+    expect((await userRow("u2"))?.personId).toBe(personId);
   });
 
   // The holder check is a read followed by a write, so two admins linking the
@@ -293,13 +293,13 @@ describe("setUserStaffLink", () => {
   // it. Whichever way the two calls interleave, the loser must see the same
   // 409 as a caller who lost the up-front check.
   it("answers 409 for the loser of two concurrent links on one staff record", async () => {
-    const staffId = await seedStaff(await seedTeamEntry(), "Eins");
+    const personId = await seedPerson("Eins");
     await seedUser("u1");
     await seedUser("u2");
 
     const results = await Promise.allSettled([
-      setUserStaffLink("u1", staffId, false),
-      setUserStaffLink("u2", staffId, false),
+      setUserStaffLink("u1", personId, false),
+      setUserStaffLink("u2", personId, false),
     ]);
 
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
@@ -310,13 +310,13 @@ describe("setUserStaffLink", () => {
   // Re-sending the same link for the account that already holds it must not
   // trip the conflict guard — the dialog can submit twice.
   it("is idempotent for the account that already holds the link", async () => {
-    const staffId = await seedStaff(await seedTeamEntry(), "Eins");
+    const personId = await seedPerson("Eins");
     await seedUser("u1");
-    await setUserStaffLink("u1", staffId, false);
+    await setUserStaffLink("u1", personId, false);
 
-    const result = await setUserStaffLink("u1", staffId, true);
+    const result = await setUserStaffLink("u1", personId, true);
 
-    expect(result).toEqual({ id: "u1", staffId, role: "coach" });
+    expect(result).toEqual({ id: "u1", personId, role: "coach" });
   });
 
   it("changes nothing when the staff record does not exist", async () => {
@@ -324,32 +324,48 @@ describe("setUserStaffLink", () => {
 
     await expect(setUserStaffLink("u1", 999999, true)).rejects.toThrow();
 
-    expect(await userRow("u1")).toEqual({ staffId: null, role: "teamManager" });
+    expect(await userRow("u1")).toEqual({ personId: null, role: "teamManager" });
   });
 
   it("relinks only the addressed account", async () => {
-    const entryId = await seedTeamEntry();
-    const staffA = await seedStaff(entryId, "Eins");
-    const staffB = await seedStaff(entryId, "Zwei");
+    const personA = await seedPerson("Eins");
+    const personB = await seedPerson("Zwei");
     await seedUser("u1");
     await seedUser("u2");
-    await setUserStaffLink("u2", staffB, false);
+    await setUserStaffLink("u2", personB, false);
 
-    await setUserStaffLink("u1", staffA, false);
+    await setUserStaffLink("u1", personA, false);
 
-    expect((await userRow("u1"))?.staffId).toBe(staffA);
-    expect((await userRow("u2"))?.staffId).toBe(staffB);
+    expect((await userRow("u1"))?.personId).toBe(personA);
+    expect((await userRow("u2"))?.personId).toBe(personB);
   });
 
-  // The FK is ON DELETE SET NULL: removing the staff row drops the link and
+  // The FK is ON DELETE SET NULL: removing the person drops the link and
   // leaves the account — and the coach role it was granted — in place.
-  it("nulls the link when the staff row is deleted", async () => {
+  it("nulls the link when the person is deleted", async () => {
     await seedUser("u1");
-    const staffId = await seedStaff(await seedTeamEntry(), "Eins");
-    await setUserStaffLink("u1", staffId, true);
+    const personId = await seedPerson("Eins");
+    await setUserStaffLink("u1", personId, true);
 
-    await ctx.db.delete(teamStaff).where(eq(teamStaff.id, staffId));
+    await ctx.db.delete(staffPeople).where(eq(staffPeople.id, personId));
 
-    expect(await userRow("u1")).toEqual({ staffId: null, role: "coach" });
+    expect(await userRow("u1")).toEqual({ personId: null, role: "coach" });
+  });
+
+  // The link is to the human, not to one team's assignment (ADR 0009), so a
+  // coach who leaves one team keeps their account and their other teams.
+  it("keeps the link when one of the person's assignments is removed", async () => {
+    await seedUser("u1");
+    const personId = await seedPerson("Eins");
+    const entryId = await seedTeamEntry();
+    const [assignment] = await ctx.db
+      .insert(teamStaff)
+      .values({ teamEntryId: entryId, personId, role: "trainer" })
+      .returning({ id: teamStaff.id });
+    await setUserStaffLink("u1", personId, true);
+
+    await ctx.db.delete(teamStaff).where(eq(teamStaff.id, assignment!.id));
+
+    expect(await userRow("u1")).toEqual({ personId, role: "coach" });
   });
 });

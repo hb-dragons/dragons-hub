@@ -145,7 +145,7 @@ export function UserActions({
   // gone takes it away in the roles dialog.
   async function handleUnlinkStaff() {
     try {
-      await api.users.linkStaff(user.id, { staffId: null })
+      await api.users.linkStaff(user.id, { personId: null })
       toast.success(t("users.toast.staffUnlinked"))
       onMutated()
     } catch {
@@ -194,12 +194,12 @@ export function UserActions({
               {t("users.actions.removeReferee")}
             </DropdownMenuItem>
           )}
-          {!isSelf && user.staffId === null && (
+          {!isSelf && user.personId === null && (
             <DropdownMenuItem onSelect={() => setLinkStaffOpen(true)}>
               {t("users.actions.linkStaff")}
             </DropdownMenuItem>
           )}
-          {!isSelf && user.staffId !== null && (
+          {!isSelf && user.personId !== null && (
             <DropdownMenuItem onSelect={() => { void handleUnlinkStaff(); }}>
               {t("users.actions.unlinkStaff")}
             </DropdownMenuItem>

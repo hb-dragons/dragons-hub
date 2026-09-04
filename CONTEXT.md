@@ -86,14 +86,18 @@ _Avoid_: partner, second referee, officials
 The Dragons team that supplies the table crew (Anschreiber, Zeitnehmer, Shotclock) for a home game. A team, not named persons.
 _Avoid_: table officials, scorer's table, officials
 
+**Staff person**:
+The human the club holds staff contact data on — name, phone, email, licence, portrait. Exists once regardless of how many teams they work with (ADR-0009). Owned by the club, not synced from the federation.
+_Avoid_: person (alone, in code, for anything else), trainer, ehrenamtliche
+
 **Team staff**:
-A person attached to a team entry in a staff role, with the contact data the club holds on them. Owned by the club, not synced from the federation. The only roles today are Trainer and Co-Trainer, so every staff member is a coach.
-_Avoid_: trainer (in code), ehrenamtliche, team member
+The assignment of a staff person to one team entry in a role, with the referee-contact flag. Carries no contact data of its own — that belongs to the staff person. The only roles today are Trainer and Co-Trainer, so every staff member is a coach.
+_Avoid_: trainer (in code), team member
 
 **Coach**:
-Team staff in the Trainer or Co-Trainer role. Today that is all team staff.
+A staff person assigned in the Trainer or Co-Trainer role. Today that is all team staff.
 _Avoid_: trainer (in code), head coach
 
 **Team contact**:
-The team staff an assigned referee reaches before a referee game: the members flagged as referee contact, or every coach of that team entry when none is flagged. Only exists for Dragons teams.
+The staff people an assigned referee reaches before a referee game: those whose assignment is flagged as referee contact, or every coach of that team entry when none is flagged. Only exists for Dragons teams.
 _Avoid_: contact person, Ansprechpartner (in code)

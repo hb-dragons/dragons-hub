@@ -26,4 +26,5 @@ export type {
   SyncEntriesQuery,
   TriggerEventBody,
   BroadcastUpsertBody,
+  TeamStaffCreateBody,
 } from "./endpoints";

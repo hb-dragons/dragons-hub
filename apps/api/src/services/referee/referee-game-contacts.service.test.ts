@@ -17,6 +17,7 @@ vi.mock("../../config/database", () => ({
     ),
 }));
 
+import { eq } from "drizzle-orm";
 import { getRefereeGameContacts } from "./referee-game-contacts.service";
 import { invalidateActiveSeasonCache } from "../admin/season.service";
 import {
@@ -27,6 +28,7 @@ import {
   teams,
   teamEntries,
   teamStaff,
+  staffPeople,
 } from "@dragons/db/schema";
 import {
   setupTestDb,
@@ -124,24 +126,41 @@ async function seedEntry(opts: {
   return row!.id;
 }
 
+/**
+ * Attaches a person to an entry. `personId` reuses an existing person, which is
+ * how a coach ends up on two teams with one phone number (ADR 0009); otherwise
+ * a new person is created from the given fields.
+ */
 async function seedStaff(opts: {
   teamEntryId: number;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
+  personId?: number;
   role?: "trainer" | "co_trainer";
   phone?: string | null;
   email?: string | null;
   refereeContact?: boolean;
-}): Promise<void> {
+}): Promise<number> {
+  let personId = opts.personId;
+  if (personId === undefined) {
+    const [person] = await ctx.db
+      .insert(staffPeople)
+      .values({
+        firstName: opts.firstName ?? "Given",
+        lastName: opts.lastName ?? "Name",
+        phone: opts.phone ?? null,
+        email: opts.email ?? null,
+      })
+      .returning({ id: staffPeople.id });
+    personId = person!.id;
+  }
   await ctx.db.insert(teamStaff).values({
     teamEntryId: opts.teamEntryId,
-    firstName: opts.firstName,
-    lastName: opts.lastName,
+    personId,
     role: opts.role ?? "trainer",
-    phone: opts.phone ?? null,
-    email: opts.email ?? null,
     refereeContact: opts.refereeContact ?? false,
   });
+  return personId;
 }
 
 async function seedMatch(opts: {
@@ -548,6 +567,34 @@ describe("getRefereeGameContacts", () => {
     expect(result.contacts[0]?.contacts.map((c) => c.lastName).sort()).toEqual([
       "Berger",
       "Draak",
+    ]);
+  });
+
+  it("shows one entry per person, with the number the person now carries", async () => {
+    const seasonId = await seedSeason("2026/27", "active");
+    const own = await seedTeam({ name: "Dragons 1", isOwnClub: true });
+    const entry = await seedEntry({ teamId: own.teamId, seasonId });
+    const other = await seedTeam({ name: "Dragons 2", isOwnClub: true });
+    const otherEntry = await seedEntry({ teamId: other.teamId, seasonId });
+    // One coach on two teams — the case the flat model duplicated (ADR 0009).
+    const personId = await seedStaff({
+      teamEntryId: entry,
+      firstName: "Ana",
+      lastName: "Berger",
+      phone: "+49 111",
+    });
+    await seedStaff({ teamEntryId: otherEntry, personId, role: "co_trainer" });
+
+    await ctx.db
+      .update(staffPeople)
+      .set({ phone: "+49 222" })
+      .where(eq(staffPeople.id, personId));
+
+    const gameId = await seedRefereeGame({ homeTeamId: own.teamId });
+    const result = await getRefereeGameContacts(gameId);
+
+    expect(result.contacts[0]?.contacts).toEqual([
+      { firstName: "Ana", lastName: "Berger", role: "trainer", phone: "+49 222", email: null },
     ]);
   });
 

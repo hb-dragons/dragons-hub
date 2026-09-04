@@ -32,13 +32,13 @@ describe("visibleSurfaces", () => {
   });
   it("scopes team manager to league + boards (no operations/system)", () => {
     const ids = visibleSurfaces(teamManager).map((s) => s.id).sort();
-    expect(ids).toEqual(["boards", "matches", "standings", "teams"]);
+    expect(ids).toEqual(["boards", "matches", "staffPeople", "standings", "teams"]);
   });
   it("gives the coach seam league view + boards (intentional wide grant)", () => {
     // Coach is granted team/match/standing/board view (see rbac.ts), so it
     // surfaces Boards in Tools. If the coach grant narrows, update this.
     const ids = visibleSurfaces(coach).map((s) => s.id).sort();
-    expect(ids).toEqual(["boards", "matches", "standings", "teams"]);
+    expect(ids).toEqual(["boards", "matches", "staffPeople", "standings", "teams"]);
   });
   it("unions surfaces across comma-separated multi-role users", () => {
     const ids = visibleSurfaces(multiRole).map((s) => s.id);

@@ -114,7 +114,8 @@ tables (`user`, `session`, `account`, `verification`) use text ids,
 | `leagues` | `packages/db/src/schema/leagues.ts` | apiLigaId (unique), ligaNr, name, seasonId (legacy SDK int), seasonRefId (FK → seasons.id, NOT NULL), vorabliga (boolean), isTracked, discoveredAt, dataHash — season scoping for matches/standings flows through `leagues.seasonRefId`; sync gates to active+upcoming seasons; public reads are active-season-only; admin reads accept an optional `seasonId` query param (defaulting to the active season) |
 | `teams` | `packages/db/src/schema/teams.ts` | apiTeamPermanentId (unique), name, clubId, isOwnClub, dataHash — the Squad (federation identity); club-facing fields live on `teamEntries` |
 | `teamEntries` | `packages/db/src/schema/team-entries.ts` | teamId FK + seasonId FK (unique pair), leagueId FK (nullable = not connected), linkSource (`seeded`\|`manual`), customName, badgeColor, estimatedGameDuration, displayOrder — the per-season Team entry; source of truth for team↔league (ADR 0004) |
-| `teamStaff` | `packages/db/src/schema/team-staff.ts` | teamEntryId FK (cascade), firstName, lastName, role (`trainer`\|`co_trainer`), phone, email, licence, photoFilename, refereeContact — the Hub owns people in club roles (ADR 0008); attached to the entry, so staff are per season and copied forward by `team-entry-seeding.service.ts` |
+| `teamStaff` | `packages/db/src/schema/team-staff.ts` | teamEntryId FK (cascade), personId FK (cascade), role (`trainer`\|`co_trainer`), refereeContact, unique (teamEntryId, personId) — the assignment of a staff person to a team entry (ADR 0009); attached to the entry, so assignments are per season and copied forward by `team-entry-seeding.service.ts` with the same person |
+| `staffPeople` | `packages/db/src/schema/staff-people.ts` | firstName, lastName, phone, email, licence, photoFilename — the human the club holds staff data on, once regardless of how many teams (ADR 0009); the Hub owns people in club roles (ADR 0008) |
 | `venues` | `packages/db/src/schema/venues.ts` | apiId (unique), name, street, postalCode, city, lat/lng, dataHash |
 | `matches` | `packages/db/src/schema/matches.ts` | apiMatchId (unique), leagueId FK, venueId FK, scores, sr1Open, sr2Open, sr3Open, JSONB fields, versioning |
 | `standings` | `packages/db/src/schema/standings.ts` | leagueId FK + teamApiId (unique), position, won, lost, points |
@@ -154,7 +155,7 @@ tables (`user`, `session`, `account`, `verification`) use text ids,
 | `pushDevices` | `packages/db/src/schema/push-devices.ts` | userId, token (unique), platform, locale, lastSeenAt |
 | `playerPhotos` | `packages/db/src/schema/player-photos.ts` | filename, originalName, width, height — uploaded player photos for social posts |
 | `socialBackgrounds` | `packages/db/src/schema/social-backgrounds.ts` | filename, originalName, width, height, isDefault — background images for social posts |
-| `user` | `packages/db/src/schema/auth.ts` | id (text PK), email (unique), name, role, refereeId FK (unique), staffId FK (unique, set null on staff delete), banned, banReason, banExpires |
+| `user` | `packages/db/src/schema/auth.ts` | id (text PK), email (unique), name, role, refereeId FK (unique), personId FK (unique, set null on staff person delete), banned, banReason, banExpires |
 | `session` | `packages/db/src/schema/auth.ts` | id (text PK), userId FK (cascade), token (unique), expiresAt, ipAddress, userAgent, impersonatedBy |
 | `account` | `packages/db/src/schema/auth.ts` | id (text PK), userId FK (cascade), providerId, accountId, password |
 | `verification` | `packages/db/src/schema/auth.ts` | id (text PK), identifier, value, expiresAt |
@@ -662,11 +663,15 @@ nested under their task.
 | PATCH | `/admin/teams/:id` | Update a team entry (custom name, color, duration, connected league) |
 | PUT | `/admin/teams/order` | Reorder a season's team entries (`seasonId` optional, defaults to active) |
 | GET | `/admin/teams/:id/staff` | List the staff of a team entry (`team:view`) |
-| POST | `/admin/teams/:id/staff` | Add a staff member to a team entry (`team:manage`) |
-| PATCH | `/admin/teams/:id/staff/:staffId` | Update a staff member, including the referee-contact flag (`team:manage`) |
-| DELETE | `/admin/teams/:id/staff/:staffId` | Remove a staff member from a team entry (`team:manage`) |
-| GET | `/admin/teams/:id/staff/:staffId/photo` | Serve a staff member's portrait (`team:view`) |
-| POST | `/admin/teams/:id/staff/:staffId/photo` | Upload or replace a staff member's portrait (`team:manage`) |
+| POST | `/admin/teams/:id/staff` | Attach a staff person to a team entry, by id or created inline (`team:manage`) |
+| PATCH | `/admin/teams/:id/staff/:staffId` | Update the role and the referee-contact flag of an assignment (`team:manage`) |
+| DELETE | `/admin/teams/:id/staff/:staffId` | Remove an assignment, leaving the person in the pool (`team:manage`) |
+| GET | `/admin/staff-people` | List staff people with their current-season assignments; `?q=` matches either name (`team:view`) |
+| POST | `/admin/staff-people` | Add a staff person to the pool (`team:manage`) |
+| PATCH | `/admin/staff-people/:id` | Update a person's name, contact data and licence (`team:manage`) |
+| DELETE | `/admin/staff-people/:id` | Delete a staff person; 409 while they hold an assignment (`team:manage`) |
+| GET | `/admin/staff-people/:id/photo` | Serve a staff person's portrait (`team:view`) |
+| POST | `/admin/staff-people/:id/photo` | Upload or replace a staff person's portrait (`team:manage`) |
 
 ### Admin - Venues
 
@@ -680,7 +685,7 @@ nested under their task.
 | Method | Path | Description |
 |--------|------|-------------|
 | PATCH | `/admin/users/:id/referee-link` | Link or unlink a referee record from a user account |
-| PATCH | `/admin/users/:id/staff-link` | Link or unlink a staff record from a user account; `grantCoachRole` also grants the `coach` role |
+| PATCH | `/admin/users/:id/staff-link` | Link or unlink a staff person from a user account; `grantCoachRole` also grants the `coach` role |
 
 User listing, role assignment and banning are served by better-auth's admin
 plugin under `/api/auth/*`, not by this route group.
@@ -788,9 +793,9 @@ for a device that does not exist.
 | GET | `/public/matches/:id/context` | H2H record and form for both teams (no auth) |
 | GET | `/public/schedule.ics` | ICS calendar subscription feed for own-club matches. Default window: 30 days back to 180 days forward (no auth) |
 | GET | `/public/standings` | League standings (no auth) |
-| GET | `/public/teams` | List teams (no auth). Own-club rows carry `staff[]` (id, first/last name, role, licence, portrait path) — never phone or email |
+| GET | `/public/teams` | List teams (no auth). Own-club rows carry `staff[]` (assignment id, personId, first/last name, role, licence, portrait path) — never phone or email |
 | GET | `/public/teams/:id/stats` | Season stats and recent form for a team (no auth) |
-| GET | `/public/staff/:id/photo` | Portrait of a team staff member as stored bytes, own-club entries only (no auth). Addressed by staff id alone, since the Website renders it from a static page |
+| GET | `/public/staff/:id/photo` | Portrait of a team staff member as stored bytes, own-club entries only (no auth). Addressed by the assignment id alone, since the Website renders it from a static page; resolved to the person's object |
 | GET | `/public/home/dashboard` | Aggregated home screen data: next game, recent results, upcoming games, club stats (no auth) |
 | GET | `/public/assets/clubs/:id` | Club logo as webp, proxied by club id. The route constrains `:id` to `[0-9]+\.webp` |
 | GET | `/public/notifications/unsubscribe` | Email unsubscribe confirmation page for a per-recipient token (no auth). **Safe** — renders a form and changes nothing, so a link scanner cannot opt a member out. Query: `token`, optional `locale`. 404 + a readable page for an unknown token. |

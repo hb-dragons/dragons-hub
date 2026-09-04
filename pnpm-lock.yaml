@@ -264,15 +264,6 @@ importers:
         specifier: '>=0.35.0 <0.36'
         version: 0.35.3(@types/node@25.8.0)
     devDependencies:
-      '@dragons/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      '@dragons/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
-      '@google-cloud/storage':
-        specifier: ^7.19.0
-        version: 7.19.0(supports-color@8.1.1)
       '@types/node':
         specifier: ^25.8.0
         version: 25.8.0
@@ -285,9 +276,6 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^4.1.6
         version: 4.1.6(vitest@4.1.6)
-      drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2(@electric-sql/pglite@0.4.5)(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.28.17)(pg@8.20.0)
       eslint:
         specifier: ^9.28.0
         version: 9.39.4(jiti@2.7.0)(supports-color@8.1.1)

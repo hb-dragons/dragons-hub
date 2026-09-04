@@ -5,8 +5,8 @@ export interface UserListItem {
   emailVerified: boolean;
   role: string | null;
   refereeId: number | null;
-  /** The linked `team_staff` row, or null when the account is not staff. */
-  staffId: number | null;
+  /** The linked staff person, or null when the account is not staff. */
+  personId: number | null;
   banned: boolean | null;
   banReason: string | null;
   banExpires: number | null;

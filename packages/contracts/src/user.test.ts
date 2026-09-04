@@ -66,52 +66,52 @@ describe("userIdParamSchema", () => {
 });
 
 describe("userStaffLinkBodySchema", () => {
-  it("accepts a positive integer staffId", () => {
-    expect(userStaffLinkBodySchema.parse({ staffId: 7 })).toEqual({ staffId: 7 });
+  it("accepts a positive integer personId", () => {
+    expect(userStaffLinkBodySchema.parse({ personId: 7 })).toEqual({ personId: 7 });
   });
 
-  it("accepts staffId: null (unlink)", () => {
-    expect(userStaffLinkBodySchema.parse({ staffId: null })).toEqual({
-      staffId: null,
+  it("accepts personId: null (unlink)", () => {
+    expect(userStaffLinkBodySchema.parse({ personId: null })).toEqual({
+      personId: null,
     });
   });
 
   it("accepts the optional grantCoachRole flag", () => {
-    expect(userStaffLinkBodySchema.parse({ staffId: 7, grantCoachRole: true })).toEqual({
-      staffId: 7,
+    expect(userStaffLinkBodySchema.parse({ personId: 7, grantCoachRole: true })).toEqual({
+      personId: 7,
       grantCoachRole: true,
     });
   });
 
   it("leaves grantCoachRole undefined when omitted, so the service decides the default", () => {
-    expect(userStaffLinkBodySchema.parse({ staffId: 7 }).grantCoachRole).toBeUndefined();
+    expect(userStaffLinkBodySchema.parse({ personId: 7 }).grantCoachRole).toBeUndefined();
   });
 
-  it("rejects a missing staffId field", () => {
+  it("rejects a missing personId field", () => {
     expect(userStaffLinkBodySchema.safeParse({}).success).toBe(false);
   });
 
   it("rejects zero", () => {
-    expect(userStaffLinkBodySchema.safeParse({ staffId: 0 }).success).toBe(false);
+    expect(userStaffLinkBodySchema.safeParse({ personId: 0 }).success).toBe(false);
   });
 
   it("rejects a float", () => {
-    expect(userStaffLinkBodySchema.safeParse({ staffId: 1.5 }).success).toBe(false);
+    expect(userStaffLinkBodySchema.safeParse({ personId: 1.5 }).success).toBe(false);
   });
 
-  it("rejects a string staffId", () => {
-    expect(userStaffLinkBodySchema.safeParse({ staffId: "7" }).success).toBe(false);
+  it("rejects a string personId", () => {
+    expect(userStaffLinkBodySchema.safeParse({ personId: "7" }).success).toBe(false);
   });
 
   it("rejects a non-boolean grantCoachRole", () => {
     expect(
-      userStaffLinkBodySchema.safeParse({ staffId: 7, grantCoachRole: "yes" }).success,
+      userStaffLinkBodySchema.safeParse({ personId: 7, grantCoachRole: "yes" }).success,
     ).toBe(false);
   });
 
   it("rejects unknown keys", () => {
     expect(
-      userStaffLinkBodySchema.safeParse({ staffId: 7, role: "coach" }).success,
+      userStaffLinkBodySchema.safeParse({ personId: 7, role: "coach" }).success,
     ).toBe(false);
   });
 });

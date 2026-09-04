@@ -8,13 +8,13 @@ export interface UserRefereeLinkResult {
 }
 
 /**
- * Result of linking/unlinking a staff record to a user account. `role` is the
+ * Result of linking/unlinking a staff person to a user account. `role` is the
  * account's comma-joined role string after the call, so a caller that asked for
  * the coach grant can render the new roles without refetching.
  */
 export interface UserStaffLinkResult {
   id: string;
-  staffId: number | null;
+  personId: number | null;
   role: string | null;
 }
 

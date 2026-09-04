@@ -47,6 +47,9 @@ export type {
   PublicTeamStaff,
   TeamReorderItem,
   TeamStaffMember,
+  StaffPerson,
+  StaffPersonAssignment,
+  StaffPersonWithAssignments,
   TeamStaffRole,
 } from "./teams";
 export { TEAM_STAFF_ROLES, teamDisplayName } from "./teams";

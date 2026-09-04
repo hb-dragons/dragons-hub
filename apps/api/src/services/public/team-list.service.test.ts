@@ -64,31 +64,56 @@ async function seedEntry(teamId: number, seasonId: number, displayOrder = 0): Pr
   return r.rows[0]!.id;
 }
 
+async function seedPerson(member: {
+  firstName: string;
+  lastName: string;
+  phone?: string | null;
+  email?: string | null;
+  licence?: string | null;
+  photoFilename?: string | null;
+}): Promise<number> {
+  const r = await ctx.client.query<{ id: number }>(
+    `INSERT INTO staff_people (first_name, last_name, phone, email, licence, photo_filename)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+    [
+      member.firstName,
+      member.lastName,
+      member.phone ?? null,
+      member.email ?? null,
+      member.licence ?? null,
+      member.photoFilename ?? null,
+    ],
+  );
+  return r.rows[0]!.id;
+}
+
+/** Attaches a person to an entry; creates the person unless one is given. */
 async function seedStaff(
   entryId: number,
   member: {
-    firstName: string;
-    lastName: string;
+    firstName?: string;
+    lastName?: string;
     role: string;
+    personId?: number;
     phone?: string | null;
     email?: string | null;
     licence?: string | null;
     photoFilename?: string | null;
   },
 ): Promise<number> {
+  const personId =
+    member.personId ??
+    (await seedPerson({
+      firstName: member.firstName ?? "Given",
+      lastName: member.lastName ?? "Name",
+      phone: member.phone,
+      email: member.email,
+      licence: member.licence,
+      photoFilename: member.photoFilename,
+    }));
   const r = await ctx.client.query<{ id: number }>(
-    `INSERT INTO team_staff (team_entry_id, first_name, last_name, role, phone, email, licence, photo_filename)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-    [
-      entryId,
-      member.firstName,
-      member.lastName,
-      member.role,
-      member.phone ?? null,
-      member.email ?? null,
-      member.licence ?? null,
-      member.photoFilename ?? null,
-    ],
+    `INSERT INTO team_staff (team_entry_id, person_id, role) VALUES ($1, $2, $3) RETURNING id`,
+    [entryId, personId, member.role],
   );
   return r.rows[0]!.id;
 }
@@ -203,6 +228,7 @@ describe("listPublicTeams", () => {
     expect(own?.staff).toEqual([
       {
         id: withPhoto,
+        personId: expect.any(Number),
         firstName: "Emily",
         lastName: "Gust",
         role: "trainer",
@@ -211,6 +237,7 @@ describe("listPublicTeams", () => {
       },
       {
         id: withoutPhoto,
+        personId: expect.any(Number),
         firstName: "Ben",
         lastName: "Adler",
         role: "co_trainer",
@@ -252,6 +279,27 @@ describe("listPublicTeams", () => {
     const payload = JSON.stringify(rows);
     expect(payload).not.toContain("+49 170 1234567");
     expect(payload).not.toContain("emily@example.de");
+  });
+
+  it("shows one person's portrait on both teams they train", async () => {
+    const active = await seedSeason("2026/27", "active");
+    const first = await seedEntry(await seedTeam(7105, "Dragons U16"), active);
+    const second = await seedEntry(await seedTeam(7106, "Dragons U18"), active);
+    const person = await seedPerson({
+      firstName: "Emily",
+      lastName: "Gust",
+      photoFilename: "abc.webp",
+    });
+    await seedStaff(first, { role: "trainer", personId: person });
+    await seedStaff(second, { role: "co_trainer", personId: person });
+
+    const rows = await listPublicTeams();
+    const staff = rows.flatMap((r) => r.staff ?? []);
+
+    expect(staff).toHaveLength(2);
+    expect(new Set(staff.map((s) => s.personId))).toEqual(new Set([person]));
+    expect(staff[0]?.photoUrl).toBe(`/public/staff/${staff[0]?.id}/photo?v=abc.webp`);
+    expect(staff[1]?.photoUrl).toBe(`/public/staff/${staff[1]?.id}/photo?v=abc.webp`);
   });
 
   it("gives an entry without staff an empty list", async () => {

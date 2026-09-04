@@ -21,6 +21,7 @@ export type SurfaceLabelKey =
   | "nav.matches"
   | "nav.standings"
   | "nav.teams"
+  | "nav.staffPeople"
   | "nav.board"
   | "nav.bookings"
   | "nav.venues"
@@ -54,6 +55,7 @@ export const SURFACE_META: Record<string, { href: string; labelKey: SurfaceLabel
   matches: { href: "/admin/matches", labelKey: "nav.matches" },
   standings: { href: "/admin/standings", labelKey: "nav.standings" },
   teams: { href: "/admin/teams", labelKey: "nav.teams" },
+  staffPeople: { href: "/admin/staff", labelKey: "nav.staffPeople" },
   boards: { href: "/admin/boards", labelKey: "nav.board" },
   bookings: { href: "/admin/bookings", labelKey: "nav.bookings" },
   venues: { href: "/admin/venues", labelKey: "nav.venues" },

@@ -37,6 +37,7 @@ import { errorHandler } from "../../middleware/error";
 import {
   user as userTable,
   teamStaff,
+  staffPeople,
   teamEntries,
   teams,
   seasons,
@@ -107,21 +108,19 @@ async function seedStaff(lastName: string): Promise<number> {
     .insert(teamEntries)
     .values({ teamId: team!.id, seasonId: season!.id })
     .returning({ id: teamEntries.id });
-  const [staff] = await ctx.db
+  const [person] = await ctx.db
+    .insert(staffPeople)
+    .values({ firstName: "Coach", lastName })
+    .returning({ id: staffPeople.id });
+  await ctx.db
     .insert(teamStaff)
-    .values({
-      teamEntryId: entry!.id,
-      firstName: "Coach",
-      lastName,
-      role: "trainer",
-    })
-    .returning({ id: teamStaff.id });
-  return staff!.id;
+    .values({ teamEntryId: entry!.id, personId: person!.id, role: "trainer" });
+  return person!.id;
 }
 
 async function userRow(id: string) {
   const [row] = await ctx.db
-    .select({ staffId: userTable.staffId, role: userTable.role })
+    .select({ personId: userTable.personId, role: userTable.role })
     .from(userTable)
     .where(eq(userTable.id, id));
   return row;
@@ -131,59 +130,62 @@ describe("PATCH /admin/users/:id/staff-link over HTTP", () => {
   it("grants the coach role only when the flag is set", async () => {
     await seedUser("u1");
     await seedUser("u2");
-    const staffA = await seedStaff("Eins");
-    const staffB = await seedStaff("Zwei");
+    const personA = await seedStaff("Eins");
+    const personB = await seedStaff("Zwei");
 
-    const granted = await linkStaff("u1", { staffId: staffA, grantCoachRole: true });
-    const plain = await linkStaff("u2", { staffId: staffB, grantCoachRole: false });
+    const granted = await linkStaff("u1", { personId: personA, grantCoachRole: true });
+    const plain = await linkStaff("u2", { personId: personB, grantCoachRole: false });
 
     expect(granted.status).toBe(200);
     expect(plain.status).toBe(200);
-    expect(await userRow("u1")).toEqual({ staffId: staffA, role: "coach" });
-    expect(await userRow("u2")).toEqual({ staffId: staffB, role: null });
+    expect(await userRow("u1")).toEqual({ personId: personA, role: "coach" });
+    expect(await userRow("u2")).toEqual({ personId: personB, role: null });
   });
 
   it("answers 409 when the staff record is already linked elsewhere", async () => {
     await seedUser("u1");
     await seedUser("u2");
-    const staffId = await seedStaff("Eins");
-    await linkStaff("u2", { staffId });
+    const personId = await seedStaff("Eins");
+    await linkStaff("u2", { personId });
 
-    const res = await linkStaff("u1", { staffId });
+    const res = await linkStaff("u1", { personId });
 
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ code: "STAFF_ALREADY_LINKED" });
-    expect((await userRow("u1"))?.staffId).toBeNull();
+    expect((await userRow("u1"))?.personId).toBeNull();
   });
 
   it("leaves every role unchanged on unlink", async () => {
     await seedUser("u1", "teamManager");
-    const staffId = await seedStaff("Eins");
-    await linkStaff("u1", { staffId, grantCoachRole: true });
+    const personId = await seedStaff("Eins");
+    await linkStaff("u1", { personId, grantCoachRole: true });
 
-    const res = await linkStaff("u1", { staffId: null, grantCoachRole: true });
+    const res = await linkStaff("u1", { personId: null, grantCoachRole: true });
 
     expect(res.status).toBe(200);
     expect(await userRow("u1")).toEqual({
-      staffId: null,
+      personId: null,
       role: "teamManager,coach",
     });
   });
 
-  it("nulls the link when the staff row is deleted", async () => {
+  it("nulls the link when the person is deleted", async () => {
     await seedUser("u1");
-    const staffId = await seedStaff("Eins");
-    await linkStaff("u1", { staffId, grantCoachRole: true });
+    const personId = await seedStaff("Eins");
+    await linkStaff("u1", { personId, grantCoachRole: true });
 
-    await ctx.db.delete(teamStaff).where(eq(teamStaff.id, staffId));
+    // A person can only be deleted once nothing is attached to them — the FK on
+    // `team_staff.person_id` is ON DELETE restrict, unlike this one.
+    await ctx.db.delete(teamStaff).where(eq(teamStaff.personId, personId));
+    await ctx.db.delete(staffPeople).where(eq(staffPeople.id, personId));
 
-    expect(await userRow("u1")).toEqual({ staffId: null, role: "coach" });
+    expect(await userRow("u1")).toEqual({ personId: null, role: "coach" });
   });
 
   it("answers 404 for an unknown staff record", async () => {
     await seedUser("u1");
 
-    const res = await linkStaff("u1", { staffId: 999999 });
+    const res = await linkStaff("u1", { personId: 999999 });
 
     expect(res.status).toBe(404);
     expect(await res.json()).toMatchObject({ code: "STAFF_NOT_FOUND" });
@@ -193,22 +195,22 @@ describe("PATCH /admin/users/:id/staff-link over HTTP", () => {
   // itself the coach role by linking to any staff record it likes.
   it("refuses a non-admin session with 403 and writes nothing", async () => {
     await seedUser("u1");
-    const staffId = await seedStaff("Eins");
+    const personId = await seedStaff("Eins");
     mocks.getSession.mockResolvedValue({
       user: { id: "u1", role: "teamManager" },
       session: { id: "sess-u1" },
     });
 
-    const res = await linkStaff("u1", { staffId, grantCoachRole: true });
+    const res = await linkStaff("u1", { personId, grantCoachRole: true });
 
     expect(res.status).toBe(403);
-    expect(await userRow("u1")).toEqual({ staffId: null, role: null });
+    expect(await userRow("u1")).toEqual({ personId: null, role: null });
   });
 
   it("refuses an anonymous request with 401", async () => {
     mocks.getSession.mockResolvedValue(null);
 
-    const res = await linkStaff("u1", { staffId: null });
+    const res = await linkStaff("u1", { personId: null });
 
     expect(res.status).toBe(401);
   });

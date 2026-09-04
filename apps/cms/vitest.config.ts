@@ -22,9 +22,6 @@ export default defineConfig({
         // migration. The orchestration it calls lives in migrate.ts and is
         // covered there.
         "scripts/migrate-strapi/index.ts",
-        // Same three-line runner shape for the one-off staff import; its
-        // orchestration lives in run.ts and is covered there.
-        "scripts/import-staff/index.ts",
       ],
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
@@ -52,8 +49,17 @@ export default defineConfig({
         // Ratcheted 2026-09-04 (issue #329): the import's `--portraits` pass
         // added ~200 covered lines. Measured statements 99.64,
         // branches 93.23, functions 99.22, lines 99.6.
-        branches: 93,
-        functions: 99,
+        //
+        // RESCOPED 2026-09-04 (issue #332): the CMS -> Hub staff import was
+        // removed — it targeted the flat `team_staff` shape ADR-0009 replaced,
+        // and it has already run in production. That took away the ~400 lines
+        // the two ratchets above measured, so the gate is back to the scope of
+        // the 2026-08-10 measurement and its floors: measured 99.46/90.76/
+        // 98.93/99.39. A smaller scope, not a relaxed gate — the two ratchets
+        // stand as the record of what the removed code reached. Ratchet up as
+        // tests grow; never lower.
+        branches: 90,
+        functions: 98,
         lines: 99,
         statements: 99,
       },

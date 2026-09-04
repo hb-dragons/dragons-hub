@@ -19,12 +19,14 @@ export type UserIdParam = z.infer<typeof userIdParamSchema>;
 
 /**
  * Link/unlink body for `/admin/users/:id/staff-link`, the staff mirror of
- * `userRefereeLinkBodySchema`. `grantCoachRole` is optional here rather than
- * defaulted, so the service — not the schema — owns what an omitted flag means;
- * the dialog sends it explicitly either way.
+ * `userRefereeLinkBodySchema`. The link is to the staff *person*, not to one
+ * team's assignment, so it survives the coach changing teams (ADR 0009).
+ * `grantCoachRole` is optional here rather than defaulted, so the service — not
+ * the schema — owns what an omitted flag means; the dialog sends it explicitly
+ * either way.
  */
 export const userStaffLinkBodySchema = z.strictObject({
-  staffId: z.number().int().positive().nullable(),
+  personId: z.number().int().positive().nullable(),
   grantCoachRole: z.boolean().optional(),
 });
 

@@ -38,6 +38,8 @@ export { bookingEndpoints } from "./booking";
 export { teamEndpoints } from "./team";
 
 export { teamStaffEndpoints } from "./team-staff";
+export type { TeamStaffCreateBody } from "@dragons/contracts";
+export { staffPeopleEndpoints } from "./staff-people";
 
 export { channelConfigEndpoints } from "./channel-config";
 

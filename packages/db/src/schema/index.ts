@@ -4,6 +4,7 @@ export * from "./leagues";
 export * from "./teams";
 export * from "./team-entries";
 export * from "./team-staff";
+export * from "./staff-people";
 export * from "./venues";
 export * from "./matches";
 export * from "./match-overrides";
