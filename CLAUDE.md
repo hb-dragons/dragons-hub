@@ -257,8 +257,10 @@ throws by name when one is missing.
 
 A second one-off script, the CMS -> Hub trainer import
 (`pnpm --filter @dragons/cms migrate:cms-staff`, add `--dry-run` to print the
-planned rows without writing; issue #311), reads teams and trainers over the
-same `CMS_URL` + `CMS_API_TOKEN` pair and writes `team_staff` rows into the
+planned rows without writing; issue #311). It has run, and #316 has since
+dropped the CMS trainers collection it reads, so what follows is the record of
+how the data reached the Hub, not a recipe. It read teams and trainers over the
+same `CMS_URL` + `CMS_API_TOKEN` pair and wrote `team_staff` rows into the
 *Hub* database — so it is the one thing in `apps/cms` that needs
 `DATABASE_URL` (the Hub's connection string, not `DATABASE_URL_CMS`). It
 throws by name on a missing variable, and on a CMS team whose
@@ -278,9 +280,7 @@ rerun copies only what is still missing; trainers without an image, and rows
 the first pass never wrote, are reported and skipped. A coach on two team
 entries gets two independent copies, because each row owns and deletes its
 own object. `--dry-run` lists every planned copy with its source URL and
-writes neither objects nor rows. Run it in production before #316 removes the
-CMS trainers collection, then trigger a Website rebuild so the team pages and
-Kontakt page render the Hub portraits. The prefix, size and type rules are
+writes neither objects nor rows. The prefix, size and type rules are
 duplicated from `apps/api/src/services/admin/team-staff-photo.service.ts` on
 purpose (the script must not import the API's service layer);
 `scripts/import-staff/portrait-rules.ts` holds them, says so, and its test

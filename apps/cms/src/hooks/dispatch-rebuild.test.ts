@@ -13,7 +13,6 @@ import { Referees } from "../collections/referees";
 import { ShopItems } from "../collections/shop-items";
 import { Teams } from "../collections/teams";
 import { TimelineItems } from "../collections/timeline-items";
-import { Trainers } from "../collections/trainers";
 import { Users } from "../collections/users";
 import { Vorstand } from "../collections/vorstand";
 import { BackgroundVideo } from "../globals/background-video";
@@ -260,7 +259,6 @@ describe("hook attachment", () => {
     { slug: "shop-items", collection: ShopItems },
     { slug: "teams", collection: Teams },
     { slug: "timeline-items", collection: TimelineItems },
-    { slug: "trainers", collection: Trainers },
     { slug: "vorstand", collection: Vorstand },
   ];
 

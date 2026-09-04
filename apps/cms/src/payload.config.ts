@@ -19,7 +19,6 @@ import { Referees } from "./collections/referees";
 import { ShopItems } from "./collections/shop-items";
 import { Teams } from "./collections/teams";
 import { TimelineItems } from "./collections/timeline-items";
-import { Trainers } from "./collections/trainers";
 import { Users } from "./collections/users";
 import { Vorstand } from "./collections/vorstand";
 import { BackgroundVideo } from "./globals/background-video";
@@ -58,7 +57,6 @@ export default buildConfig({
     People,
     Vorstand,
     Positions,
-    Trainers,
     Referees,
     Partners,
     Projects,

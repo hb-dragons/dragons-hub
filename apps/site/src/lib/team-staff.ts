@@ -3,13 +3,14 @@ import { z } from "astro/zod";
 /**
  * Build-time coaches for the teams pages and the Kontakt page.
  *
- * The Hub owns club staff (ADR 0008) — the CMS `trainers` collection is on its
- * way out — so the static pages read them from `/public/teams` and join them to
- * a CMS team through the `apiTeamPermanentId` key, exactly as the league name
- * is joined from `/public/standings` (src/lib/team-league.ts). Same failure
- * model as the loaders: callers gate the fetch on a content build, and once it
- * runs any failure — non-200, network error, shape drift — throws and fails the
- * build rather than quietly shipping a page with no coaches on it.
+ * The Hub owns club staff (ADR 0008) — the CMS `trainers` collection is gone
+ * (issue #316) — so the static pages read them from `/public/teams` and join
+ * them to a CMS team through the `apiTeamPermanentId` key, exactly as the
+ * league name is joined from `/public/standings` (src/lib/team-league.ts).
+ * Same failure model as the loaders: callers gate the fetch on a content
+ * build, and once it runs any failure — non-200, network error, shape drift —
+ * throws and fails the build rather than quietly shipping a page with no
+ * coaches on it.
  */
 
 // z.object strips undeclared keys, so what lands in the static HTML is exactly
