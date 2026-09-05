@@ -209,6 +209,9 @@ export const strings = {
     trainerFallback: "Trainer",
     lastGame: "Letztes Spiel",
     nextGame: "Nächstes Spiel",
+    trainingTimesHeading: "Trainingszeiten",
+    // Tooltip on the gym name when the CMS row carries a maps link.
+    trainingMapTitle: "Halle auf der Karte anzeigen",
     tabGames: "Spielplan",
     tabStandings: "Tabelle",
     colDate: "Datum",
