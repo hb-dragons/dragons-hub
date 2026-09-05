@@ -39,7 +39,6 @@ const person = z.object({
   id: z.number(),
   name: z.string(),
   email: z.string().nullish(),
-  phone: z.string().nullish(),
   image: media.nullish(),
 });
 

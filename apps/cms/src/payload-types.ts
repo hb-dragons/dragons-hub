@@ -338,7 +338,6 @@ export interface Person {
   id: number;
   name: string;
   email?: string | null;
-  phone?: string | null;
   image?: (number | null) | Media;
   updatedAt: string;
   createdAt: string;
@@ -710,7 +709,6 @@ export interface TeamsSelect<T extends boolean = true> {
 export interface PeopleSelect<T extends boolean = true> {
   name?: T;
   email?: T;
-  phone?: T;
   image?: T;
   updatedAt?: T;
   createdAt?: T;
