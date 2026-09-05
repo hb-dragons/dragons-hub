@@ -246,14 +246,27 @@ jobs:
     name: Secret Scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      # Job-level so the step `if` below can test it: `secrets.*` is not
+      # readable from a step condition, `env.*` is.
+      GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
 
+      # gitleaks-action needs a licence on an organization repo and fails the
+      # job without one. Runs triggered by dependabot[bot] read the Dependabot
+      # secret store, which does not hold it (issue #340). Those PRs change
+      # lockfiles and manifests, so skipping the scan there is acceptable; to
+      # scan them too, add GITLEAKS_LICENSE under Settings → Secrets → Dependabot.
+      - name: Secret scan unavailable
+        if: env.GITLEAKS_LICENSE == ''
+        run: echo "::notice::gitleaks skipped — no GITLEAKS_LICENSE in this run (dependabot runs carry no repository secrets)."
+
       - name: Run gitleaks
+        if: env.GITLEAKS_LICENSE != ''
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
