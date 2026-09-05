@@ -211,6 +211,37 @@ describe("seedSeasonTeamEntries", () => {
     expect(after.rows[0]!.league_id).toBe(league);
     expect(after.rows[0]!.updated_at).toEqual(before.rows[0]!.updated_at);
   });
+
+  it("does nothing when no club is configured, without asking the federation", async () => {
+    const season = await seedSeason("2026/27", "upcoming");
+    await seedLeague(38, "U10", season);
+
+    const result = await seedSeasonTeamEntries(season, [38]);
+
+    expect(result).toEqual({ entriesSeeded: 0, rosterFailures: [] });
+    expect(fetchLeagueRoster).not.toHaveBeenCalled();
+    expect((await ctx.client.query(`SELECT id FROM team_entries`)).rows).toEqual([]);
+  });
+
+  it("does nothing for an empty league list", async () => {
+    await seedClubConfig(100);
+    const season = await seedSeason("2026/27", "upcoming");
+
+    expect(await seedSeasonTeamEntries(season, [])).toEqual({ entriesSeeded: 0, rosterFailures: [] });
+    expect(fetchLeagueRoster).not.toHaveBeenCalled();
+  });
+
+  it("skips a liga id the season has no league row for, even if another season has it", async () => {
+    await seedClubConfig(100);
+    const season = await seedSeason("2026/27", "upcoming");
+    const lastSeason = await seedSeason("2025/26", "active");
+    await seedLeague(39, "U10 last year", lastSeason);
+
+    const result = await seedSeasonTeamEntries(season, [39]);
+
+    expect(result).toEqual({ entriesSeeded: 0, rosterFailures: [] });
+    expect(fetchLeagueRoster).not.toHaveBeenCalled();
+  });
 });
 
 describe("staff carry-forward", () => {

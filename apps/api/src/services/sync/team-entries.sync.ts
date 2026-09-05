@@ -115,7 +115,15 @@ export async function syncTeamEntriesFromData(
 
   for (const e of evidence) {
     const teamId = squadIdByPermanent.get(e.permanentId);
-    if (teamId === undefined) continue; // squad row lands via teams.sync in the same run
+    if (teamId === undefined) {
+      // teams.sync ran earlier in this run, so a squad with league evidence
+      // and no row is unexpected; say so, or a partial run leaves no trace.
+      log.warn(
+        { permanentId: e.permanentId, seasonRefId: e.seasonRefId, leagueDbId: e.leagueDbId },
+        "Squad has league evidence but no teams row; entry skipped until the next run",
+      );
+      continue;
+    }
     result.total++;
     try {
       const outcome = await upsertEntryFromEvidence(teamId, e.seasonRefId, e.leagueDbId, {
