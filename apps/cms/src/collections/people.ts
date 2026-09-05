@@ -12,7 +12,6 @@ export const People: CollectionConfig = {
   fields: [
     { name: "name", type: "text", required: true },
     { name: "email", type: "email" },
-    { name: "phone", type: "text" },
     { name: "image", type: "upload", relationTo: "media" },
   ],
   hooks: { afterChange: [dispatchOnPublish], afterDelete: [dispatchOnDelete] },
