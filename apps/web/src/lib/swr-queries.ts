@@ -191,6 +191,10 @@ export function makeQueries(api: Api) {
     }),
     // seasons
     seasons: () => ({ key: SWR_KEYS.seasons, fetcher: () => api.seasons.list() }),
+    seasonLeagues: (seasonId: number) => ({
+      key: SWR_KEYS.seasonLeagues(seasonId),
+      fetcher: () => api.seasons.getLeagues(seasonId),
+    }),
   } as const;
 }
 
