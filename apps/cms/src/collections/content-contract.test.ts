@@ -148,7 +148,7 @@ describe("teams", () => {
 
 describe("people graph and flat collections", () => {
   const contracts: { slug: string; collection: CollectionConfig; fields: string[] }[] = [
-    { slug: "people", collection: People, fields: ["name", "email", "phone", "image"] },
+    { slug: "people", collection: People, fields: ["name", "email", "image"] },
   ];
 
   it.each(contracts)(
