@@ -50,6 +50,7 @@ import {
   matchOverrides,
   matchRemoteVersions,
   matches,
+  seasons,
   teams,
   teamEntries,
   venueBookingMatches,
@@ -57,6 +58,7 @@ import {
   venues,
 } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
+import { buildCalendarFeed } from "../public/calendar.service";
 import {
   setupTestDb,
   resetTestDb,
@@ -542,6 +544,30 @@ describe("row mappers", () => {
     });
   });
 
+  it("rowToListItem reads each side's own season entry, so the guest alias sides with the guest", async () => {
+    const leagueId = await seedLeague("Bezirksliga");
+    const ids = await ctx.db
+      .select({ id: teams.id, apiId: teams.apiTeamPermanentId })
+      .from(teams);
+    const teamId = (apiId: number) => ids.find((t) => t.apiId === apiId)!.id;
+    await ctx.db.insert(teamEntries).values([
+      { teamId: teamId(OWN_A), seasonId: activeSeasonId, customName: "Drachen I", badgeColor: "#00FF00" },
+      { teamId: teamId(OWN_B), seasonId: activeSeasonId, customName: "Drachen II", badgeColor: "#0000FF" },
+    ]);
+    const matchId = await seedMatch({ leagueId, home: OWN_A, guest: OWN_B });
+
+    const result = rowToListItem(await firstRow(matchId), []);
+
+    // Two distinct values per side: an alias joined on the wrong team would
+    // echo the home entry on the guest side, and null would satisfy nothing.
+    expect(result).toMatchObject({
+      homeTeamCustomName: "Drachen I",
+      homeBadgeColor: "#00FF00",
+      guestTeamCustomName: "Drachen II",
+      guestBadgeColor: "#0000FF",
+    });
+  });
+
   it("rowToListItem defaults a null isOwnClub to false", async () => {
     await ctx.db.update(teams).set({ isOwnClub: null }).where(eq(teams.apiTeamPermanentId, OWN_A));
     await ctx.db
@@ -595,6 +621,57 @@ describe("row mappers", () => {
     expect(result.publicComment).toBe("Halle B");
     expect(result).not.toHaveProperty("internalNotes");
     expect(result).not.toHaveProperty("overrides");
+  });
+});
+
+describe("entry join fan-out (calendar path)", () => {
+  beforeEach(seedTeams);
+
+  // The public calendar feed is getOwnClubMatches().items piped into
+  // buildCalendarFeed. The feed's own suite builds MatchListItems by hand, so
+  // the widest join in the list query — both team aliases, both season-scoped
+  // entry aliases, league and venue — was only ever asserted mapper by mapper.
+  // This runs the whole path once against PGlite.
+  it("carries both sides' season entries, league and venue through to the ICS", async () => {
+    const leagueId = await seedLeague("Bezirksliga");
+    const venueId = await seedVenue("Sporthalle Nord");
+    const ids = await ctx.db
+      .select({ id: teams.id, apiId: teams.apiTeamPermanentId })
+      .from(teams);
+    const teamId = (apiId: number) => ids.find((t) => t.apiId === apiId)!.id;
+    // A stale entry for the guest squad in an archived season must lose: the
+    // entry join is keyed on the match's league season, not on the squad.
+    const [archived] = await ctx.db
+      .insert(seasons)
+      .values({ name: "2024/25", status: "archived" })
+      .returning({ id: seasons.id });
+    await ctx.db.insert(teamEntries).values([
+      { teamId: teamId(OWN_A), seasonId: activeSeasonId, customName: "Drachen I", badgeColor: "#00FF00" },
+      { teamId: teamId(OWN_B), seasonId: activeSeasonId, customName: "Drachen II", badgeColor: "#0000FF" },
+      { teamId: teamId(OWN_B), seasonId: archived!.id, customName: "Stale II", badgeColor: "#FF0000" },
+    ]);
+    const matchId = await seedMatch({ leagueId, venueId, home: OWN_A, guest: OWN_B });
+
+    const result = await getOwnClubMatches({ ...listParams, seasonId: activeSeasonId });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      id: matchId,
+      homeTeamCustomName: "Drachen I",
+      homeBadgeColor: "#00FF00",
+      guestTeamCustomName: "Drachen II",
+      guestBadgeColor: "#0000FF",
+      leagueName: "Bezirksliga",
+      venueName: "Sporthalle Nord",
+      venueStreet: "Hauptstr. 1",
+    });
+
+    // Unfold ICS line continuations (RFC 5545 §3.1) before matching.
+    const ics = buildCalendarFeed(result.items, { hostname: "test.local" }).replace(/\r\n[ \t]/g, "");
+    expect(ics).toContain("SUMMARY:Drachen I vs Drachen II");
+    expect(ics).toContain("Sporthalle Nord");
+    expect(ics).toContain("Bezirksliga");
+    expect(ics).not.toContain("Stale II");
   });
 });
 

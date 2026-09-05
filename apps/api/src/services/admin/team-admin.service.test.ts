@@ -278,6 +278,35 @@ describe("getOwnClubTeams (entry-based)", () => {
     expect(await getOwnClubTeams()).toEqual([]);
   });
 
+  it("reports leagueTracked false when the connected league's is_tracked is NULL", async () => {
+    const active = await seedSeason("2026/27", "active");
+    const league = await seedLeague(12, "U12 Kreisliga", active);
+    // is_tracked is nullable with a default of true; a NULL is "not tracked",
+    // not "tracked", so the row still gets the stale-connection warning.
+    await ctx.client.query(`UPDATE leagues SET is_tracked = NULL WHERE id = $1`, [league]);
+    const squad = await seedTeam(1100, "Dragons U12");
+    await insertEntry(squad, active, { league_id: league });
+
+    const rows = await getOwnClubTeams(active);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.leagueName).toBe("U12 Kreisliga");
+    expect(rows[0]!.leagueTracked).toBe(false);
+  });
+
+  it("normalises any link_source other than manual to seeded", async () => {
+    const active = await seedSeason("2026/27", "active");
+    const squad = await seedTeam(1101, "Dragons U12");
+    // link_source is a bare varchar(10). An unknown value must read as
+    // "seeded", never as "manual": only a manual link is protected from the
+    // sync, so the safe default is the one the sync may overwrite.
+    await insertEntry(squad, active, { link_source: "import" });
+
+    const rows = await getOwnClubTeams(active);
+
+    expect(rows[0]!.linkSource).toBe("seeded");
+  });
+
   it("regression #original-bug: cross-season standings cannot leak — an archived U14 league never shows on the active season's entry", async () => {
     const archived = await seedSeason("2025/26", "archived");
     const active = await seedSeason("2026/27", "active");
@@ -387,6 +416,21 @@ describe("updateTeamEntry", () => {
     expect(updated?.leagueId).toBe(league);
     expect(updated?.linkSource).toBe("seeded");
   });
+
+  it("answers with only the updated entry when the season has several", async () => {
+    const season = await seedSeason("2026/27", "active");
+    const a = await seedTeam(5006, "Dragons U10");
+    const b = await seedTeam(5007, "Dragons U12");
+    const entryA = await insertEntry(a, season, { display_order: 1 });
+    const entryB = await insertEntry(b, season, { display_order: 0 });
+
+    const updated = await updateTeamEntry(entryA, { customName: "Zehn" });
+
+    expect(updated).toMatchObject({ id: entryA, name: "Dragons U10", customName: "Zehn" });
+    const other = await ctx.client.query<{ custom_name: string | null }>(
+      `SELECT custom_name FROM team_entries WHERE id = $1`, [entryB]);
+    expect(other.rows[0]!.custom_name).toBeNull();
+  });
 });
 
 describe("reorderTeamEntries", () => {
@@ -410,6 +454,30 @@ describe("reorderTeamEntries", () => {
       `INSERT INTO team_entries (team_id, season_id) VALUES ($1, $2) RETURNING id`, [a, season]);
     await expect(reorderTeamEntries([rows.rows[0]!.id, 99999], season))
       .rejects.toThrow(TeamReorderError);
+  });
+
+  it("rejects a real entry id from another season, even when the count matches", async () => {
+    const active = await seedSeason("2026/27", "active");
+    const archived = await seedSeason("2025/26", "archived");
+    const a = await seedTeam(5105, "A");
+    const b = await seedTeam(5106, "B");
+    const activeA = await insertEntry(a, active, { display_order: 0 });
+    const activeB = await insertEntry(b, active, { display_order: 1 });
+    const archivedB = await insertEntry(b, archived, { display_order: 0 });
+
+    // Two ids for a season with two entries: the length check alone passes,
+    // so only the membership check can catch the foreign entry.
+    await expect(reorderTeamEntries([activeA, archivedB], active)).rejects.toThrow(
+      expect.objectContaining({ code: "INVALID_TEAM_SET" }),
+    );
+    const orders = await ctx.client.query<{ id: number; display_order: number }>(
+      `SELECT id, display_order FROM team_entries WHERE id IN ($1, $2, $3) ORDER BY id`,
+      [activeA, activeB, archivedB]);
+    expect(orders.rows).toEqual([
+      { id: activeA, display_order: 0 },
+      { id: activeB, display_order: 1 },
+      { id: archivedB, display_order: 0 },
+    ]);
   });
 
   it("rejects duplicate entryIds", async () => {

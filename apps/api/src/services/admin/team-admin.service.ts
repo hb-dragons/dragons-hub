@@ -12,7 +12,15 @@ export async function getOwnClubTeams(seasonId?: number): Promise<OwnClubTeam[]>
   // No season to scope to means no entries; answering with an unscoped read is
   // exactly the bug this table replaced.
   if (scopeId === null) return [];
+  return selectOwnClubTeams(scopeId);
+}
 
+/**
+ * The one select behind the list and the single-row read: a season's entries
+ * whose squad is own-club, optionally narrowed to one entry so a PATCH does
+ * not re-read the whole season to answer with the row it just wrote.
+ */
+async function selectOwnClubTeams(seasonId: number, entryId?: number): Promise<OwnClubTeam[]> {
   const rows = await getDb()
     .select({
       id: teamEntries.id,
@@ -31,7 +39,13 @@ export async function getOwnClubTeams(seasonId?: number): Promise<OwnClubTeam[]>
     .from(teamEntries)
     .innerJoin(teams, eq(teamEntries.teamId, teams.id))
     .leftJoin(leagues, eq(teamEntries.leagueId, leagues.id))
-    .where(and(eq(teamEntries.seasonId, scopeId), eq(teams.isOwnClub, true)));
+    .where(
+      and(
+        eq(teamEntries.seasonId, seasonId),
+        eq(teams.isOwnClub, true),
+        entryId === undefined ? undefined : eq(teamEntries.id, entryId),
+      ),
+    );
 
   return rows
     .map((r) => ({
@@ -76,14 +90,8 @@ export async function updateTeamEntry(
   }
 
   await db.update(teamEntries).set(set).where(eq(teamEntries.id, entryId));
-  const [row] = await getOwnClubTeamsById(entryId, entry.seasonId);
+  const [row] = await selectOwnClubTeams(entry.seasonId, entryId);
   return row ?? null;
-}
-
-/** One entry, in the exact OwnClubTeam shape the list uses. */
-async function getOwnClubTeamsById(entryId: number, seasonId: number): Promise<OwnClubTeam[]> {
-  const all = await getOwnClubTeams(seasonId);
-  return all.filter((t) => t.id === entryId);
 }
 
 export async function reorderTeamEntries(
