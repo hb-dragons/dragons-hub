@@ -1305,6 +1305,6 @@ Two operational constraints the code relies on but doesn't state inline:
 | CodeQL | `.github/workflows/codeql.yml` | PR, push main/master, weekly | `analyze` (JavaScript/TypeScript) |
 | Scorecard | `.github/workflows/scorecard.yml` | push main, weekly | `analysis` (OSSF Scorecard) |
 | Semgrep | `.github/workflows/semgrep.yml` | push main, PR, weekly | `semgrep` (OSS scan) |
-| Dependabot | `.github/dependabot.yml` | weekly | npm + GitHub Actions updates |
+| Dependabot | `.github/dependabot.yml` | weekly | npm + GitHub Actions updates. Its PRs run CI with the Dependabot secret store, which holds none of the repository secrets: the setup action skips the Turbo remote cache (jobs build from scratch) and the `secret-scan` job skips gitleaks when `GITLEAKS_LICENSE` is empty, each with a `::notice::` saying so. Add a secret under Settings → Secrets → Dependabot to turn the corresponding step back on for those runs |
 
 The web image is built with `NEXT_PUBLIC_*` build args (`deploy.yml` → `apps/web/Dockerfile`), because Next.js inlines them at build time. Changing one of those values requires a rebuild, not a restart.
