@@ -109,6 +109,41 @@ export function teamFilterOptions(games: readonly SpielplanGame[]): TeamFilterOp
     .map(([name, badgeColor]) => ({ name, badgeColor }));
 }
 
+/** The slice of a game the calendar feed link needs: the sides plus their squad ids. */
+export interface SquadIdGame extends SpielplanSide {
+  homeTeamApiId: number;
+  guestTeamApiId: number;
+}
+
+/**
+ * The squads (`apiTeamPermanentId`) behind the team filter selection, for the
+ * squad-filtered calendar feed, each once and in the filter order. No explicit
+ * choice, every team, or nothing at all resolves to the club-wide feed (an
+ * empty list) — a calendar of no games helps nobody.
+ */
+export function calendarFeedSquadIds(
+  games: readonly SquadIdGame[],
+  selectedTeams: ReadonlySet<string> | null,
+): number[] {
+  if (selectedTeams === null || selectedTeams.size === 0) return [];
+  const byName = new Map<string, number>();
+  for (const game of games) {
+    const name = dragonsTeamName(game);
+    if (!name || byName.has(name)) continue;
+    byName.set(name, game.homeIsOwnClub ? game.homeTeamApiId : game.guestTeamApiId);
+  }
+  const chosen = [...byName.entries()].filter(([name]) => selectedTeams.has(name));
+  if (chosen.length === byName.size) return [];
+  return chosen.sort(([a], [b]) => compareTeamNames(a, b)).map(([, id]) => id);
+}
+
+/** The subscribe URL for `GET /public/schedule.ics`, one `teamApiId` per squad. */
+export function calendarFeedUrl(apiBase: string, squadIds: readonly number[]): string {
+  const url = new URL("/public/schedule.ics", apiBase);
+  for (const id of squadIds) url.searchParams.append("teamApiId", String(id));
+  return url.toString();
+}
+
 /**
  * Crawls every page of `/public/matches` (the API caps a page at 1000 rows)
  * into the full season plan. The empty-page guard means a server that keeps

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const getMatches = vi.fn();
 vi.mock("../../lib/api", () => ({
@@ -48,6 +48,15 @@ describe("SpielplanIsland", () => {
     getMatches.mockRejectedValue(new Error("network"));
     render(<SpielplanIsland />);
     expect(await screen.findByText(strings.spielplan.loadError)).toBeInTheDocument();
+  });
+
+  it("offers the club-wide calendar feed while every team is selected", async () => {
+    getMatches.mockResolvedValue(page([game()]));
+    render(<SpielplanIsland />);
+    await screen.findByText("Goetheschule", { exact: false });
+    fireEvent.click(screen.getByRole("button", { name: strings.spielplan.subscribe }));
+    const url = new URL(document.querySelector("code")?.textContent ?? "");
+    expect(url.toString()).toBe("https://api.example/public/schedule.ics");
   });
 
   /**
