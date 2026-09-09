@@ -6,7 +6,10 @@ import { getVtimezoneComponent } from "@touch4it/ical-timezones";
 import type { MatchListItem } from "@dragons/shared";
 
 const TIMEZONE = "Europe/Berlin";
-const GAME_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours
+// The event window around kickoff: warm-up and travel before, the game and
+// its overrun after. A calendar entry that starts at the whistle is late.
+const BEFORE_KICKOFF_MS = 1 * 60 * 60 * 1000;
+const AFTER_KICKOFF_MS = 2 * 60 * 60 * 1000;
 const PROD_ID = "-//Dragons//Spielplan//DE";
 
 export interface CalendarFeedOptions {
@@ -117,14 +120,15 @@ export function buildCalendarFeed(
     // Parse kickoff into a Date in Europe/Berlin
     const dateParts = match.kickoffDate.split("-").map(Number);
     const timeParts = match.kickoffTime.split(":").map(Number);
-    const start = new Date(
+    const kickoff = new Date(
       dateParts[0]!,
       dateParts[1]! - 1,
       dateParts[2],
       timeParts[0],
       timeParts[1],
     );
-    const end = new Date(start.getTime() + GAME_DURATION_MS);
+    const start = new Date(kickoff.getTime() - BEFORE_KICKOFF_MS);
+    const end = new Date(kickoff.getTime() + AFTER_KICKOFF_MS);
 
     const event = calendar.createEvent({
       id: `match-${match.id}@${hostname}`,

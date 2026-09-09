@@ -182,6 +182,18 @@ describe("buildCalendarFeed", () => {
     expect(ics).not.toContain("BEGIN:VEVENT");
   });
 
+  it("opens the event one hour before kickoff and closes it two hours after", () => {
+    const ics = unfold(buildCalendarFeed([makeMatch({ kickoffDate: "2026-04-15", kickoffTime: "14:00" })], {}));
+    expect(ics).toContain("DTSTART;TZID=Europe/Berlin:20260415T130000");
+    expect(ics).toContain("DTEND;TZID=Europe/Berlin:20260415T160000");
+  });
+
+  it("keeps the window on the club wall clock across midnight", () => {
+    const ics = unfold(buildCalendarFeed([makeMatch({ kickoffDate: "2026-04-15", kickoffTime: "00:30" })], {}));
+    expect(ics).toContain("DTSTART;TZID=Europe/Berlin:20260414T233000");
+    expect(ics).toContain("DTEND;TZID=Europe/Berlin:20260415T023000");
+  });
+
   it("includes Europe/Berlin timezone", () => {
     const ics = buildCalendarFeed([makeMatch()], {});
     expect(ics).toContain("Europe/Berlin");

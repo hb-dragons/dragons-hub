@@ -791,7 +791,7 @@ for a device that does not exist.
 | GET | `/public/matches` | List own club matches, supports `opponentApiId` filter (no auth) |
 | GET | `/public/matches/:id` | Single match with quarter scores (no auth) |
 | GET | `/public/matches/:id/context` | H2H record and form for both teams (no auth) |
-| GET | `/public/schedule.ics` | ICS calendar feed for own-club matches. `teamApiId` may repeat to narrow the feed to those squads (unknown ids are dropped, not rejected) and then names the calendar after them in the club's display order (three names, then "+N"). Default window: 30 days back to 180 days forward (no auth) |
+| GET | `/public/schedule.ics` | ICS calendar feed for own-club matches. `teamApiId` may repeat to narrow the feed to those squads (unknown ids are dropped, not rejected) and then names the calendar after them in the club's display order (three names, then "+N"). Each event runs from one hour before kickoff to two hours after. Default window: 30 days back to 180 days forward (no auth) |
 | GET | `/public/standings` | League standings (no auth) |
 | GET | `/public/teams` | List teams (no auth). Own-club rows carry `staff[]` (assignment id, personId, first/last name, role, licence, portrait path) — never phone or email |
 | GET | `/public/teams/:id/stats` | Season stats and recent form for a team (no auth) |
