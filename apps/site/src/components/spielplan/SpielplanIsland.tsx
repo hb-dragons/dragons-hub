@@ -20,7 +20,6 @@ import { Skeleton } from "@dragons/ui/components/skeleton";
 import { API_BASE, api } from "../../lib/api";
 import type { PlanGame } from "../../lib/full-plan";
 import {
-  calendarFeedSquadIds,
   fetchFullPlan,
   filterGames,
   teamFilterOptions,
@@ -165,11 +164,13 @@ export default function SpielplanIsland({
           </DropdownMenu>
         </div>
 
-        {/* The team filter doubles as the feed's squad picker; home/away is
-            a view filter only, the feed always carries both. */}
+        {/* The popover's squad picker starts from the team filter; home/away
+            is a view filter only, the feed always carries both. */}
         <CalendarSubscribe
           apiBase={API_BASE}
-          squadIds={calendarFeedSquadIds(games ?? [], selectedTeams)}
+          games={games ?? []}
+          teams={teams}
+          filterSelection={selectedTeams}
         />
       </div>
 

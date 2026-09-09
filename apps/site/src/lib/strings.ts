@@ -86,7 +86,7 @@ export const strings = {
     exportLabel: "Excel Export",
     subscribe: "Kalender abonnieren",
     subscribeTitle: "Spielplan im Kalender abonnieren",
-    subscribeHint: "Die Auswahl im Teams-Filter bestimmt, welche Spiele im Kalender landen.",
+    subscribeHint: "Welche Teams sollen im Kalender landen?",
     copy: "Kopieren",
     copied: "Kopiert",
     instructionApple: "Kalender > Ablage > Neues Kalenderabo",
