@@ -260,4 +260,36 @@ describe("<SpielplanTable> calendar subscription", () => {
     expect(url).toContain("/public/schedule.ics");
     expect(url).not.toContain("teamApiId");
   });
+
+  it("names every selected team's squad in the feed URL", () => {
+    render(
+      <SpielplanTable
+        matches={[
+          makeMatch({ id: 1, guestTeamCustomName: "Herren 2", guestTeamApiId: 20 }),
+          makeMatch({
+            id: 2,
+            homeIsOwnClub: true,
+            guestIsOwnClub: false,
+            homeTeamCustomName: "Damen 1",
+            homeTeamApiId: 31,
+            guestTeamCustomName: null,
+          }),
+          makeMatch({ id: 3, guestTeamCustomName: "U16", guestTeamApiId: 45 }),
+        ]}
+      />,
+    );
+
+    // The column header is also a button named after the column; the facet
+    // trigger is the one that opens a popover.
+    const facet = screen
+      .getAllByRole("button", { name: /columns\.team/ })
+      .find((b) => b.getAttribute("aria-haspopup") === "dialog");
+    fireEvent.click(facet!);
+    fireEvent.click(screen.getByRole("option", { name: /Damen 1/ }));
+    fireEvent.click(screen.getByRole("option", { name: /U16/ }));
+    fireEvent.click(screen.getByRole("button", { name: /subscribe/ }));
+
+    const url = new URL(document.querySelector("code")?.textContent ?? "");
+    expect(url.searchParams.getAll("teamApiId")).toEqual(["31", "45"]);
+  });
 });

@@ -9,7 +9,8 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 interface SubscribeButtonProps {
-  teamApiId: number | null;
+  /** Squads to narrow the feed to; empty means every Dragons game. */
+  teamApiIds: number[];
   translations: {
     subscribe: string;
     subscribeTitle: string;
@@ -21,18 +22,18 @@ interface SubscribeButtonProps {
   };
 }
 
-function buildIcsUrl(teamApiId: number | null): string {
+function buildIcsUrl(teamApiIds: readonly number[]): string {
   const url = new URL(`${API_BASE_URL}/public/schedule.ics`);
-  if (teamApiId) url.searchParams.set("teamApiId", teamApiId.toString());
+  for (const id of teamApiIds) url.searchParams.append("teamApiId", id.toString());
   return url.toString();
 }
 
 export function SubscribeButton({
-  teamApiId,
+  teamApiIds,
   translations: t,
 }: SubscribeButtonProps) {
   const [copied, setCopied] = useState(false);
-  const icsUrl = buildIcsUrl(teamApiId);
+  const icsUrl = buildIcsUrl(teamApiIds);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(icsUrl);

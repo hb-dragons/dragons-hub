@@ -7,9 +7,23 @@ describe("publicScheduleIcsQuerySchema", () => {
     expect(result).toEqual({});
   });
 
-  it("coerces string teamApiId to number", () => {
+  it("lifts a single teamApiId into a one-element list", () => {
     const result = publicScheduleIcsQuerySchema.parse({ teamApiId: "42" });
-    expect(result).toMatchObject({ teamApiId: 42 });
+    expect(result).toMatchObject({ teamApiId: [42] });
+  });
+
+  it("accepts a repeated teamApiId as a list of squad ids", () => {
+    const result = publicScheduleIcsQuerySchema.parse({ teamApiId: ["42", "7"] });
+    expect(result).toMatchObject({ teamApiId: [42, 7] });
+  });
+
+  it("rejects a repeated teamApiId when one value is not a positive int", () => {
+    expect(() =>
+      publicScheduleIcsQuerySchema.parse({ teamApiId: ["42", "abc"] }),
+    ).toThrow();
+    expect(() =>
+      publicScheduleIcsQuerySchema.parse({ teamApiId: ["42", "0"] }),
+    ).toThrow();
   });
 
   it("coerces string leagueId to number", () => {
@@ -35,7 +49,7 @@ describe("publicScheduleIcsQuerySchema", () => {
       dateTo: "2026-12-31",
     });
     expect(result).toEqual({
-      teamApiId: 7,
+      teamApiId: [7],
       leagueId: 3,
       dateFrom: "2026-01-01",
       dateTo: "2026-12-31",

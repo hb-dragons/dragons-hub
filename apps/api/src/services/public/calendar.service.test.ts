@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCalendarFeed } from "./calendar.service";
+import { buildCalendarFeed, buildCalendarName } from "./calendar.service";
 import type { MatchListItem } from "@dragons/shared";
 
 /** Unfold ICS line continuations (RFC 5545 §3.1) so toContain works across folds */
@@ -274,5 +274,24 @@ describe("buildCalendarFeed", () => {
       {},
     ));
     expect(ics).not.toContain("U14 Kreisliga");
+  });
+});
+
+describe("buildCalendarName", () => {
+  it("is the club-wide name when no squad is selected", () => {
+    expect(buildCalendarName([])).toBe("Dragons Spielplan");
+  });
+
+  it("lists up to three selected squads by name", () => {
+    expect(buildCalendarName(["Damen 1"])).toBe("Dragons: Damen 1");
+    expect(buildCalendarName(["Damen 1", "Herren 1", "U16"])).toBe(
+      "Dragons: Damen 1, Herren 1, U16",
+    );
+  });
+
+  it("truncates a longer selection to three names plus a count", () => {
+    expect(buildCalendarName(["Damen 1", "Herren 1", "U16", "U14", "U12"])).toBe(
+      "Dragons: Damen 1, Herren 1, U16 +2",
+    );
   });
 });

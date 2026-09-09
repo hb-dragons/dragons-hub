@@ -3,7 +3,8 @@ import { describeRoute, validator } from "hono-openapi";
 import { getOwnClubMatches } from "../../services/admin/match-admin.service";
 import { getPublicMatchDetail } from "../../services/admin/match-query.service";
 import { getMatchContext } from "../../services/public/match-context.service";
-import { buildCalendarFeed } from "../../services/public/calendar.service";
+import { buildCalendarFeed, buildCalendarName } from "../../services/public/calendar.service";
+import { getOwnClubSquadNames } from "../../services/admin/team-admin.service";
 import {
   publicMatchListQuerySchema,
   publicScheduleIcsQuerySchema,
@@ -77,21 +78,29 @@ publicMatchRoutes.get(
     const toDateStr = (d: Date) => d.toISOString().split("T")[0];
 
     const activeSeasonId = await getActiveSeasonId();
+    const seasonId = activeSeasonId ?? NO_SEASON;
+    // Squads named in the URL. Unknown ids and squads without a team entry
+    // this season fall out of both the filter and the name: a calendar app
+    // that gets a 4xx shows a sync error and may stop fetching the feed, an
+    // empty feed just fills in once the fixtures exist.
+    const squadApiIds = query.teamApiId ?? [];
     const result = await getOwnClubMatches({
       limit: 1000,
       offset: 0,
       sort: "asc",
       excludeInactive: false, // include cancelled so calendar shows strikethrough
-      teamApiId: query.teamApiId,
+      teamApiIds: squadApiIds,
       leagueId: query.leagueId,
       dateFrom: query.dateFrom ?? toDateStr(defaultFrom),
       dateTo: query.dateTo ?? toDateStr(defaultTo),
-      seasonId: activeSeasonId ?? NO_SEASON,
+      seasonId,
     });
 
+    const squadNames =
+      squadApiIds.length > 0 ? await getOwnClubSquadNames(seasonId, squadApiIds) : [];
     const ics = buildCalendarFeed(result.items, {
       hostname: resolveIcsHostname(),
-      calendarName: "Dragons Spielplan",
+      calendarName: buildCalendarName(squadNames),
     });
 
     return c.text(ics, 200, {

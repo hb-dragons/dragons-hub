@@ -43,6 +43,10 @@ _Avoid_: active season, latest season
 **Vorabliga**:
 A preliminary league the federation publishes before promotion/relegation is settled. Carries a full schedule; superseded by a committed league whose fixtures replace it.
 
+**Calendar feed**:
+The ICS document a fan or staff member adds to their calendar app. Always the current season; covers every Dragons game, or only the games of the squads named in it. Follows squads, not team entries, so the feed keeps working as a squad ages up.
+_Avoid_: calendar subscription, ICS export, team calendar
+
 ### Native app
 
 **iOS-first**:

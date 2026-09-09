@@ -86,6 +86,7 @@ afterAll(async () => {
 
 const OWN_A = 100;
 const OWN_B = 101;
+const OWN_C = 102;
 const FOREIGN_X = 200;
 const FOREIGN_Y = 201;
 
@@ -108,6 +109,15 @@ async function seedTeams(): Promise<void> {
       teamCompetitionId: 2,
       name: "Dragons II",
       nameShort: "DRG2",
+      clubId: 500,
+      isOwnClub: true,
+    },
+    {
+      apiTeamPermanentId: OWN_C,
+      seasonTeamId: 1102,
+      teamCompetitionId: 5,
+      name: "Dragons III",
+      nameShort: "DRG3",
       clubId: 500,
       isOwnClub: true,
     },
@@ -309,6 +319,35 @@ describe("getOwnClubMatches — filters", () => {
     const result = await getOwnClubMatches({ ...listParams, teamApiId: OWN_A });
 
     expect(result.items.map((m) => m.id).sort()).toEqual([home, away].sort());
+  });
+
+  it("teamApiIds keeps every game of any listed squad, home or away", async () => {
+    const aHome = await seedMatch({ home: OWN_A, guest: FOREIGN_X });
+    const bAway = await seedMatch({ home: FOREIGN_Y, guest: OWN_B });
+    await seedMatch({ home: OWN_C, guest: FOREIGN_X });
+
+    const result = await getOwnClubMatches({ ...listParams, teamApiIds: [OWN_A, OWN_B] });
+
+    expect(result.items.map((m) => m.id).sort()).toEqual([aHome, bAway].sort());
+    expect(result.total).toBe(2);
+  });
+
+  it("an empty teamApiIds list is no filter at all", async () => {
+    await seedMatch({ home: OWN_A, guest: FOREIGN_X });
+    await seedMatch({ home: FOREIGN_Y, guest: OWN_B });
+
+    const result = await getOwnClubMatches({ ...listParams, teamApiIds: [] });
+
+    expect(result.total).toBe(2);
+  });
+
+  it("an unknown squad id in teamApiIds is silently ignored", async () => {
+    const aHome = await seedMatch({ home: OWN_A, guest: FOREIGN_X });
+    await seedMatch({ home: FOREIGN_Y, guest: OWN_B });
+
+    const result = await getOwnClubMatches({ ...listParams, teamApiIds: [OWN_A, 99999] });
+
+    expect(result.items.map((m) => m.id)).toEqual([aHome]);
   });
 
   it("ANDs teamApiId with opponentApiId to pin a fixture", async () => {
