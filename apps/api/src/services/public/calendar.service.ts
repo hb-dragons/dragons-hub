@@ -70,12 +70,27 @@ function getStatus(match: MatchListItem): ICalEventStatus {
   return ICalEventStatus.CONFIRMED;
 }
 
+const CLUB_CALENDAR_NAME = "Dragons Spielplan";
+const MAX_NAMED_SQUADS = 3;
+
+/**
+ * The calendar's display name (`X-WR-CALNAME`). Calendar apps snapshot it at
+ * subscribe time, so a squad-filtered feed names its squads: a parent with two
+ * feeds needs to tell them apart. Capped at three names plus a count.
+ */
+export function buildCalendarName(squadNames: readonly string[]): string {
+  if (squadNames.length === 0) return CLUB_CALENDAR_NAME;
+  const shown = squadNames.slice(0, MAX_NAMED_SQUADS).join(", ");
+  const rest = squadNames.length - MAX_NAMED_SQUADS;
+  return rest > 0 ? `Dragons: ${shown} +${rest}` : `Dragons: ${shown}`;
+}
+
 export function buildCalendarFeed(
   matches: MatchListItem[],
   options: CalendarFeedOptions,
 ): string {
   const hostname = options.hostname ?? "dragons.local";
-  const calendarName = options.calendarName ?? "Dragons Spielplan";
+  const calendarName = options.calendarName ?? CLUB_CALENDAR_NAME;
 
   const calendar = ical({
     name: calendarName,

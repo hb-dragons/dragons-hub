@@ -40,6 +40,8 @@ export interface MatchListParams {
   sort?: "asc" | "desc";
   hasScore?: boolean;
   teamApiId?: number;
+  /** Squad ids (`apiTeamPermanentId`) OR-ed together; empty means no filter. */
+  teamApiIds?: number[];
   opponentApiId?: number;
   excludeInactive?: boolean;
   seasonId?: number;
@@ -459,7 +461,7 @@ export async function buildDetailResponse(
 }
 
 export async function getOwnClubMatches(params: MatchListParams) {
-  const { limit, offset, leagueId, dateFrom, dateTo, sort = "asc", hasScore, teamApiId, opponentApiId, excludeInactive, seasonId } = params;
+  const { limit, offset, leagueId, dateFrom, dateTo, sort = "asc", hasScore, teamApiId, teamApiIds, opponentApiId, excludeInactive, seasonId } = params;
 
   const ownTeams = await getDb()
     .select({ apiTeamPermanentId: teams.apiTeamPermanentId })
@@ -493,6 +495,14 @@ export async function getOwnClubMatches(params: MatchListParams) {
       or(
         eq(matches.homeTeamApiId, teamApiId),
         eq(matches.guestTeamApiId, teamApiId),
+      )!,
+    );
+  }
+  if (teamApiIds && teamApiIds.length > 0) {
+    conditions.push(
+      or(
+        inArray(matches.homeTeamApiId, teamApiIds),
+        inArray(matches.guestTeamApiId, teamApiIds),
       )!,
     );
   }

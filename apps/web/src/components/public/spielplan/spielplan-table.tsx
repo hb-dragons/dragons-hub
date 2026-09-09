@@ -38,7 +38,7 @@ import {
   getOwnTeamLabel,
 } from "@/components/admin/matches/utils"
 import { SubscribeButton } from "@/components/public/shared/subscribe-button"
-import { selectedTeamApiId, spielplanRowClass } from "./utils"
+import { selectedTeamApiIds, spielplanRowClass } from "./utils"
 import { SpielplanDetailSheet } from "./spielplan-detail-sheet"
 
 /**
@@ -354,7 +354,7 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
                 options={teamFilterOptions}
               />
               <SubscribeButton
-                teamApiId={selectedTeamApiId(
+                teamApiIds={selectedTeamApiIds(
                   matches,
                   table.getColumn("team")?.getFilterValue() as string[] | undefined,
                 )}

@@ -15,7 +15,7 @@ vi.mock("../../config/database", () => ({
 
 // --- Imports (after mocks) ---
 
-import { getOwnClubTeams, updateTeamEntry, reorderTeamEntries } from "./team-admin.service";
+import { getOwnClubTeams, getOwnClubSquadNames, updateTeamEntry, reorderTeamEntries } from "./team-admin.service";
 import { TeamReorderError, TeamLeagueMismatchError } from "./team-admin.errors";
 import { invalidateActiveSeasonCache } from "./season.service";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
@@ -104,6 +104,50 @@ async function insertTeam(overrides: Record<string, unknown> = {}) {
 }
 
 // --- Tests ---
+
+describe("getOwnClubSquadNames", () => {
+  let active: number;
+
+  beforeEach(async () => {
+    active = await seedSeason("2025/26", "active");
+  });
+
+  it("names the requested squads by their team entry in the given season, in display order", async () => {
+    const damen = await insertTeam({ api_team_permanent_id: 11, name: "HB Dragons Hannover", name_short: "DRG", is_own_club: true });
+    const herren = await insertTeam({ api_team_permanent_id: 12, name: "HB Dragons Hannover 2", is_own_club: true });
+    const u16 = await insertTeam({ api_team_permanent_id: 13, name: "HB Dragons U16", is_own_club: true });
+    await insertEntry(damen, active, { custom_name: "Damen 1", display_order: 2 });
+    await insertEntry(herren, active, { display_order: 1 });
+    await insertEntry(u16, active, { custom_name: "U16", display_order: 3 });
+
+    const names = await getOwnClubSquadNames(active, [13, 11, 12]);
+
+    expect(names).toEqual(["HB Dragons Hannover 2", "Damen 1", "U16"]);
+  });
+
+  it("falls back from custom name to short name to federation name", async () => {
+    const withShort = await insertTeam({ api_team_permanent_id: 21, name: "Long Name", name_short: "Short", is_own_club: true });
+    await insertEntry(withShort, active);
+
+    expect(await getOwnClubSquadNames(active, [21])).toEqual(["Short"]);
+  });
+
+  it("omits squads with no team entry in that season, unknown ids, and foreign teams", async () => {
+    const own = await insertTeam({ api_team_permanent_id: 31, name: "Dragons", is_own_club: true });
+    const other = await seedSeason("2024/25", "archived");
+    const lastYearOnly = await insertTeam({ api_team_permanent_id: 32, name: "Folded", is_own_club: true });
+    const foreign = await insertTeam({ api_team_permanent_id: 33, name: "Tigers", club_id: 9, is_own_club: false });
+    await insertEntry(own, active, { custom_name: "Herren 1" });
+    await insertEntry(lastYearOnly, other);
+    await insertEntry(foreign, active);
+
+    expect(await getOwnClubSquadNames(active, [31, 32, 33, 99999])).toEqual(["Herren 1"]);
+  });
+
+  it("is empty for an empty id list", async () => {
+    expect(await getOwnClubSquadNames(active, [])).toEqual([]);
+  });
+});
 
 describe("getOwnClubTeams", () => {
   let active: number;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MatchListItem } from "@dragons/shared";
-import { selectedTeamApiId, spielplanRowClass } from "./utils";
+import { selectedTeamApiIds, spielplanRowClass } from "./utils";
 
 function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
   return {
@@ -75,9 +75,10 @@ describe("spielplanRowClass", () => {
   });
 });
 
-describe("selectedTeamApiId", () => {
+describe("selectedTeamApiIds", () => {
   const games = [
     makeMatch({ guestTeamCustomName: "Herren 2", guestTeamApiId: 20 }),
+    makeMatch({ id: 3, guestTeamCustomName: "Herren 2", guestTeamApiId: 20 }),
     makeMatch({
       id: 2,
       homeIsOwnClub: true,
@@ -88,15 +89,21 @@ describe("selectedTeamApiId", () => {
     }),
   ];
 
-  it("resolves the api id when exactly one team is selected", () => {
-    expect(selectedTeamApiId(games, ["Herren 2"])).toBe(20);
-    expect(selectedTeamApiId(games, ["U18"])).toBe(33);
+  it("resolves the squad id of a single selected team", () => {
+    expect(selectedTeamApiIds(games, ["Herren 2"])).toEqual([20]);
+    expect(selectedTeamApiIds(games, ["U18"])).toEqual([33]);
   });
 
-  it("is null without a single-team selection", () => {
-    expect(selectedTeamApiId(games, undefined)).toBeNull();
-    expect(selectedTeamApiId(games, [])).toBeNull();
-    expect(selectedTeamApiId(games, ["Herren 2", "U18"])).toBeNull();
-    expect(selectedTeamApiId(games, ["Damen 1"])).toBeNull();
+  it("resolves every selected team, in selection order, each squad once", () => {
+    expect(selectedTeamApiIds(games, ["U18", "Herren 2"])).toEqual([33, 20]);
+  });
+
+  it("drops labels that match no team in the schedule", () => {
+    expect(selectedTeamApiIds(games, ["Damen 1", "U18"])).toEqual([33]);
+  });
+
+  it("is empty without a selection", () => {
+    expect(selectedTeamApiIds(games, undefined)).toEqual([]);
+    expect(selectedTeamApiIds(games, [])).toEqual([]);
   });
 });
