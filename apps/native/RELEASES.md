@@ -40,17 +40,26 @@ Assumes `cd apps/native` unless stated otherwise.
 - `expo-updates` is installed and registered as a plugin.
 - `runtimeVersion.policy = "appVersion"`, `updates.checkAutomatically =
   ON_LOAD`, `fallbackToCacheTimeout = 0`.
-- `eas.json` has three profiles, each with a channel + `EXPO_PUBLIC_API_URL`:
+- `eas.json` has four profiles. Three carry a channel + `EXPO_PUBLIC_API_URL`:
   - `development` → `http://localhost:3001`
   - `preview` → `https://api.app.hbdragons.de`
   - `production` → `https://api.app.hbdragons.de`
+  - `preview-internal` extends `preview` with `distribution: internal`
+    (Android `buildType: apk`), so it inherits the `preview` channel and
+    API URL but produces a sideloadable APK / ad-hoc IPA with an EAS
+    install link instead of a store artifact (#244). Same `autoIncrement`
+    as `preview`, so it consumes a version code / build number.
 - EAS account: organization `hb-dragons` (transferred from the personal
   `eshamounskerto` account 2026-09-01, #239; projectId and updates URL
   unchanged by the transfer). The Apple team still has the personal-account
   problem, see `PRE-LAUNCH.md` § Account / ownership.
 
-**Builds:** six exist, all iOS, all on **SDK 55** (`eas build:list`,
-2026-08-25). April 2026: one `production` and three `preview` builds
+**Builds:** as of 2026-09-09 the newest binaries are iOS build 12 and
+Android version code 5 (both `preview`, SDK 57, commit `334d0b46`);
+version code 4 was the first AAB uploaded by hand to Play Internal
+testing under the club's Play organization (#247), and its app-signing
+fingerprint is live in `assetlinks.json` (#249). Earlier history: six
+builds existed on 2026-08-25, all iOS, all on **SDK 55** (`eas build:list`). April 2026: one `production` and three `preview` builds
 (`internal` distribution, numbered 1, 1 and 2). 2026-08-10: two `preview`
 builds with `store` distribution — build 3 errored, build 4 finished and
 is the newest binary. At the time of that snapshot no Android build had
@@ -108,6 +117,19 @@ at least one build.
 eas build --profile preview --platform ios
 eas build --profile preview --platform android
 ```
+
+### Preview, sideloadable (device test without a store)
+
+```bash
+eas build --profile preview-internal --platform android   # APK
+eas build --profile preview-internal --platform ios       # ad-hoc IPA, registered devices only
+```
+
+Same channel and API as `preview`; the build page shows an install link
+/ QR code. Use it when Play Internal testing is not (yet) delivering —
+it was added on 2026-09-09 when a freshly created Play listing showed
+"won't work on your device" on a supported phone for hours after the
+first upload (#244).
 
 ### Production (public release)
 
