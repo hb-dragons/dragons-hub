@@ -84,7 +84,7 @@ export const strings = {
     selectAll: "Alle auswählen",
     deselectAll: "Alle abwählen",
     exportLabel: "Excel Export",
-    subscribe: "Kalender abonnieren",
+    subscribe: "Abonnieren",
     subscribeTitle: "Spielplan im Kalender abonnieren",
     subscribeHint: "Welche Teams sollen im Kalender landen?",
     copy: "Kopieren",
