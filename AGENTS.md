@@ -30,7 +30,7 @@ Two dependency edges are easy to get wrong and matter:
 - **`@dragons/db` is not a leaf.** It depends on `@dragons/shared` and re-exports
   `SyncRunSummary` from it, so a schema-only import still crosses that edge.
 
-**Request contracts:** `@dragons/contracts` (`packages/contracts/src/<group>.ts`) is the sole declaration of each API endpoint's request schema. The API validates via `hono-openapi`'s `validator(..., validationHook)` (which also registers the schema into `/openapi.json`); `@dragons/api-client` infers `z.infer` request types from the same schemas; `*.contract.test.ts` files guard against client/server drift. Every route body goes through `validator()` + `c.req.valid(...)`, as does every query and path param outside the one exception named below. A few endpoints still read something by hand because it isn't a validator-shaped request at all: `GET /public/scoreboard/stream` parses the `Last-Event-ID` SSE reconnection header with `scoreboardLastEventIdSchema` (whose own `.catch(undefined)` degrades a malformed header to a fresh stream rather than rejecting the connection); `POST /mcp` reads its JSON-RPC body with `c.req.json()` and hands it untouched to the MCP SDK's own transport; `POST /api/scoreboard/ingest` reads a raw hex string from the Pi plus a device-id header; and the public unsubscribe `POST` reads its body as raw text only to tell an RFC 8058 one-click ping apart from the confirmation form's submit, never parsing it as JSON; and `POST /public/probetraining`'s honeypot guard peeks at `website` via `c.req.json()` **before** the route's regular `validator()` runs, because a filled honeypot must get the same fake 201 as a real submission instead of the validation 400 the schema would give it (Hono caches the parsed body, so the validator does not re-read the stream). None of these hand-roll a body-schema `schema.parse()` in place of `validator()`. One route file does still read a path param raw and is the exception to the sentence above, not a pattern to copy: `public/assets.routes.ts` hand-parses its `:id` because the router pattern `:id{[0-9]+\.webp}` already does the real validation.
+**Request contracts:** `@dragons/contracts` (`packages/contracts/src/<group>.ts`) is the sole declaration of each API endpoint's request schema. The API validates via `hono-openapi`'s `validator(..., validationHook)` (which also registers the schema into `/openapi.json`); `@dragons/api-client` infers `z.infer` request types from the same schemas; `*.contract.test.ts` files guard against client/server drift. Every route body goes through `validator()` + `c.req.valid(...)`, as does every query and path param outside the one exception named below. A few endpoints still read something by hand because it isn't a validator-shaped request at all: `GET /public/scoreboard/stream` parses the `Last-Event-ID` SSE reconnection header with `scoreboardLastEventIdSchema` (whose own `.catch(undefined)` degrades a malformed header to a fresh stream rather than rejecting the connection); `POST /api/scoreboard/ingest` reads a raw hex string from the Pi plus a device-id header; and the public unsubscribe `POST` reads its body as raw text only to tell an RFC 8058 one-click ping apart from the confirmation form's submit, never parsing it as JSON; and `POST /public/probetraining`'s honeypot guard peeks at `website` via `c.req.json()` **before** the route's regular `validator()` runs, because a filled honeypot must get the same fake 201 as a real submission instead of the validation 400 the schema would give it (Hono caches the parsed body, so the validator does not re-read the stream). None of these hand-roll a body-schema `schema.parse()` in place of `validator()`. One route file does still read a path param raw and is the exception to the sentence above, not a pattern to copy: `public/assets.routes.ts` hand-parses its `:id` because the router pattern `:id{[0-9]+\.webp}` already does the real validation.
 
 ## Data Model
 
@@ -573,36 +573,11 @@ now picked per season through the endpoints below.
 
 Match list and detail responses include associated venue booking data when available.
 
-### Admin - Assistant
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/admin/assistant/reschedule/chat` | Rescheduling copilot chat (AI SDK UI message stream). 503 when ASSISTANT_ENABLED=false. Permission: match:update. Body capped at 512 KiB (413) and rate-limited (429). |
-
 ### Club Q&A Assistant
 
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/qa/chat` | Members-only club Q&A assistant (AI SDK UI message stream); auth-gated (`requireAuth`), rate-limited, gated by `CHATBOT_ENABLED`. Returns 503 when `CHATBOT_ENABLED=false`. |
-
-### MCP server
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/mcp` | Streamable-HTTP MCP endpoint. Bearer-token auth (`Authorization: Bearer $MCP_TOKEN`), not the admin session gate. Exposes the read-only reschedule tools (`get_match`, `list_club_matches`, `list_venue_bookings`, `list_club_venues`, `get_round_window`, `get_referee_context`, `verify_slot`). Stateless. Gated by `ASSISTANT_ENABLED` (503 when off, same flag as the in-app copilot it shares tools with). Body capped at 256 KiB (413) and rate-limited (429). The bearer check is constant-time; 401 on missing/invalid token. |
-
-The same provider-neutral tool registry that backs the in-app chat is served here for external hosts (Claude Desktop, Cursor). The tools are read-only: they never write to the federation. Attach a host with:
-
-```json
-{
-  "mcpServers": {
-    "dragons-reschedule": {
-      "url": "https://<api-host>/mcp",
-      "headers": { "Authorization": "Bearer <MCP_TOKEN>" }
-    }
-  }
-}
-```
 
 ### Admin - Bookings
 
@@ -873,7 +848,7 @@ the app hides the "Meine Kontaktdaten" section on.
 | PATCH | `/admin/social/backgrounds/:id/default` | Set default background |
 | POST | `/admin/social/generate` | Generate social post PNG (Satori + Sharp compositing) |
 
-Route files: `apps/api/src/routes/health.routes.ts`, `apps/api/src/routes/mcp.routes.ts`, `apps/api/src/routes/qa.routes.ts`, `apps/api/src/routes/device.routes.ts`, `apps/api/src/routes/admin/*.routes.ts`, `apps/api/src/routes/api/*.routes.ts`, `apps/api/src/routes/public/*.routes.ts`, `apps/api/src/routes/referee/*.routes.ts`. Mount table: `apps/api/src/routes/index.ts`; app-level routes: `apps/api/src/app.ts`.
+Route files: `apps/api/src/routes/health.routes.ts`, `apps/api/src/routes/qa.routes.ts`, `apps/api/src/routes/device.routes.ts`, `apps/api/src/routes/admin/*.routes.ts`, `apps/api/src/routes/api/*.routes.ts`, `apps/api/src/routes/public/*.routes.ts`, `apps/api/src/routes/referee/*.routes.ts`. Mount table: `apps/api/src/routes/index.ts`; app-level routes: `apps/api/src/app.ts`.
 Request schemas: `packages/contracts/src/<group>.ts` (never redeclared in the route).
 Service layer: `apps/api/src/services/admin/*.service.ts`, `apps/api/src/services/referee/`, `apps/api/src/services/venue-booking/`, `apps/api/src/services/reschedule/`, `apps/api/src/services/notifications/`, `apps/api/src/services/social/`
 

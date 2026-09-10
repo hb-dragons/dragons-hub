@@ -23,9 +23,6 @@ vi.mock("@/components/rbac/can", () => ({
 vi.mock("./match-edit-sheet", () => ({ MatchEditSheet: () => null }));
 vi.mock("./match-change-history", () => ({ MatchChangeHistory: () => null }));
 vi.mock("./match-divergence-table", () => ({ MatchDivergenceTable: () => null }));
-vi.mock("./reschedule-chat-sheet", () => ({
-  RescheduleChatSheet: () => <div data-testid="reschedule-sheet" />,
-}));
 
 import { MatchDetailPage } from "./match-detail-page";
 
@@ -35,7 +32,6 @@ const messages = {
     matchday: "Matchday {day}",
     edit: "Edit",
     overrideCount: "{count} overrides",
-    reschedule: { trigger: "Suggest reschedule" },
     info: {
       title: "Info",
       matchNo: "No",
@@ -134,39 +130,4 @@ describe("MatchDetailPage kickoff date anchor", () => {
       expect(screen.getByText(/01\.04\.26/)).toBeInTheDocument();
     },
   );
-});
-
-describe("MatchDetailPage reschedule copilot entry point", () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    cleanup();
-  });
-
-  it("hides the trigger when the assistant is disabled", () => {
-    vi.stubEnv("NEXT_PUBLIC_ASSISTANT_ENABLED", "false");
-    renderPage();
-    // With ASSISTANT_ENABLED off server-side the endpoint 404s/500s, so the
-    // sheet could only ever fail silently.
-    expect(
-      screen.queryByRole("button", { name: "Suggest reschedule" }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByTestId("reschedule-sheet")).not.toBeInTheDocument();
-  });
-
-  it("hides the trigger when the flag is absent entirely", () => {
-    vi.stubEnv("NEXT_PUBLIC_ASSISTANT_ENABLED", "");
-    renderPage();
-    expect(
-      screen.queryByRole("button", { name: "Suggest reschedule" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("shows the trigger when the assistant is enabled", () => {
-    vi.stubEnv("NEXT_PUBLIC_ASSISTANT_ENABLED", "true");
-    renderPage();
-    expect(
-      screen.getByRole("button", { name: "Suggest reschedule" }),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("reschedule-sheet")).toBeInTheDocument();
-  });
 });

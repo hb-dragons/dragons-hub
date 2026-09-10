@@ -276,7 +276,6 @@ module "secrets" {
     "auth-secret-production",
     "scoreboard-ingest-key-production",
     "google-generative-ai-api-key-production",
-    "mcp-token-production",
     ], local.expo_access_token_enabled ? ["expo-access-token-production"] : [],
   local.smtp_enabled ? ["smtp-password-production"] : [])
   secret_values = merge({
@@ -289,7 +288,6 @@ module "secrets" {
     "auth-secret-production"                  = random_password.auth_secret.result
     "scoreboard-ingest-key-production"        = random_password.scoreboard_ingest_key.result
     "google-generative-ai-api-key-production" = var.google_generative_ai_api_key
-    "mcp-token-production"                    = var.mcp_token
     }, local.expo_access_token_enabled ? {
     "expo-access-token-production" = var.expo_access_token
     } : {}, local.smtp_enabled ? {
@@ -335,8 +333,6 @@ module "api" {
     SCOREBOARD_DEVICE_ID = var.scoreboard_device_id
     CHATBOT_ENABLED      = var.chatbot_enabled
     CHATBOT_MODEL        = var.chatbot_model
-    ASSISTANT_ENABLED    = var.assistant_enabled
-    ASSISTANT_MODEL      = var.assistant_model
     # WhatsApp group delivery. The API dispatches through the same pipeline as
     # the Worker via the admin "retry failed notification" route, so it needs
     # these too. Omitted entirely when unset: env.ts validates WAHA_BASE_URL as
@@ -387,10 +383,6 @@ module "api" {
     }
     GOOGLE_GENERATIVE_AI_API_KEY = {
       secret_name = "google-generative-ai-api-key-production"
-      version     = "latest"
-    }
-    MCP_TOKEN = {
-      secret_name = "mcp-token-production"
       version     = "latest"
     }
     # Same PAT the CMS mounts, for the same job: a team staff change is content
@@ -460,8 +452,6 @@ module "worker" {
     SCOREBOARD_DEVICE_ID = var.scoreboard_device_id
     CHATBOT_ENABLED      = var.chatbot_enabled
     CHATBOT_MODEL        = var.chatbot_model
-    ASSISTANT_ENABLED    = var.assistant_enabled
-    ASSISTANT_MODEL      = var.assistant_model
     # WhatsApp group delivery. This is the service that runs the event worker,
     # so without these every WhatsApp notification logs "not configured,
     # skipping" and is dropped. See the API block for why "" is not passed.

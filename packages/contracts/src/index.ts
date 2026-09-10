@@ -303,11 +303,6 @@ export {
 export { qaChatBodySchema, type QaChatBody } from "./qa";
 
 export {
-  assistantRescheduleChatBodySchema,
-  type AssistantRescheduleChatBody,
-} from "./assistant";
-
-export {
   unsubscribeQuerySchema,
   type UnsubscribeQuery,
 } from "./unsubscribe";
