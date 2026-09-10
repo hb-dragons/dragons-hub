@@ -306,6 +306,15 @@
       "to": "Bis",
       "homeGame": "Heimspiel",
       "awayGame": "Auswärtsspiel",
+      "groups": {
+        "booked": "Mit Hallenbuchung",
+        "unbooked": "Ohne Hallenbuchung",
+        "away": "Auswärts"
+      },
+      "noBooking": "keine Buchung",
+      "awayVenue": "Halle: Gegner",
+      "needsReconfirmation": "Rückbestätigung nötig",
+      "suggestedKickoff": "Vorschlag: {time} Uhr",
       "loading": "Termine werden gesucht",
       "empty": "In diesem Zeitraum ist kein Wochenendtag frei.",
       "error": "Die Ausweichtermine konnten nicht geladen werden."

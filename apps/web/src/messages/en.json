@@ -306,6 +306,15 @@
       "to": "To",
       "homeGame": "Home game",
       "awayGame": "Away game",
+      "groups": {
+        "booked": "With a hall booking",
+        "unbooked": "Without a hall booking",
+        "away": "Away"
+      },
+      "noBooking": "no booking",
+      "awayVenue": "Hall: opponent",
+      "needsReconfirmation": "Needs re-confirmation",
+      "suggestedKickoff": "Suggested kickoff: {time}",
       "loading": "Searching for dates",
       "empty": "No free weekend day in this range.",
       "error": "The alternative dates could not be loaded."

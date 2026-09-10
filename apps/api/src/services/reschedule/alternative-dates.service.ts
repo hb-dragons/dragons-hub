@@ -1,22 +1,37 @@
 import { and, eq, gte, inArray, lte, max, ne, or } from "drizzle-orm";
-import { matches } from "@dragons/db/schema";
+import {
+  leagues,
+  matches,
+  teamEntries,
+  teams,
+  venueBookingMatches,
+  venueBookings,
+} from "@dragons/db/schema";
 import { clubWeekendDay, eachClubDay, todayInClubZone } from "@dragons/shared";
 import type { AlternativeDatesQuery } from "@dragons/contracts";
 import type {
+  AlternativeDateBooking,
   AlternativeDateCandidate,
   AlternativeDatesResponse,
   DateRange,
 } from "@dragons/shared";
 import { getDb } from "../../config/database";
 import { queryMatchWithJoins } from "../admin/match-query.service";
+import {
+  calculateTimeWindow,
+  type BookingConfig,
+  type BookingMatchInput,
+} from "../venue-booking/booking-calculator";
+import { getBookingConfig } from "../venue-booking/venue-booking.service";
 
 /**
  * The weekend days in a range on which neither squad of a game already plays —
  * the answer a staff member owes the other club when a game has to move.
  *
- * At most three queries, whatever the range: the game itself, the league's
- * last fixture when the client left the end open, then every game of either
- * squad inside the range. The weekends are walked in memory, so a six-month
+ * A fixed handful of queries, whatever the range: the game itself, the league's
+ * last fixture when the client left the end open, every game of either squad
+ * inside the range, and — for a home game — the hall's bookings, their games
+ * and the booking config. The weekends are walked in memory, so a six-month
  * range costs the same as a two-week one.
  *
  * Returns `null` when the match does not exist, so the route can answer 404.
@@ -28,28 +43,69 @@ export async function findAlternativeDates(
   const [match] = await queryMatchWithJoins().where(eq(matches.id, matchId)).limit(1);
   if (!match) return null;
 
+  const isHomeGame = match.homeIsOwnClub === true;
   const range = await resolveRange(match.leagueId, params);
   const busyDays = await loadBusyDays(
     matchId,
     [match.homeTeamApiId, match.guestTeamApiId],
     range,
   );
+  // Only a home game asks after the hall: on an away day the venue belongs to
+  // the other club and its booking, if we even have one, means nothing here.
+  // A home game the federation has named no venue for reads as unbooked, which
+  // is what it is — there is no hall to hold a booking, and the staff member
+  // has to settle that before a kickoff can be suggested for it.
+  const bookedDays =
+    isHomeGame && match.venueId != null
+      ? await loadBookedDays(match.venueId, range)
+      : new Map<string, BookedDay>();
 
   const candidates: AlternativeDateCandidate[] = [];
   for (const day of eachClubDay(range.from, range.to)) {
     const weekday = clubWeekendDay(day);
     if (!weekday || busyDays.has(day)) continue;
-    candidates.push({ date: day, weekday });
+    if (!isHomeGame) {
+      candidates.push({
+        date: day,
+        weekday,
+        group: "away",
+        bookings: [],
+        suggestedKickoffTime: null,
+      });
+      continue;
+    }
+    const booked = bookedDays.get(day);
+    candidates.push({
+      date: day,
+      weekday,
+      group: booked ? "booked" : "unbooked",
+      bookings: booked?.bookings ?? [],
+      suggestedKickoffTime: booked?.suggestedKickoffTime ?? null,
+    });
   }
 
   return {
-    isHomeGame: match.homeIsOwnClub === true,
+    isHomeGame,
     // Opponent games are known only for the leagues we sync, and no query can
     // tell the staff member what we never fetched.
     caveats: ["opponentGamesOutsideTrackedLeagues"],
     range,
-    candidates,
+    candidates: rank(candidates),
   };
+}
+
+/**
+ * Days the hall is already ours come first: they need no new request to the
+ * town. Inside a group the list reads like a calendar, which the calendar walk
+ * produced already — the sort only has to lift the booked days out of it. An
+ * away game has one group and comes out of this untouched.
+ */
+function rank(candidates: AlternativeDateCandidate[]): AlternativeDateCandidate[] {
+  return [...candidates].sort(
+    (a, b) =>
+      Number(a.group === "unbooked") - Number(b.group === "unbooked") ||
+      a.date.localeCompare(b.date),
+  );
 }
 
 /**
@@ -91,6 +147,146 @@ async function lastLeagueFixtureDate(leagueId: number): Promise<string | null> {
       ),
     );
   return row?.last ?? null;
+}
+
+/** What one candidate day looks like when the hall is already booked. */
+interface BookedDay {
+  bookings: AlternativeDateBooking[];
+  suggestedKickoffTime: string | null;
+}
+
+/**
+ * The club's bookings at one venue inside the range, keyed by day, each with
+ * the kickoff the game to be moved could take.
+ *
+ * That kickoff is the moment the hall frees up after the programme already
+ * booked: the same end the booking calculator computes from the day's games,
+ * which is the last game's kickoff plus its team entry's duration (the
+ * configured default when the entry names none) plus the buffer after. A
+ * booking nobody's game hangs off has nothing to derive it from, so it suggests
+ * nothing.
+ *
+ * The booking's override end is deliberately not consulted: it says how long
+ * the club may keep the hall, not when the programme inside it ends, and a
+ * negotiated late end would push the suggestion into an empty gym. It is shown
+ * beside the suggestion, so the staff member can see both.
+ */
+async function loadBookedDays(
+  venueId: number,
+  range: DateRange,
+): Promise<Map<string, BookedDay>> {
+  const bookings = await getDb()
+    .select({
+      id: venueBookings.id,
+      date: venueBookings.date,
+      calculatedStartTime: venueBookings.calculatedStartTime,
+      calculatedEndTime: venueBookings.calculatedEndTime,
+      overrideStartTime: venueBookings.overrideStartTime,
+      overrideEndTime: venueBookings.overrideEndTime,
+      status: venueBookings.status,
+      needsReconfirmation: venueBookings.needsReconfirmation,
+    })
+    .from(venueBookings)
+    .where(
+      and(
+        eq(venueBookings.venueId, venueId),
+        gte(venueBookings.date, range.from),
+        lte(venueBookings.date, range.to),
+      ),
+    )
+    // A day carries one booking per venue today, but nothing in the response
+    // shape says so: ordering here keeps two of them from swapping places
+    // between two identical requests.
+    .orderBy(venueBookings.id);
+  if (bookings.length === 0) return new Map();
+
+  const gamesByBooking = await loadBookedGames(bookings.map((b) => b.id));
+  const config = await getBookingConfig();
+
+  const days = new Map<string, BookedDay>();
+  for (const booking of bookings) {
+    const entry = days.get(booking.date) ?? {
+      bookings: [],
+      suggestedKickoffTime: suggestKickoff(gamesByBooking.get(booking.id) ?? [], config),
+    };
+    entry.bookings.push({
+      id: booking.id,
+      // An override end without an override start, or the other way round, is
+      // half an agreement: each end stands on its own, as the booking screens
+      // already show them.
+      effectiveStartTime: booking.overrideStartTime ?? booking.calculatedStartTime,
+      effectiveEndTime: booking.overrideEndTime ?? booking.calculatedEndTime,
+      status: booking.status,
+      needsReconfirmation: booking.needsReconfirmation,
+    });
+    days.set(booking.date, entry);
+  }
+  return days;
+}
+
+/**
+ * When the hall frees up after the games already booked — the kickoff the game
+ * being moved could take.
+ *
+ * This is the booking calculator's own end for those games, so the suggestion
+ * and the hall window a reconcile would compute are the same number: the latest
+ * game end (kickoff plus that team entry's duration, the configured default
+ * when the entry names none) plus the buffer after. When an earlier game runs
+ * longer than the last one, that latest end is the earlier game's, not the last
+ * kickoff's — the hall is busy until the last basket either way.
+ */
+function suggestKickoff(games: BookingMatchInput[], config: BookingConfig): string | null {
+  const end = calculateTimeWindow(games, config)?.calculatedEndTime;
+  // The calculator clamps a window that runs past midnight to 23:59:59. That is
+  // a fine end for a hall booking and a nonsense kickoff, so a day whose
+  // programme runs that late suggests nothing at all.
+  if (!end || end === "23:59:59") return null;
+  return end;
+}
+
+/**
+ * The live games each booking is made of, carrying the game duration of the
+ * squad that plays them. Keyed by booking rather than by the games' own day, so
+ * a junction row left behind by a game that has since moved cannot quietly
+ * withhold the suggestion from the booking it still hangs off.
+ *
+ * Cancelled and forfeited fixtures are dead: the booking planner does not count
+ * them towards the hall window, and neither does the kickoff suggested behind
+ * it.
+ */
+async function loadBookedGames(
+  bookingIds: number[],
+): Promise<Map<number, BookingMatchInput[]>> {
+  const rows = await getDb()
+    .select({
+      bookingId: venueBookingMatches.venueBookingId,
+      kickoffTime: matches.kickoffTime,
+      teamGameDuration: teamEntries.estimatedGameDuration,
+    })
+    .from(venueBookingMatches)
+    .innerJoin(matches, eq(matches.id, venueBookingMatches.matchId))
+    .leftJoin(leagues, eq(leagues.id, matches.leagueId))
+    .leftJoin(teams, eq(teams.apiTeamPermanentId, matches.homeTeamApiId))
+    .leftJoin(
+      teamEntries,
+      and(eq(teamEntries.teamId, teams.id), eq(teamEntries.seasonId, leagues.seasonRefId)),
+    )
+    .where(
+      and(
+        inArray(venueBookingMatches.venueBookingId, bookingIds),
+        eq(matches.isCancelled, false),
+        eq(matches.isForfeited, false),
+      ),
+    );
+
+  const byBooking = new Map<number, BookingMatchInput[]>();
+  for (const row of rows) {
+    const games = byBooking.get(row.bookingId);
+    const game = { kickoffTime: row.kickoffTime, teamGameDuration: row.teamGameDuration };
+    if (games) games.push(game);
+    else byBooking.set(row.bookingId, [game]);
+  }
+  return byBooking;
 }
 
 /**

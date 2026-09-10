@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import { Hono } from "hono";
 import type { AppEnv } from "../../types";
-import type { AlternativeDatesResponse } from "@dragons/shared";
+import type {
+  AlternativeDateCandidate,
+  AlternativeDatesResponse,
+  BookingStatus,
+} from "@dragons/shared";
 
 // --- Mocks (hoisted before imports) ---
 //
@@ -37,9 +41,20 @@ vi.mock("../../config/auth", () => ({
 
 // --- Subject (imported after mocks) ---
 
+import { eq } from "drizzle-orm";
 import { matchRoutes } from "./match.routes";
 import { errorHandler } from "../../middleware/error";
-import { seasons, leagues, teams, matches } from "@dragons/db/schema";
+import {
+  appSettings,
+  seasons,
+  leagues,
+  teams,
+  teamEntries,
+  matches,
+  venues,
+  venueBookings,
+  venueBookingMatches,
+} from "@dragons/db/schema";
 import {
   setupTestDb,
   resetTestDb,
@@ -64,6 +79,14 @@ const OWN_SQUAD = 100;
 const OPPONENT_SQUAD = 200;
 const THIRD_SQUAD = 300;
 const FOURTH_SQUAD = 400;
+/** Two more teams of our own club — the ones whose games fill the hall. */
+const OWN_SECOND_SQUAD = 500;
+const OWN_THIRD_SQUAD = 600;
+
+// Deliberately not the fallbacks (60 / 90): a suggested kickoff computed from
+// the defaults instead of these rows would still land on a plausible time.
+const BUFFER_AFTER_MINUTES = 45;
+const DEFAULT_GAME_DURATION_MINUTES = 100;
 
 beforeAll(async () => {
   ctx = await setupTestDb();
@@ -104,11 +127,15 @@ async function seedSquad(apiTeamPermanentId: number, isOwnClub: boolean): Promis
   });
 }
 
+/** Set by `seedLeague`, so team entries can be hung off the same season. */
+let seededSeasonId = 0;
+
 async function seedLeague(): Promise<number> {
   const [season] = await ctx.db
     .insert(seasons)
     .values({ name: "2025/26", status: "active" })
     .returning({ id: seasons.id });
+  seededSeasonId = season!.id;
   const [league] = await ctx.db
     .insert(leagues)
     .values({
@@ -129,6 +156,8 @@ async function seedMatch(seed: {
   homeTeamApiId: number;
   guestTeamApiId: number;
   kickoffDate: string;
+  kickoffTime?: string;
+  venueId?: number | null;
   leagueId?: number | null;
   matchDay?: number;
   isCancelled?: boolean;
@@ -142,7 +171,8 @@ async function seedMatch(seed: {
       matchNo: matchNoSeq,
       matchDay: seed.matchDay ?? 5,
       kickoffDate: seed.kickoffDate,
-      kickoffTime: "18:00:00",
+      kickoffTime: seed.kickoffTime ?? "18:00:00",
+      venueId: seed.venueId ?? null,
       leagueId: seed.leagueId ?? null,
       homeTeamApiId: seed.homeTeamApiId,
       guestTeamApiId: seed.guestTeamApiId,
@@ -179,6 +209,126 @@ async function seedStandardFixture(): Promise<{ matchId: number; leagueId: numbe
   return { matchId, leagueId };
 }
 
+let venueApiIdSeq = 0;
+
+async function seedVenue(name: string): Promise<number> {
+  venueApiIdSeq += 1;
+  const [row] = await ctx.db
+    .insert(venues)
+    .values({ apiId: 7000 + venueApiIdSeq, name })
+    .returning({ id: venues.id });
+  return row!.id;
+}
+
+/** The club's buffers and default duration, as the settings screen stores them. */
+async function seedBookingConfig(): Promise<void> {
+  await ctx.db.insert(appSettings).values([
+    { key: "venue_booking_buffer_before", value: "30" },
+    { key: "venue_booking_buffer_after", value: String(BUFFER_AFTER_MINUTES) },
+    { key: "venue_booking_game_duration", value: String(DEFAULT_GAME_DURATION_MINUTES) },
+  ]);
+}
+
+/** A team entry carries the squad's own game duration for the booking window. */
+async function seedTeamEntry(
+  squadApiId: number,
+  leagueId: number,
+  estimatedGameDuration: number | null,
+): Promise<void> {
+  const [team] = await ctx.db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.apiTeamPermanentId, squadApiId));
+  await ctx.db.insert(teamEntries).values({
+    teamId: team!.id,
+    seasonId: seededSeasonId,
+    leagueId,
+    estimatedGameDuration,
+  });
+}
+
+async function seedBooking(seed: {
+  venueId: number;
+  date: string;
+  calculatedStartTime?: string;
+  calculatedEndTime?: string;
+  overrideStartTime?: string | null;
+  overrideEndTime?: string | null;
+  status?: BookingStatus;
+  needsReconfirmation?: boolean;
+  matchIds?: number[];
+}): Promise<number> {
+  const [row] = await ctx.db
+    .insert(venueBookings)
+    .values({
+      venueId: seed.venueId,
+      date: seed.date,
+      calculatedStartTime: seed.calculatedStartTime ?? "11:30:00",
+      calculatedEndTime: seed.calculatedEndTime ?? "16:00:00",
+      overrideStartTime: seed.overrideStartTime ?? null,
+      overrideEndTime: seed.overrideEndTime ?? null,
+      status: seed.status ?? "pending",
+      needsReconfirmation: seed.needsReconfirmation ?? false,
+    })
+    .returning({ id: venueBookings.id });
+  for (const matchId of seed.matchIds ?? []) {
+    await ctx.db
+      .insert(venueBookingMatches)
+      .values({ venueBookingId: row!.id, matchId });
+  }
+  return row!.id;
+}
+
+/**
+ * The standard fixture plus a hall: our home game is played at "Drachenhalle",
+ * and our second team is the one whose games fill it on other weekends.
+ */
+async function seedHomeFixtureWithVenue(): Promise<{
+  matchId: number;
+  leagueId: number;
+  venueId: number;
+}> {
+  await seedSquad(OWN_SQUAD, true);
+  await seedSquad(OPPONENT_SQUAD, false);
+  await seedSquad(THIRD_SQUAD, false);
+  await seedSquad(FOURTH_SQUAD, false);
+  await seedSquad(OWN_SECOND_SQUAD, true);
+  await seedSquad(OWN_THIRD_SQUAD, true);
+  const leagueId = await seedLeague();
+  const venueId = await seedVenue("Drachenhalle");
+  await seedBookingConfig();
+  const matchId = await seedMatch({
+    homeTeamApiId: OWN_SQUAD,
+    guestTeamApiId: OPPONENT_SQUAD,
+    kickoffDate: "2026-03-07",
+    venueId,
+    leagueId,
+  });
+  await seedMatch({
+    homeTeamApiId: THIRD_SQUAD,
+    guestTeamApiId: FOURTH_SQUAD,
+    kickoffDate: "2026-03-28",
+    leagueId,
+  });
+  return { matchId, leagueId, venueId };
+}
+
+/** A game of our second team in the hall — what a booking is made of. */
+async function seedHallGame(seed: {
+  venueId: number;
+  leagueId: number;
+  kickoffDate: string;
+  kickoffTime: string;
+  homeTeamApiId?: number;
+  isCancelled?: boolean;
+}): Promise<number> {
+  return seedMatch({
+    homeTeamApiId: OWN_SECOND_SQUAD,
+    guestTeamApiId: THIRD_SQUAD,
+    ...seed,
+  });
+}
+
 async function get(matchId: number, query = ""): Promise<Response> {
   return app.request(`/matches/${matchId}/alternative-dates${query}`);
 }
@@ -188,6 +338,25 @@ async function candidateDates(matchId: number, query = ""): Promise<string[]> {
   expect(res.status).toBe(200);
   const body = (await res.json()) as AlternativeDatesResponse;
   return body.candidates.map((c) => c.date);
+}
+
+async function candidateOn(
+  matchId: number,
+  date: string,
+  query = "",
+): Promise<AlternativeDateCandidate> {
+  const body = (await (await get(matchId, query)).json()) as AlternativeDatesResponse;
+  const found = body.candidates.find((c) => c.date === date);
+  expect(found, `no candidate for ${date}`).toBeDefined();
+  return found!;
+}
+
+/** A day nothing is booked on: what most candidates look like. */
+function unbooked(
+  date: string,
+  weekday: AlternativeDateCandidate["weekday"],
+): AlternativeDateCandidate {
+  return { date, weekday, group: "unbooked", bookings: [], suggestedKickoffTime: null };
 }
 
 // --- Tests ---
@@ -202,14 +371,14 @@ describe("GET /matches/:id/alternative-dates", () => {
     const body = (await res.json()) as AlternativeDatesResponse;
     expect(body.range).toEqual({ from: "2026-03-01", to: "2026-03-28" });
     expect(body.candidates).toEqual([
-      { date: "2026-03-01", weekday: "sunday" },
-      { date: "2026-03-07", weekday: "saturday" },
-      { date: "2026-03-08", weekday: "sunday" },
-      { date: "2026-03-14", weekday: "saturday" },
-      { date: "2026-03-15", weekday: "sunday" },
-      { date: "2026-03-21", weekday: "saturday" },
-      { date: "2026-03-22", weekday: "sunday" },
-      { date: "2026-03-28", weekday: "saturday" },
+      unbooked("2026-03-01", "sunday"),
+      unbooked("2026-03-07", "saturday"),
+      unbooked("2026-03-08", "sunday"),
+      unbooked("2026-03-14", "saturday"),
+      unbooked("2026-03-15", "sunday"),
+      unbooked("2026-03-21", "saturday"),
+      unbooked("2026-03-22", "sunday"),
+      unbooked("2026-03-28", "saturday"),
     ]);
   });
 
@@ -323,7 +492,7 @@ describe("GET /matches/:id/alternative-dates", () => {
 
     expect(body.range).toEqual({ from: "2026-03-01", to: "2026-03-01" });
     // 2026-03-01 is itself a Sunday, so the collapsed range still yields it.
-    expect(body.candidates).toEqual([{ date: "2026-03-01", weekday: "sunday" }]);
+    expect(body.candidates).toEqual([unbooked("2026-03-01", "sunday")]);
   });
 
   it("collapses the range to today for a game with no league", async () => {
@@ -364,7 +533,7 @@ describe("GET /matches/:id/alternative-dates", () => {
     ).json()) as AlternativeDatesResponse;
 
     expect(body.range).toEqual({ from: "2026-02-14", to: "2026-02-14" });
-    expect(body.candidates).toEqual([{ date: "2026-02-14", weekday: "saturday" }]);
+    expect(body.candidates).toEqual([unbooked("2026-02-14", "saturday")]);
   });
 
   it("honours an explicit range", async () => {
@@ -432,5 +601,303 @@ describe("GET /matches/:id/alternative-dates", () => {
         body: expect.objectContaining({ permissions: { match: ["view"] } }),
       }),
     );
+  });
+});
+
+describe("GET /matches/:id/alternative-dates — hall bookings", () => {
+  it("lists the booking at the game's own venue, override times winning", async () => {
+    const { matchId, leagueId, venueId } = await seedHomeFixtureWithVenue();
+    const hallGame = await seedHallGame({
+      venueId,
+      leagueId,
+      kickoffDate: "2026-03-14",
+      kickoffTime: "12:00:00",
+    });
+    const bookingId = await seedBooking({
+      venueId,
+      date: "2026-03-14",
+      calculatedStartTime: "11:00:00",
+      calculatedEndTime: "15:00:00",
+      overrideStartTime: "10:30:00",
+      overrideEndTime: "16:30:00",
+      status: "confirmed",
+      needsReconfirmation: true,
+      matchIds: [hallGame],
+    });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    expect(candidate.group).toBe("booked");
+    expect(candidate.bookings).toEqual([
+      {
+        id: bookingId,
+        effectiveStartTime: "10:30:00",
+        effectiveEndTime: "16:30:00",
+        status: "confirmed",
+        needsReconfirmation: true,
+      },
+    ]);
+  });
+
+  it("shows the calculated window when the booking carries no override", async () => {
+    const { matchId, venueId } = await seedHomeFixtureWithVenue();
+    await seedBooking({
+      venueId,
+      date: "2026-03-14",
+      calculatedStartTime: "09:15:00",
+      calculatedEndTime: "13:45:00",
+    });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    expect(candidate.bookings[0]).toMatchObject({
+      effectiveStartTime: "09:15:00",
+      effectiveEndTime: "13:45:00",
+      status: "pending",
+      needsReconfirmation: false,
+    });
+  });
+
+  it("takes each end of the window on its own when only one is overridden", async () => {
+    const { matchId, venueId } = await seedHomeFixtureWithVenue();
+    await seedBooking({
+      venueId,
+      date: "2026-03-14",
+      calculatedStartTime: "11:00:00",
+      calculatedEndTime: "15:00:00",
+      overrideEndTime: "17:00:00",
+    });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    expect(candidate.bookings[0]).toMatchObject({
+      effectiveStartTime: "11:00:00",
+      effectiveEndTime: "17:00:00",
+    });
+  });
+
+  it("treats a home game without a venue as unbooked", async () => {
+    const { matchId, venueId } = await seedHomeFixtureWithVenue();
+    await ctx.db
+      .update(matches)
+      .set({ venueId: null })
+      .where(eq(matches.id, matchId));
+    await seedBooking({ venueId, date: "2026-03-14" });
+
+    const body = (await (await get(matchId)).json()) as AlternativeDatesResponse;
+
+    expect(body.isHomeGame).toBe(true);
+    expect(body.candidates.every((c) => c.group === "unbooked")).toBe(true);
+  });
+
+  it("suggests a kickoff after the last booked game, using that entry's duration", async () => {
+    const { matchId, leagueId, venueId } = await seedHomeFixtureWithVenue();
+    await seedTeamEntry(OWN_SECOND_SQUAD, leagueId, 80);
+    const early = await seedHallGame({
+      venueId,
+      leagueId,
+      kickoffDate: "2026-03-14",
+      kickoffTime: "10:00:00",
+    });
+    const late = await seedHallGame({
+      venueId,
+      leagueId,
+      kickoffDate: "2026-03-14",
+      kickoffTime: "12:00:00",
+    });
+    await seedBooking({ venueId, date: "2026-03-14", matchIds: [early, late] });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    // 12:00 + 80 minutes of game + 45 minutes of buffer.
+    expect(candidate.suggestedKickoffTime).toBe("14:05:00");
+  });
+
+  it("falls back to the configured default duration when the team entry has none", async () => {
+    const { matchId, leagueId, venueId } = await seedHomeFixtureWithVenue();
+    await seedTeamEntry(OWN_SECOND_SQUAD, leagueId, null);
+    const hallGame = await seedHallGame({
+      venueId,
+      leagueId,
+      kickoffDate: "2026-03-14",
+      kickoffTime: "12:00:00",
+    });
+    await seedBooking({ venueId, date: "2026-03-14", matchIds: [hallGame] });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    // 12:00 + 100 minutes of default duration + 45 minutes of buffer.
+    expect(candidate.suggestedKickoffTime).toBe("14:25:00");
+  });
+
+  it("waits for the game that runs longest, not for the one that starts last", async () => {
+    const { matchId, leagueId, venueId } = await seedHomeFixtureWithVenue();
+    await seedTeamEntry(OWN_THIRD_SQUAD, leagueId, 240);
+    await seedTeamEntry(OWN_SECOND_SQUAD, leagueId, 80);
+    const long = await seedHallGame({
+      venueId,
+      leagueId,
+      kickoffDate: "2026-03-14",
+      kickoffTime: "10:00:00",
+      homeTeamApiId: OWN_THIRD_SQUAD,
+    });
+    const late = await seedHallGame({
+      venueId,
+      leagueId,
+      kickoffDate: "2026-03-14",
+      kickoffTime: "12:00:00",
+    });
+    await seedBooking({ venueId, date: "2026-03-14", matchIds: [long, late] });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    // The 10:00 game runs to 14:00, past the 12:00 one's 13:20; the hall is
+    // busy until the last basket either way.
+    expect(candidate.suggestedKickoffTime).toBe("14:45:00");
+  });
+
+  it("suggests nothing when the booked programme runs past midnight", async () => {
+    const { matchId, leagueId, venueId } = await seedHomeFixtureWithVenue();
+    await seedTeamEntry(OWN_SECOND_SQUAD, leagueId, 200);
+    const lateGame = await seedHallGame({
+      venueId,
+      leagueId,
+      kickoffDate: "2026-03-14",
+      kickoffTime: "22:00:00",
+    });
+    await seedBooking({ venueId, date: "2026-03-14", matchIds: [lateGame] });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    expect(candidate.group).toBe("booked");
+    expect(candidate.suggestedKickoffTime).toBeNull();
+  });
+
+  it("ignores a cancelled game of the booking when suggesting a kickoff", async () => {
+    const { matchId, leagueId, venueId } = await seedHomeFixtureWithVenue();
+    await seedTeamEntry(OWN_SECOND_SQUAD, leagueId, 80);
+    const played = await seedHallGame({
+      venueId,
+      leagueId,
+      kickoffDate: "2026-03-14",
+      kickoffTime: "12:00:00",
+    });
+    const dead = await seedHallGame({
+      venueId,
+      leagueId,
+      kickoffDate: "2026-03-14",
+      kickoffTime: "15:00:00",
+      isCancelled: true,
+    });
+    await seedBooking({ venueId, date: "2026-03-14", matchIds: [played, dead] });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    expect(candidate.suggestedKickoffTime).toBe("14:05:00");
+  });
+
+  it("suggests no kickoff for a booking nothing is linked to", async () => {
+    const { matchId, venueId } = await seedHomeFixtureWithVenue();
+    await seedBooking({ venueId, date: "2026-03-14" });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    expect(candidate.group).toBe("booked");
+    expect(candidate.suggestedKickoffTime).toBeNull();
+  });
+
+  it("says a day is unbooked and suggests nothing for it", async () => {
+    const { matchId, venueId } = await seedHomeFixtureWithVenue();
+    await seedBooking({ venueId, date: "2026-03-14" });
+
+    const candidate = await candidateOn(matchId, "2026-03-15");
+
+    expect(candidate.group).toBe("unbooked");
+    expect(candidate.bookings).toEqual([]);
+    expect(candidate.suggestedKickoffTime).toBeNull();
+  });
+
+  it("does not show a booking of another hall", async () => {
+    const { matchId, venueId } = await seedHomeFixtureWithVenue();
+    const otherVenueId = await seedVenue("Turnhalle am Wald");
+    await seedBooking({ venueId: otherVenueId, date: "2026-03-14" });
+    await seedBooking({ venueId, date: "2026-03-21" });
+
+    const body = (await (await get(matchId)).json()) as AlternativeDatesResponse;
+
+    expect(body.candidates.filter((c) => c.group === "booked").map((c) => c.date)).toEqual([
+      "2026-03-21",
+    ]);
+  });
+
+  it("returns away candidates as dates alone, whatever the hall is booked for", async () => {
+    await seedSquad(OWN_SQUAD, true);
+    await seedSquad(OPPONENT_SQUAD, false);
+    await seedSquad(THIRD_SQUAD, false);
+    await seedSquad(FOURTH_SQUAD, false);
+    const leagueId = await seedLeague();
+    const venueId = await seedVenue("Halle des Gegners");
+    await seedBookingConfig();
+    const matchId = await seedMatch({
+      homeTeamApiId: OPPONENT_SQUAD,
+      guestTeamApiId: OWN_SQUAD,
+      kickoffDate: "2026-03-07",
+      venueId,
+      leagueId,
+    });
+    await seedMatch({
+      homeTeamApiId: THIRD_SQUAD,
+      guestTeamApiId: FOURTH_SQUAD,
+      kickoffDate: "2026-03-28",
+      leagueId,
+    });
+    await seedBooking({ venueId, date: "2026-03-14" });
+
+    const body = (await (await get(matchId)).json()) as AlternativeDatesResponse;
+
+    expect(body.isHomeGame).toBe(false);
+    expect(body.candidates.every((c) => c.group === "away")).toBe(true);
+    expect(body.candidates.every((c) => c.bookings.length === 0)).toBe(true);
+    expect(body.candidates.every((c) => c.suggestedKickoffTime === null)).toBe(true);
+    expect(body.candidates.map((c) => c.date)).toEqual([
+      "2026-03-01",
+      "2026-03-07",
+      "2026-03-08",
+      "2026-03-14",
+      "2026-03-15",
+      "2026-03-21",
+      "2026-03-22",
+      "2026-03-28",
+    ]);
+  });
+
+  it("ranks booked days before unbooked ones, chronologically inside each group", async () => {
+    const { matchId, venueId } = await seedHomeFixtureWithVenue();
+    await seedBooking({ venueId, date: "2026-03-21" });
+    await seedBooking({ venueId, date: "2026-03-14" });
+
+    const dates = await candidateDates(matchId);
+
+    expect(dates).toEqual([
+      "2026-03-14",
+      "2026-03-21",
+      "2026-03-01",
+      "2026-03-07",
+      "2026-03-08",
+      "2026-03-15",
+      "2026-03-22",
+      "2026-03-28",
+    ]);
+  });
+
+  it("ignores a booking outside the range", async () => {
+    const { matchId, venueId } = await seedHomeFixtureWithVenue();
+    await seedBooking({ venueId, date: "2026-03-21" });
+
+    const body = (await (
+      await get(matchId, "?from=2026-03-07&to=2026-03-15")
+    ).json()) as AlternativeDatesResponse;
+
+    expect(body.candidates.every((c) => c.group === "unbooked")).toBe(true);
   });
 });

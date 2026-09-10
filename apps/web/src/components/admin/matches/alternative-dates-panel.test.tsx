@@ -3,7 +3,11 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import type { AlternativeDatesResponse } from "@dragons/shared";
+import type {
+  AlternativeDateCandidate,
+  AlternativeDatesResponse,
+  ClubWeekendDay,
+} from "@dragons/shared";
 
 const mocks = vi.hoisted(() => ({
   alternativeDates: vi.fn(),
@@ -17,6 +21,14 @@ import { AlternativeDatesPanel } from "./alternative-dates-panel";
 
 const messages = {
   common: { back: "Back", loading: "Loading" },
+  bookings: {
+    status: {
+      pending: "Pending",
+      requested: "Requested",
+      confirmed: "Confirmed",
+      cancelled: "Cancelled",
+    },
+  },
   errors: {
     title: "Something went wrong",
     description: "An unexpected error occurred.",
@@ -35,6 +47,15 @@ const messages = {
       to: "To",
       homeGame: "Home game",
       awayGame: "Away game",
+      groups: {
+        booked: "With a hall booking",
+        unbooked: "Without a hall booking",
+        away: "Away",
+      },
+      noBooking: "no booking",
+      awayVenue: "Hall: opponent",
+      needsReconfirmation: "Needs re-confirmation",
+      suggestedKickoff: "Suggested kickoff: {time}",
       loading: "Searching for dates…",
       empty: "No free weekend day in this range.",
       error: "The alternative dates could not be loaded.",
@@ -45,18 +66,43 @@ const messages = {
 const formats = {
   dateTime: {
     matchDate: { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" },
+    matchTime: { hour: "2-digit", minute: "2-digit" },
   },
 } as const;
+
+function unbooked(date: string, weekday: ClubWeekendDay): AlternativeDateCandidate {
+  return { date, weekday, group: "unbooked", bookings: [], suggestedKickoffTime: null };
+}
+
+function booked(
+  date: string,
+  weekday: ClubWeekendDay,
+  over: Partial<AlternativeDateCandidate> = {},
+): AlternativeDateCandidate {
+  return {
+    date,
+    weekday,
+    group: "booked",
+    bookings: [
+      {
+        id: 1,
+        effectiveStartTime: "10:30:00",
+        effectiveEndTime: "16:30:00",
+        status: "confirmed",
+        needsReconfirmation: false,
+      },
+    ],
+    suggestedKickoffTime: "17:00:00",
+    ...over,
+  };
+}
 
 function response(over: Partial<AlternativeDatesResponse> = {}): AlternativeDatesResponse {
   return {
     isHomeGame: true,
     caveats: ["opponentGamesOutsideTrackedLeagues"],
     range: { from: "2026-03-01", to: "2026-03-28" },
-    candidates: [
-      { date: "2026-03-14", weekday: "saturday" },
-      { date: "2026-03-15", weekday: "sunday" },
-    ],
+    candidates: [unbooked("2026-03-14", "saturday"), unbooked("2026-03-15", "sunday")],
     ...over,
   };
 }
@@ -196,6 +242,87 @@ describe("AlternativeDatesPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back to the game" }));
 
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("heads each group and shows the booking window, status and kickoff", async () => {
+    mocks.alternativeDates.mockResolvedValue(
+      response({
+        candidates: [booked("2026-03-14", "saturday"), unbooked("2026-03-15", "sunday")],
+      }),
+    );
+
+    renderPanel();
+    await settle();
+
+    const headings = screen.getAllByRole("heading", { level: 4 }).map((h) => h.textContent);
+    expect(headings).toEqual(["With a hall booking", "Without a hall booking"]);
+
+    const items = screen.getAllByRole("listitem");
+    // 12-hour clock: the panel renders in the viewer's locale, and this one is
+    // English.
+    expect(items[0]).toHaveTextContent("10:30 AM – 04:30 PM");
+    expect(items[0]).toHaveTextContent("Confirmed");
+    expect(items[0]).toHaveTextContent("Suggested kickoff: 05:00 PM");
+    expect(items[0]).not.toHaveTextContent("Needs re-confirmation");
+  });
+
+  it("marks a booking that has to be reconfirmed", async () => {
+    mocks.alternativeDates.mockResolvedValue(
+      response({
+        candidates: [
+          booked("2026-03-14", "saturday", {
+            bookings: [
+              {
+                id: 1,
+                effectiveStartTime: "10:30:00",
+                effectiveEndTime: "16:30:00",
+                status: "confirmed",
+                needsReconfirmation: true,
+              },
+            ],
+          }),
+        ],
+      }),
+    );
+
+    renderPanel();
+    await settle();
+
+    expect(screen.getByText("Needs re-confirmation")).toBeInTheDocument();
+  });
+
+  it("says a day has no booking and suggests no kickoff for it", async () => {
+    mocks.alternativeDates.mockResolvedValue(response());
+
+    renderPanel();
+    await settle();
+
+    expect(screen.getAllByText("no booking")).toHaveLength(2);
+    expect(screen.queryByText(/Suggested kickoff/)).not.toBeInTheDocument();
+  });
+
+  it("leaves the hall to the other club on an away game", async () => {
+    mocks.alternativeDates.mockResolvedValue(
+      response({
+        isHomeGame: false,
+        candidates: [
+          {
+            date: "2026-03-14",
+            weekday: "saturday",
+            group: "away",
+            bookings: [],
+            suggestedKickoffTime: null,
+          },
+        ],
+      }),
+    );
+
+    renderPanel();
+    await settle();
+
+    expect(screen.getByRole("heading", { level: 4, name: "Away" })).toBeInTheDocument();
+    expect(screen.getByText("Hall: opponent")).toBeInTheDocument();
+    expect(screen.queryByText("no booking")).not.toBeInTheDocument();
   });
 
   it("re-queries with the range the staff member picked", async () => {

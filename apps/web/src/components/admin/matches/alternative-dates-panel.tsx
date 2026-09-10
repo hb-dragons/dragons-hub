@@ -7,8 +7,13 @@ import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
 import { DatePicker } from "@dragons/ui/components/date-picker";
 import { Field, FieldLabel } from "@dragons/ui/components/field";
-import { clubDayAnchor } from "@dragons/shared";
-import type { AlternativeDatesResponse, DateRange } from "@dragons/shared";
+import { clubDayAnchor, clubTimeAnchor } from "@dragons/shared";
+import type {
+  AlternativeDateCandidate,
+  AlternativeDateGroup,
+  AlternativeDatesResponse,
+  DateRange,
+} from "@dragons/shared";
 import { api } from "@/lib/api";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -36,6 +41,9 @@ type PanelState =
  */
 export function AlternativeDatesPanel({ matchId, onBack }: AlternativeDatesPanelProps) {
   const t = useTranslations("matchDetail.alternativeDates");
+  // The booking screens' own status wording, so one hall booking never reads
+  // two different ways in the same app.
+  const tStatus = useTranslations("bookings.status");
   const format = useFormatter();
   const fieldIds = useId();
   const [requested, setRequested] = useState<RequestedRange>(null);
@@ -158,17 +166,92 @@ export function AlternativeDatesPanel({ matchId, onBack }: AlternativeDatesPanel
             {t("empty")}
           </p>
         ) : (
-          <ul className="space-y-1">
-            {state.data.candidates.map((candidate) => (
-              <li
-                key={candidate.date}
-                className="rounded-md bg-surface-low px-3 py-2 text-sm font-medium"
-              >
-                {format.dateTime(clubDayAnchor(candidate.date), "matchDate")}
-              </li>
-            ))}
-          </ul>
+          groupCandidates(state.data.candidates).map(([group, candidates]) => (
+            <section key={group} className="space-y-2">
+              <h4 className="font-display text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+                {t(`groups.${group}`)}
+              </h4>
+              <ul className="space-y-1">
+                {candidates.map((candidate) => (
+                  <li
+                    key={candidate.date}
+                    className="space-y-1 rounded-md bg-surface-low px-3 py-2 text-sm"
+                  >
+                    <span className="font-medium">
+                      {format.dateTime(clubDayAnchor(candidate.date), "matchDate")}
+                    </span>
+                    {candidate.group === "away" && (
+                      <span className="text-muted-foreground block text-xs">
+                        {t("awayVenue")}
+                      </span>
+                    )}
+                    {candidate.group === "unbooked" && (
+                      <span className="text-muted-foreground block text-xs">
+                        {t("noBooking")}
+                      </span>
+                    )}
+                    {candidate.bookings.map((booking) => (
+                      <span
+                        key={booking.id}
+                        className="text-muted-foreground block text-xs"
+                      >
+                        {format.dateTime(
+                          clubTimeAnchor(booking.effectiveStartTime, candidate.date),
+                          "matchTime",
+                        )}{" "}
+                        –{" "}
+                        {format.dateTime(
+                          clubTimeAnchor(booking.effectiveEndTime, candidate.date),
+                          "matchTime",
+                        )}{" "}
+                        · {tStatus(booking.status)}
+                        {booking.needsReconfirmation && (
+                          <>
+                            {" · "}
+                            <span className="text-heat">
+                              {t("needsReconfirmation")}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    ))}
+                    {candidate.suggestedKickoffTime && (
+                      <span className="block text-xs font-medium">
+                        {t("suggestedKickoff", {
+                          time: format.dateTime(
+                            clubTimeAnchor(candidate.suggestedKickoffTime, candidate.date),
+                            "matchTime",
+                          ),
+                        })}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))
         ))}
     </div>
   );
+}
+
+/** The order the piles are shown in; a pile with no day in it is not shown. */
+const GROUP_ORDER: AlternativeDateGroup[] = ["booked", "unbooked", "away"];
+
+/**
+ * The candidates split into their piles, each keeping the order the server
+ * ranked it in. Every day of a group lands under that group's one heading
+ * whatever order the answer arrived in, so a change of ranking on the server
+ * can never split a pile into two headings here.
+ */
+function groupCandidates(
+  candidates: AlternativeDateCandidate[],
+): [AlternativeDateGroup, AlternativeDateCandidate[]][] {
+  return GROUP_ORDER.map(
+    (group) =>
+      [group, candidates.filter((c) => c.group === group)] as [
+        AlternativeDateGroup,
+        AlternativeDateCandidate[],
+      ],
+  ).filter(([, items]) => items.length > 0);
 }
