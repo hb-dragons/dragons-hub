@@ -40,6 +40,7 @@ vi.mock("../../config/auth", () => ({
 import { eq } from "drizzle-orm";
 import { matchRoutes } from "./match.routes";
 import { errorHandler } from "../../middleware/error";
+import { invalidateActiveSeasonCache } from "../../services/admin/season.service";
 import {
   seasons,
   leagues,
@@ -88,6 +89,10 @@ beforeEach(async () => {
   // the club day, not the runtime day. Kiritimati is UTC+14, so 09:00Z is
   // already the next calendar day there.
   vi.stubEnv("TZ", "Pacific/Kiritimati");
+  // The active season is memoised for a minute, and the clock below never
+  // moves — without this every test after the first would see the first one's
+  // season (or its absence).
+  invalidateActiveSeasonCache();
   mocks.userHasPermission.mockResolvedValue({ success: true });
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
@@ -115,15 +120,15 @@ async function seedSquad(apiTeamPermanentId: number, isOwnClub: boolean): Promis
   });
 }
 
-/** Set by {@link seedLeague}: the season every team entry below belongs to. */
-let seasonId = 0;
-
-async function seedLeague(): Promise<number> {
+/**
+ * An active season with one league in it. Both ids matter: the league connects
+ * the game, the season owns the team entries the coach flag walks.
+ */
+async function seedSeasonAndLeague(): Promise<{ seasonId: number; leagueId: number }> {
   const [season] = await ctx.db
     .insert(seasons)
     .values({ name: "2025/26", status: "active" })
     .returning({ id: seasons.id });
-  seasonId = season!.id;
   const [league] = await ctx.db
     .insert(leagues)
     .values({
@@ -135,18 +140,22 @@ async function seedLeague(): Promise<number> {
       seasonRefId: season!.id,
     })
     .returning({ id: leagues.id });
-  return league!.id;
+  return { seasonId: season!.id, leagueId: league!.id };
 }
 
-/** A Team entry for an already-seeded squad, in the league's season. */
-async function seedTeamEntry(squadApiId: number, customName?: string): Promise<number> {
+/** A Team entry for an already-seeded squad, in the given season. */
+async function seedTeamEntry(
+  seasonId: number,
+  squadApiId: number,
+  customName: string,
+): Promise<number> {
   const [team] = await ctx.db
     .select({ id: teams.id })
     .from(teams)
     .where(eq(teams.apiTeamPermanentId, squadApiId));
   const [entry] = await ctx.db
     .insert(teamEntries)
-    .values({ teamId: team!.id, seasonId, customName: customName ?? null })
+    .values({ teamId: team!.id, seasonId, customName })
     .returning({ id: teamEntries.id });
   return entry!.id;
 }
@@ -203,13 +212,17 @@ async function seedMatch(seed: {
  * carries a flag unless a test seeds one. Flag cases narrow the window with
  * their own match days.
  */
-async function seedStandardFixture(): Promise<{ matchId: number; leagueId: number }> {
+async function seedStandardFixture(): Promise<{
+  matchId: number;
+  leagueId: number;
+  seasonId: number;
+}> {
   await seedSquad(OWN_SQUAD, true);
   await seedSquad(OPPONENT_SQUAD, false);
   await seedSquad(THIRD_SQUAD, false);
   await seedSquad(FOURTH_SQUAD, false);
   await seedSquad(OWN_SECOND_SQUAD, true);
-  const leagueId = await seedLeague();
+  const { seasonId, leagueId } = await seedSeasonAndLeague();
   const matchId = await seedMatch({
     homeTeamApiId: OWN_SQUAD,
     guestTeamApiId: OPPONENT_SQUAD,
@@ -230,7 +243,7 @@ async function seedStandardFixture(): Promise<{ matchId: number; leagueId: numbe
     kickoffDate: "2026-03-28",
     leagueId,
   });
-  return { matchId, leagueId };
+  return { matchId, leagueId, seasonId };
 }
 
 /**
@@ -243,7 +256,7 @@ async function seedRoundFixture(): Promise<number> {
   await seedSquad(OPPONENT_SQUAD, false);
   await seedSquad(THIRD_SQUAD, false);
   await seedSquad(FOURTH_SQUAD, false);
-  const leagueId = await seedLeague();
+  const { leagueId } = await seedSeasonAndLeague();
   const matchId = await seedMatch({
     homeTeamApiId: OWN_SQUAD,
     guestTeamApiId: OPPONENT_SQUAD,
@@ -325,7 +338,7 @@ describe("GET /matches/:id/alternative-dates", () => {
   it("reports an away game when the club is the guest", async () => {
     await seedSquad(OWN_SQUAD, true);
     await seedSquad(OPPONENT_SQUAD, false);
-    const leagueId = await seedLeague();
+    const { leagueId } = await seedSeasonAndLeague();
     const matchId = await seedMatch({
       homeTeamApiId: OPPONENT_SQUAD,
       guestTeamApiId: OWN_SQUAD,
@@ -411,7 +424,7 @@ describe("GET /matches/:id/alternative-dates", () => {
   it("collapses the range to today when the league has no later fixture", async () => {
     await seedSquad(OWN_SQUAD, true);
     await seedSquad(OPPONENT_SQUAD, false);
-    const leagueId = await seedLeague();
+    const { leagueId } = await seedSeasonAndLeague();
     const matchId = await seedMatch({
       homeTeamApiId: OWN_SQUAD,
       guestTeamApiId: OPPONENT_SQUAD,
@@ -524,9 +537,9 @@ describe("GET /matches/:id/alternative-dates", () => {
   });
 
   it("flags a day on which a shared staff person's other team entry plays", async () => {
-    const { matchId, leagueId } = await seedStandardFixture();
-    const moving = await seedTeamEntry(OWN_SQUAD, "Herren 1");
-    const other = await seedTeamEntry(OWN_SECOND_SQUAD, "Damen 1");
+    const { matchId, leagueId, seasonId } = await seedStandardFixture();
+    const moving = await seedTeamEntry(seasonId, OWN_SQUAD, "Herren 1");
+    const other = await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, "Damen 1");
     await seedStaffPerson([moving, other]);
     await seedMatch({
       homeTeamApiId: OWN_SECOND_SQUAD,
@@ -541,12 +554,11 @@ describe("GET /matches/:id/alternative-dates", () => {
     expect(await flagsOn(matchId, "2026-03-15")).toEqual([]);
   });
 
-  it("does not flag a day when the other team entry shares no one with ours", async () => {
-    const { matchId, leagueId } = await seedStandardFixture();
-    const moving = await seedTeamEntry(OWN_SQUAD, "Herren 1");
-    const other = await seedTeamEntry(OWN_SECOND_SQUAD, "Damen 1");
-    await seedStaffPerson([moving], "Meier");
-    await seedStaffPerson([other], "Schulz");
+  it("does not flag a day when our staff person is on no other team entry", async () => {
+    const { matchId, leagueId, seasonId } = await seedStandardFixture();
+    const moving = await seedTeamEntry(seasonId, OWN_SQUAD, "Herren 1");
+    await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, "Damen 1");
+    await seedStaffPerson([moving]);
     await seedMatch({
       homeTeamApiId: OWN_SECOND_SQUAD,
       guestTeamApiId: THIRD_SQUAD,
@@ -557,10 +569,38 @@ describe("GET /matches/:id/alternative-dates", () => {
     expect(await flagsOn(matchId, "2026-03-14")).toEqual([]);
   });
 
+  it("still finds a coach collision for a game with no league", async () => {
+    const { seasonId, leagueId } = await seedSeasonAndLeague();
+    await seedSquad(OWN_SQUAD, true);
+    await seedSquad(OPPONENT_SQUAD, false);
+    await seedSquad(THIRD_SQUAD, false);
+    await seedSquad(OWN_SECOND_SQUAD, true);
+    // A friendly: no league, so the season comes from the active one instead.
+    const matchId = await seedMatch({
+      homeTeamApiId: OWN_SQUAD,
+      guestTeamApiId: OPPONENT_SQUAD,
+      kickoffDate: "2026-03-07",
+      leagueId: null,
+    });
+    const moving = await seedTeamEntry(seasonId, OWN_SQUAD, "Herren 1");
+    const other = await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, "Damen 1");
+    await seedStaffPerson([moving, other]);
+    await seedMatch({
+      homeTeamApiId: OWN_SECOND_SQUAD,
+      guestTeamApiId: THIRD_SQUAD,
+      kickoffDate: "2026-03-01",
+      leagueId,
+    });
+
+    expect(await flagsOn(matchId, "2026-03-01")).toEqual([
+      { type: "coachCollision", teamEntryName: "Damen 1" },
+    ]);
+  });
+
   it("does not flag a day whose colliding game is cancelled", async () => {
-    const { matchId, leagueId } = await seedStandardFixture();
-    const moving = await seedTeamEntry(OWN_SQUAD, "Herren 1");
-    const other = await seedTeamEntry(OWN_SECOND_SQUAD, "Damen 1");
+    const { matchId, leagueId, seasonId } = await seedStandardFixture();
+    const moving = await seedTeamEntry(seasonId, OWN_SQUAD, "Herren 1");
+    const other = await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, "Damen 1");
     await seedStaffPerson([moving, other]);
     await seedMatch({
       homeTeamApiId: OWN_SECOND_SQUAD,

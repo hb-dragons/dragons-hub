@@ -308,8 +308,8 @@
       "awayGame": "Auswärtsspiel",
       "loading": "Termine werden gesucht",
       "flags": {
-        "outsideRoundWindow": "Außerhalb des Spieltags",
-        "coachCollision": "Trainer-Kollision: {team}"
+        "outsideRoundWindow": "Außerhalb des Spieltagsfensters",
+        "coachCollision": "Trainer auch bei {team}"
       },
       "empty": "In diesem Zeitraum ist kein Wochenendtag frei.",
       "error": "Die Ausweichtermine konnten nicht geladen werden."

@@ -16,6 +16,16 @@ import type {
 } from "@dragons/shared";
 import { getDb } from "../../config/database";
 import { queryMatchWithJoins } from "../admin/match-query.service";
+import { getActiveSeasonId } from "../admin/season.service";
+
+/**
+ * A game that will actually be played. Cancelled and forfeited fixtures are
+ * dead: they block no day, stretch no horizon, widen no round window and put no
+ * coach anywhere. Every read below asks for this and nothing else.
+ */
+function isLiveFixture() {
+  return and(eq(matches.isCancelled, false), eq(matches.isForfeited, false));
+}
 
 /** The parts of the game being moved that the collision read needs. */
 interface MovingGame {
@@ -31,12 +41,12 @@ interface MovingGame {
  * The weekend days in a range on which neither squad of a game already plays —
  * the answer a staff member owes the other club when a game has to move.
  *
- * At most five queries, whatever the range: the game itself, the league's last
+ * At most six queries, whatever the range: the game itself, the league's last
  * fixture when the client left the end open, then — in parallel — every game of
- * either squad inside the range, the round window and the days a staff person
- * of the moving team entry is committed elsewhere. Each is loaded once for the
- * whole request; the weekends are walked in memory, so a six-month range costs
- * the same as a two-week one.
+ * either squad inside the range, the round window, and the game's season plus
+ * the days a staff person of the moving team entry is committed elsewhere. Each
+ * is loaded once for the whole request; the weekends are walked in memory, so a
+ * six-month range costs the same as a two-week one.
  *
  * Returns `null` when the match does not exist, so the route can answer 404.
  */
@@ -67,7 +77,7 @@ export async function findAlternativeDates(
     // tell the staff member what we never fetched.
     caveats: ["opponentGamesOutsideTrackedLeagues"],
     range,
-    candidates: rank(candidates),
+    candidates: unflaggedFirst(candidates),
   };
 }
 
@@ -99,7 +109,9 @@ function flagsForDay(
  * The input is already chronological, and a partition of it keeps it that way
  * within each half.
  */
-function rank(candidates: AlternativeDateCandidate[]): AlternativeDateCandidate[] {
+function unflaggedFirst(
+  candidates: AlternativeDateCandidate[],
+): AlternativeDateCandidate[] {
   return [
     ...candidates.filter((c) => c.flags.length === 0),
     ...candidates.filter((c) => c.flags.length > 0),
@@ -114,6 +126,10 @@ function rank(candidates: AlternativeDateCandidate[]): AlternativeDateCandidate[
  * Cancelled and forfeited fixtures are dead and must not stretch the window,
  * the same rule the range horizon follows. A game with no league has no round
  * to compare against and gets no flag at all.
+ *
+ * The game being moved counts towards its own window: it is part of the round,
+ * and a game already standing outside it is not one the finder should start
+ * flagging its own current date over.
  */
 async function loadRoundWindow(
   leagueId: number | null,
@@ -128,8 +144,7 @@ async function loadRoundWindow(
       and(
         eq(matches.leagueId, leagueId),
         eq(matches.matchDay, matchDay),
-        eq(matches.isCancelled, false),
-        eq(matches.isForfeited, false),
+        isLiveFixture(),
       ),
     );
 
@@ -141,11 +156,14 @@ async function loadRoundWindow(
  * staff person with the team entry being moved — a trainer cannot coach two
  * games at once, whatever the role they hold on either team (ADR 0008/0009).
  *
- * One query for the whole range: from our squad to its entry for this match's
- * season (`matches.leagueId` -> `leagues.seasonRefId`, as the booking reads
- * do), across the people on it to their other entries of the same season, and
- * on to those entries' games. A game with no league resolves to no entry and
- * therefore to no collisions, the same way it resolves to no round window.
+ * One query for the whole range once the season is known: from our squad to its
+ * entry for that season, across the people on it to their other entries of the
+ * same season, and on to those entries' games. Only a game neither squad of
+ * which is ours — or a club with no season at all — yields nothing.
+ *
+ * The games themselves are matched by squad id and date alone, as the busy-day
+ * read does: a squad id is stable across seasons, and a range that reaches into
+ * the next one is a range the staff member chose to ask about.
  */
 async function loadCoachCollisions(
   match: MovingGame,
@@ -156,7 +174,10 @@ async function loadCoachCollisions(
     : match.guestIsOwnClub
       ? match.guestTeamApiId
       : null;
-  if (ownSquadApiId == null || match.leagueId == null) return new Map();
+  if (ownSquadApiId == null) return new Map();
+
+  const seasonId = await seasonOfGame(match.leagueId);
+  if (seasonId == null) return new Map();
 
   const movingEntry = alias(teamEntries, "moving_entry");
   const movingStaff = alias(teamStaff, "moving_staff");
@@ -172,10 +193,9 @@ async function loadCoachCollisions(
       customName: otherEntry.customName,
     })
     .from(teams)
-    .innerJoin(leagues, eq(leagues.id, match.leagueId))
     .innerJoin(
       movingEntry,
-      and(eq(movingEntry.teamId, teams.id), eq(movingEntry.seasonId, leagues.seasonRefId)),
+      and(eq(movingEntry.teamId, teams.id), eq(movingEntry.seasonId, seasonId)),
     )
     .innerJoin(movingStaff, eq(movingStaff.teamEntryId, movingEntry.id))
     .innerJoin(
@@ -187,10 +207,7 @@ async function loadCoachCollisions(
     )
     .innerJoin(
       otherEntry,
-      and(
-        eq(otherEntry.id, otherStaff.teamEntryId),
-        eq(otherEntry.seasonId, leagues.seasonRefId),
-      ),
+      and(eq(otherEntry.id, otherStaff.teamEntryId), eq(otherEntry.seasonId, seasonId)),
     )
     .innerJoin(otherTeam, eq(otherTeam.id, otherEntry.teamId))
     .innerJoin(
@@ -203,8 +220,7 @@ async function loadCoachCollisions(
         gte(matches.kickoffDate, range.from),
         lte(matches.kickoffDate, range.to),
         ne(matches.id, match.id),
-        eq(matches.isCancelled, false),
-        eq(matches.isForfeited, false),
+        isLiveFixture(),
       ),
     )
     .where(eq(teams.apiTeamPermanentId, ownSquadApiId));
@@ -218,6 +234,24 @@ async function loadCoachCollisions(
     byDay.set(row.date, names);
   }
   return new Map([...byDay].map(([day, names]) => [day, [...names].sort()]));
+}
+
+/**
+ * Which season's team entries the game belongs to. The league carries it
+ * (`matches.leagueId` -> `leagues.seasonRefId`, as the booking reads do); a game
+ * with no league falls back to the club's active season, so a friendly still
+ * finds the people on the moving team entry. A round window has no such
+ * fallback — without a league there is no round to compare against at all.
+ */
+async function seasonOfGame(leagueId: number | null): Promise<number | null> {
+  if (leagueId == null) return getActiveSeasonId();
+
+  const [row] = await getDb()
+    .select({ seasonId: leagues.seasonRefId })
+    .from(leagues)
+    .where(eq(leagues.id, leagueId))
+    .limit(1);
+  return row?.seasonId ?? null;
 }
 
 /**
@@ -254,8 +288,7 @@ async function lastLeagueFixtureDate(leagueId: number): Promise<string | null> {
     .where(
       and(
         eq(matches.leagueId, leagueId),
-        eq(matches.isCancelled, false),
-        eq(matches.isForfeited, false),
+        isLiveFixture(),
       ),
     );
   return row?.last ?? null;
@@ -279,8 +312,7 @@ async function loadBusyDays(
         gte(matches.kickoffDate, range.from),
         lte(matches.kickoffDate, range.to),
         ne(matches.id, matchId),
-        eq(matches.isCancelled, false),
-        eq(matches.isForfeited, false),
+        isLiveFixture(),
         or(
           inArray(matches.homeTeamApiId, squadApiIds),
           inArray(matches.guestTeamApiId, squadApiIds),

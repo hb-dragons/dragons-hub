@@ -8,10 +8,31 @@ import { Button } from "@dragons/ui/components/button";
 import { DatePicker } from "@dragons/ui/components/date-picker";
 import { Field, FieldLabel } from "@dragons/ui/components/field";
 import { clubDayAnchor } from "@dragons/shared";
-import type { AlternativeDatesResponse, DateRange } from "@dragons/shared";
+import type {
+  AlternativeDateFlag,
+  AlternativeDatesResponse,
+  DateRange,
+} from "@dragons/shared";
 import { api } from "@/lib/api";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/loading-state";
+
+/**
+ * The badge for one flag, in one place: a third flag type is then one arm here
+ * rather than an edit to both the label and the React key.
+ */
+function describeFlag(
+  flag: AlternativeDateFlag,
+  t: (key: string, values?: Record<string, string>) => string,
+): { key: string; label: string } {
+  if (flag.type === "coachCollision") {
+    return {
+      key: `${flag.type}:${flag.teamEntryName}`,
+      label: t("flags.coachCollision", { team: flag.teamEntryName }),
+    };
+  }
+  return { key: flag.type, label: t("flags.outsideRoundWindow") };
+}
 
 interface AlternativeDatesPanelProps {
   matchId: number;
@@ -165,20 +186,14 @@ export function AlternativeDatesPanel({ matchId, onBack }: AlternativeDatesPanel
                 className="flex flex-wrap items-center gap-2 rounded-md bg-surface-low px-3 py-2 text-sm font-medium"
               >
                 {format.dateTime(clubDayAnchor(candidate.date), "matchDate")}
-                {candidate.flags.map((flag) => (
-                  <Badge
-                    key={
-                      flag.type === "coachCollision"
-                        ? `${flag.type}:${flag.teamEntryName}`
-                        : flag.type
-                    }
-                    variant="secondary"
-                  >
-                    {flag.type === "coachCollision"
-                      ? t("flags.coachCollision", { team: flag.teamEntryName })
-                      : t("flags.outsideRoundWindow")}
-                  </Badge>
-                ))}
+                {candidate.flags.map((flag) => {
+                  const { key, label } = describeFlag(flag, t);
+                  return (
+                    <Badge key={key} variant="secondary">
+                      {label}
+                    </Badge>
+                  );
+                })}
               </li>
             ))}
           </ul>

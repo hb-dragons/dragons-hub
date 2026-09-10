@@ -39,8 +39,8 @@ const messages = {
       awayGame: "Away game",
       loading: "Searching for dates…",
       flags: {
-        outsideRoundWindow: "Outside the match day",
-        coachCollision: "Coach collision: {team}",
+        outsideRoundWindow: "Outside the round window",
+        coachCollision: "Trainer also with {team}",
       },
       empty: "No free weekend day in this range.",
       error: "The alternative dates could not be loaded.",
@@ -226,8 +226,8 @@ describe("AlternativeDatesPanel", () => {
     await settle();
 
     const items = screen.getAllByRole("listitem");
-    expect(items[0]).toHaveTextContent("Outside the match day");
-    expect(items[1]).toHaveTextContent("Coach collision: Damen 1");
+    expect(items[0]).toHaveTextContent("Outside the round window");
+    expect(items[1]).toHaveTextContent("Trainer also with Damen 1");
   });
 
   it("shows no badge on a day with nothing to say about it", async () => {
@@ -236,12 +236,12 @@ describe("AlternativeDatesPanel", () => {
     renderPanel();
     await settle();
 
-    expect(screen.queryByText("Outside the match day")).not.toBeInTheDocument();
+    expect(screen.queryByText("Outside the round window")).not.toBeInTheDocument();
   });
 
   it.each([
-    ["en", "Outside the match day", "Coach collision: Damen 1"],
-    ["de", "Außerhalb des Spieltags", "Trainer-Kollision: Damen 1"],
+    ["en", "Outside the round window", "Trainer also with Damen 1"],
+    ["de", "Außerhalb des Spieltagsfensters", "Trainer auch bei Damen 1"],
   ] as const)("names both flags in %s", async (locale, round, collision) => {
     mocks.alternativeDates.mockResolvedValue(flagged);
 
