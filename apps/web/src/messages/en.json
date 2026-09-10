@@ -316,6 +316,10 @@
       "needsReconfirmation": "Needs re-confirmation",
       "suggestedKickoff": "Suggested kickoff: {time}",
       "loading": "Searching for dates",
+      "flags": {
+        "outsideRoundWindow": "Outside the round window",
+        "coachCollision": "Trainer also with {team}"
+      },
       "empty": "No free weekend day in this range.",
       "error": "The alternative dates could not be loaded."
     },

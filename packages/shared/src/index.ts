@@ -44,6 +44,7 @@ export type {
   AlternativeDateBooking,
   AlternativeDateCandidate,
   AlternativeDateGroup,
+  AlternativeDateFlag,
   AlternativeDatesCaveat,
   AlternativeDatesResponse,
 } from "./matches";

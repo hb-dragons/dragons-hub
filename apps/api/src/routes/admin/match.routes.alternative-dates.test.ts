@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../../types";
 import type {
   AlternativeDateCandidate,
+  AlternativeDateFlag,
   AlternativeDatesResponse,
   BookingStatus,
 } from "@dragons/shared";
@@ -44,12 +45,15 @@ vi.mock("../../config/auth", () => ({
 import { eq } from "drizzle-orm";
 import { matchRoutes } from "./match.routes";
 import { errorHandler } from "../../middleware/error";
+import { invalidateActiveSeasonCache } from "../../services/admin/season.service";
 import {
   appSettings,
   seasons,
   leagues,
   teams,
   teamEntries,
+  teamStaff,
+  staffPeople,
   matches,
   venues,
   venueBookings,
@@ -79,7 +83,7 @@ const OWN_SQUAD = 100;
 const OPPONENT_SQUAD = 200;
 const THIRD_SQUAD = 300;
 const FOURTH_SQUAD = 400;
-/** Two more teams of our own club — the ones whose games fill the hall. */
+/** Two more squads of our own club: the coach a shared person collides with, and the ones whose games fill the hall. */
 const OWN_SECOND_SQUAD = 500;
 const OWN_THIRD_SQUAD = 600;
 
@@ -100,6 +104,10 @@ beforeEach(async () => {
   // the club day, not the runtime day. Kiritimati is UTC+14, so 09:00Z is
   // already the next calendar day there.
   vi.stubEnv("TZ", "Pacific/Kiritimati");
+  // The active season is memoised for a minute, and the clock below never
+  // moves — without this every test after the first would see the first one's
+  // season (or its absence).
+  invalidateActiveSeasonCache();
   mocks.userHasPermission.mockResolvedValue({ success: true });
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
@@ -127,15 +135,15 @@ async function seedSquad(apiTeamPermanentId: number, isOwnClub: boolean): Promis
   });
 }
 
-/** Set by `seedLeague`, so team entries can be hung off the same season. */
-let seededSeasonId = 0;
-
-async function seedLeague(): Promise<number> {
+/**
+ * An active season with one league in it. Both ids matter: the league connects
+ * the game, the season owns the team entries the coach flag walks.
+ */
+async function seedSeasonAndLeague(): Promise<{ seasonId: number; leagueId: number }> {
   const [season] = await ctx.db
     .insert(seasons)
     .values({ name: "2025/26", status: "active" })
     .returning({ id: seasons.id });
-  seededSeasonId = season!.id;
   const [league] = await ctx.db
     .insert(leagues)
     .values({
@@ -147,7 +155,42 @@ async function seedLeague(): Promise<number> {
       seasonRefId: season!.id,
     })
     .returning({ id: leagues.id });
-  return league!.id;
+  return { seasonId: season!.id, leagueId: league!.id };
+}
+
+/** A Team entry for an already-seeded squad, in the given season. */
+async function seedTeamEntry(
+  seasonId: number,
+  squadApiId: number,
+  fields: { customName?: string; estimatedGameDuration?: number | null } = {},
+): Promise<number> {
+  const [team] = await ctx.db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.apiTeamPermanentId, squadApiId));
+  const [entry] = await ctx.db
+    .insert(teamEntries)
+    .values({
+      teamId: team!.id,
+      seasonId,
+      customName: fields.customName ?? null,
+      estimatedGameDuration: fields.estimatedGameDuration ?? null,
+    })
+    .returning({ id: teamEntries.id });
+  return entry!.id;
+}
+
+/** One human, attached as trainer to every entry given. */
+async function seedStaffPerson(entryIds: number[], lastName = "Meier"): Promise<void> {
+  const [person] = await ctx.db
+    .insert(staffPeople)
+    .values({ firstName: "Ada", lastName })
+    .returning({ id: staffPeople.id });
+  for (const teamEntryId of entryIds) {
+    await ctx.db
+      .insert(teamStaff)
+      .values({ teamEntryId, personId: person!.id, role: "trainer" });
+  }
 }
 
 let matchNoSeq = 0;
@@ -186,17 +229,34 @@ async function seedMatch(seed: {
 /**
  * The standard fixture: an own-club home game on Sat 2026-03-07 against a
  * foreign squad, in a league whose last fixture is Sat 2026-03-28.
+ *
+ * Its two sibling fixtures share match day 5 and sit at either end of the
+ * default range, so the round window spans the whole range and no candidate
+ * carries a flag unless a test seeds one. Flag cases narrow the window with
+ * their own match days.
  */
-async function seedStandardFixture(): Promise<{ matchId: number; leagueId: number }> {
+async function seedStandardFixture(): Promise<{
+  matchId: number;
+  leagueId: number;
+  seasonId: number;
+}> {
   await seedSquad(OWN_SQUAD, true);
   await seedSquad(OPPONENT_SQUAD, false);
   await seedSquad(THIRD_SQUAD, false);
   await seedSquad(FOURTH_SQUAD, false);
-  const leagueId = await seedLeague();
+  await seedSquad(OWN_SECOND_SQUAD, true);
+  const { seasonId, leagueId } = await seedSeasonAndLeague();
   const matchId = await seedMatch({
     homeTeamApiId: OWN_SQUAD,
     guestTeamApiId: OPPONENT_SQUAD,
     kickoffDate: "2026-03-07",
+    leagueId,
+  });
+  // Same round, opening the window at the first day of the default range.
+  await seedMatch({
+    homeTeamApiId: FOURTH_SQUAD,
+    guestTeamApiId: THIRD_SQUAD,
+    kickoffDate: "2026-03-01",
     leagueId,
   });
   // Last fixture of the league, between two squads that are not ours.
@@ -206,7 +266,42 @@ async function seedStandardFixture(): Promise<{ matchId: number; leagueId: numbe
     kickoffDate: "2026-03-28",
     leagueId,
   });
-  return { matchId, leagueId };
+  return { matchId, leagueId, seasonId };
+}
+
+/**
+ * A league whose round 9 is played over Sat 2026-03-07 and Sun 2026-03-08 and
+ * whose round 10 follows on Sat 2026-03-21 — so the round window is narrower
+ * than the range, and days outside it are flagged.
+ */
+async function seedRoundFixture(): Promise<number> {
+  await seedSquad(OWN_SQUAD, true);
+  await seedSquad(OPPONENT_SQUAD, false);
+  await seedSquad(THIRD_SQUAD, false);
+  await seedSquad(FOURTH_SQUAD, false);
+  const { leagueId } = await seedSeasonAndLeague();
+  const matchId = await seedMatch({
+    homeTeamApiId: OWN_SQUAD,
+    guestTeamApiId: OPPONENT_SQUAD,
+    kickoffDate: "2026-03-07",
+    leagueId,
+    matchDay: 9,
+  });
+  await seedMatch({
+    homeTeamApiId: THIRD_SQUAD,
+    guestTeamApiId: FOURTH_SQUAD,
+    kickoffDate: "2026-03-08",
+    leagueId,
+    matchDay: 9,
+  });
+  await seedMatch({
+    homeTeamApiId: THIRD_SQUAD,
+    guestTeamApiId: FOURTH_SQUAD,
+    kickoffDate: "2026-03-21",
+    leagueId,
+    matchDay: 10,
+  });
+  return matchId;
 }
 
 let venueApiIdSeq = 0;
@@ -227,24 +322,6 @@ async function seedBookingConfig(): Promise<void> {
     { key: "venue_booking_buffer_after", value: String(BUFFER_AFTER_MINUTES) },
     { key: "venue_booking_game_duration", value: String(DEFAULT_GAME_DURATION_MINUTES) },
   ]);
-}
-
-/** A team entry carries the squad's own game duration for the booking window. */
-async function seedTeamEntry(
-  squadApiId: number,
-  leagueId: number,
-  estimatedGameDuration: number | null,
-): Promise<void> {
-  const [team] = await ctx.db
-    .select({ id: teams.id })
-    .from(teams)
-    .where(eq(teams.apiTeamPermanentId, squadApiId));
-  await ctx.db.insert(teamEntries).values({
-    teamId: team!.id,
-    seasonId: seededSeasonId,
-    leagueId,
-    estimatedGameDuration,
-  });
 }
 
 async function seedBooking(seed: {
@@ -286,6 +363,7 @@ async function seedBooking(seed: {
 async function seedHomeFixtureWithVenue(): Promise<{
   matchId: number;
   leagueId: number;
+  seasonId: number;
   venueId: number;
 }> {
   await seedSquad(OWN_SQUAD, true);
@@ -294,7 +372,7 @@ async function seedHomeFixtureWithVenue(): Promise<{
   await seedSquad(FOURTH_SQUAD, false);
   await seedSquad(OWN_SECOND_SQUAD, true);
   await seedSquad(OWN_THIRD_SQUAD, true);
-  const leagueId = await seedLeague();
+  const { seasonId, leagueId } = await seedSeasonAndLeague();
   const venueId = await seedVenue("Drachenhalle");
   await seedBookingConfig();
   const matchId = await seedMatch({
@@ -310,7 +388,7 @@ async function seedHomeFixtureWithVenue(): Promise<{
     kickoffDate: "2026-03-28",
     leagueId,
   });
-  return { matchId, leagueId, venueId };
+  return { matchId, leagueId, seasonId, venueId };
 }
 
 /** A game of our second team in the hall — what a booking is made of. */
@@ -355,8 +433,20 @@ async function candidateOn(
 function unbooked(
   date: string,
   weekday: AlternativeDateCandidate["weekday"],
+  flags: AlternativeDateFlag[] = [],
 ): AlternativeDateCandidate {
-  return { date, weekday, group: "unbooked", bookings: [], suggestedKickoffTime: null };
+  return { date, weekday, group: "unbooked", bookings: [], suggestedKickoffTime: null, flags };
+}
+
+async function flagsOn(
+  matchId: number,
+  date: string,
+  query = "",
+): Promise<AlternativeDateFlag[]> {
+  const res = await get(matchId, query);
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as AlternativeDatesResponse;
+  return body.candidates.find((c) => c.date === date)?.flags ?? [];
 }
 
 // --- Tests ---
@@ -394,7 +484,7 @@ describe("GET /matches/:id/alternative-dates", () => {
   it("reports an away game when the club is the guest", async () => {
     await seedSquad(OWN_SQUAD, true);
     await seedSquad(OPPONENT_SQUAD, false);
-    const leagueId = await seedLeague();
+    const { leagueId } = await seedSeasonAndLeague();
     const matchId = await seedMatch({
       homeTeamApiId: OPPONENT_SQUAD,
       guestTeamApiId: OWN_SQUAD,
@@ -480,7 +570,7 @@ describe("GET /matches/:id/alternative-dates", () => {
   it("collapses the range to today when the league has no later fixture", async () => {
     await seedSquad(OWN_SQUAD, true);
     await seedSquad(OPPONENT_SQUAD, false);
-    const leagueId = await seedLeague();
+    const { leagueId } = await seedSeasonAndLeague();
     const matchId = await seedMatch({
       homeTeamApiId: OWN_SQUAD,
       guestTeamApiId: OPPONENT_SQUAD,
@@ -491,8 +581,11 @@ describe("GET /matches/:id/alternative-dates", () => {
     const body = (await (await get(matchId)).json()) as AlternativeDatesResponse;
 
     expect(body.range).toEqual({ from: "2026-03-01", to: "2026-03-01" });
-    // 2026-03-01 is itself a Sunday, so the collapsed range still yields it.
-    expect(body.candidates).toEqual([unbooked("2026-03-01", "sunday")]);
+    // 2026-03-01 is itself a Sunday, so the collapsed range still yields it —
+    // outside the round window of the only fixture the league has.
+    expect(body.candidates).toEqual([
+      unbooked("2026-03-01", "sunday", [{ type: "outsideRoundWindow" }]),
+    ]);
   });
 
   it("collapses the range to today for a game with no league", async () => {
@@ -533,7 +626,9 @@ describe("GET /matches/:id/alternative-dates", () => {
     ).json()) as AlternativeDatesResponse;
 
     expect(body.range).toEqual({ from: "2026-02-14", to: "2026-02-14" });
-    expect(body.candidates).toEqual([unbooked("2026-02-14", "saturday")]);
+    expect(body.candidates).toEqual([
+      unbooked("2026-02-14", "saturday", [{ type: "outsideRoundWindow" }]),
+    ]);
   });
 
   it("honours an explicit range", async () => {
@@ -560,6 +655,121 @@ describe("GET /matches/:id/alternative-dates", () => {
     ).json()) as AlternativeDatesResponse;
 
     expect(body.range).toEqual({ from: "2026-03-21", to: "2026-03-28" });
+  });
+
+  it("flags a day outside the round window and leaves the round's own days clean", async () => {
+    const matchId = await seedRoundFixture();
+
+    expect(await flagsOn(matchId, "2026-03-07")).toEqual([]);
+    expect(await flagsOn(matchId, "2026-03-08")).toEqual([]);
+    expect(await flagsOn(matchId, "2026-03-14")).toEqual([{ type: "outsideRoundWindow" }]);
+  });
+
+  it("carries no round flag for a game with no league", async () => {
+    await seedSquad(OWN_SQUAD, true);
+    await seedSquad(OPPONENT_SQUAD, false);
+    const matchId = await seedMatch({
+      homeTeamApiId: OWN_SQUAD,
+      guestTeamApiId: OPPONENT_SQUAD,
+      kickoffDate: "2026-03-07",
+      leagueId: null,
+    });
+
+    const res = await get(matchId);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as AlternativeDatesResponse;
+    expect(body.candidates).toEqual([unbooked("2026-03-01", "sunday")]);
+  });
+
+  it("flags a day on which a shared staff person's other team entry plays", async () => {
+    const { matchId, leagueId, seasonId } = await seedStandardFixture();
+    const moving = await seedTeamEntry(seasonId, OWN_SQUAD, { customName: "Herren 1" });
+    const other = await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, { customName: "Damen 1" });
+    await seedStaffPerson([moving, other]);
+    await seedMatch({
+      homeTeamApiId: OWN_SECOND_SQUAD,
+      guestTeamApiId: THIRD_SQUAD,
+      kickoffDate: "2026-03-14",
+      leagueId,
+    });
+
+    expect(await flagsOn(matchId, "2026-03-14")).toEqual([
+      { type: "coachCollision", teamEntryName: "Damen 1" },
+    ]);
+    expect(await flagsOn(matchId, "2026-03-15")).toEqual([]);
+  });
+
+  it("does not flag a day when our staff person is on no other team entry", async () => {
+    const { matchId, leagueId, seasonId } = await seedStandardFixture();
+    const moving = await seedTeamEntry(seasonId, OWN_SQUAD, { customName: "Herren 1" });
+    await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, { customName: "Damen 1" });
+    await seedStaffPerson([moving]);
+    await seedMatch({
+      homeTeamApiId: OWN_SECOND_SQUAD,
+      guestTeamApiId: THIRD_SQUAD,
+      kickoffDate: "2026-03-14",
+      leagueId,
+    });
+
+    expect(await flagsOn(matchId, "2026-03-14")).toEqual([]);
+  });
+
+  it("still finds a coach collision for a game with no league", async () => {
+    const { seasonId, leagueId } = await seedSeasonAndLeague();
+    await seedSquad(OWN_SQUAD, true);
+    await seedSquad(OPPONENT_SQUAD, false);
+    await seedSquad(THIRD_SQUAD, false);
+    await seedSquad(OWN_SECOND_SQUAD, true);
+    // A friendly: no league, so the season comes from the active one instead.
+    const matchId = await seedMatch({
+      homeTeamApiId: OWN_SQUAD,
+      guestTeamApiId: OPPONENT_SQUAD,
+      kickoffDate: "2026-03-07",
+      leagueId: null,
+    });
+    const moving = await seedTeamEntry(seasonId, OWN_SQUAD, { customName: "Herren 1" });
+    const other = await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, { customName: "Damen 1" });
+    await seedStaffPerson([moving, other]);
+    await seedMatch({
+      homeTeamApiId: OWN_SECOND_SQUAD,
+      guestTeamApiId: THIRD_SQUAD,
+      kickoffDate: "2026-03-01",
+      leagueId,
+    });
+
+    expect(await flagsOn(matchId, "2026-03-01")).toEqual([
+      { type: "coachCollision", teamEntryName: "Damen 1" },
+    ]);
+  });
+
+  it("does not flag a day whose colliding game is cancelled", async () => {
+    const { matchId, leagueId, seasonId } = await seedStandardFixture();
+    const moving = await seedTeamEntry(seasonId, OWN_SQUAD, { customName: "Herren 1" });
+    const other = await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, { customName: "Damen 1" });
+    await seedStaffPerson([moving, other]);
+    await seedMatch({
+      homeTeamApiId: OWN_SECOND_SQUAD,
+      guestTeamApiId: THIRD_SQUAD,
+      kickoffDate: "2026-03-14",
+      leagueId,
+      isCancelled: true,
+    });
+
+    expect(await flagsOn(matchId, "2026-03-14")).toEqual([]);
+  });
+
+  it("ranks flagged days after unflagged ones, chronological inside each", async () => {
+    const matchId = await seedRoundFixture();
+
+    expect(await candidateDates(matchId)).toEqual([
+      "2026-03-07",
+      "2026-03-08",
+      "2026-03-01",
+      "2026-03-14",
+      "2026-03-15",
+      "2026-03-21",
+    ]);
   });
 
   it("returns 400 for a malformed date", async () => {
@@ -691,8 +901,8 @@ describe("GET /matches/:id/alternative-dates — hall bookings", () => {
   });
 
   it("suggests a kickoff after the last booked game, using that entry's duration", async () => {
-    const { matchId, leagueId, venueId } = await seedHomeFixtureWithVenue();
-    await seedTeamEntry(OWN_SECOND_SQUAD, leagueId, 80);
+    const { matchId, leagueId, seasonId, venueId } = await seedHomeFixtureWithVenue();
+    await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, { estimatedGameDuration: 80 });
     const early = await seedHallGame({
       venueId,
       leagueId,
@@ -714,8 +924,8 @@ describe("GET /matches/:id/alternative-dates — hall bookings", () => {
   });
 
   it("falls back to the configured default duration when the team entry has none", async () => {
-    const { matchId, leagueId, venueId } = await seedHomeFixtureWithVenue();
-    await seedTeamEntry(OWN_SECOND_SQUAD, leagueId, null);
+    const { matchId, leagueId, seasonId, venueId } = await seedHomeFixtureWithVenue();
+    await seedTeamEntry(seasonId, OWN_SECOND_SQUAD);
     const hallGame = await seedHallGame({
       venueId,
       leagueId,
@@ -731,9 +941,9 @@ describe("GET /matches/:id/alternative-dates — hall bookings", () => {
   });
 
   it("waits for the game that runs longest, not for the one that starts last", async () => {
-    const { matchId, leagueId, venueId } = await seedHomeFixtureWithVenue();
-    await seedTeamEntry(OWN_THIRD_SQUAD, leagueId, 240);
-    await seedTeamEntry(OWN_SECOND_SQUAD, leagueId, 80);
+    const { matchId, leagueId, seasonId, venueId } = await seedHomeFixtureWithVenue();
+    await seedTeamEntry(seasonId, OWN_THIRD_SQUAD, { estimatedGameDuration: 240 });
+    await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, { estimatedGameDuration: 80 });
     const long = await seedHallGame({
       venueId,
       leagueId,
@@ -757,8 +967,8 @@ describe("GET /matches/:id/alternative-dates — hall bookings", () => {
   });
 
   it("suggests nothing when the booked programme runs past midnight", async () => {
-    const { matchId, leagueId, venueId } = await seedHomeFixtureWithVenue();
-    await seedTeamEntry(OWN_SECOND_SQUAD, leagueId, 200);
+    const { matchId, leagueId, seasonId, venueId } = await seedHomeFixtureWithVenue();
+    await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, { estimatedGameDuration: 200 });
     const lateGame = await seedHallGame({
       venueId,
       leagueId,
@@ -774,8 +984,8 @@ describe("GET /matches/:id/alternative-dates — hall bookings", () => {
   });
 
   it("ignores a cancelled game of the booking when suggesting a kickoff", async () => {
-    const { matchId, leagueId, venueId } = await seedHomeFixtureWithVenue();
-    await seedTeamEntry(OWN_SECOND_SQUAD, leagueId, 80);
+    const { matchId, leagueId, seasonId, venueId } = await seedHomeFixtureWithVenue();
+    await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, { estimatedGameDuration: 80 });
     const played = await seedHallGame({
       venueId,
       leagueId,
@@ -835,7 +1045,7 @@ describe("GET /matches/:id/alternative-dates — hall bookings", () => {
     await seedSquad(OPPONENT_SQUAD, false);
     await seedSquad(THIRD_SQUAD, false);
     await seedSquad(FOURTH_SQUAD, false);
-    const leagueId = await seedLeague();
+    const { leagueId } = await seedSeasonAndLeague();
     const venueId = await seedVenue("Halle des Gegners");
     await seedBookingConfig();
     const matchId = await seedMatch({
@@ -859,8 +1069,9 @@ describe("GET /matches/:id/alternative-dates — hall bookings", () => {
     expect(body.candidates.every((c) => c.group === "away")).toBe(true);
     expect(body.candidates.every((c) => c.bookings.length === 0)).toBe(true);
     expect(body.candidates.every((c) => c.suggestedKickoffTime === null)).toBe(true);
+    // 2026-03-01 lies before the round (all fixtures share a match day), so it
+    // carries the round flag and closes the list; the rest reads like a calendar.
     expect(body.candidates.map((c) => c.date)).toEqual([
-      "2026-03-01",
       "2026-03-07",
       "2026-03-08",
       "2026-03-14",
@@ -868,6 +1079,7 @@ describe("GET /matches/:id/alternative-dates — hall bookings", () => {
       "2026-03-21",
       "2026-03-22",
       "2026-03-28",
+      "2026-03-01",
     ]);
   });
 
@@ -878,15 +1090,17 @@ describe("GET /matches/:id/alternative-dates — hall bookings", () => {
 
     const dates = await candidateDates(matchId);
 
+    // Booked days lead; inside the unbooked group 2026-03-01 is flagged (before
+    // the round) and therefore closes the list.
     expect(dates).toEqual([
       "2026-03-14",
       "2026-03-21",
-      "2026-03-01",
       "2026-03-07",
       "2026-03-08",
       "2026-03-15",
       "2026-03-22",
       "2026-03-28",
+      "2026-03-01",
     ]);
   });
 

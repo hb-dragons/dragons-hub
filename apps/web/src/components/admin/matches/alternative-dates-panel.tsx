@@ -10,6 +10,7 @@ import { Field, FieldLabel } from "@dragons/ui/components/field";
 import { clubDayAnchor, clubTimeAnchor } from "@dragons/shared";
 import type {
   AlternativeDateCandidate,
+  AlternativeDateFlag,
   AlternativeDateGroup,
   AlternativeDatesResponse,
   DateRange,
@@ -17,6 +18,23 @@ import type {
 import { api } from "@/lib/api";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/loading-state";
+
+/**
+ * The badge for one flag, in one place: a third flag type is then one arm here
+ * rather than an edit to both the label and the React key.
+ */
+function describeFlag(
+  flag: AlternativeDateFlag,
+  t: (key: string, values?: Record<string, string>) => string,
+): { key: string; label: string } {
+  if (flag.type === "coachCollision") {
+    return {
+      key: `${flag.type}:${flag.teamEntryName}`,
+      label: t("flags.coachCollision", { team: flag.teamEntryName }),
+    };
+  }
+  return { key: flag.type, label: t("flags.outsideRoundWindow") };
+}
 
 interface AlternativeDatesPanelProps {
   matchId: number;
@@ -177,8 +195,18 @@ export function AlternativeDatesPanel({ matchId, onBack }: AlternativeDatesPanel
                     key={candidate.date}
                     className="space-y-1 rounded-md bg-surface-low px-3 py-2 text-sm"
                   >
-                    <span className="font-medium">
-                      {format.dateTime(clubDayAnchor(candidate.date), "matchDate")}
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">
+                        {format.dateTime(clubDayAnchor(candidate.date), "matchDate")}
+                      </span>
+                      {candidate.flags.map((flag) => {
+                        const { key, label } = describeFlag(flag, t);
+                        return (
+                          <Badge key={key} variant="secondary">
+                            {label}
+                          </Badge>
+                        );
+                      })}
                     </span>
                     {candidate.group === "away" && (
                       <span className="text-muted-foreground block text-xs">

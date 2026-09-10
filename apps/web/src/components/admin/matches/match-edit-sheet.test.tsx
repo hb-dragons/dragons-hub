@@ -461,6 +461,7 @@ describe("MatchEditSheet alternative-date finder", () => {
             },
           ],
           suggestedKickoffTime: "17:00:00",
+          flags: [],
         },
       ],
     });

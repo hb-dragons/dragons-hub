@@ -8,6 +8,8 @@ import type {
   AlternativeDatesResponse,
   ClubWeekendDay,
 } from "@dragons/shared";
+import enMessages from "@/messages/en.json";
+import deMessages from "@/messages/de.json";
 
 const mocks = vi.hoisted(() => ({
   alternativeDates: vi.fn(),
@@ -57,6 +59,10 @@ const messages = {
       needsReconfirmation: "Needs re-confirmation",
       suggestedKickoff: "Suggested kickoff: {time}",
       loading: "Searching for dates…",
+      flags: {
+        outsideRoundWindow: "Outside the round window",
+        coachCollision: "Trainer also with {team}",
+      },
       empty: "No free weekend day in this range.",
       error: "The alternative dates could not be loaded.",
     },
@@ -71,7 +77,7 @@ const formats = {
 } as const;
 
 function unbooked(date: string, weekday: ClubWeekendDay): AlternativeDateCandidate {
-  return { date, weekday, group: "unbooked", bookings: [], suggestedKickoffTime: null };
+  return { date, weekday, group: "unbooked", bookings: [], suggestedKickoffTime: null, flags: [] };
 }
 
 function booked(
@@ -93,6 +99,7 @@ function booked(
       },
     ],
     suggestedKickoffTime: "17:00:00",
+    flags: [],
     ...over,
   };
 }
@@ -105,6 +112,31 @@ function response(over: Partial<AlternativeDatesResponse> = {}): AlternativeDate
     candidates: [unbooked("2026-03-14", "saturday"), unbooked("2026-03-15", "sunday")],
     ...over,
   };
+}
+
+/** The two flags on two days, for the locale checks below. */
+const flagged = response({
+  candidates: [
+    { ...unbooked("2026-03-14", "saturday"), flags: [{ type: "outsideRoundWindow" }] },
+    {
+      ...unbooked("2026-03-15", "sunday"),
+      flags: [{ type: "coachCollision", teamEntryName: "Damen 1" }],
+    },
+  ],
+});
+
+/** Renders against the real catalog, so a missing key fails the test. */
+function renderWithCatalog(locale: "en" | "de") {
+  render(
+    <NextIntlClientProvider
+      locale={locale}
+      timeZone="Europe/Berlin"
+      messages={locale === "en" ? enMessages : deMessages}
+      formats={formats}
+    >
+      <AlternativeDatesPanel matchId={7} onBack={vi.fn()} />
+    </NextIntlClientProvider>,
+  );
 }
 
 function renderPanel(onBack = vi.fn()) {
@@ -233,6 +265,39 @@ describe("AlternativeDatesPanel", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
   });
 
+  it("badges a day the federation may question and a day a coach is taken", async () => {
+    mocks.alternativeDates.mockResolvedValue(flagged);
+
+    renderPanel();
+    await settle();
+
+    const items = screen.getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("Outside the round window");
+    expect(items[1]).toHaveTextContent("Trainer also with Damen 1");
+  });
+
+  it("shows no badge on a day with nothing to say about it", async () => {
+    mocks.alternativeDates.mockResolvedValue(response());
+
+    renderPanel();
+    await settle();
+
+    expect(screen.queryByText("Outside the round window")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["en", "Outside the round window", "Trainer also with Damen 1"],
+    ["de", "Außerhalb des Spieltagsfensters", "Trainer auch bei Damen 1"],
+  ] as const)("names both flags in %s", async (locale, round, collision) => {
+    mocks.alternativeDates.mockResolvedValue(flagged);
+
+    renderWithCatalog(locale);
+    await settle();
+
+    expect(screen.getByText(round)).toBeInTheDocument();
+    expect(screen.getByText(collision)).toBeInTheDocument();
+  });
+
   it("goes back to the match on the back arrow", async () => {
     mocks.alternativeDates.mockResolvedValue(response());
 
@@ -312,6 +377,7 @@ describe("AlternativeDatesPanel", () => {
             group: "away",
             bookings: [],
             suggestedKickoffTime: null,
+            flags: [],
           },
         ],
       }),
