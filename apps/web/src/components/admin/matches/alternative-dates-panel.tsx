@@ -168,7 +168,7 @@ export function AlternativeDatesPanel({ matchId, onBack }: AlternativeDatesPanel
         ) : (
           groupCandidates(state.data.candidates).map(([group, candidates]) => (
             <section key={group} className="space-y-2">
-              <h4 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+              <h4 className="font-display text-muted-foreground text-xs font-semibold tracking-wide uppercase">
                 {t(`groups.${group}`)}
               </h4>
               <ul className="space-y-1">
@@ -235,20 +235,23 @@ export function AlternativeDatesPanel({ matchId, onBack }: AlternativeDatesPanel
   );
 }
 
+/** The order the piles are shown in; a pile with no day in it is not shown. */
+const GROUP_ORDER: AlternativeDateGroup[] = ["booked", "unbooked", "away"];
+
 /**
- * The candidates split into the piles the server ranked them into, in that
- * order. The server already sorted booked days before unbooked ones, so a
- * single pass over the list is enough — the panel never reorders what it was
- * handed.
+ * The candidates split into their piles, each keeping the order the server
+ * ranked it in. Every day of a group lands under that group's one heading
+ * whatever order the answer arrived in, so a change of ranking on the server
+ * can never split a pile into two headings here.
  */
 function groupCandidates(
   candidates: AlternativeDateCandidate[],
 ): [AlternativeDateGroup, AlternativeDateCandidate[]][] {
-  const groups: [AlternativeDateGroup, AlternativeDateCandidate[]][] = [];
-  for (const candidate of candidates) {
-    const last = groups.at(-1);
-    if (last && last[0] === candidate.group) last[1].push(candidate);
-    else groups.push([candidate.group, [candidate]]);
-  }
-  return groups;
+  return GROUP_ORDER.map(
+    (group) =>
+      [group, candidates.filter((c) => c.group === group)] as [
+        AlternativeDateGroup,
+        AlternativeDateCandidate[],
+      ],
+  ).filter(([, items]) => items.length > 0);
 }

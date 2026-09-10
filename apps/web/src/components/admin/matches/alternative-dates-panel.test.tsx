@@ -55,7 +55,7 @@ const messages = {
       noBooking: "no booking",
       awayVenue: "Hall: opponent",
       needsReconfirmation: "Needs re-confirmation",
-      suggestedKickoff: "Suggested tip-off: {time}",
+      suggestedKickoff: "Suggested kickoff: {time}",
       loading: "Searching for dates…",
       empty: "No free weekend day in this range.",
       error: "The alternative dates could not be loaded.",
@@ -262,7 +262,7 @@ describe("AlternativeDatesPanel", () => {
     // English.
     expect(items[0]).toHaveTextContent("10:30 AM – 04:30 PM");
     expect(items[0]).toHaveTextContent("Confirmed");
-    expect(items[0]).toHaveTextContent("Suggested tip-off: 05:00 PM");
+    expect(items[0]).toHaveTextContent("Suggested kickoff: 05:00 PM");
     expect(items[0]).not.toHaveTextContent("Needs re-confirmation");
   });
 
@@ -298,7 +298,7 @@ describe("AlternativeDatesPanel", () => {
     await settle();
 
     expect(screen.getAllByText("no booking")).toHaveLength(2);
-    expect(screen.queryByText(/Suggested tip-off/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Suggested kickoff/)).not.toBeInTheDocument();
   });
 
   it("leaves the hall to the other club on an away game", async () => {

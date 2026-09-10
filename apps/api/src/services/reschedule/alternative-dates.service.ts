@@ -17,7 +17,11 @@ import type {
 } from "@dragons/shared";
 import { getDb } from "../../config/database";
 import { queryMatchWithJoins } from "../admin/match-query.service";
-import { calculateTimeWindow } from "../venue-booking/booking-calculator";
+import {
+  calculateTimeWindow,
+  type BookingConfig,
+  type BookingMatchInput,
+} from "../venue-booking/booking-calculator";
 import { getBookingConfig } from "../venue-booking/venue-booking.service";
 
 /**
@@ -48,6 +52,9 @@ export async function findAlternativeDates(
   );
   // Only a home game asks after the hall: on an away day the venue belongs to
   // the other club and its booking, if we even have one, means nothing here.
+  // A home game the federation has named no venue for reads as unbooked, which
+  // is what it is — there is no hall to hold a booking, and the staff member
+  // has to settle that before a kickoff can be suggested for it.
   const bookedDays =
     isHomeGame && match.venueId != null
       ? await loadBookedDays(match.venueId, range)
@@ -89,13 +96,15 @@ export async function findAlternativeDates(
 
 /**
  * Days the hall is already ours come first: they need no new request to the
- * town. Inside a group the list reads like a calendar. Away games are one
- * group, so the sort leaves them in the order the walk produced.
+ * town. Inside a group the list reads like a calendar, which the calendar walk
+ * produced already — the sort only has to lift the booked days out of it. An
+ * away game has one group and comes out of this untouched.
  */
 function rank(candidates: AlternativeDateCandidate[]): AlternativeDateCandidate[] {
-  const groupRank = { booked: 0, unbooked: 1, away: 0 } as const;
-  return candidates.sort(
-    (a, b) => groupRank[a.group] - groupRank[b.group] || a.date.localeCompare(b.date),
+  return [...candidates].sort(
+    (a, b) =>
+      Number(a.group === "unbooked") - Number(b.group === "unbooked") ||
+      a.date.localeCompare(b.date),
   );
 }
 
@@ -156,6 +165,11 @@ interface BookedDay {
  * configured default when the entry names none) plus the buffer after. A
  * booking nobody's game hangs off has nothing to derive it from, so it suggests
  * nothing.
+ *
+ * The booking's override end is deliberately not consulted: it says how long
+ * the club may keep the hall, not when the programme inside it ends, and a
+ * negotiated late end would push the suggestion into an empty gym. It is shown
+ * beside the suggestion, so the staff member can see both.
  */
 async function loadBookedDays(
   venueId: number,
@@ -179,19 +193,21 @@ async function loadBookedDays(
         gte(venueBookings.date, range.from),
         lte(venueBookings.date, range.to),
       ),
-    );
+    )
+    // A day carries one booking per venue today, but nothing in the response
+    // shape says so: ordering here keeps two of them from swapping places
+    // between two identical requests.
+    .orderBy(venueBookings.id);
   if (bookings.length === 0) return new Map();
 
-  const gamesByDay = await loadBookedGames(bookings.map((b) => b.id));
+  const gamesByBooking = await loadBookedGames(bookings.map((b) => b.id));
   const config = await getBookingConfig();
 
   const days = new Map<string, BookedDay>();
   for (const booking of bookings) {
     const entry = days.get(booking.date) ?? {
       bookings: [],
-      suggestedKickoffTime:
-        calculateTimeWindow(gamesByDay.get(booking.date) ?? [], config)?.calculatedEndTime ??
-        null,
+      suggestedKickoffTime: suggestKickoff(gamesByBooking.get(booking.id) ?? [], config),
     };
     entry.bookings.push({
       id: booking.id,
@@ -209,17 +225,41 @@ async function loadBookedDays(
 }
 
 /**
- * The live games behind those bookings, grouped by day and carrying the game
- * duration of the squad that plays them. Cancelled and forfeited fixtures are
- * dead: the booking planner does not count them towards the hall window, and
- * neither does the kickoff suggested behind it.
+ * When the hall frees up after the games already booked — the kickoff the game
+ * being moved could take.
+ *
+ * This is the booking calculator's own end for those games, so the suggestion
+ * and the hall window a reconcile would compute are the same number: the latest
+ * game end (kickoff plus that team entry's duration, the configured default
+ * when the entry names none) plus the buffer after. When an earlier game runs
+ * longer than the last one, that latest end is the earlier game's, not the last
+ * kickoff's — the hall is busy until the last basket either way.
+ */
+function suggestKickoff(games: BookingMatchInput[], config: BookingConfig): string | null {
+  const end = calculateTimeWindow(games, config)?.calculatedEndTime;
+  // The calculator clamps a window that runs past midnight to 23:59:59. That is
+  // a fine end for a hall booking and a nonsense kickoff, so a day whose
+  // programme runs that late suggests nothing at all.
+  if (!end || end === "23:59:59") return null;
+  return end;
+}
+
+/**
+ * The live games each booking is made of, carrying the game duration of the
+ * squad that plays them. Keyed by booking rather than by the games' own day, so
+ * a junction row left behind by a game that has since moved cannot quietly
+ * withhold the suggestion from the booking it still hangs off.
+ *
+ * Cancelled and forfeited fixtures are dead: the booking planner does not count
+ * them towards the hall window, and neither does the kickoff suggested behind
+ * it.
  */
 async function loadBookedGames(
   bookingIds: number[],
-): Promise<Map<string, { kickoffTime: string; teamGameDuration: number | null }[]>> {
+): Promise<Map<number, BookingMatchInput[]>> {
   const rows = await getDb()
     .select({
-      date: matches.kickoffDate,
+      bookingId: venueBookingMatches.venueBookingId,
       kickoffTime: matches.kickoffTime,
       teamGameDuration: teamEntries.estimatedGameDuration,
     })
@@ -239,14 +279,14 @@ async function loadBookedGames(
       ),
     );
 
-  const byDay = new Map<string, { kickoffTime: string; teamGameDuration: number | null }[]>();
+  const byBooking = new Map<number, BookingMatchInput[]>();
   for (const row of rows) {
-    const games = byDay.get(row.date);
+    const games = byBooking.get(row.bookingId);
     const game = { kickoffTime: row.kickoffTime, teamGameDuration: row.teamGameDuration };
     if (games) games.push(game);
-    else byDay.set(row.date, [game]);
+    else byBooking.set(row.bookingId, [game]);
   }
-  return byDay;
+  return byBooking;
 }
 
 /**

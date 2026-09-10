@@ -79,8 +79,9 @@ const OWN_SQUAD = 100;
 const OPPONENT_SQUAD = 200;
 const THIRD_SQUAD = 300;
 const FOURTH_SQUAD = 400;
-/** Another team of our own club — the one whose games fill the hall. */
+/** Two more teams of our own club — the ones whose games fill the hall. */
 const OWN_SECOND_SQUAD = 500;
+const OWN_THIRD_SQUAD = 600;
 
 // Deliberately not the fallbacks (60 / 90): a suggested kickoff computed from
 // the defaults instead of these rows would still land on a plausible time.
@@ -292,6 +293,7 @@ async function seedHomeFixtureWithVenue(): Promise<{
   await seedSquad(THIRD_SQUAD, false);
   await seedSquad(FOURTH_SQUAD, false);
   await seedSquad(OWN_SECOND_SQUAD, true);
+  await seedSquad(OWN_THIRD_SQUAD, true);
   const leagueId = await seedLeague();
   const venueId = await seedVenue("Drachenhalle");
   await seedBookingConfig();
@@ -317,6 +319,7 @@ async function seedHallGame(seed: {
   leagueId: number;
   kickoffDate: string;
   kickoffTime: string;
+  homeTeamApiId?: number;
   isCancelled?: boolean;
 }): Promise<number> {
   return seedMatch({
@@ -655,6 +658,38 @@ describe("GET /matches/:id/alternative-dates — hall bookings", () => {
     });
   });
 
+  it("takes each end of the window on its own when only one is overridden", async () => {
+    const { matchId, venueId } = await seedHomeFixtureWithVenue();
+    await seedBooking({
+      venueId,
+      date: "2026-03-14",
+      calculatedStartTime: "11:00:00",
+      calculatedEndTime: "15:00:00",
+      overrideEndTime: "17:00:00",
+    });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    expect(candidate.bookings[0]).toMatchObject({
+      effectiveStartTime: "11:00:00",
+      effectiveEndTime: "17:00:00",
+    });
+  });
+
+  it("treats a home game without a venue as unbooked", async () => {
+    const { matchId, venueId } = await seedHomeFixtureWithVenue();
+    await ctx.db
+      .update(matches)
+      .set({ venueId: null })
+      .where(eq(matches.id, matchId));
+    await seedBooking({ venueId, date: "2026-03-14" });
+
+    const body = (await (await get(matchId)).json()) as AlternativeDatesResponse;
+
+    expect(body.isHomeGame).toBe(true);
+    expect(body.candidates.every((c) => c.group === "unbooked")).toBe(true);
+  });
+
   it("suggests a kickoff after the last booked game, using that entry's duration", async () => {
     const { matchId, leagueId, venueId } = await seedHomeFixtureWithVenue();
     await seedTeamEntry(OWN_SECOND_SQUAD, leagueId, 80);
@@ -693,6 +728,49 @@ describe("GET /matches/:id/alternative-dates — hall bookings", () => {
 
     // 12:00 + 100 minutes of default duration + 45 minutes of buffer.
     expect(candidate.suggestedKickoffTime).toBe("14:25:00");
+  });
+
+  it("waits for the game that runs longest, not for the one that starts last", async () => {
+    const { matchId, leagueId, venueId } = await seedHomeFixtureWithVenue();
+    await seedTeamEntry(OWN_THIRD_SQUAD, leagueId, 240);
+    await seedTeamEntry(OWN_SECOND_SQUAD, leagueId, 80);
+    const long = await seedHallGame({
+      venueId,
+      leagueId,
+      kickoffDate: "2026-03-14",
+      kickoffTime: "10:00:00",
+      homeTeamApiId: OWN_THIRD_SQUAD,
+    });
+    const late = await seedHallGame({
+      venueId,
+      leagueId,
+      kickoffDate: "2026-03-14",
+      kickoffTime: "12:00:00",
+    });
+    await seedBooking({ venueId, date: "2026-03-14", matchIds: [long, late] });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    // The 10:00 game runs to 14:00, past the 12:00 one's 13:20; the hall is
+    // busy until the last basket either way.
+    expect(candidate.suggestedKickoffTime).toBe("14:45:00");
+  });
+
+  it("suggests nothing when the booked programme runs past midnight", async () => {
+    const { matchId, leagueId, venueId } = await seedHomeFixtureWithVenue();
+    await seedTeamEntry(OWN_SECOND_SQUAD, leagueId, 200);
+    const lateGame = await seedHallGame({
+      venueId,
+      leagueId,
+      kickoffDate: "2026-03-14",
+      kickoffTime: "22:00:00",
+    });
+    await seedBooking({ venueId, date: "2026-03-14", matchIds: [lateGame] });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    expect(candidate.group).toBe("booked");
+    expect(candidate.suggestedKickoffTime).toBeNull();
   });
 
   it("ignores a cancelled game of the booking when suggesting a kickoff", async () => {

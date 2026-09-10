@@ -314,7 +314,7 @@
       "noBooking": "no booking",
       "awayVenue": "Hall: opponent",
       "needsReconfirmation": "Needs re-confirmation",
-      "suggestedKickoff": "Suggested tip-off: {time}",
+      "suggestedKickoff": "Suggested kickoff: {time}",
       "loading": "Searching for dates",
       "empty": "No free weekend day in this range.",
       "error": "The alternative dates could not be loaded."

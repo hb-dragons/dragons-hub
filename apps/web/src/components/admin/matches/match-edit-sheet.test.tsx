@@ -192,7 +192,7 @@ const messages = {
       noBooking: "no booking",
       awayVenue: "Hall: opponent",
       needsReconfirmation: "Needs re-confirmation",
-      suggestedKickoff: "Suggested tip-off: {time}",
+      suggestedKickoff: "Suggested kickoff: {time}",
       loading: "Searching for dates…",
       empty: "No free weekend day in this range.",
       error: "The alternative dates could not be loaded.",
@@ -520,7 +520,7 @@ describe("MatchEditSheet alternative-date finder", () => {
     // The window itself is asserted where the provider pins the club zone, as
     // production does; this sheet renders in UTC.
     expect(screen.getByText(/Confirmed/, { selector: "span" })).toBeInTheDocument();
-    expect(screen.getByText(/Suggested tip-off/)).toBeInTheDocument();
+    expect(screen.getByText(/Suggested kickoff/)).toBeInTheDocument();
   });
 
   it("keeps the sheet title while the finder is open", async () => {
