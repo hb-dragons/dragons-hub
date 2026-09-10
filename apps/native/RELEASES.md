@@ -140,14 +140,29 @@ eas build --profile production --platform android
 
 ### Development (custom dev client)
 
-Only needed for local development with Expo Go-style hot reload but
-with native modules. Points at `localhost:3001`. Use your LAN IP if
-testing on a physical device.
+The fast loop for a physical device: one EAS build of the dev client,
+then JS changes hot-reload over Wi-Fi without further builds. Only a
+native change (a new native module, an `app.json` native key, an Expo
+SDK bump) needs a rebuild. `expo-dev-client` is a dependency since
+2026-09-10; the first Android dev client was built the same day.
 
 ```bash
 eas build --profile development --platform ios
 eas build --profile development --platform android
 ```
+
+Install the resulting APK / IPA once, then start Metro from
+`apps/native` with the dev-client flag and scan the QR code in the app:
+
+```bash
+EXPO_PUBLIC_API_URL=http://<mac-lan-ip>:3001 pnpm start --dev-client
+```
+
+The `development` profile bakes in `http://localhost:3001`, which is the
+phone's own loopback, so on a device override `EXPO_PUBLIC_API_URL` with
+the Mac's LAN address (API running locally) or the production API URL.
+Phone and Mac must be on the same network; `pnpm start --dev-client
+--tunnel` works across networks at the cost of latency.
 
 Builds run in EAS cloud (~10–20 min each). Output: `.ipa` / `.aab` +
 install link.

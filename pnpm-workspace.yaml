@@ -49,6 +49,9 @@ overrides:
   kysely: 0.28.17
   '@tootallnate/once': '>=3.0.1'
   postcss: '>=8.5.18 <9'
+  # GHSA-7w5x-hrqm-74c2: DoS via malformed TOML in smol-toml <=1.7.0. Transitive
+  # only (knip, @astrojs/internal-helpers); bounded on the right per CLAUDE.md.
+  smol-toml: '>=1.7.1 <2'
   # Security floors raised together with the pnpm bump in issue #136 — the
   # audit job had timed out on every run since 2026-08-02, so none of these
   # advisories had ever been reported. Each floor is the lowest patched
