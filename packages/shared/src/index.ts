@@ -41,7 +41,9 @@ export type {
   MatchChangeHistoryResponse,
   RefereeSlotInfo,
   DateRange,
+  AlternativeDateBooking,
   AlternativeDateCandidate,
+  AlternativeDateGroup,
   AlternativeDatesCaveat,
   AlternativeDatesResponse,
 } from "./matches";

@@ -123,6 +123,14 @@ const messages = {
     saveChanges: "Save Changes",
   },
   matches: { title: "Matches" },
+  bookings: {
+    status: {
+      pending: "Pending",
+      requested: "Requested",
+      confirmed: "Confirmed",
+      cancelled: "Cancelled",
+    },
+  },
   matchDetail: {
     overrideActive: "Override active",
     discard: "Discard",
@@ -176,6 +184,15 @@ const messages = {
       to: "To",
       homeGame: "Home game",
       awayGame: "Away game",
+      groups: {
+        booked: "With a hall booking",
+        unbooked: "Without a hall booking",
+        away: "Away",
+      },
+      noBooking: "no booking",
+      awayVenue: "Hall: opponent",
+      needsReconfirmation: "Needs re-confirmation",
+      suggestedKickoff: "Suggested tip-off: {time}",
       loading: "Searching for dates…",
       empty: "No free weekend day in this range.",
       error: "The alternative dates could not be loaded.",
@@ -206,6 +223,7 @@ const formats = {
       month: "2-digit",
       year: "2-digit",
     },
+    matchTime: { hour: "2-digit", minute: "2-digit" },
   },
 } as const;
 
@@ -428,7 +446,23 @@ describe("MatchEditSheet alternative-date finder", () => {
       isHomeGame: true,
       caveats: ["opponentGamesOutsideTrackedLeagues"],
       range: { from: "2026-08-01", to: "2026-09-30" },
-      candidates: [{ date: "2026-08-15", weekday: "saturday" }],
+      candidates: [
+        {
+          date: "2026-08-15",
+          weekday: "saturday",
+          group: "booked",
+          bookings: [
+            {
+              id: 1,
+              effectiveStartTime: "10:00:00",
+              effectiveEndTime: "16:00:00",
+              status: "confirmed",
+              needsReconfirmation: false,
+            },
+          ],
+          suggestedKickoffTime: "17:00:00",
+        },
+      ],
     });
   });
 
@@ -475,6 +509,18 @@ describe("MatchEditSheet alternative-date finder", () => {
 
     expect(screen.getByText("Overrides")).toBeInTheDocument();
     expect(screen.queryByText("Alternative dates")).not.toBeInTheDocument();
+  });
+
+  it("shows the hall booking behind a candidate inside the sheet", async () => {
+    await openFinder();
+
+    expect(
+      screen.getByRole("heading", { name: "With a hall booking", hidden: true }),
+    ).toBeInTheDocument();
+    // The window itself is asserted where the provider pins the club zone, as
+    // production does; this sheet renders in UTC.
+    expect(screen.getByText(/Confirmed/, { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByText(/Suggested tip-off/)).toBeInTheDocument();
   });
 
   it("keeps the sheet title while the finder is open", async () => {

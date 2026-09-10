@@ -171,14 +171,47 @@ export interface DateRange {
 }
 
 /**
- * One weekend day a game to be rescheduled could move to. In this slice a
- * candidate carries nothing but the day itself: hall bookings, flags and
- * kickoff times arrive with the later slices of the finder.
+ * Which pile a candidate belongs in, and therefore what the panel shows for it.
+ * A home game splits into the days the club's hall is already booked and the
+ * days it is not; an away game has one pile, because the hall is the other
+ * club's problem.
+ */
+export type AlternativeDateGroup = "booked" | "unbooked" | "away";
+
+/**
+ * One of the club's hall bookings at the game's current venue on a candidate
+ * day. The effective window is the one actually agreed: an override time wins
+ * over the calculated one, per end, exactly as the booking screens show it.
+ */
+export interface AlternativeDateBooking {
+  id: number;
+  effectiveStartTime: string;
+  effectiveEndTime: string;
+  status: BookingStatus;
+  needsReconfirmation: boolean;
+}
+
+/**
+ * One weekend day a game to be rescheduled could move to. Flags — the round
+ * window and coach collisions — arrive with the later slices of the finder.
  */
 export interface AlternativeDateCandidate {
   /** `YYYY-MM-DD` in the club's timezone. */
   date: string;
   weekday: ClubWeekendDay;
+  group: AlternativeDateGroup;
+  /**
+   * The club's bookings at the game's current venue that day. Empty for an away
+   * game and for a day in the `unbooked` group.
+   */
+  bookings: AlternativeDateBooking[];
+  /**
+   * `HH:mm:ss` directly after the last booked game — its kickoff plus that team
+   * entry's game duration plus the buffer after. Null whenever nothing is
+   * booked: the club's hall times are not modeled, so the finder has nothing to
+   * derive a kickoff from and must not invent one (ADR-0010).
+   */
+  suggestedKickoffTime: string | null;
 }
 
 /**
