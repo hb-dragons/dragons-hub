@@ -45,20 +45,42 @@ export function tabRootHeaderOptions(title: string): NativeStackNavigationOption
 }
 
 /**
- * A pushed detail screen: a transparent header floating over content that
- * scrolls beneath it, with no title of its own unless the screen sets one from
- * its data.
+ * A pushed detail screen: a header with no title of its own unless the screen
+ * sets one from its data.
  *
- * `headerTintColor` is passed in rather than left to the system because this
- * header has no background of its own — the chevron sits directly on screen
- * content, so it takes the theme's foreground colour for contrast.
+ * On iOS it is transparent and floats over content that scrolls beneath it —
+ * the system draws glass under the chevron, and insets the screen's first
+ * scroll view for the header (`contentInsetAdjustmentBehavior`, see
+ * `lib/ui/scroll-inset.ts`).
+ *
+ * On Android neither happens: there is no glass, and the inset behaviour is
+ * an iOS-only prop, so under a transparent header the content was laid out
+ * from the top of the screen — behind the status bar and the back button. The
+ * header is opaque there, painted in the theme background so it reads as the
+ * same surface, and the screen's content starts below it as on every other
+ * Android toolbar.
+ *
+ * `headerTintColor` is passed in rather than left to the system because the
+ * iOS header has no background of its own — the chevron sits directly on
+ * screen content, so it takes the theme's foreground colour for contrast.
  */
-export function detailHeaderOptions(tintColor: string): NativeStackNavigationOptions {
-  return {
+export function detailHeaderOptions(opts: {
+  tintColor: string;
+  backgroundColor: string;
+  os: string;
+}): NativeStackNavigationOptions {
+  const shared = {
     headerShown: true,
-    headerTransparent: true,
     headerTitle: "",
-    headerTintColor: tintColor,
+    headerTintColor: opts.tintColor,
     headerBackButtonDisplayMode: BACK_BUTTON_DISPLAY_MODE,
-  };
+  } satisfies NativeStackNavigationOptions;
+  if (opts.os === "android") {
+    return {
+      ...shared,
+      headerTransparent: false,
+      headerStyle: { backgroundColor: opts.backgroundColor },
+    };
+  }
+  return { ...shared, headerTransparent: true };
 }

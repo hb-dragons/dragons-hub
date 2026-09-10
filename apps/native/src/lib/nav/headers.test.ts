@@ -45,21 +45,53 @@ describe("tabRootHeaderOptions", () => {
 });
 
 describe("detailHeaderOptions", () => {
-  const options = detailHeaderOptions("#ffffff");
+  const tint = "#ffffff";
+  const background = "#131313";
 
-  it("floats a transparent, title-less header over the content", () => {
-    expect(options.headerShown).toBe(true);
-    expect(options.headerTransparent).toBe(true);
-    expect(options.headerTitle).toBe("");
+  describe("on iOS", () => {
+    const options = detailHeaderOptions({ tintColor: tint, backgroundColor: background, os: "ios" });
+
+    it("floats a transparent, title-less header over the content", () => {
+      // The system draws glass under the chevron and insets the screen's first
+      // scroll view for the header (`contentInsetAdjustmentBehavior`).
+      expect(options.headerShown).toBe(true);
+      expect(options.headerTransparent).toBe(true);
+      expect(options.headerTitle).toBe("");
+    });
+
+    it("paints no background of its own", () => {
+      // An explicit colour is painted solid and then swapped for the system
+      // glass mid-transition, which flashes.
+      expect(options.headerStyle).toBeUndefined();
+    });
+
+    it("tints the back chevron with the passed colour", () => {
+      expect(options.headerTintColor).toBe(tint);
+    });
+
+    it("drops the back title through the display mode, not a zero font size", () => {
+      expect(options.headerBackButtonDisplayMode).toBe("minimal");
+      expect(options.headerBackTitle).toBeUndefined();
+      expect(options.headerBackTitleStyle).toBeUndefined();
+    });
   });
 
-  it("tints the back chevron with the passed colour", () => {
-    expect(options.headerTintColor).toBe("#ffffff");
-  });
+  describe("on Android", () => {
+    const options = detailHeaderOptions({ tintColor: tint, backgroundColor: background, os: "android" });
 
-  it("drops the back title through the display mode, not a zero font size", () => {
-    expect(options.headerBackButtonDisplayMode).toBe("minimal");
-    expect(options.headerBackTitle).toBeUndefined();
-    expect(options.headerBackTitleStyle).toBeUndefined();
+    it("draws an opaque header in the theme background so content starts below it", () => {
+      // Android has no glass and `contentInsetAdjustmentBehavior` is an iOS
+      // prop, so under a transparent header the content was laid out from the
+      // top of the screen — behind the status bar and the back button.
+      expect(options.headerShown).toBe(true);
+      expect(options.headerTransparent).toBe(false);
+      expect(options.headerStyle).toEqual({ backgroundColor: background });
+    });
+
+    it("keeps the same title-less, minimal-back shape", () => {
+      expect(options.headerTitle).toBe("");
+      expect(options.headerTintColor).toBe(tint);
+      expect(options.headerBackButtonDisplayMode).toBe("minimal");
+    });
   });
 });

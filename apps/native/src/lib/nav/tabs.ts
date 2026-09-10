@@ -1,5 +1,10 @@
 import type { TabId } from "@dragons/shared";
-import type { AppTab, AppTabsMinimizeBehavior } from "@/components/nav/AppTabs";
+import type {
+  AppTab,
+  AppTabsAppearance,
+  AppTabsMinimizeBehavior,
+} from "@/components/nav/AppTabs";
+import type { ColorToken } from "@/theme/colors";
 
 /**
  * A tab as declared here, i.e. an `AppTab` whose label is still a translation
@@ -35,6 +40,40 @@ export const STANDINGS_SHORTCUT_ROUTE = "/league-tables";
  * current iOS.
  */
 export const TAB_BAR_MINIMIZE_BEHAVIOR: AppTabsMinimizeBehavior = "onScrollDown";
+
+/**
+ * What the app paints on the tab bar, per platform.
+ *
+ * iOS: nothing. The system draws the bar's glass, and any colour we set
+ * replaces it with a solid bar — the same reasoning as the native headers.
+ *
+ * Android: the bar is Material's bottom navigation, which without our input
+ * takes its colours from the device theme — Material You where the OS has it,
+ * and a stock lavender-on-grey where it does not — and labels only the
+ * selected tab once there are more than three. Each Material role is mapped
+ * to the design token that plays it: the bar sits on `surfaceLow` (the
+ * container tier), the selected pill is `secondary` (the secondary container)
+ * with the brand `primary` for the selected icon and label on top, and
+ * unselected items take `mutedForeground`.
+ */
+export function tabBarAppearance(opts: {
+  os: string;
+  colors: Record<ColorToken, string>;
+}): AppTabsAppearance {
+  if (opts.os !== "android") return {};
+  const { colors } = opts;
+  return {
+    backgroundColor: colors.surfaceLow,
+    indicatorColor: colors.secondary,
+    rippleColor: colors.primary,
+    iconColor: { default: colors.mutedForeground, selected: colors.primary },
+    labelStyle: {
+      default: { color: colors.mutedForeground },
+      selected: { color: colors.primary },
+    },
+    labelVisibilityMode: "labeled",
+  };
+}
 
 export const TAB_CONFIG: Record<TabId, TabConfig> = {
   home: {

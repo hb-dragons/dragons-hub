@@ -50,7 +50,11 @@ function RootNavigator() {
   // them is attached (or changed) after a push transition has begun. The
   // exception is a title a screen can only know from its data; those screens
   // declare that one option inline. See lib/nav/headers.ts.
-  const detail = detailHeaderOptions(colors.foreground);
+  const detail = detailHeaderOptions({
+    tintColor: colors.foreground,
+    backgroundColor: colors.background,
+    os: Platform.OS,
+  });
 
   return (
     <>
