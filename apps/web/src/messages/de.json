@@ -266,17 +266,6 @@
       "active": "Aktiv",
       "cancelled": "Abgesagt",
       "forfeited": "Kampflos"
-    },
-    "reschedule": {
-      "trigger": "Terminverschiebung vorschlagen",
-      "title": "Terminverschiebungs-Assistent",
-      "description": "Beschreibe deine Einschränkungen; ich schlage gültige Termine und Hallen vor.",
-      "placeholder": "z. B. nächste 3 Wochen, lieber Samstagabend, gleiche Halle",
-      "stop": "Stopp",
-      "retry": "Erneut versuchen",
-      "newChat": "Neuen Chat starten",
-      "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
-      "send": "Senden"
     }
   },
   "matchDetail": {
@@ -407,10 +396,7 @@
       "fieldCleared": "{field}: gelöscht (war {oldValue})",
       "showMore": "Mehr laden"
     },
-    "edit": "Bearbeiten",
-    "reschedule": {
-      "trigger": "Terminverschiebung vorschlagen"
-    }
+    "edit": "Bearbeiten"
   },
   "sync": {
     "title": "Synchronisation",

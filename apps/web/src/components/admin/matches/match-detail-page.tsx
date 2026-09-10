@@ -19,7 +19,6 @@ import { Sheet } from "@dragons/ui/components/sheet";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { Can } from "@/components/rbac/can";
 import { MatchEditSheet } from "./match-edit-sheet";
-import { RescheduleChatSheet } from "./reschedule-chat-sheet";
 import { MatchDivergenceTable } from "./match-divergence-table";
 import { MatchChangeHistory } from "./match-change-history";
 import { formatMatchTime, formatScore, formatPeriodScores } from "./utils";
@@ -45,13 +44,6 @@ export function MatchDetailPage({
   const router = useRouter();
   const { mutate: globalMutate } = useSWRConfig();
   const [editOpen, setEditOpen] = useState(false);
-  const [rescheduleOpen, setRescheduleOpen] = useState(false);
-
-  // Mirrors the API's ASSISTANT_ENABLED. Without it the copilot endpoint is not
-  // mounted server-side and the sheet can only fail silently, so hide the entry
-  // point entirely. Next inlines NEXT_PUBLIC_* at build time — the deploy
-  // workflow feeds this from the same GitHub variable as TF_VAR_assistant_enabled.
-  const assistantEnabled = process.env.NEXT_PUBLIC_ASSISTANT_ENABLED === "true";
 
   const matchDetailQ = queries.matchDetail(matchId);
   const { data: detailData, mutate: mutateDetail } = useSWR(
@@ -96,11 +88,6 @@ export function MatchDetailPage({
           </Badge>
         )}
         <Can resource="match" action="update">
-          {assistantEnabled && (
-            <Button variant="outline" size="sm" onClick={() => setRescheduleOpen(true)}>
-              {t("matchDetail.reschedule.trigger")}
-            </Button>
-          )}
           <Button size="sm" onClick={() => setEditOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" />
             {t("matchDetail.edit")}
@@ -295,15 +282,6 @@ export function MatchDetailPage({
           onSaved={handleSaved}
         />
       </Sheet>
-
-      {/* Reschedule Chat Sheet */}
-      {assistantEnabled && (
-        <RescheduleChatSheet
-          matchId={matchId}
-          open={rescheduleOpen}
-          onOpenChange={setRescheduleOpen}
-        />
-      )}
     </div>
   );
 }

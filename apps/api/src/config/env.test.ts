@@ -172,33 +172,8 @@ describe("env config", () => {
   });
 });
 
-describe("assistant env vars", () => {
-  const ORIGINAL = { ...process.env };
-  beforeEach(() => {
-    vi.resetModules();
-    process.env = { ...ORIGINAL };
-  });
-  afterEach(() => { process.env = { ...ORIGINAL }; });
-
-  it("defaults ASSISTANT_ENABLED to false and ASSISTANT_MODEL to gemini-2.5-flash", async () => {
-    delete process.env.ASSISTANT_ENABLED;
-    delete process.env.ASSISTANT_MODEL;
-    const { envSchema } = await import("./env");
-    const parsed = envSchema.parse(process.env);
-    expect(parsed.ASSISTANT_ENABLED).toBe(false);
-    expect(parsed.ASSISTANT_MODEL).toBe("gemini-2.5-flash");
-  });
-
-  it("requires GOOGLE_GENERATIVE_AI_API_KEY when ASSISTANT_ENABLED=true", async () => {
-    process.env.ASSISTANT_ENABLED = "true";
-    delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    const { envSchema } = await import("./env");
-    expect(() => envSchema.parse(process.env)).toThrow(/GOOGLE_GENERATIVE_AI_API_KEY/);
-  });
-});
-
 describe("boolean feature flags", () => {
-  const FLAGS = ["VERBOSE_ERRORS", "ASSISTANT_ENABLED", "CHATBOT_ENABLED"] as const;
+  const FLAGS = ["VERBOSE_ERRORS", "CHATBOT_ENABLED"] as const;
 
   // The schema used to accept only the literals "true"/"false". Terraform
   // renders an unset variable as "", shells pass "1"/"0" — each of those failed

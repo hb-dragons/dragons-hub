@@ -266,17 +266,6 @@
       "active": "Active",
       "cancelled": "Cancelled",
       "forfeited": "Forfeited"
-    },
-    "reschedule": {
-      "trigger": "Suggest reschedule",
-      "title": "Reschedule assistant",
-      "description": "Describe your constraints; I'll suggest valid dates and venues.",
-      "placeholder": "e.g. next 3 weeks, prefer Saturday evenings, keep our gym",
-      "stop": "Stop",
-      "retry": "Retry",
-      "newChat": "Start a new chat",
-      "error": "Something went wrong. Please try again.",
-      "send": "Send"
     }
   },
   "matchDetail": {
@@ -407,10 +396,7 @@
       "fieldCleared": "{field}: cleared (was {oldValue})",
       "showMore": "Load more"
     },
-    "edit": "Edit",
-    "reschedule": {
-      "trigger": "Suggest reschedule"
-    }
+    "edit": "Edit"
   },
   "sync": {
     "title": "Sync Management",
