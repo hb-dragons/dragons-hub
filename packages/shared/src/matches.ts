@@ -171,14 +171,35 @@ export interface DateRange {
 }
 
 /**
+ * Why a candidate day deserves a second look. A flag informs, it never
+ * excludes: the federation may question a date outside the round window and a
+ * coach may be standing on another court that day, but whether either matters
+ * is the staff member's call, not the finder's (ADR-0010).
+ *
+ * A discriminated union rather than a code plus optional fields, so the team
+ * entry name exists exactly where it means something.
+ */
+export type AlternativeDateFlag =
+  /** Outside the min/max kickoff date of the same match day across the league. */
+  | { type: "outsideRoundWindow" }
+  /**
+   * Someone on the moving team entry also works with another team entry that
+   * plays that day. `teamEntryName` is that other entry, named as it is on
+   * screen.
+   */
+  | { type: "coachCollision"; teamEntryName: string };
+
+/**
  * One weekend day a game to be rescheduled could move to. In this slice a
- * candidate carries nothing but the day itself: hall bookings, flags and
- * kickoff times arrive with the later slices of the finder.
+ * candidate carries the day and its flags; hall bookings and kickoff times
+ * arrive with the home-game slice of the finder.
  */
 export interface AlternativeDateCandidate {
   /** `YYYY-MM-DD` in the club's timezone. */
   date: string;
   weekday: ClubWeekendDay;
+  /** Empty when nothing about the day needs saying — the common case. */
+  flags: AlternativeDateFlag[];
 }
 
 /**
@@ -197,5 +218,6 @@ export interface AlternativeDatesResponse {
    * whatever the client left out. The date pickers show this back.
    */
   range: DateRange;
+  /** Ranked server-side: unflagged days before flagged, chronological within. */
   candidates: AlternativeDateCandidate[];
 }

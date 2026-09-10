@@ -131,3 +131,11 @@ _Avoid_: postponement, moving a match
 **Alternative date (Ausweichtermin)**:
 A weekend day on which a game to be rescheduled could take place: neither squad plays that day, and for a home game the hall situation on that day is shown so staff can judge it. A proposal for the other club, not a decision.
 _Avoid_: free date, candidate slot, suggestion
+
+**Round window (Spieltagsfenster)**:
+The span from the first to the last kickoff date on which a league plays one match day. An alternative date outside it is the one the federation is most likely to question.
+_Avoid_: game week, matchday weekend, round dates
+
+**Flag**:
+A note on an alternative date that informs the staff member without removing the day from the list — outside the round window, or a coach committed to another team entry that day. The decision stays with the person writing the mail.
+_Avoid_: warning, conflict, blocker (a flag never blocks)

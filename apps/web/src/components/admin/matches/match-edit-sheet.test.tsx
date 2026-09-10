@@ -428,7 +428,7 @@ describe("MatchEditSheet alternative-date finder", () => {
       isHomeGame: true,
       caveats: ["opponentGamesOutsideTrackedLeagues"],
       range: { from: "2026-08-01", to: "2026-09-30" },
-      candidates: [{ date: "2026-08-15", weekday: "saturday" }],
+      candidates: [{ date: "2026-08-15", weekday: "saturday", flags: [] }],
     });
   });
 

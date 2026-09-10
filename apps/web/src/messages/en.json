@@ -307,6 +307,10 @@
       "homeGame": "Home game",
       "awayGame": "Away game",
       "loading": "Searching for dates",
+      "flags": {
+        "outsideRoundWindow": "Outside the match day",
+        "coachCollision": "Coach collision: {team}"
+      },
       "empty": "No free weekend day in this range.",
       "error": "The alternative dates could not be loaded."
     },

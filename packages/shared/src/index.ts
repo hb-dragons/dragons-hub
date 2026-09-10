@@ -42,6 +42,7 @@ export type {
   RefereeSlotInfo,
   DateRange,
   AlternativeDateCandidate,
+  AlternativeDateFlag,
   AlternativeDatesCaveat,
   AlternativeDatesResponse,
 } from "./matches";

@@ -162,9 +162,23 @@ export function AlternativeDatesPanel({ matchId, onBack }: AlternativeDatesPanel
             {state.data.candidates.map((candidate) => (
               <li
                 key={candidate.date}
-                className="rounded-md bg-surface-low px-3 py-2 text-sm font-medium"
+                className="flex flex-wrap items-center gap-2 rounded-md bg-surface-low px-3 py-2 text-sm font-medium"
               >
                 {format.dateTime(clubDayAnchor(candidate.date), "matchDate")}
+                {candidate.flags.map((flag) => (
+                  <Badge
+                    key={
+                      flag.type === "coachCollision"
+                        ? `${flag.type}:${flag.teamEntryName}`
+                        : flag.type
+                    }
+                    variant="secondary"
+                  >
+                    {flag.type === "coachCollision"
+                      ? t("flags.coachCollision", { team: flag.teamEntryName })
+                      : t("flags.outsideRoundWindow")}
+                  </Badge>
+                ))}
               </li>
             ))}
           </ul>
