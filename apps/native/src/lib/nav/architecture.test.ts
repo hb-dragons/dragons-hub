@@ -83,6 +83,20 @@ describe("navigation architecture", () => {
       .toEqual([]);
   });
 
+  it("has no numeric bottom padding left clearing a tab bar", () => {
+    // The native tab bar clears itself: on iOS the list's
+    // `contentInsetAdjustmentBehavior` insets for it, on Android expo-router
+    // pads the tab's content by the bar's height. A `paddingBottom: 100` from
+    // the JS tab bar's days on top of that is a blank band above the bar —
+    // visible on Android, where the bar is opaque. Content ends with the same
+    // `spacing.xl` breathing room `Screen` gives every scroll view.
+    const tabRoots = SOURCE_FILES.filter((f) => f.startsWith(TABS_DIR));
+    expect(tabRoots.length).toBeGreaterThan(0);
+    expect(
+      tabRoots.filter((f) => /paddingBottom:\s*\d/.test(readFileSync(f, "utf8"))).map(rel),
+    ).toEqual([]);
+  });
+
   it("hides back titles with the display mode, not a zero font size", () => {
     expect(
       SOURCE_FILES.filter((f) => /headerBackTitle(Style)?\b/.test(readFileSync(f, "utf8"))).map(rel),
