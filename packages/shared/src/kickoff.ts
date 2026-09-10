@@ -292,3 +292,64 @@ export function daysUntilKickoff(date: string, now: Date = new Date()): number {
   if (!isValid(to) || !isValid(from)) return Number.NaN;
   return Math.round((to.getTime() - from.getTime()) / DAY_MS);
 }
+
+/**
+ * Weekday names in `Date.getUTCDay()` order, so a numeric index maps straight
+ * onto a name.
+ */
+const WEEKDAY_NAMES = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+] as const;
+
+export type ClubWeekday = (typeof WEEKDAY_NAMES)[number];
+
+/**
+ * The weekday a club calendar day (`YYYY-MM-DD`) falls on, or `null` when the
+ * string is not a real calendar day.
+ *
+ * Reads the weekday off the club-pinned noon anchor rather than off the raw
+ * string, so a device in Kiritimati and one in Honolulu agree with the club on
+ * which day is a Saturday.
+ */
+export function clubWeekdayName(day: string): ClubWeekday | null {
+  const at = clubDayAnchor(day);
+  if (!isValid(at)) return null;
+  // The anchor is noon in Berlin, i.e. 10:00 or 11:00 UTC on the same date, so
+  // the UTC weekday is the club weekday without a second formatter.
+  return WEEKDAY_NAMES[at.getUTCDay()]!;
+}
+
+/**
+ * The weekend a club calendar day falls on, or `null` for a weekday and for a
+ * day that is not a real calendar day. Narrower than {@link clubWeekdayName} on
+ * purpose: a caller that only wants Saturdays and Sundays gets the name it may
+ * keep, so nothing downstream has to re-assert which two days these were.
+ */
+export function clubWeekendDay(day: string): "saturday" | "sunday" | null {
+  const weekday = clubWeekdayName(day);
+  return weekday === "saturday" || weekday === "sunday" ? weekday : null;
+}
+
+/**
+ * Every club calendar day from `from` to `to`, both inclusive, in order.
+ *
+ * Steps through the club-pinned noon anchors, so a DST transition inside the
+ * range neither skips nor repeats a day. Yields nothing when either end is
+ * unparseable or the range runs backwards.
+ */
+export function* eachClubDay(from: string, to: string): Generator<string> {
+  let at = clubDayAnchor(from);
+  if (!isValid(at) || !isValid(clubDayAnchor(to))) return;
+  let day = toClubDateString(at);
+  while (day <= to) {
+    yield day;
+    at = clubDayAnchor(plusDaysInClubZone(1, at));
+    day = toClubDateString(at);
+  }
+}

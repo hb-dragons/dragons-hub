@@ -3,8 +3,14 @@ import type {
   MatchListItem,
   MatchDetailResponse,
   MatchChangeHistoryResponse,
+  AlternativeDatesResponse,
 } from "@dragons/shared";
-import type { MatchListQuery, MatchUpdateBody, MatchHistoryQuery } from "@dragons/contracts";
+import type {
+  MatchListQuery,
+  MatchUpdateBody,
+  MatchHistoryQuery,
+  AlternativeDatesQuery,
+} from "@dragons/contracts";
 import type { ApiClient } from "../client";
 
 export function matchEndpoints(client: ApiClient) {
@@ -24,6 +30,15 @@ export function matchEndpoints(client: ApiClient) {
     ): Promise<MatchChangeHistoryResponse> {
       return client.get(
         `/admin/matches/${id}/history`,
+        query as Record<string, string | number | boolean | undefined>,
+      );
+    },
+    alternativeDates(
+      id: number,
+      query?: AlternativeDatesQuery,
+    ): Promise<AlternativeDatesResponse> {
+      return client.get(
+        `/admin/matches/${id}/alternative-dates`,
         query as Record<string, string | number | boolean | undefined>,
       );
     },

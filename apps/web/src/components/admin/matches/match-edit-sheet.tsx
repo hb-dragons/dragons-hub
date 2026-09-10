@@ -50,13 +50,14 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@dragons/ui/components/popover";
-import { AlertTriangle, Loader2, RotateCcw, Save, X, Users } from "lucide-react";
+import { AlertTriangle, CalendarSearch, Loader2, RotateCcw, Save, X, Users } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
 import { can, clubDayAnchor, teamDisplayName } from "@dragons/shared";
 import type { OwnClubTeam } from "@dragons/shared";
 import { api } from "@/lib/api";
 import { resolveVenueId, type SelectedVenue } from "@/lib/venue-selection";
+import { AlternativeDatesPanel } from "./alternative-dates-panel";
 import {
   formatMatchTime,
   formatPeriodScores,
@@ -224,6 +225,9 @@ export function MatchEditSheet({
   const selectedVenueRef = useRef<SelectedVenue | null>(null);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [setAllOpen, setSetAllOpen] = useState(false);
+  // The finder takes over the sheet body rather than opening a second sheet.
+  // The form stays in `useForm`, so returning to it restores every edit.
+  const [finderOpen, setFinderOpen] = useState(false);
 
   const form = useForm<MatchFormValues>({
     resolver: zodResolver(matchFormSchema),
@@ -266,6 +270,7 @@ export function MatchEditSheet({
 
     let cancelled = false;
     setLoading(true);
+    setFinderOpen(false);
 
     api.matches
       .get(matchId)
@@ -449,6 +454,11 @@ export function MatchEditSheet({
 
         {loading || !match ? (
           <SheetSkeleton />
+        ) : finderOpen ? (
+          <AlternativeDatesPanel
+            matchId={match.id}
+            onBack={() => setFinderOpen(false)}
+          />
         ) : (
           <form
             onSubmit={(e) => { void form.handleSubmit(onSubmit)(e); }}
@@ -652,6 +662,17 @@ export function MatchEditSheet({
                       </OverrideField>
                     )}
                   />
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start sm:col-span-2"
+                    onClick={() => setFinderOpen(true)}
+                  >
+                    <CalendarSearch />
+                    {t("matchDetail.alternativeDates.trigger")}
+                  </Button>
                 </div>
 
                 {/* #3 — Boolean toggles as inline switches */}

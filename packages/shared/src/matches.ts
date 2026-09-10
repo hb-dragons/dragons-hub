@@ -162,3 +162,39 @@ export interface MatchChangeHistoryResponse {
   changes: MatchChangeHistoryItem[];
   total: number;
 }
+
+/** An inclusive span of club calendar days, both ends `YYYY-MM-DD`. */
+export interface DateRange {
+  from: string;
+  to: string;
+}
+
+/**
+ * One weekend day a game to be rescheduled could move to. In this slice a
+ * candidate carries nothing but the day itself: hall bookings, flags and
+ * suggested kickoffs arrive with the later slices of the finder.
+ */
+export interface AlternativeDateCandidate {
+  /** `YYYY-MM-DD` in the club's timezone. */
+  date: string;
+  weekday: "saturday" | "sunday";
+}
+
+/**
+ * Why the candidate list may be incomplete. A code rather than prose: the
+ * caveat is shown to a staff member in their own locale, so the wording lives
+ * in the web app's messages, not in the API response.
+ */
+export type AlternativeDatesCaveat = "opponentGamesOutsideTrackedLeagues";
+
+export interface AlternativeDatesResponse {
+  /** Whether the home squad belongs to the club — who owes the hall. */
+  isHomeGame: boolean;
+  caveats: AlternativeDatesCaveat[];
+  /**
+   * The range the candidates were enumerated over, after the server filled in
+   * whatever the client left out. The date pickers show this back.
+   */
+  range: DateRange;
+  candidates: AlternativeDateCandidate[];
+}

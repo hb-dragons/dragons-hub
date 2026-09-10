@@ -3,6 +3,7 @@ import {
   matchListQuerySchema,
   matchUpdateBodySchema,
   matchHistoryQuerySchema,
+  alternativeDatesQuerySchema,
 } from "@dragons/contracts";
 import { ApiClient } from "../client";
 import { matchEndpoints } from "./match";
@@ -61,6 +62,28 @@ describe("match request bodies satisfy @dragons/contracts schemas", () => {
     });
     const parsed = matchUpdateBodySchema.safeParse(calls[0]!.body);
     expect(parsed.error?.issues, "matchUpdateBodySchema rejected the request body").toBeUndefined();
+  });
+
+  it("alternative-dates query parses against alternativeDatesQuerySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.alternativeDates(7, { from: "2026-03-01", to: "2026-05-31" });
+    const url = new URL(calls[0]!.url);
+    expect(url.pathname).toBe("/admin/matches/7/alternative-dates");
+    const parsed = alternativeDatesQuerySchema.safeParse(
+      Object.fromEntries(url.searchParams),
+    );
+    expect(
+      parsed.error?.issues,
+      "alternativeDatesQuerySchema rejected the finder query",
+    ).toBeUndefined();
+  });
+
+  it("alternative-dates sends no range when the caller passes none", async () => {
+    const { api, calls } = recordingClient();
+    await api.alternativeDates(7);
+    const url = new URL(calls[0]!.url);
+    expect(url.search).toBe("");
+    expect(alternativeDatesQuerySchema.safeParse({}).success).toBe(true);
   });
 
   it("releaseOverride percent-encodes the fieldName path segment", async () => {

@@ -11,12 +11,14 @@ import {
 import { requirePermission } from "../../middleware/rbac";
 import { validationHook } from "../../middleware/validation";
 import { reconcileMatch } from "../../services/venue-booking/venue-booking.service";
+import { findAlternativeDates } from "../../services/reschedule/alternative-dates.service";
 import {
   matchListQuerySchema,
   matchIdParamSchema,
   matchHistoryQuerySchema,
   matchUpdateBodySchema,
   releaseOverrideParamsSchema,
+  alternativeDatesQuerySchema,
 } from "@dragons/contracts";
 import { getActiveSeasonId } from "../../services/admin/season.service";
 import { NO_SEASON } from "../../services/season-scope";
@@ -83,6 +85,33 @@ matchRoutes.get(
     const { id } = c.req.valid("param");
     const query = c.req.valid("query");
     const result = await getMatchChangeHistory(id, query);
+    return c.json(result);
+  },
+);
+
+// GET /admin/matches/:id/alternative-dates - Weekend days the game could move to
+matchRoutes.get(
+  "/matches/:id/alternative-dates",
+  requirePermission("match", "view"),
+  validator("param", matchIdParamSchema, validationHook),
+  validator("query", alternativeDatesQuerySchema, validationHook),
+  describeRoute({
+    description: "Weekend days in a range on which neither squad of the match plays",
+    tags: ["Matches"],
+    responses: {
+      200: { description: "Success" },
+      404: { description: "Match not found" },
+    },
+  }),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    const query = c.req.valid("query");
+    const result = await findAlternativeDates(id, query);
+
+    if (!result) {
+      return c.json({ error: "Match not found", code: "NOT_FOUND" }, 404);
+    }
+
     return c.json(result);
   },
 );

@@ -295,6 +295,21 @@
       "time": "Time",
       "venue": "Venue"
     },
+    "alternativeDates": {
+      "trigger": "Find alternative dates",
+      "title": "Alternative dates",
+      "back": "Back to the match",
+      "caveats": {
+        "opponentGamesOutsideTrackedLeagues": "Games of the opponent outside the leagues we track are unknown."
+      },
+      "from": "From",
+      "to": "To",
+      "homeGame": "Home game",
+      "awayGame": "Away game",
+      "loading": "Searching for dates",
+      "empty": "No free weekend day in this range.",
+      "error": "The alternative dates could not be loaded."
+    },
     "score": {
       "title": "Score",
       "final": "Final",

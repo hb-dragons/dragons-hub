@@ -73,9 +73,25 @@ export const releaseOverrideParamsSchema = idParamSchema.extend({
   fieldName: z.string().min(1).max(100),
 });
 
+/**
+ * Range for the alternative-date finder. Both ends are optional: the client
+ * sends nothing on first load and the server fills in today -> the last fixture
+ * of the game's league, returning the range it actually used.
+ */
+export const alternativeDatesQuerySchema = z
+  .object({
+    from: dateSchema.optional(),
+    to: dateSchema.optional(),
+  })
+  .refine((q) => !q.from || !q.to || q.from <= q.to, {
+    message: "`from` must not be after `to`",
+    path: ["to"],
+  });
+
 export type MatchListQuery = z.infer<typeof matchListQuerySchema>;
 export type PublicMatchListQuery = z.infer<typeof publicMatchListQuerySchema>;
 export type MatchUpdateBody = z.infer<typeof matchUpdateBodySchema>;
 export type MatchIdParam = z.infer<typeof matchIdParamSchema>;
 export type MatchHistoryQuery = z.infer<typeof matchHistoryQuerySchema>;
 export type ReleaseOverrideParams = z.infer<typeof releaseOverrideParamsSchema>;
+export type AlternativeDatesQuery = z.infer<typeof alternativeDatesQuerySchema>;

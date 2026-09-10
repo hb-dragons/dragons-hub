@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   releaseOverride: vi.fn(),
   searchVenues: vi.fn(),
   listTeams: vi.fn(),
+  alternativeDates: vi.fn(),
   refresh: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock("@/lib/api", () => ({
       get: mocks.getMatch,
       update: mocks.updateMatch,
       releaseOverride: mocks.releaseOverride,
+      alternativeDates: mocks.alternativeDates,
     },
     venues: { search: mocks.searchVenues },
     teams: { list: mocks.listTeams },
@@ -108,6 +110,11 @@ function makeMatch(): MatchDetail {
 }
 
 const messages = {
+  errors: {
+    title: "Something went wrong",
+    description: "An unexpected error occurred.",
+    tryAgain: "Try again",
+  },
   common: {
     cancel: "Cancel",
     close: "Close",
@@ -156,6 +163,22 @@ const messages = {
       zeitnehmer: "Zeitnehmer",
       shotclock: "Shotclock",
       clear: "Clear {role}",
+    },
+    alternativeDates: {
+      trigger: "Find alternative dates",
+      title: "Alternative dates",
+      back: "Back to the match",
+      caveats: {
+        opponentGamesOutsideTrackedLeagues:
+          "Games of the opponent outside the leagues we track are unknown.",
+      },
+      from: "From",
+      to: "To",
+      homeGame: "Home game",
+      awayGame: "Away game",
+      loading: "Searching for dates…",
+      empty: "No free weekend day in this range.",
+      error: "The alternative dates could not be loaded.",
     },
     booking: { title: "Booking", needsReconfirmation: "Needs reconfirmation" },
     notes: {
@@ -392,4 +415,71 @@ describe("MatchEditSheet official kickoff date hint", () => {
       expect(screen.getByText(/Official: .*01\.08\.26/)).toBeInTheDocument();
     },
   );
+});
+
+describe("MatchEditSheet alternative-date finder", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    const match = makeMatch();
+    mocks.getMatch.mockResolvedValue({ match, diffs: [] });
+    mocks.listTeams.mockResolvedValue([]);
+    mocks.alternativeDates.mockResolvedValue({
+      isHomeGame: true,
+      caveats: ["opponentGamesOutsideTrackedLeagues"],
+      range: { from: "2026-08-01", to: "2026-09-30" },
+      candidates: [{ date: "2026-08-15", weekday: "saturday" }],
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  async function openFinder() {
+    await renderSheet();
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Find alternative dates", hidden: true }),
+      );
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  }
+
+  it("offers the finder next to the date and time fields", async () => {
+    await renderSheet();
+
+    const trigger = screen.getByRole("button", {
+      name: "Find alternative dates",
+      hidden: true,
+    });
+    const dateField = screen.getByText("Date").closest("[data-slot=field]");
+
+    expect(trigger).toBeInTheDocument();
+    expect(dateField?.parentElement?.parentElement).toContainElement(trigger);
+  });
+
+  it("replaces the sheet body with the finder and comes back on the back arrow", async () => {
+    await openFinder();
+
+    expect(screen.queryByText("Overrides")).not.toBeInTheDocument();
+    expect(mocks.alternativeDates).toHaveBeenCalledWith(7, undefined);
+    expect(screen.getAllByRole("listitem", { hidden: true })).toHaveLength(1);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Back to the match", hidden: true }));
+    });
+
+    expect(screen.getByText("Overrides")).toBeInTheDocument();
+    expect(screen.queryByText("Alternative dates")).not.toBeInTheDocument();
+  });
+
+  it("keeps the sheet title while the finder is open", async () => {
+    await openFinder();
+
+    expect(screen.getByText("Dragons vs Bears")).toBeInTheDocument();
+  });
 });

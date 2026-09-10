@@ -295,6 +295,21 @@
       "time": "Uhrzeit",
       "venue": "Halle"
     },
+    "alternativeDates": {
+      "trigger": "Ausweichtermine finden",
+      "title": "Ausweichtermine",
+      "back": "Zurück zum Spiel",
+      "caveats": {
+        "opponentGamesOutsideTrackedLeagues": "Spiele des Gegners außerhalb der von uns verfolgten Ligen sind nicht bekannt."
+      },
+      "from": "Von",
+      "to": "Bis",
+      "homeGame": "Heimspiel",
+      "awayGame": "Auswärtsspiel",
+      "loading": "Termine werden gesucht",
+      "empty": "In diesem Zeitraum ist kein Wochenendtag frei.",
+      "error": "Die Ausweichtermine konnten nicht geladen werden."
+    },
     "score": {
       "title": "Ergebnis",
       "final": "Endstand",

@@ -567,6 +567,7 @@ now picked per season through the endpoints below.
 | GET | `/admin/matches` | List own club matches (with booking info) |
 | GET | `/admin/matches/:id` | Match detail with remote/local diffs (includes booking info) |
 | GET | `/admin/matches/:id/history` | Match change history (remote + local track) |
+| GET | `/admin/matches/:id/alternative-dates` | Weekend days in a range on which neither squad plays |
 | PATCH | `/admin/matches/:id` | Update match local fields |
 | DELETE | `/admin/matches/:id/overrides/:fieldName` | Release a local override |
 

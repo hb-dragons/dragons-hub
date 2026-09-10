@@ -1,7 +1,7 @@
 # Game Rescheduling Copilot — design spec
 
 - Date: 2026-06-08
-- Status: approved (brainstorming), pending implementation plan
+- Status: superseded by ADR-0010 (`docs/adr/0010-deterministic-alternative-date-finder.md`) — the copilot is removed in favour of a deterministic finder
 - Scope: v1 of an AI copilot for game management, focused on the rescheduling vertical
 
 ## Goal

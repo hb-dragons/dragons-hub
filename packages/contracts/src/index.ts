@@ -23,12 +23,14 @@ export {
   matchUpdateBodySchema,
   matchHistoryQuerySchema,
   releaseOverrideParamsSchema,
+  alternativeDatesQuerySchema,
   type MatchListQuery,
   type PublicMatchListQuery,
   type MatchUpdateBody,
   type MatchIdParam,
   type MatchHistoryQuery,
   type ReleaseOverrideParams,
+  type AlternativeDatesQuery,
 } from "./match";
 
 export {
