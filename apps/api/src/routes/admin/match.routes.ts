@@ -96,7 +96,7 @@ matchRoutes.get(
   validator("param", matchIdParamSchema, validationHook),
   validator("query", alternativeDatesQuerySchema, validationHook),
   describeRoute({
-    description: "Weekend days in a range on which neither squad of the match plays",
+    description: "Weekend days in a range on which neither squad of the game plays",
     tags: ["Matches"],
     responses: {
       200: { description: "Success" },

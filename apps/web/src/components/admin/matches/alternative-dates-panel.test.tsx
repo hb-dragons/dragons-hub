@@ -26,7 +26,7 @@ const messages = {
     alternativeDates: {
       trigger: "Find alternative dates",
       title: "Alternative dates",
-      back: "Back to the match",
+      back: "Back to the game",
       caveats: {
         opponentGamesOutsideTrackedLeagues:
           "Games of the opponent outside the leagues we track are unknown.",
@@ -63,7 +63,7 @@ function response(over: Partial<AlternativeDatesResponse> = {}): AlternativeDate
 
 function renderPanel(onBack = vi.fn()) {
   render(
-    <NextIntlClientProvider locale="en" timeZone="UTC" messages={messages} formats={formats}>
+    <NextIntlClientProvider locale="en" timeZone="Europe/Berlin" messages={messages} formats={formats}>
       <AlternativeDatesPanel matchId={7} onBack={onBack} />
     </NextIntlClientProvider>,
   );
@@ -79,11 +79,14 @@ async function settle() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
+  // Non-Berlin runtime zone on purpose: the rendered day must be the club day.
+  vi.stubEnv("TZ", "Pacific/Honolulu");
 });
 
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  vi.unstubAllEnvs();
 });
 
 describe("AlternativeDatesPanel", () => {
@@ -190,7 +193,7 @@ describe("AlternativeDatesPanel", () => {
     const { onBack } = renderPanel();
     await settle();
 
-    fireEvent.click(screen.getByRole("button", { name: "Back to the match" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back to the game" }));
 
     expect(onBack).toHaveBeenCalledTimes(1);
   });

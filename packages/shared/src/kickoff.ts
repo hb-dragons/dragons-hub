@@ -331,7 +331,9 @@ export function clubWeekdayName(day: string): ClubWeekday | null {
  * purpose: a caller that only wants Saturdays and Sundays gets the name it may
  * keep, so nothing downstream has to re-assert which two days these were.
  */
-export function clubWeekendDay(day: string): "saturday" | "sunday" | null {
+export type ClubWeekendDay = Extract<ClubWeekday, "saturday" | "sunday">;
+
+export function clubWeekendDay(day: string): ClubWeekendDay | null {
   const weekday = clubWeekdayName(day);
   return weekday === "saturday" || weekday === "sunday" ? weekday : null;
 }

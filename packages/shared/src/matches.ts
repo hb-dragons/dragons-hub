@@ -1,4 +1,5 @@
 import type { BookingStatus, DiffStatus } from "./constants";
+import type { ClubWeekendDay } from "./kickoff";
 interface RefereeSlotReferee {
   id: number;
   firstName: string | null;
@@ -172,12 +173,12 @@ export interface DateRange {
 /**
  * One weekend day a game to be rescheduled could move to. In this slice a
  * candidate carries nothing but the day itself: hall bookings, flags and
- * suggested kickoffs arrive with the later slices of the finder.
+ * kickoff times arrive with the later slices of the finder.
  */
 export interface AlternativeDateCandidate {
   /** `YYYY-MM-DD` in the club's timezone. */
   date: string;
-  weekday: "saturday" | "sunday";
+  weekday: ClubWeekendDay;
 }
 
 /**

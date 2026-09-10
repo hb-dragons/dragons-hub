@@ -298,7 +298,7 @@
     "alternativeDates": {
       "trigger": "Find alternative dates",
       "title": "Alternative dates",
-      "back": "Back to the match",
+      "back": "Back to the game",
       "caveats": {
         "opponentGamesOutsideTrackedLeagues": "Games of the opponent outside the leagues we track are unknown."
       },

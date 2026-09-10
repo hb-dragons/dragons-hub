@@ -875,7 +875,7 @@ the app hides the "Meine Kontaktdaten" section on.
 
 Route files: `apps/api/src/routes/health.routes.ts`, `apps/api/src/routes/mcp.routes.ts`, `apps/api/src/routes/qa.routes.ts`, `apps/api/src/routes/device.routes.ts`, `apps/api/src/routes/admin/*.routes.ts`, `apps/api/src/routes/api/*.routes.ts`, `apps/api/src/routes/public/*.routes.ts`, `apps/api/src/routes/referee/*.routes.ts`. Mount table: `apps/api/src/routes/index.ts`; app-level routes: `apps/api/src/app.ts`.
 Request schemas: `packages/contracts/src/<group>.ts` (never redeclared in the route).
-Service layer: `apps/api/src/services/admin/*.service.ts`, `apps/api/src/services/referee/`, `apps/api/src/services/venue-booking/`, `apps/api/src/services/notifications/`, `apps/api/src/services/social/`
+Service layer: `apps/api/src/services/admin/*.service.ts`, `apps/api/src/services/referee/`, `apps/api/src/services/venue-booking/`, `apps/api/src/services/reschedule/`, `apps/api/src/services/notifications/`, `apps/api/src/services/social/`
 
 ## Access Control (RBAC)
 

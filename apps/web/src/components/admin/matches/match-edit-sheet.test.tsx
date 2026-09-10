@@ -167,7 +167,7 @@ const messages = {
     alternativeDates: {
       trigger: "Find alternative dates",
       title: "Alternative dates",
-      back: "Back to the match",
+      back: "Back to the game",
       caveats: {
         opponentGamesOutsideTrackedLeagues:
           "Games of the opponent outside the leagues we track are unknown.",
@@ -470,7 +470,7 @@ describe("MatchEditSheet alternative-date finder", () => {
     expect(screen.getAllByRole("listitem", { hidden: true })).toHaveLength(1);
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Back to the match", hidden: true }));
+      fireEvent.click(screen.getByRole("button", { name: "Back to the game", hidden: true }));
     });
 
     expect(screen.getByText("Overrides")).toBeInTheDocument();
@@ -481,5 +481,27 @@ describe("MatchEditSheet alternative-date finder", () => {
     await openFinder();
 
     expect(screen.getByText("Dragons vs Bears")).toBeInTheDocument();
+  });
+
+  it("returns to the form with every edit intact", async () => {
+    await renderSheet();
+    const notes = screen.getByLabelText("Internal", { selector: "textarea" });
+    fireEvent.change(notes, { target: { value: "Gegner hat abgesagt" } });
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Find alternative dates", hidden: true }),
+      );
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Back to the game", hidden: true }));
+    });
+
+    expect(screen.getByLabelText("Internal", { selector: "textarea" })).toHaveValue(
+      "Gegner hat abgesagt",
+    );
   });
 });

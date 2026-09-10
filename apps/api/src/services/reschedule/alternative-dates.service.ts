@@ -1,6 +1,7 @@
 import { and, eq, gte, inArray, lte, max, ne, or } from "drizzle-orm";
 import { matches } from "@dragons/db/schema";
 import { clubWeekendDay, eachClubDay, todayInClubZone } from "@dragons/shared";
+import type { AlternativeDatesQuery } from "@dragons/contracts";
 import type {
   AlternativeDateCandidate,
   AlternativeDatesResponse,
@@ -9,13 +10,12 @@ import type {
 import { getDb } from "../../config/database";
 import { queryMatchWithJoins } from "../admin/match-query.service";
 
-export type AlternativeDatesParams = Partial<DateRange>;
-
 /**
  * The weekend days in a range on which neither squad of a game already plays —
  * the answer a staff member owes the other club when a game has to move.
  *
- * Two queries, whatever the range: the game itself, then every game of either
+ * At most three queries, whatever the range: the game itself, the league's
+ * last fixture when the client left the end open, then every game of either
  * squad inside the range. The weekends are walked in memory, so a six-month
  * range costs the same as a two-week one.
  *
@@ -23,7 +23,7 @@ export type AlternativeDatesParams = Partial<DateRange>;
  */
 export async function findAlternativeDates(
   matchId: number,
-  params: AlternativeDatesParams = {},
+  params: AlternativeDatesQuery = {},
 ): Promise<AlternativeDatesResponse | null> {
   const [match] = await queryMatchWithJoins().where(eq(matches.id, matchId)).limit(1);
   if (!match) return null;
@@ -65,14 +65,11 @@ export async function findAlternativeDates(
  */
 async function resolveRange(
   leagueId: number | null,
-  params: AlternativeDatesParams,
+  params: AlternativeDatesQuery,
 ): Promise<DateRange> {
-  if (params.to) {
-    const from = params.from ?? todayInClubZone();
-    return { from: from > params.to ? params.to : from, to: params.to };
-  }
-
   const from = params.from ?? todayInClubZone();
+  if (params.to) return { from: from > params.to ? params.to : from, to: params.to };
+
   const lastFixture = leagueId == null ? null : await lastLeagueFixtureDate(leagueId);
   return { from, to: lastFixture != null && lastFixture > from ? lastFixture : from };
 }

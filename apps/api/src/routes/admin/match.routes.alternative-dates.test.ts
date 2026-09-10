@@ -73,6 +73,10 @@ beforeAll(async () => {
 beforeEach(async () => {
   await resetTestDb(ctx);
   vi.clearAllMocks();
+  // A non-Berlin zone on purpose (see kickoff.test.ts): the finder must name
+  // the club day, not the runtime day. Kiritimati is UTC+14, so 09:00Z is
+  // already the next calendar day there.
+  vi.stubEnv("TZ", "Pacific/Kiritimati");
   mocks.userHasPermission.mockResolvedValue({ success: true });
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
@@ -80,6 +84,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllEnvs();
 });
 
 afterAll(async () => {
