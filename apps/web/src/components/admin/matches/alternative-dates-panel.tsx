@@ -1,13 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useId, useState } from "react";
-import { useFormatter, useTranslations } from "next-intl";
-import { ArrowLeft, Info } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
+import { toast } from "sonner";
+import { ArrowLeft, ClipboardCopy, Info } from "lucide-react";
 import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
 import { DatePicker } from "@dragons/ui/components/date-picker";
 import { Field, FieldLabel } from "@dragons/ui/components/field";
-import { clubDayAnchor, clubTimeAnchor } from "@dragons/shared";
+import {
+  clubDayAnchor,
+  clubTimeAnchor,
+  formatKickoffDayShort,
+  resolveDateLocale,
+} from "@dragons/shared";
 import type {
   AlternativeDateCandidate,
   AlternativeDateFlag,
@@ -38,6 +44,18 @@ function describeFlag(
 
 interface AlternativeDatesPanelProps {
   matchId: number;
+  /** The four things the copied reply text names the game by. */
+  homeTeamName: string;
+  guestTeamName: string;
+  leagueName: string | null;
+  matchDay: number;
+  /**
+   * Fills the picked day — and its suggested kickoff, where the finder found
+   * one — into the sheet's override fields, then returns to the form. Null
+   * when the staff member may not update the match: the list stays theirs to
+   * read and to copy, only the form it would write into is not.
+   */
+  onPrefill: ((date: string, time: string | null) => void) | null;
   /** Returns the sheet to the match form. */
   onBack: () => void;
 }
@@ -57,12 +75,17 @@ type PanelState =
  * first load and shows back whatever range the answer was computed over, so the
  * pickers never claim a season window the finder did not actually walk.
  */
-export function AlternativeDatesPanel({ matchId, onBack }: AlternativeDatesPanelProps) {
+export function AlternativeDatesPanel({
+  matchId,
+  homeTeamName,
+  guestTeamName,
+  leagueName,
+  matchDay,
+  onPrefill,
+  onBack,
+}: AlternativeDatesPanelProps) {
   const t = useTranslations("matchDetail.alternativeDates");
-  // The booking screens' own status wording, so one hall booking never reads
-  // two different ways in the same app.
-  const tStatus = useTranslations("bookings.status");
-  const format = useFormatter();
+  const locale = useLocale();
   const fieldIds = useId();
   const [requested, setRequested] = useState<RequestedRange>(null);
   // Bumped to re-run the effect after a failure; its value is never read.
@@ -118,6 +141,31 @@ export function AlternativeDatesPanel({ matchId, onBack }: AlternativeDatesPanel
     setRetryNonce((n) => n + 1);
   }, []);
 
+  // The server's ranking, not the grouped order on screen: the reply to the
+  // other club offers the days best-first, and the piles are a reading aid.
+  const ranked = useMemo(
+    () => (state.status === "ready" ? state.data.candidates : []),
+    [state],
+  );
+
+  const copyAsText = useCallback(() => {
+    const dateLocale = resolveDateLocale(locale);
+    const text = [
+      t("copyHeader", {
+        home: homeTeamName,
+        guest: guestTeamName,
+        league: leagueName ?? "—",
+        matchDay: String(matchDay),
+      }),
+      ...ranked.map((c) => `- ${formatKickoffDayShort(c.date, dateLocale)}`),
+    ].join("\n");
+
+    navigator.clipboard
+      .writeText(text)
+      .then(() => toast.success(t("copied")))
+      .catch(() => toast.error(t("copyFailed")));
+  }, [ranked, locale, t, homeTeamName, guestTeamName, leagueName, matchDay]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 pb-4">
       <div className="flex items-center gap-2">
@@ -132,6 +180,12 @@ export function AlternativeDatesPanel({ matchId, onBack }: AlternativeDatesPanel
           <Badge variant="outline" className="ml-auto">
             {state.data.isHomeGame ? t("homeGame") : t("awayGame")}
           </Badge>
+        )}
+        {ranked.length > 0 && (
+          <Button type="button" variant="outline" size="sm" onClick={copyAsText}>
+            <ClipboardCopy />
+            {t("copy")}
+          </Button>
         )}
       </div>
 
@@ -191,67 +245,21 @@ export function AlternativeDatesPanel({ matchId, onBack }: AlternativeDatesPanel
               </h4>
               <ul className="space-y-1">
                 {candidates.map((candidate) => (
-                  <li
-                    key={candidate.date}
-                    className="space-y-1 rounded-md bg-surface-low px-3 py-2 text-sm"
-                  >
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium">
-                        {format.dateTime(clubDayAnchor(candidate.date), "matchDate")}
-                      </span>
-                      {candidate.flags.map((flag) => {
-                        const { key, label } = describeFlag(flag, t);
-                        return (
-                          <Badge key={key} variant="secondary">
-                            {label}
-                          </Badge>
-                        );
-                      })}
-                    </span>
-                    {candidate.group === "away" && (
-                      <span className="text-muted-foreground block text-xs">
-                        {t("awayVenue")}
-                      </span>
-                    )}
-                    {candidate.group === "unbooked" && (
-                      <span className="text-muted-foreground block text-xs">
-                        {t("noBooking")}
-                      </span>
-                    )}
-                    {candidate.bookings.map((booking) => (
-                      <span
-                        key={booking.id}
-                        className="text-muted-foreground block text-xs"
+                  <li key={candidate.date}>
+                    {onPrefill ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onPrefill(candidate.date, candidate.suggestedKickoffTime)
+                        }
+                        className="focus-visible:ring-ring/50 block w-full space-y-1 rounded-md bg-surface-low px-3 py-2 text-left text-sm transition-colors hover:bg-surface-high focus-visible:ring-3 focus-visible:outline-none"
                       >
-                        {format.dateTime(
-                          clubTimeAnchor(booking.effectiveStartTime, candidate.date),
-                          "matchTime",
-                        )}{" "}
-                        –{" "}
-                        {format.dateTime(
-                          clubTimeAnchor(booking.effectiveEndTime, candidate.date),
-                          "matchTime",
-                        )}{" "}
-                        · {tStatus(booking.status)}
-                        {booking.needsReconfirmation && (
-                          <>
-                            {" · "}
-                            <span className="text-heat">
-                              {t("needsReconfirmation")}
-                            </span>
-                          </>
-                        )}
-                      </span>
-                    ))}
-                    {candidate.suggestedKickoffTime && (
-                      <span className="block text-xs font-medium">
-                        {t("suggestedKickoff", {
-                          time: format.dateTime(
-                            clubTimeAnchor(candidate.suggestedKickoffTime, candidate.date),
-                            "matchTime",
-                          ),
-                        })}
-                      </span>
+                        <CandidateDetails candidate={candidate} />
+                      </button>
+                    ) : (
+                      <div className="space-y-1 rounded-md bg-surface-low px-3 py-2 text-sm">
+                        <CandidateDetails candidate={candidate} />
+                      </div>
                     )}
                   </li>
                 ))}
@@ -260,6 +268,71 @@ export function AlternativeDatesPanel({ matchId, onBack }: AlternativeDatesPanel
           ))
         ))}
     </div>
+  );
+}
+
+/**
+ * One candidate day as it reads on screen, without the element around it: the
+ * same lines whether the row is a button that prefills the form or the plain
+ * block a staff member without match update sees.
+ */
+function CandidateDetails({ candidate }: { candidate: AlternativeDateCandidate }) {
+  const t = useTranslations("matchDetail.alternativeDates");
+  const tStatus = useTranslations("bookings.status");
+  const format = useFormatter();
+
+  return (
+    <>
+      <span className="flex flex-wrap items-center gap-2">
+        <span className="font-medium">
+          {format.dateTime(clubDayAnchor(candidate.date), "matchDate")}
+        </span>
+        {candidate.flags.map((flag) => {
+          const { key, label } = describeFlag(flag, t);
+          return (
+            <Badge key={key} variant="secondary">
+              {label}
+            </Badge>
+          );
+        })}
+      </span>
+      {candidate.group === "away" && (
+        <span className="text-muted-foreground block text-xs">{t("awayVenue")}</span>
+      )}
+      {candidate.group === "unbooked" && (
+        <span className="text-muted-foreground block text-xs">{t("noBooking")}</span>
+      )}
+      {candidate.bookings.map((booking) => (
+        <span key={booking.id} className="text-muted-foreground block text-xs">
+          {format.dateTime(
+            clubTimeAnchor(booking.effectiveStartTime, candidate.date),
+            "matchTime",
+          )}{" "}
+          –{" "}
+          {format.dateTime(
+            clubTimeAnchor(booking.effectiveEndTime, candidate.date),
+            "matchTime",
+          )}{" "}
+          · {tStatus(booking.status)}
+          {booking.needsReconfirmation && (
+            <>
+              {" · "}
+              <span className="text-heat">{t("needsReconfirmation")}</span>
+            </>
+          )}
+        </span>
+      ))}
+      {candidate.suggestedKickoffTime && (
+        <span className="block text-xs font-medium">
+          {t("suggestedKickoff", {
+            time: format.dateTime(
+              clubTimeAnchor(candidate.suggestedKickoffTime, candidate.date),
+              "matchTime",
+            ),
+          })}
+        </span>
+      )}
+    </>
   );
 }
 

@@ -389,6 +389,24 @@ export function MatchEditSheet({
     [match, form, router, onSaved, t],
   );
 
+  /**
+   * A candidate day picked in the finder lands in the override fields and
+   * nowhere else — saving stays the explicit save below. Marked dirty so the
+   * reset arrow, the dirty ring and the discard prompt all treat it as the
+   * edit it is; the time only follows when the finder had one to suggest, so
+   * picking a day never silently clears a kickoff the staff member set.
+   */
+  const handlePrefill = useCallback(
+    (date: string, time: string | null) => {
+      form.setValue("kickoffDate", date, { shouldDirty: true });
+      if (time) {
+        form.setValue("kickoffTime", formatMatchTime(time), { shouldDirty: true });
+      }
+      setFinderOpen(false);
+    },
+    [form],
+  );
+
   // ---- Render ----
 
   const periodScores = match ? formatPeriodScores(match) : [];
@@ -457,6 +475,11 @@ export function MatchEditSheet({
         ) : finderOpen ? (
           <AlternativeDatesPanel
             matchId={match.id}
+            homeTeamName={match.homeTeamName}
+            guestTeamName={match.guestTeamName}
+            leagueName={match.leagueName}
+            matchDay={match.matchDay}
+            onPrefill={canEdit ? handlePrefill : null}
             onBack={() => setFinderOpen(false)}
           />
         ) : (

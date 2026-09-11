@@ -310,7 +310,11 @@
         "coachCollision": "Trainer auch bei {team}"
       },
       "empty": "In diesem Zeitraum ist kein Wochenendtag frei.",
-      "error": "Die Ausweichtermine konnten nicht geladen werden."
+      "error": "Die Ausweichtermine konnten nicht geladen werden.",
+      "copy": "Als Text kopieren",
+      "copyHeader": "Mögliche Ausweichtermine für {home} – {guest} ({league}, Spieltag {matchDay}):",
+      "copied": "Ausweichtermine kopiert.",
+      "copyFailed": "Kopieren war nicht möglich."
     },
     "score": {
       "title": "Ergebnis",

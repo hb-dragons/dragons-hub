@@ -13,10 +13,16 @@ import deMessages from "@/messages/de.json";
 
 const mocks = vi.hoisted(() => ({
   alternativeDates: vi.fn(),
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
   api: { matches: { alternativeDates: mocks.alternativeDates } },
+}));
+
+vi.mock("sonner", () => ({
+  toast: { error: mocks.toastError, success: mocks.toastSuccess },
 }));
 
 import { AlternativeDatesPanel } from "./alternative-dates-panel";
@@ -65,6 +71,11 @@ const messages = {
       },
       empty: "No free weekend day in this range.",
       error: "The alternative dates could not be loaded.",
+      copy: "Copy as text",
+      copyHeader:
+        "Possible alternative dates for {home} – {guest} ({league}, matchday {matchDay}):",
+      copied: "Alternative dates copied.",
+      copyFailed: "Copying was not possible.",
     },
   },
 };
@@ -134,19 +145,32 @@ function renderWithCatalog(locale: "en" | "de") {
       messages={locale === "en" ? enMessages : deMessages}
       formats={formats}
     >
-      <AlternativeDatesPanel matchId={7} onBack={vi.fn()} />
+      <AlternativeDatesPanel {...panelProps()} onBack={vi.fn()} onPrefill={vi.fn()} />
     </NextIntlClientProvider>,
   );
 }
 
-function renderPanel(onBack = vi.fn()) {
+/** The game the panel names in the copied text; no test here reads it back. */
+function panelProps() {
+  return {
+    matchId: 7,
+    homeTeamName: "Dragons",
+    guestTeamName: "Bears",
+    leagueName: "Oberliga",
+    matchDay: 3,
+  };
+}
+
+function renderPanel(onBack = vi.fn(), onPrefill: PrefillHandler = vi.fn()) {
   render(
     <NextIntlClientProvider locale="en" timeZone="Europe/Berlin" messages={messages} formats={formats}>
-      <AlternativeDatesPanel matchId={7} onBack={onBack} />
+      <AlternativeDatesPanel {...panelProps()} onBack={onBack} onPrefill={onPrefill} />
     </NextIntlClientProvider>,
   );
-  return { onBack };
+  return { onBack, onPrefill };
 }
+
+type PrefillHandler = ((date: string, time: string | null) => void) | null;
 
 async function settle() {
   await act(async () => {
