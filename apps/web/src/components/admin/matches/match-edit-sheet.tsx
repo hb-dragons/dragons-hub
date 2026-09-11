@@ -192,11 +192,25 @@ function SheetSkeleton() {
 // MatchEditSheet
 // ---------------------------------------------------------------------------
 
+/**
+ * A day — and, where the finder had one, its suggested kickoff — picked before
+ * the sheet was open, for a host that runs the finder outside the sheet.
+ */
+export interface MatchPrefill {
+  date: string;
+  time: string | null;
+}
+
 interface MatchEditSheetProps {
   matchId: number | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved?: () => void;
+  /**
+   * Applied to the override fields once the match has loaded, exactly as a
+   * pick inside the sheet's own finder is. Null for a plain edit.
+   */
+  prefill?: MatchPrefill | null;
 }
 
 export function MatchEditSheet({
@@ -204,6 +218,7 @@ export function MatchEditSheet({
   open,
   onOpenChange,
   onSaved,
+  prefill = null,
 }: MatchEditSheetProps) {
   const t = useTranslations();
   const format = useFormatter();
@@ -264,7 +279,27 @@ export function MatchEditSheet({
     onOpenChange(false);
   }, [form, onOpenChange]);
 
-  // Fetch match detail when the sheet opens with a matchId.
+  /**
+   * A candidate day lands in the override fields and nowhere else — saving
+   * stays the explicit save below. Marked dirty so the reset arrow, the dirty
+   * ring and the discard prompt all treat it as the edit it is; the time only
+   * follows when the finder had one to suggest, so picking a day never
+   * silently clears a kickoff the staff member set.
+   */
+  const applyPrefill = useCallback(
+    (date: string, time: string | null) => {
+      form.setValue("kickoffDate", date, { shouldDirty: true });
+      if (time) {
+        form.setValue("kickoffTime", formatMatchTime(time), { shouldDirty: true });
+      }
+    },
+    [form],
+  );
+
+  // Fetch match detail when the sheet opens with a matchId. `prefill` is read
+  // but deliberately not a dependency: what counts is the pick the sheet was
+  // opened on, and re-running the fetch for a fresh object of the same pick
+  // would throw away every edit made since.
   useEffect(() => {
     if (!open || matchId == null) return;
 
@@ -280,6 +315,8 @@ export function MatchEditSheet({
         setDiffs(result.diffs);
         selectedVenueRef.current = null;
         form.reset(getDefaultValues(result.match));
+        // After the reset, or the day the caller picked would be wiped by it.
+        if (prefill) applyPrefill(prefill.date, prefill.time);
       })
       .catch(() => {
         if (cancelled) return;
@@ -389,22 +426,13 @@ export function MatchEditSheet({
     [match, form, router, onSaved, t],
   );
 
-  /**
-   * A candidate day picked in the finder lands in the override fields and
-   * nowhere else — saving stays the explicit save below. Marked dirty so the
-   * reset arrow, the dirty ring and the discard prompt all treat it as the
-   * edit it is; the time only follows when the finder had one to suggest, so
-   * picking a day never silently clears a kickoff the staff member set.
-   */
+  /** A pick in the sheet's own finder: apply it, then show the form again. */
   const handlePrefill = useCallback(
     (date: string, time: string | null) => {
-      form.setValue("kickoffDate", date, { shouldDirty: true });
-      if (time) {
-        form.setValue("kickoffTime", formatMatchTime(time), { shouldDirty: true });
-      }
+      applyPrefill(date, time);
       setFinderOpen(false);
     },
-    [form],
+    [applyPrefill],
   );
 
   // ---- Render ----

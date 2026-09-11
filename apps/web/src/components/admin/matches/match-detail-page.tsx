@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { useRouter } from "@/lib/navigation";
 import { Link } from "@/lib/navigation";
@@ -15,10 +15,18 @@ import {
 } from "@dragons/ui/components/card";
 import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
-import { Sheet } from "@dragons/ui/components/sheet";
-import { ArrowLeft, Pencil } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@dragons/ui/components/sheet";
+import { ArrowLeft, CalendarSearch, Pencil } from "lucide-react";
 import { Can } from "@/components/rbac/can";
 import { MatchEditSheet } from "./match-edit-sheet";
+import type { MatchPrefill } from "./match-edit-sheet";
+import { AlternativeDatesPanel } from "./alternative-dates-panel";
 import { MatchDivergenceTable } from "./match-divergence-table";
 import { MatchChangeHistory } from "./match-change-history";
 import { formatMatchTime, formatScore, formatPeriodScores } from "./utils";
@@ -44,6 +52,10 @@ export function MatchDetailPage({
   const router = useRouter();
   const { mutate: globalMutate } = useSWRConfig();
   const [editOpen, setEditOpen] = useState(false);
+  // The finder gets its own sheet here rather than the edit sheet's body: the
+  // page has no form to take over, and the pick has to survive the handover.
+  const [finderOpen, setFinderOpen] = useState(false);
+  const [prefill, setPrefill] = useState<MatchPrefill | null>(null);
 
   const matchDetailQ = queries.matchDetail(matchId);
   const { data: detailData, mutate: mutateDetail } = useSWR(
@@ -56,6 +68,23 @@ export function MatchDetailPage({
   const diffs = detailData?.diffs ?? initialDetail.diffs;
   const overrideCount = match.overrides.length;
   const periodScores = formatPeriodScores(match);
+
+  /** The picked day hands over to the edit sheet, which applies it on load. */
+  const handlePick = useCallback((date: string, time: string | null) => {
+    setPrefill({ date, time });
+    setFinderOpen(false);
+    setEditOpen(true);
+  }, []);
+
+  /**
+   * A pick lives exactly as long as the sheet it was handed to: closing that
+   * sheet drops it, so no later opener — the edit button, or one added since —
+   * can re-apply a day the staff member picked minutes ago.
+   */
+  const handleEditOpenChange = useCallback((open: boolean) => {
+    setEditOpen(open);
+    if (!open) setPrefill(null);
+  }, []);
 
   function handleSaved() {
     void mutateDetail();
@@ -88,6 +117,10 @@ export function MatchDetailPage({
           </Badge>
         )}
         <Can resource="match" action="update">
+          <Button variant="outline" size="sm" onClick={() => setFinderOpen(true)}>
+            <CalendarSearch className="mr-2 h-4 w-4" />
+            {t("matchDetail.alternativeDates.trigger")}
+          </Button>
           <Button size="sm" onClick={() => setEditOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" />
             {t("matchDetail.edit")}
@@ -273,13 +306,41 @@ export function MatchDetailPage({
       {/* Change History */}
       <MatchChangeHistory matchId={matchId} initialData={initialHistory} />
 
+      {/* Alternative-date finder — only reachable from the gated trigger above,
+          so the pick it hands on is behind the same match-update permission. */}
+      <Sheet open={finderOpen} onOpenChange={setFinderOpen}>
+        <SheetContent className="data-[side=right]:sm:max-w-3xl">
+          {/* The panel draws its own heading; this one names the dialog for
+              screen readers without showing a second title. */}
+          <SheetHeader className="sr-only">
+            <SheetTitle>{t("matchDetail.alternativeDates.title")}</SheetTitle>
+            <SheetDescription>
+              {t("matchDetail.info.matchdaySummary", {
+                day: match.matchDay,
+                league: match.leagueName ?? "\u2014",
+              })}
+            </SheetDescription>
+          </SheetHeader>
+          <AlternativeDatesPanel
+            matchId={matchId}
+            homeTeamName={match.homeTeamName}
+            guestTeamName={match.guestTeamName}
+            leagueName={match.leagueName}
+            matchDay={match.matchDay}
+            onPrefill={handlePick}
+            onBack={() => setFinderOpen(false)}
+          />
+        </SheetContent>
+      </Sheet>
+
       {/* Edit Sheet */}
-      <Sheet open={editOpen} onOpenChange={setEditOpen}>
+      <Sheet open={editOpen} onOpenChange={handleEditOpenChange}>
         <MatchEditSheet
           matchId={matchId}
           open={editOpen}
-          onOpenChange={setEditOpen}
+          onOpenChange={handleEditOpenChange}
           onSaved={handleSaved}
+          prefill={prefill}
         />
       </Sheet>
     </div>
