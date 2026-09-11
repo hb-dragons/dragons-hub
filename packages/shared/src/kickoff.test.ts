@@ -7,6 +7,7 @@ import {
   daysUntilKickoff,
   eachClubDay,
   formatKickoffCompact,
+  formatKickoffDayShort,
   formatKickoffLong,
   formatKickoffShortNumeric,
   clubWeekendDay,
@@ -311,6 +312,23 @@ describe("formatKickoffLong", () => {
 
   it("returns the raw date for an unparseable input", () => {
     expect(formatKickoffLong("garbage", "en-US")).toBe("garbage");
+  });
+});
+
+describe("formatKickoffDayShort", () => {
+  it("renders the short weekday and a four-digit year", () => {
+    vi.stubEnv("TZ", "Europe/Berlin");
+    expect(formatKickoffDayShort("2026-04-25", "de-DE")).toBe("Sa, 25.04.2026");
+    expect(formatKickoffDayShort("2026-04-26", "en-US")).toBe("Sun, 26.04.2026");
+  });
+
+  it.each(ZONES)("is timezone independent (TZ=%s)", (tz) => {
+    vi.stubEnv("TZ", tz);
+    expect(formatKickoffDayShort("2026-04-25", "de-DE")).toBe("Sa, 25.04.2026");
+  });
+
+  it("returns the raw date for an unparseable input", () => {
+    expect(formatKickoffDayShort("garbage", "de-DE")).toBe("garbage");
   });
 });
 

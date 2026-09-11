@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
+  // Read on every render, so a test can seat a role the sheet gates on.
+  session: { role: "admin" },
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -37,7 +39,7 @@ vi.mock("@/lib/navigation", () => ({
 
 vi.mock("@/lib/auth-client", () => ({
   authClient: {
-    useSession: () => ({ data: { user: { id: "u1", role: "admin" } } }),
+    useSession: () => ({ data: { user: { id: "u1", role: mocks.session.role } } }),
   },
 }));
 
@@ -196,6 +198,11 @@ const messages = {
       loading: "Searching for dates…",
       empty: "No free weekend day in this range.",
       error: "The alternative dates could not be loaded.",
+      copy: "Copy as text",
+      copyHeader:
+        "Possible alternative dates for {home} – {guest} ({league}, matchday {matchDay}):",
+      copied: "Alternative dates copied.",
+      copyFailed: "Copying was not possible.",
     },
     booking: { title: "Booking", needsReconfirmation: "Needs reconfirmation" },
     notes: {
@@ -470,7 +477,14 @@ describe("MatchEditSheet alternative-date finder", () => {
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    mocks.session.role = "admin";
+    vi.unstubAllGlobals();
   });
+
+  /** The row for one candidate day, found by a line only that row carries. */
+  function candidateRow(text: RegExp) {
+    return screen.getByText(text).closest("button");
+  }
 
   async function openFinder() {
     await renderSheet();
@@ -551,4 +565,123 @@ describe("MatchEditSheet alternative-date finder", () => {
       "Gegner hat abgesagt",
     );
   });
+
+  it("prefills the day and its suggested kickoff, then returns to the form", async () => {
+    await openFinder();
+
+    await act(async () => {
+      fireEvent.click(candidateRow(/Suggested kickoff/)!);
+    });
+
+    expect(screen.getByText("Overrides")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Date", hidden: true }),
+    ).toHaveTextContent("15.08.2026");
+    expect(screen.getByLabelText("Time", { selector: "input" })).toHaveValue("17:00");
+    expect(mocks.updateMatch).not.toHaveBeenCalled();
+  });
+
+  it("leaves the kickoff alone for a day the finder suggested no time for", async () => {
+    mocks.alternativeDates.mockResolvedValue({
+      isHomeGame: true,
+      caveats: [],
+      range: { from: "2026-08-01", to: "2026-09-30" },
+      candidates: [
+        {
+          date: "2026-08-15",
+          weekday: "saturday",
+          group: "unbooked",
+          bookings: [],
+          suggestedKickoffTime: null,
+          flags: [],
+        },
+      ],
+    });
+    await openFinder();
+
+    await act(async () => {
+      fireEvent.click(candidateRow(/no booking/)!);
+    });
+
+    expect(
+      screen.getByRole("button", { name: "Date", hidden: true }),
+    ).toHaveTextContent("15.08.2026");
+    expect(screen.getByLabelText("Time", { selector: "input" })).toHaveValue("18:00");
+  });
+
+  it("leaves the prefilled day unsaved until the form is submitted", async () => {
+    await openFinder();
+
+    await act(async () => {
+      fireEvent.click(candidateRow(/Suggested kickoff/)!);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Close", hidden: true }));
+    });
+
+    // The discard prompt only appears for a dirty form.
+    expect(screen.getByText("Discard changes?")).toBeInTheDocument();
+    expect(mocks.updateMatch).not.toHaveBeenCalled();
+  });
+
+  it("shows the list but no prefill without the match update permission", async () => {
+    mocks.session.role = "coach";
+    await openFinder();
+
+    expect(screen.getAllByRole("listitem", { hidden: true })).toHaveLength(1);
+    expect(screen.getByText(/Suggested kickoff/)).toBeInTheDocument();
+    expect(candidateRow(/Suggested kickoff/)).toBeNull();
+  });
+
+  it("copies the reply text: header, then the days in the server's order", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    mocks.alternativeDates.mockResolvedValue({
+      isHomeGame: true,
+      caveats: [],
+      range: { from: "2026-08-01", to: "2026-09-30" },
+      // Deliberately neither chronological nor grouped: the copied text follows
+      // the server's ranking, the headings on screen do not.
+      candidates: [
+        {
+          date: "2026-08-15",
+          weekday: "saturday",
+          group: "booked",
+          bookings: [
+            {
+              id: 1,
+              effectiveStartTime: "10:00:00",
+              effectiveEndTime: "16:00:00",
+              status: "confirmed",
+              needsReconfirmation: false,
+            },
+          ],
+          suggestedKickoffTime: "17:00:00",
+          flags: [{ type: "outsideRoundWindow" }],
+        },
+        {
+          date: "2026-08-09",
+          weekday: "sunday",
+          group: "unbooked",
+          bookings: [],
+          suggestedKickoffTime: null,
+          flags: [],
+        },
+      ],
+    });
+    await openFinder();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Copy as text", hidden: true }));
+    });
+
+    expect(writeText).toHaveBeenCalledWith(
+      [
+        "Possible alternative dates for Dragons – Bears (Oberliga, matchday 3):",
+        "- Sat, 15.08.2026",
+        "- Sun, 09.08.2026",
+      ].join("\n"),
+    );
+  });
+
 });

@@ -272,6 +272,17 @@ export function formatKickoffLong(date: string, locale: string): string {
   return `${clubWeekday(f.at, locale, "long")}, ${f.day}.${f.month}.${f.year}`;
 }
 
+/**
+ * Mail-line kickoff day label: `"Sa, 25.04.2026"` (de) / `"Sat, 25.04.2026"`
+ * (en). Used where a date is read off a line of plain text rather than a
+ * screen — the alternative-date list copied into the reply to the other club.
+ */
+export function formatKickoffDayShort(date: string, locale: string): string {
+  const f = clubDayFields(date);
+  if (!f) return date;
+  return `${clubWeekday(f.at, locale, "short")}, ${f.day}.${f.month}.${f.year}`;
+}
+
 /** Dense numeric kickoff label: `"25.04.26"`. Used in head-to-head rows. */
 export function formatKickoffShortNumeric(date: string): string {
   const f = clubDayFields(date);

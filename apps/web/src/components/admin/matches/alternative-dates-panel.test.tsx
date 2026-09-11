@@ -13,10 +13,16 @@ import deMessages from "@/messages/de.json";
 
 const mocks = vi.hoisted(() => ({
   alternativeDates: vi.fn(),
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
   api: { matches: { alternativeDates: mocks.alternativeDates } },
+}));
+
+vi.mock("sonner", () => ({
+  toast: { error: mocks.toastError, success: mocks.toastSuccess },
 }));
 
 import { AlternativeDatesPanel } from "./alternative-dates-panel";
@@ -65,6 +71,11 @@ const messages = {
       },
       empty: "No free weekend day in this range.",
       error: "The alternative dates could not be loaded.",
+      copy: "Copy as text",
+      copyHeader:
+        "Possible alternative dates for {home} – {guest} ({league}, matchday {matchDay}):",
+      copied: "Alternative dates copied.",
+      copyFailed: "Copying was not possible.",
     },
   },
 };
@@ -134,19 +145,32 @@ function renderWithCatalog(locale: "en" | "de") {
       messages={locale === "en" ? enMessages : deMessages}
       formats={formats}
     >
-      <AlternativeDatesPanel matchId={7} onBack={vi.fn()} />
+      <AlternativeDatesPanel {...panelProps()} onBack={vi.fn()} onPrefill={vi.fn()} />
     </NextIntlClientProvider>,
   );
 }
 
-function renderPanel(onBack = vi.fn()) {
+/** The game the panel names in the copied text; no test here reads it back. */
+function panelProps() {
+  return {
+    matchId: 7,
+    homeTeamName: "Dragons",
+    guestTeamName: "Bears",
+    leagueName: "Oberliga",
+    matchDay: 3,
+  };
+}
+
+function renderPanel(onBack = vi.fn(), onPrefill: PrefillHandler = vi.fn()) {
   render(
     <NextIntlClientProvider locale="en" timeZone="Europe/Berlin" messages={messages} formats={formats}>
-      <AlternativeDatesPanel matchId={7} onBack={onBack} />
+      <AlternativeDatesPanel {...panelProps()} onBack={onBack} onPrefill={onPrefill} />
     </NextIntlClientProvider>,
   );
-  return { onBack };
+  return { onBack, onPrefill };
 }
+
+type PrefillHandler = ((date: string, time: string | null) => void) | null;
 
 async function settle() {
   await act(async () => {
@@ -409,5 +433,97 @@ describe("AlternativeDatesPanel", () => {
       from: "2026-03-21",
       to: "2026-03-28",
     });
+  });
+
+  it("hands the picked day and its suggested kickoff to the sheet", async () => {
+    mocks.alternativeDates.mockResolvedValue(
+      response({ candidates: [booked("2026-03-14", "saturday")] }),
+    );
+    const { onPrefill } = renderPanel();
+    await settle();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /14\.03\.2026/ }));
+    });
+
+    expect(onPrefill).toHaveBeenCalledWith("2026-03-14", "17:00:00");
+  });
+
+  it("hands over a day with no kickoff to suggest as just that day", async () => {
+    mocks.alternativeDates.mockResolvedValue(
+      response({ candidates: [unbooked("2026-03-14", "saturday")] }),
+    );
+    const { onPrefill } = renderPanel();
+    await settle();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /14\.03\.2026/ }));
+    });
+
+    expect(onPrefill).toHaveBeenCalledWith("2026-03-14", null);
+  });
+
+  it("offers no row to click, and still the list, without prefill", async () => {
+    mocks.alternativeDates.mockResolvedValue(response());
+    renderPanel(vi.fn(), null);
+    await settle();
+
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: /14\.03\.2026/ })).not.toBeInTheDocument();
+  });
+
+  it("copies the header and the ranked days, and says it did", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    mocks.alternativeDates.mockResolvedValue(
+      // Sunday first and in another pile than the Saturday, so a copy that
+      // followed the headings on screen would come out the other way round.
+      response({
+        candidates: [unbooked("2026-03-15", "sunday"), booked("2026-03-14", "saturday")],
+      }),
+    );
+
+    renderPanel();
+    await settle();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Copy as text" }));
+    });
+    await settle();
+
+    expect(writeText).toHaveBeenCalledWith(
+      [
+        "Possible alternative dates for Dragons – Bears (Oberliga, matchday 3):",
+        "- Sun, 15.03.2026",
+        "- Sat, 14.03.2026",
+      ].join("\n"),
+    );
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("Alternative dates copied.");
+    vi.unstubAllGlobals();
+  });
+
+  it("says so when there is no clipboard to write to", async () => {
+    // Outside a secure context `navigator.clipboard` is missing entirely, and
+    // the call throws where a rejected promise would be easy to handle.
+    vi.stubGlobal("navigator", { ...navigator, clipboard: undefined });
+    mocks.alternativeDates.mockResolvedValue(response());
+
+    renderPanel();
+    await settle();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Copy as text" }));
+    });
+    await settle();
+
+    expect(mocks.toastError).toHaveBeenCalledWith("Copying was not possible.");
+    vi.unstubAllGlobals();
+  });
+
+  it("offers nothing to copy when no day came back", async () => {
+    mocks.alternativeDates.mockResolvedValue(response({ candidates: [] }));
+
+    renderPanel();
+    await settle();
+
+    expect(screen.queryByRole("button", { name: "Copy as text" })).not.toBeInTheDocument();
   });
 });

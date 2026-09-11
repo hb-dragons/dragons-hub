@@ -310,7 +310,11 @@
         "coachCollision": "Trainer also with {team}"
       },
       "empty": "No free weekend day in this range.",
-      "error": "The alternative dates could not be loaded."
+      "error": "The alternative dates could not be loaded.",
+      "copy": "Copy as text",
+      "copyHeader": "Possible alternative dates for {home} – {guest} ({league}, matchday {matchDay}):",
+      "copied": "Alternative dates copied.",
+      "copyFailed": "Copying was not possible."
     },
     "score": {
       "title": "Score",
