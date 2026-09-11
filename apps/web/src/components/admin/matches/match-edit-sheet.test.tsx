@@ -685,3 +685,48 @@ describe("MatchEditSheet alternative-date finder", () => {
   });
 
 });
+
+describe("MatchEditSheet opened on a day picked elsewhere", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    mocks.getMatch.mockResolvedValue({ match: makeMatch(), diffs: [] });
+    mocks.listTeams.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  async function renderWithPrefill(prefill: { date: string; time: string | null }) {
+    render(
+      wrap(
+        <MatchEditSheet matchId={7} open onOpenChange={() => {}} prefill={prefill} />,
+      ),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  }
+
+  it("lands the day and its kickoff in the override fields, unsaved", async () => {
+    await renderWithPrefill({ date: "2026-08-15", time: "17:00:00" });
+
+    expect(screen.getByRole("button", { name: "Date", hidden: true })).toHaveTextContent(
+      "15.08.2026",
+    );
+    expect(screen.getByLabelText("Time", { selector: "input" })).toHaveValue("17:00");
+    expect(mocks.updateMatch).not.toHaveBeenCalled();
+  });
+
+  it("leaves the kickoff alone when the day came without a suggested time", async () => {
+    await renderWithPrefill({ date: "2026-08-15", time: null });
+
+    expect(screen.getByRole("button", { name: "Date", hidden: true })).toHaveTextContent(
+      "15.08.2026",
+    );
+    // The match's own kickoff, untouched.
+    expect(screen.getByLabelText("Time", { selector: "input" })).toHaveValue("18:00");
+  });
+});
