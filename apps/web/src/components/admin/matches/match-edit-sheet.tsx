@@ -296,12 +296,10 @@ export function MatchEditSheet({
     [form],
   );
 
-  // Read by the load effect below, which must not re-run when a caller hands
-  // in a fresh object for the same pick.
-  const prefillRef = useRef(prefill);
-  prefillRef.current = prefill;
-
-  // Fetch match detail when the sheet opens with a matchId.
+  // Fetch match detail when the sheet opens with a matchId. `prefill` is read
+  // but deliberately not a dependency: what counts is the pick the sheet was
+  // opened on, and re-running the fetch for a fresh object of the same pick
+  // would throw away every edit made since.
   useEffect(() => {
     if (!open || matchId == null) return;
 
@@ -318,8 +316,7 @@ export function MatchEditSheet({
         selectedVenueRef.current = null;
         form.reset(getDefaultValues(result.match));
         // After the reset, or the day the caller picked would be wiped by it.
-        const pending = prefillRef.current;
-        if (pending) applyPrefill(pending.date, pending.time);
+        if (prefill) applyPrefill(prefill.date, prefill.time);
       })
       .catch(() => {
         if (cancelled) return;

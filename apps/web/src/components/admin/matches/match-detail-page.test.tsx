@@ -271,12 +271,19 @@ describe("MatchDetailPage alternative-date finder", () => {
     expect(screen.queryByText(/Suggested kickoff/)).not.toBeInTheDocument();
   });
 
-  it("hands the sheet no prefill when the edit button opened it", async () => {
+  it("drops the picked day when its sheet closes", async () => {
     await openFinder();
     await act(async () => {
       fireEvent.click(screen.getByText(/Suggested kickoff/).closest("button")!);
     });
 
+    // The sheet closes itself — the X, a discarded edit, a failed load.
+    const { onOpenChange } = mocks.editSheet.mock.lastCall![0] as {
+      onOpenChange: (open: boolean) => void;
+    };
+    await act(async () => {
+      onOpenChange(false);
+    });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     });

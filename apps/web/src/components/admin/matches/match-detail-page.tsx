@@ -76,10 +76,14 @@ export function MatchDetailPage({
     setEditOpen(true);
   }, []);
 
-  /** Plain edit: the sheet must not re-apply a day picked earlier. */
-  const handleEdit = useCallback(() => {
-    setPrefill(null);
-    setEditOpen(true);
+  /**
+   * A pick lives exactly as long as the sheet it was handed to: closing that
+   * sheet drops it, so no later opener — the edit button, or one added since —
+   * can re-apply a day the staff member picked minutes ago.
+   */
+  const handleEditOpenChange = useCallback((open: boolean) => {
+    setEditOpen(open);
+    if (!open) setPrefill(null);
   }, []);
 
   function handleSaved() {
@@ -117,7 +121,7 @@ export function MatchDetailPage({
             <CalendarSearch className="mr-2 h-4 w-4" />
             {t("matchDetail.alternativeDates.trigger")}
           </Button>
-          <Button size="sm" onClick={handleEdit}>
+          <Button size="sm" onClick={() => setEditOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" />
             {t("matchDetail.edit")}
           </Button>
@@ -330,11 +334,11 @@ export function MatchDetailPage({
       </Sheet>
 
       {/* Edit Sheet */}
-      <Sheet open={editOpen} onOpenChange={setEditOpen}>
+      <Sheet open={editOpen} onOpenChange={handleEditOpenChange}>
         <MatchEditSheet
           matchId={matchId}
           open={editOpen}
-          onOpenChange={setEditOpen}
+          onOpenChange={handleEditOpenChange}
           onSaved={handleSaved}
           prefill={prefill}
         />
