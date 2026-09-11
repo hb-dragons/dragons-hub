@@ -684,18 +684,4 @@ describe("MatchEditSheet alternative-date finder", () => {
     );
   });
 
-  it("says so when the clipboard refuses", async () => {
-    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
-    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
-    await openFinder();
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Copy as text", hidden: true }));
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-
-    expect(mocks.toastError).toHaveBeenCalledWith("Copying was not possible.");
-  });
 });

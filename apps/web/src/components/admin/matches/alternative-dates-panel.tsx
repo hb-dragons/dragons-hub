@@ -8,6 +8,7 @@ import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
 import { DatePicker } from "@dragons/ui/components/date-picker";
 import { Field, FieldLabel } from "@dragons/ui/components/field";
+import { cn } from "@dragons/ui/lib/utils";
 import {
   clubDayAnchor,
   clubTimeAnchor,
@@ -160,8 +161,11 @@ export function AlternativeDatesPanel({
       ...ranked.map((c) => `- ${formatKickoffDayShort(c.date, dateLocale)}`),
     ].join("\n");
 
-    navigator.clipboard
-      .writeText(text)
+    // Entered through a resolved promise on purpose: outside a secure context
+    // `navigator.clipboard` is undefined and the call throws synchronously, so
+    // a bare `.catch()` on it would never see the failure it exists for.
+    Promise.resolve()
+      .then(() => navigator.clipboard.writeText(text))
       .then(() => toast.success(t("copied")))
       .catch(() => toast.error(t("copyFailed")));
   }, [ranked, locale, t, homeTeamName, guestTeamName, leagueName, matchDay]);
@@ -249,15 +253,25 @@ export function AlternativeDatesPanel({
                     {onPrefill ? (
                       <button
                         type="button"
+                        // Without this the accessible name is the whole row —
+                        // flags, hall window, status and suggestion read out
+                        // before the day the button is actually about.
+                        aria-label={formatKickoffDayShort(
+                          candidate.date,
+                          resolveDateLocale(locale),
+                        )}
                         onClick={() =>
                           onPrefill(candidate.date, candidate.suggestedKickoffTime)
                         }
-                        className="focus-visible:ring-ring/50 block w-full space-y-1 rounded-md bg-surface-low px-3 py-2 text-left text-sm transition-colors hover:bg-surface-high focus-visible:ring-3 focus-visible:outline-none"
+                        className={cn(
+                          ROW_CLASS,
+                          "focus-visible:ring-ring/50 block w-full text-left transition-colors hover:bg-surface-high focus-visible:ring-3 focus-visible:outline-none",
+                        )}
                       >
                         <CandidateDetails candidate={candidate} />
                       </button>
                     ) : (
-                      <div className="space-y-1 rounded-md bg-surface-low px-3 py-2 text-sm">
+                      <div className={ROW_CLASS}>
                         <CandidateDetails candidate={candidate} />
                       </div>
                     )}
@@ -270,6 +284,12 @@ export function AlternativeDatesPanel({
     </div>
   );
 }
+
+/**
+ * The chrome a candidate row wears whether or not it is a button, so the two
+ * arms of that branch cannot drift into two-looking rows.
+ */
+const ROW_CLASS = "space-y-1 rounded-md bg-surface-low px-3 py-2 text-sm";
 
 /**
  * One candidate day as it reads on screen, without the element around it: the
