@@ -266,17 +266,6 @@
       "active": "Aktiv",
       "cancelled": "Abgesagt",
       "forfeited": "Kampflos"
-    },
-    "reschedule": {
-      "trigger": "Terminverschiebung vorschlagen",
-      "title": "Terminverschiebungs-Assistent",
-      "description": "Beschreibe deine Einschränkungen; ich schlage gültige Termine und Hallen vor.",
-      "placeholder": "z. B. nächste 3 Wochen, lieber Samstagabend, gleiche Halle",
-      "stop": "Stopp",
-      "retry": "Erneut versuchen",
-      "newChat": "Neuen Chat starten",
-      "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
-      "send": "Senden"
     }
   },
   "matchDetail": {
@@ -294,6 +283,38 @@
       "date": "Datum",
       "time": "Uhrzeit",
       "venue": "Halle"
+    },
+    "alternativeDates": {
+      "trigger": "Ausweichtermine finden",
+      "title": "Ausweichtermine",
+      "back": "Zurück zum Spiel",
+      "caveats": {
+        "opponentGamesOutsideTrackedLeagues": "Spiele des Gegners außerhalb der von uns verfolgten Ligen sind nicht bekannt."
+      },
+      "from": "Von",
+      "to": "Bis",
+      "homeGame": "Heimspiel",
+      "awayGame": "Auswärtsspiel",
+      "groups": {
+        "booked": "Mit Hallenbuchung",
+        "unbooked": "Ohne Hallenbuchung",
+        "away": "Auswärts"
+      },
+      "noBooking": "keine Buchung",
+      "awayVenue": "Halle: Gegner",
+      "needsReconfirmation": "Rückbestätigung nötig",
+      "suggestedKickoff": "Vorschlag: {time} Uhr",
+      "loading": "Termine werden gesucht",
+      "flags": {
+        "outsideRoundWindow": "Außerhalb des Spieltagsfensters",
+        "coachCollision": "Trainer auch bei {team}"
+      },
+      "empty": "In diesem Zeitraum ist kein Wochenendtag frei.",
+      "error": "Die Ausweichtermine konnten nicht geladen werden.",
+      "copy": "Als Text kopieren",
+      "copyHeader": "Mögliche Ausweichtermine für {home} – {guest} ({league}, Spieltag {matchDay}):",
+      "copied": "Ausweichtermine kopiert.",
+      "copyFailed": "Kopieren war nicht möglich."
     },
     "score": {
       "title": "Ergebnis",
@@ -392,10 +413,7 @@
       "fieldCleared": "{field}: gelöscht (war {oldValue})",
       "showMore": "Mehr laden"
     },
-    "edit": "Bearbeiten",
-    "reschedule": {
-      "trigger": "Terminverschiebung vorschlagen"
-    }
+    "edit": "Bearbeiten"
   },
   "sync": {
     "title": "Synchronisation",

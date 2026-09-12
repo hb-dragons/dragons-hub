@@ -92,11 +92,8 @@ export const envSchema = z
     REFEREE_SDK_PASSWORD: z.string().min(1).optional(),
 
     GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1).optional(),
-    ASSISTANT_ENABLED: booleanFlag(),
-    ASSISTANT_MODEL: z.string().min(1).default("gemini-2.5-flash"),
     CHATBOT_ENABLED: booleanFlag(),
     CHATBOT_MODEL: z.string().min(1).default("gemini-2.5-flash"),
-    MCP_TOKEN: z.string().min(32).optional(),
 
     // SMTP relay for the `email` channel (channels/email.ts). All five are
     // optional and all five are required together: `readSmtpSettings()` treats
@@ -123,13 +120,6 @@ export const envSchema = z
     VERBOSE_ERRORS: booleanFlag(),
   })
   .superRefine((env, ctx) => {
-    if (env.ASSISTANT_ENABLED && !env.GOOGLE_GENERATIVE_AI_API_KEY) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["GOOGLE_GENERATIVE_AI_API_KEY"],
-        message: "GOOGLE_GENERATIVE_AI_API_KEY is required when ASSISTANT_ENABLED=true",
-      });
-    }
     if (env.CHATBOT_ENABLED && !env.GOOGLE_GENERATIVE_AI_API_KEY) {
       ctx.addIssue({
         code: "custom",

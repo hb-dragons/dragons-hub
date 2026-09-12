@@ -79,9 +79,7 @@ jobs:
       # Empty `||` fallbacks: an unset repo variable renders "" and would override the
       # TF default with an empty string (which the API env schema rejects at boot).
       TF_VAR_chatbot_enabled: ${{ vars.CHATBOT_ENABLED || 'false' }}
-      TF_VAR_assistant_enabled: ${{ vars.ASSISTANT_ENABLED || 'false' }}
       TF_VAR_google_generative_ai_api_key: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
-      TF_VAR_mcp_token: ${{ secrets.MCP_TOKEN }}
       # WhatsApp group delivery. The WAHA endpoint is not a credential, so it is a
       # repo variable and lands in Cloud Run env_vars. Unset renders "", which TF
       # reads as "leave WhatsApp disabled" rather than passing an invalid URL on.

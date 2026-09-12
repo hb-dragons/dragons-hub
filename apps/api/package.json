@@ -24,7 +24,6 @@
     "@google-cloud/storage": "^7.19.0",
     "@hono/node-server": "^1.19.14",
     "@hono/standard-validator": "^0.2.2",
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "@resvg/resvg-js": "^2.6.2",
     "@scalar/hono-api-reference": "^0.10.16",
     "@touch4it/ical-timezones": "^1.9.0",

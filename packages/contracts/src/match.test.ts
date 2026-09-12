@@ -6,6 +6,7 @@ import {
   matchUpdateBodySchema,
   matchHistoryQuerySchema,
   releaseOverrideParamsSchema,
+  alternativeDatesQuerySchema,
 } from "./match";
 
 describe("matchListQuerySchema", () => {
@@ -325,5 +326,42 @@ describe("releaseOverrideParamsSchema", () => {
     expect(() =>
       releaseOverrideParamsSchema.parse({ id: 1, fieldName: "x".repeat(101) }),
     ).toThrow();
+  });
+});
+
+describe("alternativeDatesQuerySchema", () => {
+  it("parses an empty query — the server fills the range in", () => {
+    expect(alternativeDatesQuerySchema.parse({})).toEqual({});
+  });
+
+  it("accepts a full range", () => {
+    expect(alternativeDatesQuerySchema.parse({ from: "2026-03-01", to: "2026-05-31" })).toEqual({
+      from: "2026-03-01",
+      to: "2026-05-31",
+    });
+  });
+
+  it("accepts one end alone", () => {
+    expect(alternativeDatesQuerySchema.parse({ from: "2026-03-01" })).toEqual({
+      from: "2026-03-01",
+    });
+    expect(alternativeDatesQuerySchema.parse({ to: "2026-05-31" })).toEqual({ to: "2026-05-31" });
+  });
+
+  it("rejects a malformed date", () => {
+    expect(() => alternativeDatesQuerySchema.parse({ from: "01.03.2026" })).toThrow();
+    expect(() => alternativeDatesQuerySchema.parse({ to: "not-a-date" })).toThrow();
+  });
+
+  it("rejects a range that runs backwards", () => {
+    expect(() =>
+      alternativeDatesQuerySchema.parse({ from: "2026-05-31", to: "2026-03-01" }),
+    ).toThrow();
+  });
+
+  it("accepts a single-day range", () => {
+    expect(
+      alternativeDatesQuerySchema.parse({ from: "2026-03-14", to: "2026-03-14" }),
+    ).toEqual({ from: "2026-03-14", to: "2026-03-14" });
   });
 });

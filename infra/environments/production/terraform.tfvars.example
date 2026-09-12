@@ -37,19 +37,15 @@ referee_sdk_password = "your-referee-sdk-password"
 # admin/overlay UI talks to the same device the API ingest is bound to.
 scoreboard_device_id = "dragons-1"
 
-# AI features (chatbot + rescheduling assistant + MCP)
-# In CI these come from GitHub: vars.CHATBOT_ENABLED / vars.ASSISTANT_ENABLED
-# (feature flags) and secrets.GOOGLE_GENERATIVE_AI_API_KEY / secrets.MCP_TOKEN,
-# passed as TF_VAR_* by .github/workflows/opentofu.yml.
-chatbot_enabled   = "false"
-assistant_enabled = "false"
+# Club Q&A chatbot
+# In CI the flag comes from GitHub: vars.CHATBOT_ENABLED, and the key from
+# secrets.GOOGLE_GENERATIVE_AI_API_KEY, passed as TF_VAR_* by
+# .github/workflows/opentofu.yml.
+chatbot_enabled = "false"
 
-# Google AI Studio key — required (no default). Must be a real key when either
-# feature flag is "true", or the API/Worker reject startup. Stored in Secret Manager.
+# Google AI Studio key — required (no default). Must be a real key when the
+# chatbot flag is "true", or the API/Worker reject startup. Stored in Secret Manager.
 google_generative_ai_api_key = "your-google-ai-studio-key"
-
-# Bearer token for the /mcp endpoint — required (no default), min 32 chars.
-mcp_token = "your-mcp-token-at-least-32-characters-long"
 
 # WhatsApp group notifications (WAHA). Not credentials — the adapter sends no
 # auth header — so these ride in Cloud Run env_vars on the API and the Worker.

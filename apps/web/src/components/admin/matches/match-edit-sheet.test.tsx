@@ -12,9 +12,12 @@ const mocks = vi.hoisted(() => ({
   releaseOverride: vi.fn(),
   searchVenues: vi.fn(),
   listTeams: vi.fn(),
+  alternativeDates: vi.fn(),
   refresh: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
+  // Read on every render, so a test can seat a role the sheet gates on.
+  session: { role: "admin" },
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -23,6 +26,7 @@ vi.mock("@/lib/api", () => ({
       get: mocks.getMatch,
       update: mocks.updateMatch,
       releaseOverride: mocks.releaseOverride,
+      alternativeDates: mocks.alternativeDates,
     },
     venues: { search: mocks.searchVenues },
     teams: { list: mocks.listTeams },
@@ -35,7 +39,7 @@ vi.mock("@/lib/navigation", () => ({
 
 vi.mock("@/lib/auth-client", () => ({
   authClient: {
-    useSession: () => ({ data: { user: { id: "u1", role: "admin" } } }),
+    useSession: () => ({ data: { user: { id: "u1", role: mocks.session.role } } }),
   },
 }));
 
@@ -108,6 +112,11 @@ function makeMatch(): MatchDetail {
 }
 
 const messages = {
+  errors: {
+    title: "Something went wrong",
+    description: "An unexpected error occurred.",
+    tryAgain: "Try again",
+  },
   common: {
     cancel: "Cancel",
     close: "Close",
@@ -116,6 +125,14 @@ const messages = {
     saveChanges: "Save Changes",
   },
   matches: { title: "Matches" },
+  bookings: {
+    status: {
+      pending: "Pending",
+      requested: "Requested",
+      confirmed: "Confirmed",
+      cancelled: "Cancelled",
+    },
+  },
   matchDetail: {
     overrideActive: "Override active",
     discard: "Discard",
@@ -157,6 +174,36 @@ const messages = {
       shotclock: "Shotclock",
       clear: "Clear {role}",
     },
+    alternativeDates: {
+      trigger: "Find alternative dates",
+      title: "Alternative dates",
+      back: "Back to the game",
+      caveats: {
+        opponentGamesOutsideTrackedLeagues:
+          "Games of the opponent outside the leagues we track are unknown.",
+      },
+      from: "From",
+      to: "To",
+      homeGame: "Home game",
+      awayGame: "Away game",
+      groups: {
+        booked: "With a hall booking",
+        unbooked: "Without a hall booking",
+        away: "Away",
+      },
+      noBooking: "no booking",
+      awayVenue: "Hall: opponent",
+      needsReconfirmation: "Needs re-confirmation",
+      suggestedKickoff: "Suggested kickoff: {time}",
+      loading: "Searching for dates…",
+      empty: "No free weekend day in this range.",
+      error: "The alternative dates could not be loaded.",
+      copy: "Copy as text",
+      copyHeader:
+        "Possible alternative dates for {home} – {guest} ({league}, matchday {matchDay}):",
+      copied: "Alternative dates copied.",
+      copyFailed: "Copying was not possible.",
+    },
     booking: { title: "Booking", needsReconfirmation: "Needs reconfirmation" },
     notes: {
       title: "Notes",
@@ -183,6 +230,7 @@ const formats = {
       month: "2-digit",
       year: "2-digit",
     },
+    matchTime: { hour: "2-digit", minute: "2-digit" },
   },
 } as const;
 
@@ -392,4 +440,293 @@ describe("MatchEditSheet official kickoff date hint", () => {
       expect(screen.getByText(/Official: .*01\.08\.26/)).toBeInTheDocument();
     },
   );
+});
+
+describe("MatchEditSheet alternative-date finder", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    const match = makeMatch();
+    mocks.getMatch.mockResolvedValue({ match, diffs: [] });
+    mocks.listTeams.mockResolvedValue([]);
+    mocks.alternativeDates.mockResolvedValue({
+      isHomeGame: true,
+      caveats: ["opponentGamesOutsideTrackedLeagues"],
+      range: { from: "2026-08-01", to: "2026-09-30" },
+      candidates: [
+        {
+          date: "2026-08-15",
+          weekday: "saturday",
+          group: "booked",
+          bookings: [
+            {
+              id: 1,
+              effectiveStartTime: "10:00:00",
+              effectiveEndTime: "16:00:00",
+              status: "confirmed",
+              needsReconfirmation: false,
+            },
+          ],
+          suggestedKickoffTime: "17:00:00",
+          flags: [],
+        },
+      ],
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    mocks.session.role = "admin";
+    vi.unstubAllGlobals();
+  });
+
+  /** The row for one candidate day, found by a line only that row carries. */
+  function candidateRow(text: RegExp) {
+    return screen.getByText(text).closest("button");
+  }
+
+  async function openFinder() {
+    await renderSheet();
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Find alternative dates", hidden: true }),
+      );
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  }
+
+  it("offers the finder next to the date and time fields", async () => {
+    await renderSheet();
+
+    const trigger = screen.getByRole("button", {
+      name: "Find alternative dates",
+      hidden: true,
+    });
+    const dateField = screen.getByText("Date").closest("[data-slot=field]");
+
+    expect(trigger).toBeInTheDocument();
+    expect(dateField?.parentElement?.parentElement).toContainElement(trigger);
+  });
+
+  it("replaces the sheet body with the finder and comes back on the back arrow", async () => {
+    await openFinder();
+
+    expect(screen.queryByText("Overrides")).not.toBeInTheDocument();
+    expect(mocks.alternativeDates).toHaveBeenCalledWith(7, undefined);
+    expect(screen.getAllByRole("listitem", { hidden: true })).toHaveLength(1);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Back to the game", hidden: true }));
+    });
+
+    expect(screen.getByText("Overrides")).toBeInTheDocument();
+    expect(screen.queryByText("Alternative dates")).not.toBeInTheDocument();
+  });
+
+  it("shows the hall booking behind a candidate inside the sheet", async () => {
+    await openFinder();
+
+    expect(
+      screen.getByRole("heading", { name: "With a hall booking", hidden: true }),
+    ).toBeInTheDocument();
+    // The window itself is asserted where the provider pins the club zone, as
+    // production does; this sheet renders in UTC.
+    expect(screen.getByText(/Confirmed/, { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByText(/Suggested kickoff/)).toBeInTheDocument();
+  });
+
+  it("keeps the sheet title while the finder is open", async () => {
+    await openFinder();
+
+    expect(screen.getByText("Dragons vs Bears")).toBeInTheDocument();
+  });
+
+  it("returns to the form with every edit intact", async () => {
+    await renderSheet();
+    const notes = screen.getByLabelText("Internal", { selector: "textarea" });
+    fireEvent.change(notes, { target: { value: "Gegner hat abgesagt" } });
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Find alternative dates", hidden: true }),
+      );
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Back to the game", hidden: true }));
+    });
+
+    expect(screen.getByLabelText("Internal", { selector: "textarea" })).toHaveValue(
+      "Gegner hat abgesagt",
+    );
+  });
+
+  it("prefills the day and its suggested kickoff, then returns to the form", async () => {
+    await openFinder();
+
+    await act(async () => {
+      fireEvent.click(candidateRow(/Suggested kickoff/)!);
+    });
+
+    expect(screen.getByText("Overrides")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Date", hidden: true }),
+    ).toHaveTextContent("15.08.2026");
+    expect(screen.getByLabelText("Time", { selector: "input" })).toHaveValue("17:00");
+    expect(mocks.updateMatch).not.toHaveBeenCalled();
+  });
+
+  it("leaves the kickoff alone for a day the finder suggested no time for", async () => {
+    mocks.alternativeDates.mockResolvedValue({
+      isHomeGame: true,
+      caveats: [],
+      range: { from: "2026-08-01", to: "2026-09-30" },
+      candidates: [
+        {
+          date: "2026-08-15",
+          weekday: "saturday",
+          group: "unbooked",
+          bookings: [],
+          suggestedKickoffTime: null,
+          flags: [],
+        },
+      ],
+    });
+    await openFinder();
+
+    await act(async () => {
+      fireEvent.click(candidateRow(/no booking/)!);
+    });
+
+    expect(
+      screen.getByRole("button", { name: "Date", hidden: true }),
+    ).toHaveTextContent("15.08.2026");
+    expect(screen.getByLabelText("Time", { selector: "input" })).toHaveValue("18:00");
+  });
+
+  it("leaves the prefilled day unsaved until the form is submitted", async () => {
+    await openFinder();
+
+    await act(async () => {
+      fireEvent.click(candidateRow(/Suggested kickoff/)!);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Close", hidden: true }));
+    });
+
+    // The discard prompt only appears for a dirty form.
+    expect(screen.getByText("Discard changes?")).toBeInTheDocument();
+    expect(mocks.updateMatch).not.toHaveBeenCalled();
+  });
+
+  it("shows the list but no prefill without the match update permission", async () => {
+    mocks.session.role = "coach";
+    await openFinder();
+
+    expect(screen.getAllByRole("listitem", { hidden: true })).toHaveLength(1);
+    expect(screen.getByText(/Suggested kickoff/)).toBeInTheDocument();
+    expect(candidateRow(/Suggested kickoff/)).toBeNull();
+  });
+
+  it("copies the reply text: header, then the days in the server's order", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    mocks.alternativeDates.mockResolvedValue({
+      isHomeGame: true,
+      caveats: [],
+      range: { from: "2026-08-01", to: "2026-09-30" },
+      // Deliberately neither chronological nor grouped: the copied text follows
+      // the server's ranking, the headings on screen do not.
+      candidates: [
+        {
+          date: "2026-08-15",
+          weekday: "saturday",
+          group: "booked",
+          bookings: [
+            {
+              id: 1,
+              effectiveStartTime: "10:00:00",
+              effectiveEndTime: "16:00:00",
+              status: "confirmed",
+              needsReconfirmation: false,
+            },
+          ],
+          suggestedKickoffTime: "17:00:00",
+          flags: [{ type: "outsideRoundWindow" }],
+        },
+        {
+          date: "2026-08-09",
+          weekday: "sunday",
+          group: "unbooked",
+          bookings: [],
+          suggestedKickoffTime: null,
+          flags: [],
+        },
+      ],
+    });
+    await openFinder();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Copy as text", hidden: true }));
+    });
+
+    expect(writeText).toHaveBeenCalledWith(
+      [
+        "Possible alternative dates for Dragons – Bears (Oberliga, matchday 3):",
+        "- Sat, 15.08.2026",
+        "- Sun, 09.08.2026",
+      ].join("\n"),
+    );
+  });
+
+});
+
+describe("MatchEditSheet opened on a day picked elsewhere", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    mocks.getMatch.mockResolvedValue({ match: makeMatch(), diffs: [] });
+    mocks.listTeams.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  async function renderWithPrefill(prefill: { date: string; time: string | null }) {
+    render(
+      wrap(
+        <MatchEditSheet matchId={7} open onOpenChange={() => {}} prefill={prefill} />,
+      ),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  }
+
+  it("lands the day and its kickoff in the override fields, unsaved", async () => {
+    await renderWithPrefill({ date: "2026-08-15", time: "17:00:00" });
+
+    expect(screen.getByRole("button", { name: "Date", hidden: true })).toHaveTextContent(
+      "15.08.2026",
+    );
+    expect(screen.getByLabelText("Time", { selector: "input" })).toHaveValue("17:00");
+    expect(mocks.updateMatch).not.toHaveBeenCalled();
+  });
+
+  it("leaves the kickoff alone when the day came without a suggested time", async () => {
+    await renderWithPrefill({ date: "2026-08-15", time: null });
+
+    expect(screen.getByRole("button", { name: "Date", hidden: true })).toHaveTextContent(
+      "15.08.2026",
+    );
+    // The match's own kickoff, untouched.
+    expect(screen.getByLabelText("Time", { selector: "input" })).toHaveValue("18:00");
+  });
 });

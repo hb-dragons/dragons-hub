@@ -5,9 +5,13 @@ import {
   clubDayAnchor,
   clubTimeAnchor,
   daysUntilKickoff,
+  eachClubDay,
   formatKickoffCompact,
+  formatKickoffDayShort,
   formatKickoffLong,
   formatKickoffShortNumeric,
+  clubWeekendDay,
+  clubWeekdayName,
   plusDaysInClubZone,
   resolveDateLocale,
   toClubDateString,
@@ -311,6 +315,23 @@ describe("formatKickoffLong", () => {
   });
 });
 
+describe("formatKickoffDayShort", () => {
+  it("renders the short weekday and a four-digit year", () => {
+    vi.stubEnv("TZ", "Europe/Berlin");
+    expect(formatKickoffDayShort("2026-04-25", "de-DE")).toBe("Sa, 25.04.2026");
+    expect(formatKickoffDayShort("2026-04-26", "en-US")).toBe("Sun, 26.04.2026");
+  });
+
+  it.each(ZONES)("is timezone independent (TZ=%s)", (tz) => {
+    vi.stubEnv("TZ", tz);
+    expect(formatKickoffDayShort("2026-04-25", "de-DE")).toBe("Sa, 25.04.2026");
+  });
+
+  it("returns the raw date for an unparseable input", () => {
+    expect(formatKickoffDayShort("garbage", "de-DE")).toBe("garbage");
+  });
+});
+
 describe("formatKickoffShortNumeric", () => {
   it.each(ZONES)("renders DD.MM.YY on the kickoff's own calendar day (TZ=%s)", (tz) => {
     // This is the HeadToHead formatter: it used to render 24.04.26 west of
@@ -356,5 +377,76 @@ describe("daysUntilKickoff", () => {
 
   it("is NaN for an unparseable kickoff date", () => {
     expect(Number.isNaN(daysUntilKickoff("garbage", new Date("2026-04-25T10:00:00Z")))).toBe(true);
+  });
+});
+
+describe("clubWeekdayName", () => {
+  it.each(ZONES)("names the calendar day's weekday regardless of device zone (TZ=%s)", (tz) => {
+    vi.stubEnv("TZ", tz);
+    // 2026-03-14 is a Saturday, 2026-03-15 a Sunday, 2026-03-16 a Monday.
+    expect(clubWeekdayName("2026-03-14")).toBe("saturday");
+    expect(clubWeekdayName("2026-03-15")).toBe("sunday");
+    expect(clubWeekdayName("2026-03-16")).toBe("monday");
+  });
+
+  it("stays correct across the club's DST transitions", () => {
+    vi.stubEnv("TZ", "Pacific/Kiritimati");
+    expect(clubWeekdayName("2026-03-29")).toBe("sunday"); // spring forward
+    expect(clubWeekdayName("2026-10-25")).toBe("sunday"); // fall back
+  });
+
+  it("returns null for a day that is not a real calendar day", () => {
+    expect(clubWeekdayName("2026-02-30")).toBeNull();
+    expect(clubWeekdayName("garbage")).toBeNull();
+  });
+});
+
+describe("clubWeekendDay", () => {
+  it("names Saturday and Sunday and nothing else", () => {
+    vi.stubEnv("TZ", "America/New_York");
+    expect(clubWeekendDay("2026-03-13")).toBeNull(); // Friday
+    expect(clubWeekendDay("2026-03-14")).toBe("saturday");
+    expect(clubWeekendDay("2026-03-15")).toBe("sunday");
+    expect(clubWeekendDay("2026-03-16")).toBeNull();
+  });
+
+  it("is null for an unparseable day", () => {
+    expect(clubWeekendDay("garbage")).toBeNull();
+  });
+});
+
+describe("eachClubDay", () => {
+  it("walks an inclusive range of calendar days", () => {
+    vi.stubEnv("TZ", "Pacific/Honolulu");
+    expect([...eachClubDay("2026-03-13", "2026-03-16")]).toEqual([
+      "2026-03-13",
+      "2026-03-14",
+      "2026-03-15",
+      "2026-03-16",
+    ]);
+  });
+
+  it("crosses a club DST boundary without dropping or repeating a day", () => {
+    vi.stubEnv("TZ", "UTC");
+    expect([...eachClubDay("2026-03-28", "2026-03-30")]).toEqual([
+      "2026-03-28",
+      "2026-03-29",
+      "2026-03-30",
+    ]);
+    expect([...eachClubDay("2026-10-24", "2026-10-26")]).toEqual([
+      "2026-10-24",
+      "2026-10-25",
+      "2026-10-26",
+    ]);
+  });
+
+  it("yields the single day when from equals to", () => {
+    expect([...eachClubDay("2026-03-14", "2026-03-14")]).toEqual(["2026-03-14"]);
+  });
+
+  it("yields nothing when the range runs backwards or is unparseable", () => {
+    expect([...eachClubDay("2026-03-16", "2026-03-14")]).toEqual([]);
+    expect([...eachClubDay("garbage", "2026-03-14")]).toEqual([]);
+    expect([...eachClubDay("2026-03-14", "garbage")]).toEqual([]);
   });
 });

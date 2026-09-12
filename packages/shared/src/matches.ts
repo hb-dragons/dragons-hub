@@ -1,4 +1,5 @@
 import type { BookingStatus, DiffStatus } from "./constants";
+import type { ClubWeekendDay } from "./kickoff";
 interface RefereeSlotReferee {
   id: number;
   firstName: string | null;
@@ -161,4 +162,96 @@ export interface MatchChangeHistoryItem {
 export interface MatchChangeHistoryResponse {
   changes: MatchChangeHistoryItem[];
   total: number;
+}
+
+/** An inclusive span of club calendar days, both ends `YYYY-MM-DD`. */
+export interface DateRange {
+  from: string;
+  to: string;
+}
+
+/**
+ * Which pile a candidate belongs in, and therefore what the panel shows for it.
+ * A home game splits into the days the club's hall is already booked and the
+ * days it is not; an away game has one pile, because the hall is the other
+ * club's problem.
+ */
+export type AlternativeDateGroup = "booked" | "unbooked" | "away";
+
+/**
+ * One of the club's hall bookings at the game's current venue on a candidate
+ * day. The effective window is the one actually agreed: an override time wins
+ * over the calculated one, per end, exactly as the booking screens show it.
+ */
+export interface AlternativeDateBooking {
+  id: number;
+  effectiveStartTime: string;
+  effectiveEndTime: string;
+  status: BookingStatus;
+  needsReconfirmation: boolean;
+}
+
+/**
+ * Why a candidate day deserves a second look. A flag informs, it never
+ * excludes: the federation may question a date outside the round window and a
+ * coach may be standing on another court that day, but whether either matters
+ * is the staff member's call, not the finder's (ADR-0010).
+ *
+ * A discriminated union rather than a code plus optional fields, so the team
+ * entry name exists exactly where it means something.
+ */
+export type AlternativeDateFlag =
+  /** Outside the min/max kickoff date of the same match day across the league. */
+  | { type: "outsideRoundWindow" }
+  /**
+   * Someone on the moving team entry also works with another team entry that
+   * plays that day. `teamEntryName` is that other entry, named as it is on
+   * screen.
+   */
+  | { type: "coachCollision"; teamEntryName: string };
+
+/**
+ * One weekend day a game to be rescheduled could move to: the day, which pile
+ * it belongs in, what the hall looks like that day, and what the finder has to
+ * say about it without refusing it.
+ */
+export interface AlternativeDateCandidate {
+  /** `YYYY-MM-DD` in the club's timezone. */
+  date: string;
+  weekday: ClubWeekendDay;
+  group: AlternativeDateGroup;
+  /**
+   * The club's bookings at the game's current venue that day. Empty for an away
+   * game and for a day in the `unbooked` group.
+   */
+  bookings: AlternativeDateBooking[];
+  /**
+   * `HH:mm:ss` directly after the last booked game — its kickoff plus that team
+   * entry's game duration plus the buffer after. Null whenever nothing is
+   * booked: the club's hall times are not modeled, so the finder has nothing to
+   * derive a kickoff from and must not invent one (ADR-0010).
+   */
+  suggestedKickoffTime: string | null;
+  /** Empty when nothing about the day needs saying — the common case. */
+  flags: AlternativeDateFlag[];
+}
+
+/**
+ * Why the candidate list may be incomplete. A code rather than prose: the
+ * caveat is shown to a staff member in their own locale, so the wording lives
+ * in the web app's messages, not in the API response.
+ */
+export type AlternativeDatesCaveat = "opponentGamesOutsideTrackedLeagues";
+
+export interface AlternativeDatesResponse {
+  /** Whether the home squad belongs to the club — who owes the hall. */
+  isHomeGame: boolean;
+  caveats: AlternativeDatesCaveat[];
+  /**
+   * The range the candidates were enumerated over, after the server filled in
+   * whatever the client left out. The date pickers show this back.
+   */
+  range: DateRange;
+  /** Ranked server-side: unflagged days before flagged, chronological within. */
+  candidates: AlternativeDateCandidate[];
 }

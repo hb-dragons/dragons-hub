@@ -266,17 +266,6 @@
       "active": "Active",
       "cancelled": "Cancelled",
       "forfeited": "Forfeited"
-    },
-    "reschedule": {
-      "trigger": "Suggest reschedule",
-      "title": "Reschedule assistant",
-      "description": "Describe your constraints; I'll suggest valid dates and venues.",
-      "placeholder": "e.g. next 3 weeks, prefer Saturday evenings, keep our gym",
-      "stop": "Stop",
-      "retry": "Retry",
-      "newChat": "Start a new chat",
-      "error": "Something went wrong. Please try again.",
-      "send": "Send"
     }
   },
   "matchDetail": {
@@ -294,6 +283,38 @@
       "date": "Date",
       "time": "Time",
       "venue": "Venue"
+    },
+    "alternativeDates": {
+      "trigger": "Find alternative dates",
+      "title": "Alternative dates",
+      "back": "Back to the game",
+      "caveats": {
+        "opponentGamesOutsideTrackedLeagues": "Games of the opponent outside the leagues we track are unknown."
+      },
+      "from": "From",
+      "to": "To",
+      "homeGame": "Home game",
+      "awayGame": "Away game",
+      "groups": {
+        "booked": "With a hall booking",
+        "unbooked": "Without a hall booking",
+        "away": "Away"
+      },
+      "noBooking": "no booking",
+      "awayVenue": "Hall: opponent",
+      "needsReconfirmation": "Needs re-confirmation",
+      "suggestedKickoff": "Suggested kickoff: {time}",
+      "loading": "Searching for dates",
+      "flags": {
+        "outsideRoundWindow": "Outside the round window",
+        "coachCollision": "Trainer also with {team}"
+      },
+      "empty": "No free weekend day in this range.",
+      "error": "The alternative dates could not be loaded.",
+      "copy": "Copy as text",
+      "copyHeader": "Possible alternative dates for {home} – {guest} ({league}, matchday {matchDay}):",
+      "copied": "Alternative dates copied.",
+      "copyFailed": "Copying was not possible."
     },
     "score": {
       "title": "Score",
@@ -392,10 +413,7 @@
       "fieldCleared": "{field}: cleared (was {oldValue})",
       "showMore": "Load more"
     },
-    "edit": "Edit",
-    "reschedule": {
-      "trigger": "Suggest reschedule"
-    }
+    "edit": "Edit"
   },
   "sync": {
     "title": "Sync Management",
