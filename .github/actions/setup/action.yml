@@ -32,19 +32,29 @@ runs:
       run: pnpm install --frozen-lockfile
       shell: bash
 
+    # The three remote-cache steps need the GCP workload identity secrets.
+    # Runs triggered by dependabot[bot] get the Dependabot secret store, which
+    # does not hold them, so the inputs arrive empty; google-github-actions/auth
+    # then fails the whole job before any repo code runs (issue #340). Skip the
+    # cache instead: the job builds from scratch, which is slower but correct.
+    - name: Turbo remote cache unavailable
+      if: inputs.turbo-cache == 'true' && inputs.gcp-workload-identity-provider == ''
+      run: echo "::notice::Turbo remote cache off — no GCP workload identity provider in this run (dependabot runs carry no repository secrets)."
+      shell: bash
+
     - name: Authenticate to Google Cloud
-      if: inputs.turbo-cache == 'true'
+      if: inputs.turbo-cache == 'true' && inputs.gcp-workload-identity-provider != ''
       uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
       with:
         workload_identity_provider: ${{ inputs.gcp-workload-identity-provider }}
         service_account: ${{ inputs.gcp-service-account }}
 
     - name: Set up Cloud SDK
-      if: inputs.turbo-cache == 'true'
+      if: inputs.turbo-cache == 'true' && inputs.gcp-workload-identity-provider != ''
       uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
 
     - name: Start Turbo cache proxy
-      if: inputs.turbo-cache == 'true'
+      if: inputs.turbo-cache == 'true' && inputs.gcp-workload-identity-provider != ''
       run: |
         gcloud run services proxy dragons-turbo-cache-production --region=europe-west3 --port=9080 &
         sleep 2
