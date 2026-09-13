@@ -3,6 +3,7 @@ import * as migration_20260803_135820_strapi_migration_schema from './20260803_1
 import * as migration_20260830_133823_add_teams_order from './20260830_133823_add_teams_order';
 import * as migration_20260830_133916_drop_teams_order_index from './20260830_133916_drop_teams_order_index';
 import * as migration_20260904_102644_drop_trainers_and_league_fields from './20260904_102644_drop_trainers_and_league_fields';
+import * as migration_20260905_113450_drop_people_phone from './20260905_113450_drop_people_phone';
 
 export const migrations = [
   {
@@ -23,11 +24,16 @@ export const migrations = [
   {
     up: migration_20260830_133916_drop_teams_order_index.up,
     down: migration_20260830_133916_drop_teams_order_index.down,
-    name: '20260830_133916_drop_teams_order_index'
+    name: '20260830_133916_drop_teams_order_index',
   },
   {
     up: migration_20260904_102644_drop_trainers_and_league_fields.up,
     down: migration_20260904_102644_drop_trainers_and_league_fields.down,
-    name: '20260904_102644_drop_trainers_and_league_fields'
+    name: '20260904_102644_drop_trainers_and_league_fields',
+  },
+  {
+    up: migration_20260905_113450_drop_people_phone.up,
+    down: migration_20260905_113450_drop_people_phone.down,
+    name: '20260905_113450_drop_people_phone'
   },
 ];
