@@ -49,6 +49,7 @@ function mockApi() {
       listTasks: rec("boards.listTasks"),
       getTask: rec("boards.getTask"),
     },
+    seasons: { list: rec("seasons.list"), getLeagues: rec("seasons.getLeagues") },
   } as unknown as Api;
   return { api, calls };
 }
@@ -511,5 +512,23 @@ describe("makeQueries", () => {
     expect(q.key).toBe(SWR_KEYS.taskDetail(10));
     await q.fetcher();
     expect(calls[0]).toEqual({ method: "boards.getTask", args: [10] });
+  });
+
+  // --- seasons ---
+  it("seasons(): key + dispatch to seasons.list()", async () => {
+    const { api, calls } = mockApi();
+    const q = makeQueries(api).seasons();
+    expect(q.key).toBe(SWR_KEYS.seasons);
+    await q.fetcher();
+    expect(calls[0]).toEqual({ method: "seasons.list", args: [] });
+  });
+
+  it("seasonLeagues(seasonId): key + dispatch to seasons.getLeagues(seasonId)", async () => {
+    const { api, calls } = mockApi();
+    const q = makeQueries(api).seasonLeagues(4);
+    expect(q.key).toBe(SWR_KEYS.seasonLeagues(4));
+    expect(q.key).toBe("/admin/seasons/4/leagues");
+    await q.fetcher();
+    expect(calls[0]).toEqual({ method: "seasons.getLeagues", args: [4] });
   });
 });

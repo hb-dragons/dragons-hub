@@ -59,7 +59,8 @@ describe("GET /teams", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(teams);
-    expect(mocks.getOwnClubTeams).toHaveBeenCalledOnce();
+    // No season named: the service resolves the active one itself.
+    expect(mocks.getOwnClubTeams).toHaveBeenCalledExactlyOnceWith(undefined);
   });
 
   it("returns empty array when no own club teams", async () => {
@@ -69,6 +70,24 @@ describe("GET /teams", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual([]);
+  });
+
+  // The season selector is the feature's headline control; this is its wiring.
+  it("forwards ?seasonId= to the service as a number", async () => {
+    mocks.getOwnClubTeams.mockResolvedValue([]);
+
+    const res = await app.request("/teams?seasonId=7");
+
+    expect(res.status).toBe(200);
+    expect(mocks.getOwnClubTeams).toHaveBeenCalledExactlyOnceWith(7);
+  });
+
+  it("returns 400 for a non-numeric seasonId without reaching the service", async () => {
+    const res = await app.request("/teams?seasonId=abc");
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(mocks.getOwnClubTeams).not.toHaveBeenCalled();
   });
 });
 

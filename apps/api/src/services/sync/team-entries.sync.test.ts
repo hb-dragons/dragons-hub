@@ -5,6 +5,10 @@ const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 vi.mock("../../config/database", () => ({
   getDb: () => new Proxy({}, { get: (_t, p) => (dbHolder.ref as Record<string | symbol, unknown>)[p] }),
 }));
+// One shared child logger, so the skip warning and the reconcile error can be
+// asserted on; the seeding service's own child lands on the same spies.
+const log = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }));
+vi.mock("../../config/logger", () => ({ logger: { ...log, child: () => log } }));
 
 import { syncTeamEntriesFromData } from "./team-entries.sync";
 import type { LeagueFetchedData } from "./data-fetcher";
@@ -283,5 +287,53 @@ describe("syncTeamEntriesFromData", () => {
     expect(res.conflicts).toBe(1);
     const rows = await ctx.client.query(`SELECT league_id FROM team_entries WHERE team_id = $1`, [squad]);
     expect(rows.rows).toEqual([{ league_id: lowerLiga }]);
+  });
+
+  it("warns and skips a squad that has league evidence but no teams row", async () => {
+    await seedClubConfig(100);
+    const season = await seedSeason("2026/27", "active");
+    const league = await seedLeague(78, "U10", season);
+    // No seedTeam on purpose: teams.sync already ran this run, so a missing
+    // row is a fault worth a log line, not a normal first-run state.
+
+    const res = await syncTeamEntriesFromData([
+      leagueData({ leagueApiId: 78, leagueDbId: league, seasonRefId: season, tabelle: [{ team: ref(6017, "Dragons U10", 100) } as never] }),
+    ]);
+
+    expect(res).toMatchObject({ total: 0, created: 0, errors: [] });
+    expect(log.warn).toHaveBeenCalledExactlyOnceWith(
+      { permanentId: 6017, seasonRefId: season, leagueDbId: league },
+      expect.stringContaining("no teams row"),
+    );
+    expect((await ctx.client.query(`SELECT id FROM team_entries`)).rows).toEqual([]);
+  });
+
+  it("records a reconcile failure for one squad and keeps going with the rest", async () => {
+    await seedClubConfig(100);
+    const season = await seedSeason("2026/27", "active");
+    const league = await seedLeague(79, "U10", season);
+    const broken = await seedTeam(6018, "Dragons U10 A");
+    const fine = await seedTeam(6019, "Dragons U10 B");
+    // A league db id that does not exist: the entry insert trips the foreign
+    // key, the kind of per-squad failure the loop has to survive instead of
+    // aborting the run.
+    const missingLeague = league + 1000;
+
+    const res = await syncTeamEntriesFromData([
+      leagueData({ leagueApiId: 80, leagueDbId: missingLeague, seasonRefId: season, tabelle: [{ team: ref(6018, "Dragons U10 A", 100) } as never] }),
+      leagueData({ leagueApiId: 79, leagueDbId: league, seasonRefId: season, tabelle: [{ team: ref(6019, "Dragons U10 B", 100) } as never] }),
+    ]);
+
+    expect(res.total).toBe(2);
+    expect(res.created).toBe(1);
+    expect(res.errors).toHaveLength(1);
+    expect(res.errors[0]).toMatch(/^Entry reconcile failed for team 6018: /);
+    expect(log.error).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ permanentId: 6018 }),
+      "Entry reconcile failed",
+    );
+    const rows = await ctx.client.query<{ team_id: number }>(`SELECT team_id FROM team_entries`);
+    expect(rows.rows.map((r) => r.team_id)).toEqual([fine]);
+    expect(rows.rows.map((r) => r.team_id)).not.toContain(broken);
   });
 });

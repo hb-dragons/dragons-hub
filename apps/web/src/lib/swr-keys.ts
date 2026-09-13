@@ -104,4 +104,5 @@ export const SWR_KEYS = {
   refereeGameByApiMatch: (apiMatchId: number) =>
     `/referee/games/by-api-match/${apiMatchId}`,
   seasons: "/admin/seasons",
+  seasonLeagues: (seasonId: number) => `/admin/seasons/${seasonId}/leagues`,
 } as const;

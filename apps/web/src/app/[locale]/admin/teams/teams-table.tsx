@@ -256,10 +256,7 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
   const seasonsQ = queries.seasons();
   const { data: seasons } = useSWR(seasonsQ.key, seasonsQ.fetcher);
   const resolvedSeasonId = seasonId ?? seasons?.find((s) => s.status === "active")?.id;
-  const leaguesQ = resolvedSeasonId !== undefined ? {
-    key: `/admin/seasons/${resolvedSeasonId}/leagues`,
-    fetcher: () => api.seasons.getLeagues(resolvedSeasonId),
-  } : null;
+  const leaguesQ = resolvedSeasonId !== undefined ? queries.seasonLeagues(resolvedSeasonId) : null;
   const { data: trackedLeagues } = useSWR(leaguesQ?.key ?? null, leaguesQ?.fetcher ?? null);
   const { mutate } = useSWRConfig();
   const teamsList = teams ?? [];

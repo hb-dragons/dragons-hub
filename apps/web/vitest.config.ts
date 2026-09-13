@@ -49,8 +49,14 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
       thresholds: {
-        // Measured floor 2026-07-27, ratcheted up from 29/32/37/36 after the
-        // #129 + #132 batch landed. Actual: 35.40 branches / 39.20 functions /
+        // Measured floor 2026-09-05 (issue #229), ratcheted up from
+        // 35/39/43/42. Actual: 42.15 branches / 46.57 functions / 51.36 lines /
+        // 50.25 statements. The old numbers had drifted 7-8 points below
+        // actual across the seasons, team staff and referee-hub work that
+        // landed since the prior measurement without moving them.
+        //
+        // Prior floor measured 2026-07-27, ratcheted up from 29/32/37/36 after
+        // the #129 + #132 batch landed. Actual: 35.40 branches / 39.20 functions /
         // 43.73 lines / 42.87 statements — roughly +5 points, from #132
         // un-skipping two files (6 dead tests became 9 live ones) and #129
         // adding tests alongside its i18n/a11y work. #132 deliberately left the
@@ -61,10 +67,10 @@ export default defineConfig({
         // 9/10/12/12 after the old numbers had drifted ~25 points below actual,
         // leaving enough slack to delete a quarter of the suite with CI green.
         // Ratchet up over time; never lower.
-        branches: 35,
-        functions: 39,
-        lines: 43,
-        statements: 42,
+        branches: 42,
+        functions: 46,
+        lines: 51,
+        statements: 50,
       },
     },
   },
