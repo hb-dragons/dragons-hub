@@ -14,6 +14,7 @@ import PageHeader from "../../components/PageHeader.astro";
 import NextPrevGame from "../../components/teams/NextPrevGame";
 import TeamTabs from "../../components/teams/TeamTabs";
 import TeamTrainer from "../../components/teams/TeamTrainer.astro";
+import TrainingTimes from "../../components/teams/TrainingTimes.astro";
 import { apiBase } from "../../lib/api-base";
 import { fetchBuildPlan, prevNextGames, teamGames } from "../../lib/full-plan";
 import { sportsTeam } from "../../lib/jsonld";
@@ -87,6 +88,10 @@ const jsonLd = sportsTeam({
 
   <PageContainer class="space-y-4 md:space-y-8 lg:space-y-12">
     <TeamTrainer teamImage={teamImage} leagueName={leagueName} trainer={trainer} />
+
+    {/* Training times sit with the team facts (photo, coach) ahead of the
+        game band; the block renders nothing when the CMS has no rows (#334). */}
+    <TrainingTimes trainingTimes={team.trainingTimes} />
 
     <NextPrevGame
       client:visible

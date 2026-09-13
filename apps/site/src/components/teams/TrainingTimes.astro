@@ -1,0 +1,74 @@
+---
+/**
+ * "Trainingszeiten" block on the team detail page (issue #334): one card per
+ * CMS training slot — day, time range, gym (linked to `gymMapsUrl` when the
+ * editor set one) and the optional info line. The heading and card frame
+ * follow the game band next to it (NextPrevGame / GameCard): same heading
+ * scale, `bg-card border-2 rounded-md` frame, mono time like the tip-off
+ * time on the cards, and the inlined Lucide map-pin the venue strip uses
+ * (the site ships no icon library). Renders nothing for a team without
+ * training times, so the page layout closes up instead of showing an empty
+ * heading.
+ */
+import { strings } from "../../lib/strings";
+import { trainingTimeRows, type TrainingTimeInput } from "../../lib/training-times";
+
+interface Props {
+  trainingTimes: readonly TrainingTimeInput[] | null | undefined;
+}
+
+const rows = trainingTimeRows(Astro.props.trainingTimes);
+---
+
+{
+  rows.length > 0 && (
+    <section class="flex flex-col gap-2 md:gap-4 items-center">
+      <h2 class="text-xl md:text-2xl lg:text-3xl font-bold text-foreground text-center">
+        {strings.teams.trainingTimesHeading}
+      </h2>
+      <ul class="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
+        {rows.map((row) => (
+          <li class="flex flex-col gap-1 bg-card border-2 rounded-md px-3 py-2 md:px-4 md:py-3">
+            <div class="flex items-baseline justify-between gap-2">
+              <span class="uppercase font-semibold text-sm md:text-base">{row.day}</span>
+              <span class="font-mono font-bold text-base md:text-lg whitespace-nowrap">
+                {row.time}
+              </span>
+            </div>
+            <div class="flex items-center gap-1 min-w-0 font-semibold text-sm md:text-base">
+              <svg
+                width="1em"
+                height="1em"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                class="shrink-0"
+              >
+                <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              {row.mapsHref ? (
+                <a
+                  href={row.mapsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={strings.teams.trainingMapTitle}
+                  class="truncate hover:text-primary underline-offset-2 hover:underline"
+                >
+                  {row.gym}
+                </a>
+              ) : (
+                <span class="truncate">{row.gym}</span>
+              )}
+            </div>
+            {row.info && <p class="text-sm text-muted-foreground">{row.info}</p>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
