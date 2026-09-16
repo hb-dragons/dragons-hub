@@ -82,6 +82,10 @@ describe("classifyUrgency", () => {
     expect(classifyUrgency(EVENT_TYPES.MATCH_FORFEITED, {})).toBe("immediate");
   });
 
+  it("classifies booking.hall_time.missing as immediate", () => {
+    expect(classifyUrgency(EVENT_TYPES.BOOKING_HALL_TIME_MISSING, {})).toBe("immediate");
+  });
+
   it("classifies booking.needs_reconfirmation as immediate", () => {
     expect(
       classifyUrgency(EVENT_TYPES.BOOKING_NEEDS_RECONFIRMATION, {}),

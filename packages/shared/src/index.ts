@@ -47,6 +47,7 @@ export type {
   AlternativeDateBooking,
   AlternativeDateCandidate,
   AlternativeDateGroup,
+  AlternativeDateHallTime,
   AlternativeDateFlag,
   AlternativeDatesCaveat,
   AlternativeDatesResponse,
@@ -273,3 +274,21 @@ export type {
   BroadcastConfig,
   AdminBroadcastMatchListItem,
 } from "./broadcast";
+
+// Hall times (Hallenzeiten): types, Anlage T parser, coverage
+export { HALL_TIME_KINDS, HALL_TIME_SOURCES } from "./hall-times";
+export type {
+  HallTimeKind,
+  HallTimeSource,
+  HallTimeInput,
+  HallTimeRow,
+  HallTimeCoverage,
+  BookingHallTime,
+  HallTimeImportBookingChange,
+  HallTimeImportPreview,
+  HallTimeImportResult,
+} from "./hall-times";
+export { parseAnlageT } from "./hall-times/anlage-t";
+export type { AnlageTParseResult } from "./hall-times/anlage-t";
+export { coverageFor, hallTimeCoverage } from "./hall-times/coverage";
+export type { CoverageResult } from "./hall-times/coverage";

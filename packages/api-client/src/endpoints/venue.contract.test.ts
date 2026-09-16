@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { venueSearchQuerySchema } from "@dragons/contracts";
+import {
+  venueSearchQuerySchema,
+  hallTimeListQuerySchema,
+  hallTimeImportBodySchema,
+  hallTimeUpsertBodySchema,
+} from "@dragons/contracts";
 import { ApiClient } from "../client";
 import { venueEndpoints } from "./venue";
 
@@ -58,5 +63,42 @@ describe("venue read endpoints target the right path + verb", () => {
     const url = new URL(calls[0]!.url);
     expect(url.pathname).toBe("/admin/venues");
     expect(calls[0]!.method).toBe("GET");
+  });
+});
+
+describe("hall-time request bodies + queries satisfy @dragons/contracts schemas", () => {
+  const open = { date: "2026-09-19", kind: "open" as const, startTime: "10:00", endTime: "22:00", note: null };
+
+  it("hallTimes query parses against hallTimeListQuerySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.hallTimes(7, { from: "2026-09-01", to: "2026-09-30" });
+    const url = new URL(calls[0]!.url);
+    expect(url.pathname).toBe("/admin/venues/7/hall-times");
+    expect(
+      hallTimeListQuerySchema.safeParse(Object.fromEntries(url.searchParams)).error?.issues,
+    ).toBeUndefined();
+  });
+
+  it("import preview + apply bodies parse against hallTimeImportBodySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.previewHallTimeImport(7, { rows: [open], updatedOn: "2026-09-14" });
+    await api.importHallTimes(7, { rows: [open] });
+    expect(calls.map((c) => [new URL(c.url).pathname, c.method])).toEqual([
+      ["/admin/venues/7/hall-times/import/preview", "POST"],
+      ["/admin/venues/7/hall-times/import", "POST"],
+    ]);
+    for (const call of calls) {
+      expect(hallTimeImportBodySchema.safeParse(call.body).error?.issues).toBeUndefined();
+    }
+  });
+
+  it("upsert body parses against hallTimeUpsertBodySchema and delete targets the day", async () => {
+    const { api, calls } = recordingClient();
+    await api.upsertHallTime(7, "2026-09-19", { kind: "closed", startTime: null, endTime: null, note: "Ferien" });
+    await api.deleteHallTime(7, "2026-09-19");
+    expect(new URL(calls[0]!.url).pathname).toBe("/admin/venues/7/hall-times/2026-09-19");
+    expect(calls[0]!.method).toBe("PUT");
+    expect(hallTimeUpsertBodySchema.safeParse(calls[0]!.body).error?.issues).toBeUndefined();
+    expect(calls[1]!.method).toBe("DELETE");
   });
 });

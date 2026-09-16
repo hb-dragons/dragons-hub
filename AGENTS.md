@@ -43,6 +43,7 @@ League (1) ──── (N) Match
 
 Venue (1) ──── (N) Match
      (1) ──── (N) VenueBooking
+     (1) ──── (N) VenueHallTime (unique: venueId + date)
 
 VenueBooking (N) ──── (N) Match (via VenueBookingMatch join table)
 
@@ -97,7 +98,7 @@ Match (0..1) ──── (N) BroadcastConfig (PK deviceId — one row per score
 
 ### Database Tables
 
-48 tables, all exported from `packages/db/src/schema/index.ts`. The list below is
+49 tables, all exported from `packages/db/src/schema/index.ts`. The list below is
 verified against those exports by `apps/api/src/test/docs-drift.test.ts` in both
 directions — adding a `pgTable` without a row here fails the build.
 
@@ -130,6 +131,7 @@ tables (`user`, `session`, `account`, `verification`) use text ids,
 | `matchChanges` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), track (remote/local), fieldName, oldValue, newValue |
 | `matchOverrides` | `packages/db/src/schema/match-overrides.ts` | matchId FK (cascade), fieldName, reason, changedBy — unique(matchId, fieldName) |
 | `venueBookings` | `packages/db/src/schema/venue-bookings.ts` | venueId FK, date, calculatedStartTime/EndTime, overrideStartTime/EndTime, status, needsReconfirmation, confirmedBy |
+| `venueHallTimes` | `packages/db/src/schema/venue-hall-times.ts` | venueId FK, date (unique with venueId), kind (open/closed), startTime/endTime, note, source (anlage_t/manual) — the hall time the club holds per its Mietantrag; bookings are judged against it at read time |
 | `venueBookingMatches` | `packages/db/src/schema/venue-booking-matches.ts` | venueBookingId FK (cascade), matchId FK — unique(venueBookingId, matchId) |
 | `boards` | `packages/db/src/schema/boards.ts` | name, description, createdBy |
 | `boardColumns` | `packages/db/src/schema/boards.ts` | boardId FK (cascade), name, position, color, isDoneColumn |
@@ -415,6 +417,7 @@ Event types are defined in `packages/shared/src/domain-events.ts`. Events are pu
 - `booking.created` — Venue booking created
 - `booking.status.changed` — Booking status or times updated
 - `booking.needs_reconfirmation` — Booking flagged for reconfirmation
+- `booking.hall_time.missing` — Booking window outside the hall time the club holds that day (or no hall time, or hall closed): a rental request is still owed to the city. Emitted once per transition out of `covered`, by sync reconcile and by an Anlage T import
 
 ### Override Events
 
@@ -668,6 +671,11 @@ nested under their task.
 |--------|------|-------------|
 | GET | `/admin/venues` | List venues |
 | GET | `/admin/venues/search` | Search venues by name. Query: `q` |
+| GET | `/admin/venues/:id/hall-times` | Hall times the club holds at a venue. Query: `from`, `to` |
+| POST | `/admin/venues/:id/hall-times/import/preview` | Diff Anlage T rows against stored hall times; lists bookings whose coverage changes; writes nothing (`venue:update`) |
+| POST | `/admin/venues/:id/hall-times/import` | Apply Anlage T rows: replace sheet rows inside the sheet span, emit `booking.hall_time.missing` (`venue:update`) |
+| PUT | `/admin/venues/:id/hall-times/:date` | Create or replace one day's hall time by hand (`venue:update`) |
+| DELETE | `/admin/venues/:id/hall-times/:date` | Remove one day's hall time (`venue:update`) |
 
 ### Admin - Users
 

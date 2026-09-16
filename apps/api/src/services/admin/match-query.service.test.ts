@@ -502,6 +502,7 @@ describe("getOwnClubMatches — row decoration", () => {
       id: booking!.id,
       status: "confirmed",
       needsReconfirmation: true,
+      hallTimeCoverage: "uncovered",
     });
     expect(decorated.venueName).toBe("Sporthalle Nord");
     expect(bare.overriddenFields).toEqual([]);
@@ -819,6 +820,7 @@ describe("getMatchDetail", () => {
       id: booking!.id,
       status: "pending",
       needsReconfirmation: false,
+      hallTimeCoverage: "uncovered",
     });
     expect(result!.match.refereeSlots!.map((s) => s.slotNumber)).toEqual([1, 2, 3]);
     // The overridden field surfaces in the diff tail (computeDiffs runs for real).

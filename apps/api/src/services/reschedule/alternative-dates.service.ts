@@ -8,9 +8,11 @@ import {
   teams,
   venueBookingMatches,
   venueBookings,
+  venueHallTimes,
 } from "@dragons/db/schema";
 import {
   clubWeekendDay,
+  coverageFor,
   eachClubDay,
   teamDisplayName,
   todayInClubZone,
@@ -20,6 +22,8 @@ import type {
   AlternativeDateBooking,
   AlternativeDateCandidate,
   AlternativeDateFlag,
+  AlternativeDateGroup,
+  AlternativeDateHallTime,
   AlternativeDatesResponse,
   DateRange,
 } from "@dragons/shared";
@@ -76,19 +80,24 @@ export async function findAlternativeDates(
 
   const isHomeGame = match.homeIsOwnClub === true;
   const range = await resolveRange(match.leagueId, params);
-  const [busyDays, roundWindow, collisions, bookedDays] = await Promise.all([
+  const asksAfterHall = isHomeGame && match.venueId != null;
+  const [busyDays, roundWindow, collisions, hallTimes] = await Promise.all([
     loadBusyDays(matchId, [match.homeTeamApiId, match.guestTeamApiId], range),
     loadRoundWindow(match.leagueId, match.matchDay),
     loadCoachCollisions(match, range),
     // Only a home game asks after the hall: on an away day the venue belongs to
-    // the other club and its booking, if we even have one, means nothing here.
-    // A home game the federation has named no venue for reads as unbooked,
-    // which is what it is — there is no hall to hold a booking, and the staff
-    // member has to settle that before a kickoff can be suggested for it.
-    isHomeGame && match.venueId != null
-      ? loadBookedDays(match.venueId, range)
-      : Promise.resolve(new Map<string, BookedDay>()),
+    // the other club and its booking or hall time, if we even have one, means
+    // nothing here. A home game the federation has named no venue for reads
+    // as unbooked, which is what it is — there is no hall to hold a booking,
+    // and the staff member has to settle that before a kickoff can be
+    // suggested for it.
+    asksAfterHall
+      ? loadHallTimes(match.venueId!, range)
+      : Promise.resolve(new Map<string, AlternativeDateHallTime>()),
   ]);
+  const bookedDays = asksAfterHall
+    ? await loadBookedDays(match.venueId!, range, hallTimes)
+    : new Map<string, BookedDay>();
 
   const candidates: AlternativeDateCandidate[] = [];
   for (const day of eachClubDay(range.from, range.to)) {
@@ -102,17 +111,20 @@ export async function findAlternativeDates(
         group: "away",
         bookings: [],
         suggestedKickoffTime: null,
+        hallTime: null,
         flags,
       });
       continue;
     }
     const booked = bookedDays.get(day);
+    const hallTime = hallTimes.get(day) ?? null;
     candidates.push({
       date: day,
       weekday,
-      group: booked ? "booked" : "unbooked",
+      group: groupFor(booked, hallTime),
       bookings: booked?.bookings ?? [],
       suggestedKickoffTime: booked?.suggestedKickoffTime ?? null,
+      hallTime,
       flags,
     });
   }
@@ -128,18 +140,58 @@ export async function findAlternativeDates(
 }
 
 /**
+ * Which pile a home-game day belongs in. A booking names the pile whatever
+ * the hall time says — the day already carries our games, and the coverage on
+ * each booking tells the rest. Without one, the hall time decides: held,
+ * closed, or nothing known.
+ */
+function groupFor(
+  booked: BookedDay | undefined,
+  hallTime: AlternativeDateHallTime | null,
+): AlternativeDateGroup {
+  if (booked) return "booked";
+  if (!hallTime) return "unbooked";
+  return hallTime.kind === "closed" ? "closed" : "hallTimeOpen";
+}
+
+/**
+ * How little a day still needs from the town, lowest first:
+ *
+ * 0. booked, and every booking sits inside the hall time we hold — nothing to ask
+ * 1. hall time held, nothing booked yet — the hall is ours, only the game moves
+ * 2. booked, but a booking sticks out of the hall time (or there is none) — a
+ *    request is owed either way, though the day already has our programme
+ * 3. neither — a request from scratch
+ * 4. the hall is closed that day — the town has already said no
+ */
+function tierOf(c: AlternativeDateCandidate): number {
+  switch (c.group) {
+    case "booked":
+      return c.bookings.every((b) => b.hallTimeCoverage === "covered") ? 0 : 2;
+    case "hallTimeOpen":
+      return 1;
+    case "unbooked":
+      return 3;
+    case "closed":
+      return 4;
+    case "away":
+      return 0;
+  }
+}
+
+/**
  * The order the panel and the copy text both use, so the mail to the other club
  * leads with the days nobody will argue about:
  *
- * 1. Days the hall is already ours come first — they need no new request to
- *    the town. An away game has one group and this step leaves it untouched.
- * 2. Inside a group, unflagged days before flagged ones.
+ * 1. Days that need the least from the town come first (see `tierOf`). An
+ *    away game has one group and this step leaves it untouched.
+ * 2. Inside a tier, unflagged days before flagged ones.
  * 3. Inside that, the list reads like a calendar.
  */
 function rank(candidates: AlternativeDateCandidate[]): AlternativeDateCandidate[] {
   return [...candidates].sort(
     (a, b) =>
-      Number(a.group === "unbooked") - Number(b.group === "unbooked") ||
+      tierOf(a) - tierOf(b) ||
       Number(a.flags.length > 0) - Number(b.flags.length > 0) ||
       a.date.localeCompare(b.date),
   );
@@ -361,6 +413,7 @@ interface BookedDay {
 async function loadBookedDays(
   venueId: number,
   range: DateRange,
+  hallTimes: ReadonlyMap<string, AlternativeDateHallTime>,
 ): Promise<Map<string, BookedDay>> {
   const bookings = await getDb()
     .select({
@@ -396,19 +449,64 @@ async function loadBookedDays(
       bookings: [],
       suggestedKickoffTime: suggestKickoff(gamesByBooking.get(booking.id) ?? [], config),
     };
+    // An override end without an override start, or the other way round, is
+    // half an agreement: each end stands on its own, as the booking screens
+    // already show them.
+    const effectiveStartTime = booking.overrideStartTime ?? booking.calculatedStartTime;
+    const effectiveEndTime = booking.overrideEndTime ?? booking.calculatedEndTime;
     entry.bookings.push({
       id: booking.id,
-      // An override end without an override start, or the other way round, is
-      // half an agreement: each end stands on its own, as the booking screens
-      // already show them.
-      effectiveStartTime: booking.overrideStartTime ?? booking.calculatedStartTime,
-      effectiveEndTime: booking.overrideEndTime ?? booking.calculatedEndTime,
+      effectiveStartTime,
+      effectiveEndTime,
       status: booking.status,
       needsReconfirmation: booking.needsReconfirmation,
+      hallTimeCoverage: coverageFor(
+        { start: effectiveStartTime, end: effectiveEndTime },
+        hallTimes.get(booking.date) ?? null,
+      ).status,
     });
     days.set(booking.date, entry);
   }
   return days;
+}
+
+/**
+ * The hall times the club holds at one venue inside the range, keyed by day —
+ * the Anlage T as imported, plus whatever was entered by hand. Times come back
+ * as the sheet writes them (HH:mm), which is how every hall-time screen shows
+ * them.
+ */
+async function loadHallTimes(
+  venueId: number,
+  range: DateRange,
+): Promise<Map<string, AlternativeDateHallTime>> {
+  const rows = await getDb()
+    .select({
+      date: venueHallTimes.date,
+      kind: venueHallTimes.kind,
+      startTime: venueHallTimes.startTime,
+      endTime: venueHallTimes.endTime,
+      note: venueHallTimes.note,
+    })
+    .from(venueHallTimes)
+    .where(
+      and(
+        eq(venueHallTimes.venueId, venueId),
+        gte(venueHallTimes.date, range.from),
+        lte(venueHallTimes.date, range.to),
+      ),
+    );
+  return new Map(
+    rows.map((r) => [
+      r.date,
+      {
+        kind: r.kind,
+        startTime: r.startTime?.slice(0, 5) ?? null,
+        endTime: r.endTime?.slice(0, 5) ?? null,
+        note: r.note,
+      },
+    ]),
+  );
 }
 
 /**

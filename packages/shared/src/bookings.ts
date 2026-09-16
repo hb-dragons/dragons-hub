@@ -1,4 +1,5 @@
 import type { BookingStatus } from "./constants";
+import type { BookingHallTime } from "./hall-times";
 
 // ── Reconcile preview types ─────────────────────────────────────────────────
 
@@ -88,6 +89,8 @@ export interface BookingListItem {
   needsReconfirmation: boolean;
   notes: string | null;
   matchCount: number;
+  /** The hall time of the booking's day, with how the window sits in it; null when the club holds no hall time that day. */
+  hallTime: BookingHallTime | null;
 }
 
 export interface BookingDetail {
@@ -110,4 +113,5 @@ export interface BookingDetail {
   createdAt: string;
   updatedAt: string;
   matches: BookingMatch[];
+  hallTime: BookingHallTime | null;
 }

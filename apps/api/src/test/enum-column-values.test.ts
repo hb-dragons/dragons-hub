@@ -70,6 +70,8 @@ const ENUM_COLUMNS: readonly EnumColumn[] = [
   { table: "sync_run_entries", column: "action", constant: "ENTRY_ACTIONS" },
   { table: "tasks", column: "priority", constant: "TASK_PRIORITIES" },
   { table: "venue_bookings", column: "status", constant: "BOOKING_STATUSES" },
+  { table: "venue_hall_times", column: "kind", constant: "HALL_TIME_KINDS" },
+  { table: "venue_hall_times", column: "source", constant: "HALL_TIME_SOURCES" },
   {
     table: "domain_events",
     column: "type",

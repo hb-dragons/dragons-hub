@@ -1383,3 +1383,128 @@ describe("reconcileBookingsForMatches — forfeited/cancelled handling", () => {
     expect(links[0]!.match_id).toBe(activeMatch);
   });
 });
+
+describe("reconcileBookingsForMatches — hall time coverage events", () => {
+  async function insertHallTime(venueId: number, date: string, startTime: string, endTime: string) {
+    await ctx.client.query(
+      `INSERT INTO venue_hall_times (venue_id, date, kind, start_time, end_time, source)
+       VALUES ($1, $2, 'open', $3, $4, 'anlage_t')`,
+      [venueId, date, startTime, endTime],
+    );
+  }
+
+  async function hallTimeEvents() {
+    const result = await ctx.client.query(
+      "SELECT entity_id, payload, enqueued_at FROM domain_events WHERE type = $1 ORDER BY id",
+      ["booking.hall_time.missing"],
+    );
+    return result.rows as { entity_id: number; payload: Record<string, unknown>; enqueued_at: unknown }[];
+  }
+
+  it("emits booking.hall_time.missing for a new booking the club holds no hall time for", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    const matchId = await insertMatch({ venue_id: venueId, kickoff_time: "18:00:00" });
+
+    await reconcileBookingsForMatches([matchId]);
+
+    const events = await hallTimeEvents();
+    expect(events).toHaveLength(1);
+    const bookings = await getBookings();
+    expect(events[0]!.entity_id).toBe(bookings[0]!.id);
+    expect(events[0]!.payload).toMatchObject({
+      venueId,
+      venueName: "Sporthalle Am Park",
+      date: "2025-03-15",
+      startTime: "17:00:00",
+      endTime: "20:30:00",
+      coverage: "uncovered",
+      hallTime: null,
+    });
+    // Emitted via the tx path: left for the outbox poller, not enqueued mid-flight.
+    expect(events[0]!.enqueued_at).toBeNull();
+  });
+
+  it("emits nothing for a new booking inside the hall time, and nothing on a repeat reconcile", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    await insertHallTime(venueId, "2025-03-15", "10:00:00", "22:00:00");
+    const matchId = await insertMatch({ venue_id: venueId, kickoff_time: "18:00:00" });
+
+    await reconcileBookingsForMatches([matchId]);
+    await reconcileBookingsForMatches([matchId]);
+
+    expect(await hallTimeEvents()).toHaveLength(0);
+  });
+
+  it("emits once when a window change pushes a covered booking out of its hall time", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    await insertHallTime(venueId, "2025-03-15", "16:00:00", "21:00:00");
+    // Kickoff 19:00 -> window 18:00-21:30, sticking 30 minutes out of the hall time.
+    const matchId = await insertMatch({ venue_id: venueId, kickoff_time: "19:00:00" });
+    const bookingId = await insertBooking({
+      venue_id: venueId,
+      date: "2025-03-15",
+      calculated_start_time: "17:00:00",
+      calculated_end_time: "20:30:00",
+    });
+    await insertBookingMatch(bookingId, matchId);
+
+    await reconcileBookingsForMatches([matchId]);
+
+    const events = await hallTimeEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]!.entity_id).toBe(bookingId);
+    expect(events[0]!.payload).toMatchObject({
+      coverage: "partial",
+      startTime: "18:00:00",
+      endTime: "21:30:00",
+      hallTime: { kind: "open", startTime: "16:00", endTime: "21:00" },
+    });
+
+    // The booking is still partial on the next run, but nothing changed: no second event.
+    await reconcileBookingsForMatches([matchId]);
+    expect(await hallTimeEvents()).toHaveLength(1);
+  });
+
+  it("does not emit for a window change that stays inside the hall time", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    await insertHallTime(venueId, "2025-03-15", "10:00:00", "22:00:00");
+    const matchId = await insertMatch({ venue_id: venueId, kickoff_time: "19:00:00" });
+    const bookingId = await insertBooking({
+      venue_id: venueId,
+      date: "2025-03-15",
+      calculated_start_time: "17:00:00",
+      calculated_end_time: "20:30:00",
+    });
+    await insertBookingMatch(bookingId, matchId);
+
+    await reconcileBookingsForMatches([matchId]);
+
+    expect(await hallTimeEvents()).toHaveLength(0);
+    expect((await getBookings())[0]!.calculated_start_time).toBe("18:00:00");
+  });
+
+  it("judges a re-windowed booking by its override when one is set", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    await insertHallTime(venueId, "2025-03-15", "10:00:00", "22:00:00");
+    const matchId = await insertMatch({ venue_id: venueId, kickoff_time: "19:00:00" });
+    // The override already sticks out of the hall time, before and after: no transition.
+    const bookingId = await insertBooking({
+      venue_id: venueId,
+      date: "2025-03-15",
+      calculated_start_time: "17:00:00",
+      calculated_end_time: "20:30:00",
+      override_start_time: "09:00:00",
+      override_end_time: "12:00:00",
+    });
+    await insertBookingMatch(bookingId, matchId);
+
+    await reconcileBookingsForMatches([matchId]);
+
+    expect(await hallTimeEvents()).toHaveLength(0);
+  });
+});

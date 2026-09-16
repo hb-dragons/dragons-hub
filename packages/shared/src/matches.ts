@@ -1,4 +1,5 @@
 import type { BookingStatus, DiffStatus } from "./constants";
+import type { HallTimeCoverage, HallTimeKind } from "./hall-times";
 import type { ClubWeekendDay } from "./kickoff";
 interface RefereeSlotReferee {
   id: number;
@@ -99,6 +100,8 @@ export interface MatchListItem {
     id: number;
     status: BookingStatus;
     needsReconfirmation: boolean;
+    /** Whether the club holds the hall for the booking's window that day. */
+    hallTimeCoverage: HallTimeCoverage;
   } | null;
 }
 
@@ -200,7 +203,20 @@ export interface DateRange {
  * days it is not; an away game has one pile, because the hall is the other
  * club's problem.
  */
-export type AlternativeDateGroup = "booked" | "unbooked" | "away";
+export type AlternativeDateGroup =
+  | "booked"
+  | "hallTimeOpen"
+  | "unbooked"
+  | "closed"
+  | "away";
+
+/** The hall time the club holds at the game's venue on a candidate day. */
+export interface AlternativeDateHallTime {
+  kind: HallTimeKind;
+  startTime: string | null;
+  endTime: string | null;
+  note: string | null;
+}
 
 /**
  * One of the club's hall bookings at the game's current venue on a candidate
@@ -213,6 +229,8 @@ export interface AlternativeDateBooking {
   effectiveEndTime: string;
   status: BookingStatus;
   needsReconfirmation: boolean;
+  /** How the booking's window sits in the day's hall time. */
+  hallTimeCoverage: HallTimeCoverage;
 }
 
 /**
@@ -252,10 +270,15 @@ export interface AlternativeDateCandidate {
   /**
    * `HH:mm:ss` directly after the last booked game — its kickoff plus that team
    * entry's game duration plus the buffer after. Null whenever nothing is
-   * booked: the club's hall times are not modeled, so the finder has nothing to
-   * derive a kickoff from and must not invent one (ADR-0010).
+   * booked: a hall time says when the hall is ours, not when a game could
+   * start inside it, so the finder derives nothing from it (ADR-0011).
    */
   suggestedKickoffTime: string | null;
+  /**
+   * The hall time the club holds at the game's current venue that day, or null
+   * when it holds none. Always null for an away game.
+   */
+  hallTime: AlternativeDateHallTime | null;
   /** Empty when nothing about the day needs saying — the common case. */
   flags: AlternativeDateFlag[];
 }

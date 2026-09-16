@@ -76,6 +76,38 @@ const bookingRenderers: Record<
           body: `${venue} on ${date} needs reconfirmation.${reason}`,
         };
   },
+
+  [EVENT_TYPES.BOOKING_HALL_TIME_MISSING]: (payload, _entityName, locale) => {
+    const venue = String(payload.venueName ?? "?");
+    const date = payload.date ? formatDate(String(payload.date), locale) : "";
+    const window = `${String(payload.startTime ?? "").slice(0, 5)}\u{2013}${String(payload.endTime ?? "").slice(0, 5)}`;
+    const hallTime = payload.hallTime as
+      | { kind?: string; startTime?: string | null; endTime?: string | null; note?: string | null }
+      | null
+      | undefined;
+    const coverage = String(payload.coverage ?? "uncovered");
+
+    let situation: string;
+    if (coverage === "closed") {
+      const note = hallTime?.note ? ` (${hallTime.note})` : "";
+      situation = locale === "de" ? `Halle geschlossen${note}` : `hall closed${note}`;
+    } else if (coverage === "partial" && hallTime?.startTime && hallTime.endTime) {
+      const held = `${hallTime.startTime.slice(0, 5)}\u{2013}${hallTime.endTime.slice(0, 5)}`;
+      situation = locale === "de" ? `Hallenzeit nur ${held}` : `hall time only ${held}`;
+    } else {
+      situation = locale === "de" ? "keine Hallenzeit" : "no hall time";
+    }
+
+    return locale === "de"
+      ? {
+          title: `\u{1F3DF}\u{FE0F} Mietantrag n\u{00F6}tig`,
+          body: `${venue} am ${date}, ${window}: ${situation}.`,
+        }
+      : {
+          title: `\u{1F3DF}\u{FE0F} Rental request needed`,
+          body: `${venue} on ${date}, ${window}: ${situation}.`,
+        };
+  },
 };
 
 export function renderBookingMessage(

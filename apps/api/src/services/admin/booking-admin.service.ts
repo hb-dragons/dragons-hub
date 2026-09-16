@@ -17,6 +17,7 @@ import type {
 } from "@dragons/shared";
 import { EVENT_TYPES } from "@dragons/shared";
 import { publishDomainEvent } from "../events/event-publisher";
+import { attachHallTimes } from "../hall-times/hall-time.service";
 import { pickDefined } from "../utils/object";
 import { logger } from "../../config/logger";
 
@@ -85,22 +86,24 @@ export async function listBookings(
     .where(whereClause)
     .orderBy(venueBookings.date, venueBookings.calculatedStartTime);
 
-  return rows.map((row) => ({
-    id: row.id,
-    venueId: row.venueId,
-    venueName: row.venueName,
-    date: row.date,
-    calculatedStartTime: row.calculatedStartTime,
-    calculatedEndTime: row.calculatedEndTime,
-    overrideStartTime: row.overrideStartTime,
-    overrideEndTime: row.overrideEndTime,
-    effectiveStartTime: row.overrideStartTime ?? row.calculatedStartTime,
-    effectiveEndTime: row.overrideEndTime ?? row.calculatedEndTime,
-    status: row.status,
-    needsReconfirmation: row.needsReconfirmation,
-    notes: row.notes,
-    matchCount: Number(row.matchCount),
-  }));
+  return attachHallTimes(
+    rows.map((row) => ({
+      id: row.id,
+      venueId: row.venueId,
+      venueName: row.venueName,
+      date: row.date,
+      calculatedStartTime: row.calculatedStartTime,
+      calculatedEndTime: row.calculatedEndTime,
+      overrideStartTime: row.overrideStartTime,
+      overrideEndTime: row.overrideEndTime,
+      effectiveStartTime: row.overrideStartTime ?? row.calculatedStartTime,
+      effectiveEndTime: row.overrideEndTime ?? row.calculatedEndTime,
+      status: row.status,
+      needsReconfirmation: row.needsReconfirmation,
+      notes: row.notes,
+      matchCount: Number(row.matchCount),
+    })),
+  );
 }
 
 export async function getBookingDetail(
@@ -171,28 +174,31 @@ export async function getBookingDetail(
     .where(eq(venueBookingMatches.venueBookingId, id))
     .orderBy(asc(matches.kickoffTime));
 
-  return {
-    id: booking.id,
-    venueId: booking.venueId,
-    venueName: booking.venueName,
-    date: booking.date,
-    calculatedStartTime: booking.calculatedStartTime,
-    calculatedEndTime: booking.calculatedEndTime,
-    overrideStartTime: booking.overrideStartTime,
-    overrideEndTime: booking.overrideEndTime,
-    overrideReason: booking.overrideReason,
-    effectiveStartTime:
-      booking.overrideStartTime ?? booking.calculatedStartTime,
-    effectiveEndTime: booking.overrideEndTime ?? booking.calculatedEndTime,
-    status: booking.status,
-    needsReconfirmation: booking.needsReconfirmation,
-    notes: booking.notes,
-    confirmedBy: booking.confirmedBy,
-    confirmedAt: booking.confirmedAt?.toISOString() ?? null,
-    createdAt: booking.createdAt.toISOString(),
-    updatedAt: booking.updatedAt.toISOString(),
-    matches: linkedMatches,
-  };
+  const [detail] = await attachHallTimes([
+    {
+      id: booking.id,
+      venueId: booking.venueId,
+      venueName: booking.venueName,
+      date: booking.date,
+      calculatedStartTime: booking.calculatedStartTime,
+      calculatedEndTime: booking.calculatedEndTime,
+      overrideStartTime: booking.overrideStartTime,
+      overrideEndTime: booking.overrideEndTime,
+      overrideReason: booking.overrideReason,
+      effectiveStartTime:
+        booking.overrideStartTime ?? booking.calculatedStartTime,
+      effectiveEndTime: booking.overrideEndTime ?? booking.calculatedEndTime,
+      status: booking.status,
+      needsReconfirmation: booking.needsReconfirmation,
+      notes: booking.notes,
+      confirmedBy: booking.confirmedBy,
+      confirmedAt: booking.confirmedAt?.toISOString() ?? null,
+      createdAt: booking.createdAt.toISOString(),
+      updatedAt: booking.updatedAt.toISOString(),
+      matches: linkedMatches,
+    },
+  ]);
+  return detail!;
 }
 
 export interface BookingUpdateData {
@@ -297,23 +303,26 @@ export async function updateBooking(
     }
   }
 
-  return {
-    id: updated.id,
-    venueId: updated.venueId,
-    venueName: venue!.name,
-    date: updated.date,
-    calculatedStartTime: updated.calculatedStartTime,
-    calculatedEndTime: updated.calculatedEndTime,
-    overrideStartTime: updated.overrideStartTime,
-    overrideEndTime: updated.overrideEndTime,
-    effectiveStartTime:
-      updated.overrideStartTime ?? updated.calculatedStartTime,
-    effectiveEndTime: updated.overrideEndTime ?? updated.calculatedEndTime,
-    status: updated.status,
-    needsReconfirmation: updated.needsReconfirmation,
-    notes: updated.notes,
-    matchCount: Number(matchCountResult[0]!.count),
-  };
+  const [item] = await attachHallTimes([
+    {
+      id: updated.id,
+      venueId: updated.venueId,
+      venueName: venue!.name,
+      date: updated.date,
+      calculatedStartTime: updated.calculatedStartTime,
+      calculatedEndTime: updated.calculatedEndTime,
+      overrideStartTime: updated.overrideStartTime,
+      overrideEndTime: updated.overrideEndTime,
+      effectiveStartTime:
+        updated.overrideStartTime ?? updated.calculatedStartTime,
+      effectiveEndTime: updated.overrideEndTime ?? updated.calculatedEndTime,
+      status: updated.status,
+      needsReconfirmation: updated.needsReconfirmation,
+      notes: updated.notes,
+      matchCount: Number(matchCountResult[0]!.count),
+    },
+  ]);
+  return item!;
 }
 
 export async function updateBookingStatus(
@@ -377,23 +386,26 @@ export async function updateBookingStatus(
     }
   }
 
-  return {
-    id: updated.id,
-    venueId: updated.venueId,
-    venueName: venue!.name,
-    date: updated.date,
-    calculatedStartTime: updated.calculatedStartTime,
-    calculatedEndTime: updated.calculatedEndTime,
-    overrideStartTime: updated.overrideStartTime,
-    overrideEndTime: updated.overrideEndTime,
-    effectiveStartTime:
-      updated.overrideStartTime ?? updated.calculatedStartTime,
-    effectiveEndTime: updated.overrideEndTime ?? updated.calculatedEndTime,
-    status: updated.status,
-    needsReconfirmation: updated.needsReconfirmation,
-    notes: updated.notes,
-    matchCount: Number(matchCountResult[0]!.count),
-  };
+  const [item] = await attachHallTimes([
+    {
+      id: updated.id,
+      venueId: updated.venueId,
+      venueName: venue!.name,
+      date: updated.date,
+      calculatedStartTime: updated.calculatedStartTime,
+      calculatedEndTime: updated.calculatedEndTime,
+      overrideStartTime: updated.overrideStartTime,
+      overrideEndTime: updated.overrideEndTime,
+      effectiveStartTime:
+        updated.overrideStartTime ?? updated.calculatedStartTime,
+      effectiveEndTime: updated.overrideEndTime ?? updated.calculatedEndTime,
+      status: updated.status,
+      needsReconfirmation: updated.needsReconfirmation,
+      notes: updated.notes,
+      matchCount: Number(matchCountResult[0]!.count),
+    },
+  ]);
+  return item!;
 }
 
 export interface BookingCreateData {

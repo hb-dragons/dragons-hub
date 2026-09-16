@@ -171,7 +171,17 @@ export { meStaffUpdateBodySchema, type MeStaffUpdateBody } from "./me";
 
 export {
   venueSearchQuerySchema,
+  venueIdParamSchema,
+  hallTimeDateParamSchema,
+  hallTimeListQuerySchema,
+  hallTimeInputSchema,
+  hallTimeUpsertBodySchema,
+  hallTimeImportBodySchema,
   type VenueSearchQuery,
+  type HallTimeDateParam,
+  type HallTimeListQuery,
+  type HallTimeUpsertBody,
+  type HallTimeImportBody,
 } from "./venue";
 
 export {

@@ -31,7 +31,10 @@ import type {
   MatchChangeHistoryItem,
   RefereeSlotInfo,
   PublicMatchDetail,
+  BookingStatus,
 } from "@dragons/shared";
+import { coverageFor } from "@dragons/shared";
+import { loadHallTimesByDay } from "../hall-times/hall-time.service";
 
 export type TransactionClient = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
@@ -367,15 +370,17 @@ export async function buildDetailResponse(
       bookingId: venueBookings.id,
       bookingStatus: venueBookings.status,
       needsReconfirmation: venueBookings.needsReconfirmation,
+      venueId: venueBookings.venueId,
+      date: venueBookings.date,
+      effectiveStartTime: sql<string>`coalesce(${venueBookings.overrideStartTime}, ${venueBookings.calculatedStartTime})`,
+      effectiveEndTime: sql<string>`coalesce(${venueBookings.overrideEndTime}, ${venueBookings.calculatedEndTime})`,
     })
     .from(venueBookingMatches)
     .innerJoin(venueBookings, eq(venueBookings.id, venueBookingMatches.venueBookingId))
     .where(eq(venueBookingMatches.matchId, matchId))
     .limit(1);
 
-  const booking = bookingLink
-    ? { id: bookingLink.bookingId, status: bookingLink.bookingStatus, needsReconfirmation: bookingLink.needsReconfirmation }
-    : null;
+  const booking = bookingLink ? (await bookingSummaries([bookingLink]))[0]! : null;
 
   // Load referee assignments for this match
   const refAssignments = await client
@@ -601,19 +606,18 @@ export async function getOwnClubMatches(params: MatchListParams) {
           bookingId: venueBookings.id,
           bookingStatus: venueBookings.status,
           needsReconfirmation: venueBookings.needsReconfirmation,
+          venueId: venueBookings.venueId,
+          date: venueBookings.date,
+          effectiveStartTime: sql<string>`coalesce(${venueBookings.overrideStartTime}, ${venueBookings.calculatedStartTime})`,
+          effectiveEndTime: sql<string>`coalesce(${venueBookings.overrideEndTime}, ${venueBookings.calculatedEndTime})`,
         })
         .from(venueBookingMatches)
         .innerJoin(venueBookings, eq(venueBookings.id, venueBookingMatches.venueBookingId))
         .where(inArray(venueBookingMatches.matchId, matchIds))
     : [];
 
-  const bookingByMatch = new Map(
-    bookingLinks.map((b) => [b.matchId, {
-      id: b.bookingId,
-      status: b.bookingStatus,
-      needsReconfirmation: b.needsReconfirmation,
-    }]),
-  );
+  const summaries = await bookingSummaries(bookingLinks);
+  const bookingByMatch = new Map(bookingLinks.map((b, i) => [b.matchId, summaries[i]!]));
 
   const items: MatchListItem[] = rows.map((row) => ({
     ...rowToListItem(row, overridesByMatch.get(row.id) ?? []),
@@ -778,4 +782,32 @@ export async function getMatchChangeHistory(
     })),
     total: totalRow!.count,
   };
+}
+
+/**
+ * The booking summary a match row carries, hall-time coverage included. One
+ * hall-time query for the whole batch, so a game plan page costs the same
+ * whether one or forty of its games have a booking.
+ */
+async function bookingSummaries(
+  links: readonly {
+    bookingId: number;
+    bookingStatus: BookingStatus;
+    needsReconfirmation: boolean;
+    venueId: number;
+    date: string;
+    effectiveStartTime: string;
+    effectiveEndTime: string;
+  }[],
+): Promise<NonNullable<MatchListItem["booking"]>[]> {
+  const byDay = await loadHallTimesByDay(links);
+  return links.map((b) => ({
+    id: b.bookingId,
+    status: b.bookingStatus,
+    needsReconfirmation: b.needsReconfirmation,
+    hallTimeCoverage: coverageFor(
+      { start: b.effectiveStartTime, end: b.effectiveEndTime },
+      byDay.get(`${b.venueId}:${b.date}`) ?? null,
+    ).status,
+  }));
 }

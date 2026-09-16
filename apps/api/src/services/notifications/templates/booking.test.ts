@@ -272,4 +272,53 @@ describe("renderBookingMessage", () => {
       expect(result).toBeNull();
     });
   });
+
+  describe(EVENT_TYPES.BOOKING_HALL_TIME_MISSING, () => {
+    const base = {
+      venueId: 3,
+      venueName: "Gymnasium Goetheschule",
+      date: "2026-09-19",
+      startTime: "17:00:00",
+      endTime: "21:30:00",
+    };
+
+    it("names the missing hall time in German", () => {
+      const result = renderBookingMessage(
+        EVENT_TYPES.BOOKING_HALL_TIME_MISSING,
+        { ...base, coverage: "uncovered", hallTime: null },
+        "Gymnasium Goetheschule - 2026-09-19",
+        "de",
+      );
+      expect(result!.title).toContain("Mietantrag");
+      expect(result!.body).toBe("Gymnasium Goetheschule am 19.09., 17:00\u{2013}21:30: keine Hallenzeit.");
+    });
+
+    it("shows the held window when the booking only partly fits, in English", () => {
+      const result = renderBookingMessage(
+        EVENT_TYPES.BOOKING_HALL_TIME_MISSING,
+        { ...base, coverage: "partial", hallTime: { kind: "open", startTime: "16:00", endTime: "21:00", note: null } },
+        "Gymnasium Goetheschule - 2026-09-19",
+        "en",
+      );
+      expect(result!.title).toContain("Rental request needed");
+      expect(result!.body).toBe("Gymnasium Goetheschule on 09/19, 17:00\u{2013}21:30: hall time only 16:00\u{2013}21:00.");
+    });
+
+    it("carries the closure note for a closed day", () => {
+      const result = renderBookingMessage(
+        EVENT_TYPES.BOOKING_HALL_TIME_MISSING,
+        { ...base, coverage: "closed", hallTime: { kind: "closed", startTime: null, endTime: null, note: "Herbstferien" } },
+        "Gymnasium Goetheschule - 2026-09-19",
+        "de",
+      );
+      expect(result!.body).toContain("Halle geschlossen (Herbstferien)");
+      const bare = renderBookingMessage(
+        EVENT_TYPES.BOOKING_HALL_TIME_MISSING,
+        { ...base, coverage: "closed", hallTime: { kind: "closed", startTime: null, endTime: null, note: null } },
+        "x",
+        "en",
+      );
+      expect(bare!.body).toContain("hall closed.");
+    });
+  });
 });

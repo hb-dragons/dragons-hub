@@ -58,6 +58,7 @@ export const EVENT_TYPES = {
   BOOKING_CREATED: "booking.created",
   BOOKING_STATUS_CHANGED: "booking.status.changed",
   BOOKING_NEEDS_RECONFIRMATION: "booking.needs_reconfirmation",
+  BOOKING_HALL_TIME_MISSING: "booking.hall_time.missing",
 
   // Override events
   OVERRIDE_CONFLICT: "override.conflict",

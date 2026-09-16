@@ -19,8 +19,10 @@ import type {
   ReconcilePreviewMatch,
   ReconcileResult,
 } from "@dragons/shared";
-import { EVENT_TYPES } from "@dragons/shared";
+import { EVENT_TYPES, coverageFor } from "@dragons/shared";
+import type { HallTimeCoverage } from "@dragons/shared";
 import { publishDomainEvent } from "../events/event-publisher";
+import { emitHallTimeMissing, loadHallTimesByDay } from "../hall-times/hall-time.service";
 
 const log = logger.child({ service: "venue-booking" });
 
@@ -329,6 +331,8 @@ export async function reconcileBookingsForMatches(
       status: venueBookings.status,
       calculatedStartTime: venueBookings.calculatedStartTime,
       calculatedEndTime: venueBookings.calculatedEndTime,
+      overrideStartTime: venueBookings.overrideStartTime,
+      overrideEndTime: venueBookings.overrideEndTime,
       needsReconfirmation: venueBookings.needsReconfirmation,
     })
     .from(venueBookings);
@@ -343,12 +347,44 @@ export async function reconcileBookingsForMatches(
     scope: { kind: "matchIds", matchIds },
   });
 
-  // Venue names for any reconfirmation events.
-  const reconfirmVenueIds = plan.updates
-    .filter((u) => u.windowChanged && u.status === "confirmed")
-    .map((u) => u.venueId);
+  // Hall-time coverage transitions: a created booking, or a re-windowed one,
+  // whose effective window the club's hall time does not cover means a rental
+  // request still has to go to the city. Judged against the hall times as
+  // they are now — the import judges the other direction, so between them a
+  // booking is reported once per transition out of `covered`.
+  const rewindowed = plan.updates.filter((u) => u.windowChanged);
+  const hallTimes = await loadHallTimesByDay([...plan.creates, ...rewindowed]);
+  const hallTimeFor = (venueId: number, date: string) => hallTimes.get(`${venueId}:${date}`) ?? null;
+  const uncoveredCreates = plan.creates
+    .map((c) => ({
+      create: c,
+      coverage: coverageFor({ start: c.calculatedStartTime, end: c.calculatedEndTime }, hallTimeFor(c.venueId, c.date)).status,
+    }))
+    .filter((x): x is typeof x & { coverage: Exclude<HallTimeCoverage, "covered"> } => x.coverage !== "covered");
+  const lostCoverage = rewindowed
+    .map((u) => {
+      const b = bookingById.get(u.bookingId)!;
+      const hallTime = hallTimeFor(u.venueId, u.date);
+      const before = coverageFor(
+        { start: b.overrideStartTime ?? u.currentStartTime, end: b.overrideEndTime ?? u.currentEndTime },
+        hallTime,
+      ).status;
+      const after = { start: b.overrideStartTime ?? u.newStartTime, end: b.overrideEndTime ?? u.newEndTime };
+      return { update: u, window: after, coverage: coverageFor(after, hallTime).status, before };
+    })
+    .filter(
+      (x): x is typeof x & { coverage: Exclude<HallTimeCoverage, "covered"> } =>
+        x.before === "covered" && x.coverage !== "covered",
+    );
+
+  // Venue names for any reconfirmation or hall-time events.
+  const eventVenueIds = [
+    ...plan.updates.filter((u) => u.windowChanged && u.status === "confirmed").map((u) => u.venueId),
+    ...uncoveredCreates.map((x) => x.create.venueId),
+    ...lostCoverage.map((x) => x.update.venueId),
+  ];
   const venueNames =
-    reconfirmVenueIds.length > 0 ? await fetchVenueNames(reconfirmVenueIds) : new Map<number, string>();
+    eventVenueIds.length > 0 ? await fetchVenueNames(eventVenueIds) : new Map<number, string>();
 
   // Apply the whole plan atomically: a crash mid-flight rolls back every
   // booking/junction change together, and reconfirmation events are inserted
@@ -391,6 +427,21 @@ export async function reconcileBookingsForMatches(
         }
       }
       result.created += createdRows.length;
+
+      for (const { create, coverage } of uncoveredCreates) {
+        const bookingId = createdIdByKey.get(`${create.venueId}:${create.date}`);
+        if (bookingId === undefined) continue;
+        await emitHallTimeMissing(tx, {
+          bookingId,
+          venueId: create.venueId,
+          venueName: venueNames.get(create.venueId) ?? "Unknown",
+          date: create.date,
+          startTime: create.calculatedStartTime,
+          endTime: create.calculatedEndTime,
+          coverage,
+          hallTime: hallTimeFor(create.venueId, create.date),
+        });
+      }
     }
 
     // Updates — per-booking UPDATE (distinct SET values) + accumulated junction deltas.
@@ -453,6 +504,19 @@ export async function reconcileBookingsForMatches(
       }
     }
     result.unchanged += plan.unchanged;
+
+    for (const { update, window, coverage } of lostCoverage) {
+      await emitHallTimeMissing(tx, {
+        bookingId: update.bookingId,
+        venueId: update.venueId,
+        venueName: venueNames.get(update.venueId) ?? "Unknown",
+        date: update.date,
+        startTime: window.start,
+        endTime: window.end,
+        coverage,
+        hallTime: hallTimeFor(update.venueId, update.date),
+      });
+    }
 
     // Removals (all-cancelled groups + scoped stale bookings).
     const bookingDeletes: number[] = [];
