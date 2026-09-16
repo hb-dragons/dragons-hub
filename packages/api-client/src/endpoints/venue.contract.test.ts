@@ -81,7 +81,7 @@ describe("hall-time request bodies + queries satisfy @dragons/contracts schemas"
 
   it("import preview + apply bodies parse against hallTimeImportBodySchema", async () => {
     const { api, calls } = recordingClient();
-    await api.previewHallTimeImport(7, { rows: [open], updatedOn: "2026-09-14" });
+    await api.previewHallTimeImport(7, { rows: [open] });
     await api.importHallTimes(7, { rows: [open] });
     expect(calls.map((c) => [new URL(c.url).pathname, c.method])).toEqual([
       ["/admin/venues/7/hall-times/import/preview", "POST"],

@@ -86,24 +86,44 @@ export async function listBookings(
     .where(whereClause)
     .orderBy(venueBookings.date, venueBookings.calculatedStartTime);
 
-  return attachHallTimes(
-    rows.map((row) => ({
-      id: row.id,
-      venueId: row.venueId,
-      venueName: row.venueName,
-      date: row.date,
-      calculatedStartTime: row.calculatedStartTime,
-      calculatedEndTime: row.calculatedEndTime,
-      overrideStartTime: row.overrideStartTime,
-      overrideEndTime: row.overrideEndTime,
-      effectiveStartTime: row.overrideStartTime ?? row.calculatedStartTime,
-      effectiveEndTime: row.overrideEndTime ?? row.calculatedEndTime,
-      status: row.status,
-      needsReconfirmation: row.needsReconfirmation,
-      notes: row.notes,
-      matchCount: Number(row.matchCount),
-    })),
-  );
+  return attachHallTimes(rows.map((row) => toBookingListItem(row, row.venueName, Number(row.matchCount))));
+}
+
+/** The columns every booking list item is built from, whichever query produced them. */
+interface BookingListRow {
+  id: number;
+  venueId: number;
+  date: string;
+  calculatedStartTime: string;
+  calculatedEndTime: string;
+  overrideStartTime: string | null;
+  overrideEndTime: string | null;
+  status: BookingStatus;
+  needsReconfirmation: boolean;
+  notes: string | null;
+}
+
+function toBookingListItem(
+  row: BookingListRow,
+  venueName: string,
+  matchCount: number,
+): Omit<BookingListItem, "hallTime"> {
+  return {
+    id: row.id,
+    venueId: row.venueId,
+    venueName,
+    date: row.date,
+    calculatedStartTime: row.calculatedStartTime,
+    calculatedEndTime: row.calculatedEndTime,
+    overrideStartTime: row.overrideStartTime,
+    overrideEndTime: row.overrideEndTime,
+    effectiveStartTime: row.overrideStartTime ?? row.calculatedStartTime,
+    effectiveEndTime: row.overrideEndTime ?? row.calculatedEndTime,
+    status: row.status,
+    needsReconfirmation: row.needsReconfirmation,
+    notes: row.notes,
+    matchCount,
+  };
 }
 
 export async function getBookingDetail(
@@ -304,23 +324,7 @@ export async function updateBooking(
   }
 
   const [item] = await attachHallTimes([
-    {
-      id: updated.id,
-      venueId: updated.venueId,
-      venueName: venue!.name,
-      date: updated.date,
-      calculatedStartTime: updated.calculatedStartTime,
-      calculatedEndTime: updated.calculatedEndTime,
-      overrideStartTime: updated.overrideStartTime,
-      overrideEndTime: updated.overrideEndTime,
-      effectiveStartTime:
-        updated.overrideStartTime ?? updated.calculatedStartTime,
-      effectiveEndTime: updated.overrideEndTime ?? updated.calculatedEndTime,
-      status: updated.status,
-      needsReconfirmation: updated.needsReconfirmation,
-      notes: updated.notes,
-      matchCount: Number(matchCountResult[0]!.count),
-    },
+    toBookingListItem(updated, venue!.name, Number(matchCountResult[0]!.count)),
   ]);
   return item!;
 }
@@ -387,23 +391,7 @@ export async function updateBookingStatus(
   }
 
   const [item] = await attachHallTimes([
-    {
-      id: updated.id,
-      venueId: updated.venueId,
-      venueName: venue!.name,
-      date: updated.date,
-      calculatedStartTime: updated.calculatedStartTime,
-      calculatedEndTime: updated.calculatedEndTime,
-      overrideStartTime: updated.overrideStartTime,
-      overrideEndTime: updated.overrideEndTime,
-      effectiveStartTime:
-        updated.overrideStartTime ?? updated.calculatedStartTime,
-      effectiveEndTime: updated.overrideEndTime ?? updated.calculatedEndTime,
-      status: updated.status,
-      needsReconfirmation: updated.needsReconfirmation,
-      notes: updated.notes,
-      matchCount: Number(matchCountResult[0]!.count),
-    },
+    toBookingListItem(updated, venue!.name, Number(matchCountResult[0]!.count)),
   ]);
   return item!;
 }

@@ -283,6 +283,8 @@ export type {
   HallTimeInput,
   HallTimeRow,
   HallTimeCoverage,
+  HallTimeShortfall,
+  HallTimeWindow,
   BookingHallTime,
   HallTimeImportBookingChange,
   HallTimeImportPreview,

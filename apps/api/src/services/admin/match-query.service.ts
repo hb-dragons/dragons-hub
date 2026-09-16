@@ -33,8 +33,12 @@ import type {
   PublicMatchDetail,
   BookingStatus,
 } from "@dragons/shared";
-import { coverageFor } from "@dragons/shared";
-import { loadHallTimesByDay } from "../hall-times/hall-time.service";
+import {
+  bookingHallTime,
+  effectiveEndTimeSql,
+  effectiveStartTimeSql,
+  loadHallTimesByDay,
+} from "../hall-times/hall-time.service";
 
 export type TransactionClient = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
@@ -372,8 +376,8 @@ export async function buildDetailResponse(
       needsReconfirmation: venueBookings.needsReconfirmation,
       venueId: venueBookings.venueId,
       date: venueBookings.date,
-      effectiveStartTime: sql<string>`coalesce(${venueBookings.overrideStartTime}, ${venueBookings.calculatedStartTime})`,
-      effectiveEndTime: sql<string>`coalesce(${venueBookings.overrideEndTime}, ${venueBookings.calculatedEndTime})`,
+      effectiveStartTime: effectiveStartTimeSql(),
+      effectiveEndTime: effectiveEndTimeSql(),
     })
     .from(venueBookingMatches)
     .innerJoin(venueBookings, eq(venueBookings.id, venueBookingMatches.venueBookingId))
@@ -608,8 +612,8 @@ export async function getOwnClubMatches(params: MatchListParams) {
           needsReconfirmation: venueBookings.needsReconfirmation,
           venueId: venueBookings.venueId,
           date: venueBookings.date,
-          effectiveStartTime: sql<string>`coalesce(${venueBookings.overrideStartTime}, ${venueBookings.calculatedStartTime})`,
-          effectiveEndTime: sql<string>`coalesce(${venueBookings.overrideEndTime}, ${venueBookings.calculatedEndTime})`,
+          effectiveStartTime: effectiveStartTimeSql(),
+          effectiveEndTime: effectiveEndTimeSql(),
         })
         .from(venueBookingMatches)
         .innerJoin(venueBookings, eq(venueBookings.id, venueBookingMatches.venueBookingId))
@@ -805,9 +809,9 @@ async function bookingSummaries(
     id: b.bookingId,
     status: b.bookingStatus,
     needsReconfirmation: b.needsReconfirmation,
-    hallTimeCoverage: coverageFor(
+    hallTime: bookingHallTime(
       { start: b.effectiveStartTime, end: b.effectiveEndTime },
-      byDay.get(`${b.venueId}:${b.date}`) ?? null,
-    ).status,
+      byDay.get(`${b.venueId}:${b.date}`),
+    ),
   }));
 }

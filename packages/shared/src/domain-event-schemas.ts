@@ -211,6 +211,7 @@ const bookingNeedsReconfirmationSchema = z.object({
  * still has to go to the city. `hallTime` is the day's row, null when none.
  */
 const bookingHallTimeMissingSchema = z.object({
+  bookingId: z.number(),
   venueId: z.number(),
   venueName: z.string(),
   date: z.string(),

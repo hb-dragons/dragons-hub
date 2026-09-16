@@ -20,7 +20,7 @@ import type {
   ReconcileResult,
 } from "@dragons/shared";
 import { EVENT_TYPES, coverageFor } from "@dragons/shared";
-import type { HallTimeCoverage } from "@dragons/shared";
+import type { HallTimeShortfall } from "@dragons/shared";
 import { publishDomainEvent } from "../events/event-publisher";
 import { emitHallTimeMissing, loadHallTimesByDay } from "../hall-times/hall-time.service";
 
@@ -360,7 +360,7 @@ export async function reconcileBookingsForMatches(
       create: c,
       coverage: coverageFor({ start: c.calculatedStartTime, end: c.calculatedEndTime }, hallTimeFor(c.venueId, c.date)).status,
     }))
-    .filter((x): x is typeof x & { coverage: Exclude<HallTimeCoverage, "covered"> } => x.coverage !== "covered");
+    .filter((x): x is typeof x & { coverage: HallTimeShortfall } => x.coverage !== "covered");
   const lostCoverage = rewindowed
     .map((u) => {
       const b = bookingById.get(u.bookingId)!;
@@ -373,7 +373,7 @@ export async function reconcileBookingsForMatches(
       return { update: u, window: after, coverage: coverageFor(after, hallTime).status, before };
     })
     .filter(
-      (x): x is typeof x & { coverage: Exclude<HallTimeCoverage, "covered"> } =>
+      (x): x is typeof x & { coverage: HallTimeShortfall } =>
         x.before === "covered" && x.coverage !== "covered",
     );
 

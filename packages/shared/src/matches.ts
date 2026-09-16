@@ -1,5 +1,5 @@
 import type { BookingStatus, DiffStatus } from "./constants";
-import type { HallTimeCoverage, HallTimeKind } from "./hall-times";
+import type { BookingHallTime, HallTimeCoverage, HallTimeWindow } from "./hall-times";
 import type { ClubWeekendDay } from "./kickoff";
 interface RefereeSlotReferee {
   id: number;
@@ -100,8 +100,8 @@ export interface MatchListItem {
     id: number;
     status: BookingStatus;
     needsReconfirmation: boolean;
-    /** Whether the club holds the hall for the booking's window that day. */
-    hallTimeCoverage: HallTimeCoverage;
+    /** The day's hall time and how the booking's window sits in it; null when the club holds none. */
+    hallTime: BookingHallTime | null;
   } | null;
 }
 
@@ -211,12 +211,7 @@ export type AlternativeDateGroup =
   | "away";
 
 /** The hall time the club holds at the game's venue on a candidate day. */
-export interface AlternativeDateHallTime {
-  kind: HallTimeKind;
-  startTime: string | null;
-  endTime: string | null;
-  note: string | null;
-}
+export type AlternativeDateHallTime = HallTimeWindow;
 
 /**
  * One of the club's hall bookings at the game's current venue on a candidate

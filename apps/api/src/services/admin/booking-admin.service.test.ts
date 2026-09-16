@@ -58,6 +58,7 @@ import {
   teamEntries,
   venueBookingMatches,
   venueBookings,
+  venueHallTimes,
   venues,
 } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
@@ -323,6 +324,56 @@ describe("listBookings", () => {
     });
 
     expect((await listBookings()).map((r) => r.id)).toEqual([earlySlot, lateSlot, later]);
+  });
+});
+
+describe("hall-time coverage on bookings", () => {
+  it("attaches the day's hall time and coverage on the list, null where the club holds none", async () => {
+    const venueId = await seedVenue();
+    const partial = await seedBooking({ venueId, date: "2025-03-15" }); // 14:00-17:00
+    const bare = await seedBooking({ venueId, date: "2025-03-16" });
+    await ctx.db.insert(venueHallTimes).values({
+      venueId,
+      date: "2025-03-15",
+      kind: "open",
+      startTime: "15:00",
+      endTime: "20:00",
+      source: "anlage_t",
+    });
+
+    const byId = new Map((await listBookings()).map((b) => [b.id, b.hallTime]));
+
+    expect(byId.get(partial)).toEqual({
+      kind: "open",
+      startTime: "15:00",
+      endTime: "20:00",
+      note: null,
+      coverage: "partial",
+      gapBeforeMinutes: 60,
+      gapAfterMinutes: 0,
+    });
+    expect(byId.get(bare)).toBeNull();
+  });
+
+  it("judges the detail by the override window and reports a closed day", async () => {
+    const venueId = await seedVenue();
+    const id = await seedBooking({
+      venueId,
+      date: "2025-03-15",
+      overrideStartTime: "10:00:00",
+      overrideEndTime: "12:00:00",
+    });
+    await ctx.db.insert(venueHallTimes).values({
+      venueId,
+      date: "2025-03-15",
+      kind: "closed",
+      note: "Ferien",
+      source: "manual",
+    });
+
+    const detail = await getBookingDetail(id);
+
+    expect(detail?.hallTime).toMatchObject({ kind: "closed", note: "Ferien", coverage: "closed" });
   });
 });
 

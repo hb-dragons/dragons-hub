@@ -8,10 +8,12 @@ export interface CoverageResult {
   gapAfterMinutes: number;
 }
 
-function toMinutes(t: string): number {
+/** "HH:mm" or "HH:mm:ss" → minutes since midnight. */
+export function timeToMinutes(t: string): number {
   const [h, m] = t.split(":").map(Number) as [number, number];
   return h * 60 + m;
 }
+const toMinutes = timeToMinutes;
 
 /**
  * How a booking's effective window sits against the hall time of its day.

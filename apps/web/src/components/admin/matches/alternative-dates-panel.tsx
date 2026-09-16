@@ -24,6 +24,7 @@ import type {
 } from "@dragons/shared";
 import { api } from "@/lib/api";
 import { ErrorState } from "@/components/ui/error-state";
+import { HallTimeCoverageBadge } from "@/components/admin/hall-times/hall-time-coverage-badge";
 import { LoadingState } from "@/components/ui/loading-state";
 
 /**
@@ -299,7 +300,6 @@ const ROW_CLASS = "space-y-1 rounded-md bg-surface-low px-3 py-2 text-sm";
 function CandidateDetails({ candidate }: { candidate: AlternativeDateCandidate }) {
   const t = useTranslations("matchDetail.alternativeDates");
   const tStatus = useTranslations("bookings.status");
-  const tCoverage = useTranslations("hallTimes.coverage");
   const format = useFormatter();
 
   return (
@@ -354,10 +354,8 @@ function CandidateDetails({ candidate }: { candidate: AlternativeDateCandidate }
           · {tStatus(booking.status)}
           {booking.hallTimeCoverage !== "covered" && (
             <>
-              {" · "}
-              <span className={booking.hallTimeCoverage === "partial" ? "text-heat" : "text-destructive"}>
-                {tCoverage(booking.hallTimeCoverage)}
-              </span>
+              {" "}
+              <HallTimeCoverageBadge coverage={booking.hallTimeCoverage} className="text-[10px]" />
             </>
           )}
           {booking.needsReconfirmation && (

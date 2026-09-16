@@ -132,7 +132,7 @@ export function HallTimeImportDialog({ open, onOpenChange, venues, onImported }:
   }, [venueId]);
 
   const result = step.status === "idle" ? null : step.result;
-  const body = result ? { rows: result.rows, updatedOn: result.updatedOn } : null;
+  const body = result ? { rows: result.rows } : null;
 
   async function loadPreview() {
     if (!result || !body || venueId === null || result.rows.length === 0) return;

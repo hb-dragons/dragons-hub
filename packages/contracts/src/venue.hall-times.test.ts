@@ -13,7 +13,6 @@ describe("hallTimeImportBodySchema", () => {
   it("accepts open and closed rows and trims seconds off times", () => {
     const parsed = hallTimeImportBodySchema.parse({
       rows: [open, closed, { ...open, date: "2026-09-20", startTime: "10:00:00", endTime: "14:00:00" }],
-      updatedOn: "2026-09-14",
     });
     expect(parsed.rows[2]).toMatchObject({ startTime: "10:00", endTime: "14:00" });
   });

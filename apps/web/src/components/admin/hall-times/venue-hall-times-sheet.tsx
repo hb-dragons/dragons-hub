@@ -28,7 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@dragons/ui/components/select";
-import { Separator } from "@dragons/ui/components/separator";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/loading-state";
 
@@ -181,9 +180,9 @@ export function VenueHallTimesSheet({ venue, canEdit }: VenueHallTimesSheetProps
             <h4 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
               {format.dateTime(clubDayAnchor(`${month}-01`), { month: "long", year: "numeric" })}
             </h4>
-            <ul className="divide-y">
+            <ul className="space-y-0.5">
               {rows.map((row) => (
-                <li key={row.id} className="flex items-center gap-3 py-1.5 text-sm" data-testid="hall-time-row">
+                <li key={row.id} className="flex items-center gap-3 rounded-md bg-surface-low px-2 py-1.5 text-sm" data-testid="hall-time-row">
                   <span className="w-28 shrink-0 tabular-nums">
                     {format.dateTime(clubDayAnchor(row.date), "matchDate")}
                   </span>
@@ -217,7 +216,6 @@ export function VenueHallTimesSheet({ venue, canEdit }: VenueHallTimesSheetProps
                 </li>
               ))}
             </ul>
-            <Separator />
           </section>
         ))}
       </div>

@@ -54,7 +54,12 @@ const real: GamePlanMatchItem = {
   anschreiber: "Anna Schreiber", zeitnehmer: "Zeno Zeit", shotclock: "Shot Clock",
   publicComment: null,
   hasLocalChanges: true, overriddenFields: ["kickoffDate", "kickoffTime"],
-  booking: { id: 3, status: "confirmed", needsReconfirmation: false, hallTimeCoverage: "covered" },
+  booking: {
+    id: 3,
+    status: "confirmed",
+    needsReconfirmation: false,
+    hallTime: { kind: "open", startTime: "10:00", endTime: "22:00", note: null, coverage: "covered", gapBeforeMinutes: 0, gapAfterMinutes: 0 },
+  },
 };
 
 const ghost: GamePlanGhostItem = {
@@ -223,14 +228,17 @@ describe("MatchListTable hall-time coverage", () => {
   });
 
   it("flags a home game whose booking has no hall time", () => {
-    renderTable([{ ...real, booking: { ...real.booking!, hallTimeCoverage: "uncovered" } }]);
+    renderTable([{ ...real, booking: { ...real.booking!, hallTime: null } }]);
     const badge = screen.getByText(de.hallTimes.coverage.uncovered);
     expect(badge).toHaveAttribute("data-coverage", "uncovered");
     expect(badge.closest("tr")).toHaveTextContent("Rivals");
   });
 
   it("flags a partly covered booking in English too", () => {
-    renderTable([{ ...real, booking: { ...real.booking!, hallTimeCoverage: "partial" } }], "en");
+    renderTable(
+      [{ ...real, booking: { ...real.booking!, hallTime: { ...real.booking!.hallTime!, coverage: "partial", gapAfterMinutes: 60 } } }],
+      "en",
+    );
     expect(screen.getByText(en.hallTimes.coverage.partial)).toBeInTheDocument();
   });
 });

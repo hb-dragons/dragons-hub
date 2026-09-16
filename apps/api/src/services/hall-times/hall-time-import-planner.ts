@@ -1,9 +1,9 @@
 import { coverageFor } from "@dragons/shared";
 import type {
-  HallTimeCoverage,
   HallTimeImportBookingChange,
   HallTimeInput,
   HallTimeRow,
+  HallTimeShortfall,
 } from "@dragons/shared";
 
 /** A booking at the venue inside the span, with the window the club would ask for. */
@@ -34,10 +34,10 @@ export interface ImportPlan {
   /** Every booking whose coverage the import changes. */
   bookings: HallTimeImportBookingChange[];
   /** The subset of `bookings` that moves out of `covered`: one event each. */
-  losses: (HallTimeImportBookingChange & { after: Exclude<HallTimeCoverage, "covered"> })[];
+  losses: (HallTimeImportBookingChange & { after: HallTimeShortfall })[];
 }
 
-function sameDay(a: HallTimeInput, b: HallTimeInput): boolean {
+function sameEntry(a: HallTimeInput, b: HallTimeInput): boolean {
   return (
     a.kind === b.kind &&
     a.startTime === b.startTime &&
@@ -89,7 +89,7 @@ export function planHallTimeImport(input: ImportPlanInput): ImportPlan {
       }
       continue;
     }
-    if (sameDay(existing, incoming) && existing.source === "anlage_t") {
+    if (sameEntry(existing, incoming) && existing.source === "anlage_t") {
       plan.unchanged++;
       afterByDate.set(existing.date, existing);
       continue;

@@ -11,15 +11,9 @@ export const HALL_TIME_SOURCES = ["anlage_t", "manual"] as const;
 export type HallTimeSource = (typeof HALL_TIME_SOURCES)[number];
 
 /** One day as it arrives from the sheet parser or a manual edit. */
-export interface HallTimeInput {
+export interface HallTimeInput extends HallTimeWindow {
   /** YYYY-MM-DD */
   date: string;
-  kind: HallTimeKind;
-  /** HH:mm; null for a closed day */
-  startTime: string | null;
-  /** HH:mm; null for a closed day */
-  endTime: string | null;
-  note: string | null;
 }
 
 export interface HallTimeRow extends HallTimeInput {
@@ -36,12 +30,19 @@ export interface HallTimeRow extends HallTimeInput {
  */
 export type HallTimeCoverage = "covered" | "partial" | "uncovered" | "closed";
 
-/** The hall-time side of a booking, attached at read time. */
-export interface BookingHallTime {
+/** A coverage that still owes the city a request: everything but `covered`. */
+export type HallTimeShortfall = Exclude<HallTimeCoverage, "covered">;
+
+/** The four facts a hall time carries wherever it is shown or published. */
+export interface HallTimeWindow {
   kind: HallTimeKind;
   startTime: string | null;
   endTime: string | null;
   note: string | null;
+}
+
+/** The hall-time side of a booking, attached at read time. */
+export interface BookingHallTime extends HallTimeWindow {
   coverage: HallTimeCoverage;
   gapBeforeMinutes: number;
   gapAfterMinutes: number;

@@ -57,6 +57,8 @@ const messages = {
     tryAgain: "Try again",
   },
   hallTimes: {
+    title: "Hall times",
+    closedNote: "Hall closed{note, select, none {} other {: {note}}}",
     coverage: {
       covered: "Hall time covered",
       partial: "Hall time partial",
@@ -313,7 +315,12 @@ describe("MatchDetailPage booking hall-time coverage", () => {
               ...detail,
               match: {
                 ...detail.match,
-                booking: { id: 3, status: "pending", needsReconfirmation: false, hallTimeCoverage: "closed" },
+                booking: {
+                  id: 3,
+                  status: "pending",
+                  needsReconfirmation: false,
+                  hallTime: { kind: "closed", startTime: null, endTime: null, note: "Ferien", coverage: "closed", gapBeforeMinutes: 0, gapAfterMinutes: 0 },
+                },
               },
             } as never
           }
@@ -323,5 +330,6 @@ describe("MatchDetailPage booking hall-time coverage", () => {
     );
     expect(screen.getByText("Pending")).toBeInTheDocument();
     expect(screen.getByText("Hall closed")).toHaveAttribute("data-coverage", "closed");
+    expect(screen.getByText("Hall closed: Ferien")).toBeInTheDocument();
   });
 });

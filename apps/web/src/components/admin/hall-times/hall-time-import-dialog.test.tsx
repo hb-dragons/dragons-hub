@@ -121,7 +121,6 @@ describe("HallTimeImportDialog", () => {
         { date: "2027-01-23", kind: "open", startTime: "10:00", endTime: "14:00", note: null },
         { date: "2027-01-24", kind: "closed", startTime: null, endTime: null, note: "Ferien" },
       ],
-      updatedOn: "2026-09-14",
     });
     expect(screen.getByText(de.hallTimes.import.added)).toBeInTheDocument();
     expect(screen.getByText(/1 Tag unverändert/)).toBeInTheDocument();
@@ -129,7 +128,7 @@ describe("HallTimeImportDialog", () => {
 
     fireEvent.click(screen.getByRole("button", { name: de.hallTimes.import.apply }));
     await waitFor(() => expect(onImported).toHaveBeenCalledWith(7));
-    expect(mocks.importHallTimes).toHaveBeenCalledWith(7, expect.objectContaining({ updatedOn: "2026-09-14" }));
+    expect(mocks.importHallTimes).toHaveBeenCalledWith(7, { rows: expect.any(Array) });
     expect(mocks.toastSuccess).toHaveBeenCalledWith(de.hallTimes.import.imported);
     expect(mocks.toastInfo).toHaveBeenCalledWith("2 Buchungen ohne Hallenzeit gemeldet");
   });

@@ -296,7 +296,6 @@ describe("POST /venues/:id/hall-times/import", () => {
 
     const res = await post(`/venues/${venueId}/hall-times/import`, {
       rows: [open("2026-09-12", "12:00", "16:00"), closed("2026-10-03", "Tag der Dt. Einheit")],
-      updatedOn: "2026-09-14",
     });
     expect(res.status).toBe(200);
     const result = (await res.json()) as HallTimeImportResult;
@@ -342,6 +341,7 @@ describe("POST /venues/:id/hall-times/import", () => {
     expect(events).toHaveLength(1);
     expect(events[0]!.entityId).toBe(loses);
     expect(events[0]!.payload).toMatchObject({
+      bookingId: loses,
       venueId,
       venueName: "Gymnasium Goetheschule",
       date: "2026-09-12",
@@ -355,6 +355,30 @@ describe("POST /venues/:id/hall-times/import", () => {
     expect(second.eventsEmitted).toBe(0);
     expect(second.unchanged).toBe(3);
     expect(await hallTimeEvents()).toHaveLength(1);
+  });
+
+  it("ignores a cancelled booking: it asks the city for nothing", async () => {
+    const venueId = await seedVenue();
+    await ctx.db
+      .insert(venueBookings)
+      .values({
+        venueId,
+        date: "2026-09-12",
+        calculatedStartTime: "17:00:00",
+        calculatedEndTime: "21:00:00",
+        status: "cancelled",
+      });
+    await ctx.db.insert(venueHallTimes).values([
+      { venueId, date: "2026-09-12", kind: "open", startTime: "10:00", endTime: "22:00", source: "anlage_t" },
+    ]);
+
+    const result = (await (
+      await post(`/venues/${venueId}/hall-times/import`, { rows: [closed("2026-09-12", "Ferien")] })
+    ).json()) as HallTimeImportResult;
+
+    expect(result.bookings).toEqual([]);
+    expect(result.eventsEmitted).toBe(0);
+    expect(await hallTimeEvents()).toHaveLength(0);
   });
 
   it("judges coverage by the booking's override window when one is set", async () => {

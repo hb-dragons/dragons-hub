@@ -32,37 +32,30 @@ function windowOrdered(v: { kind: string; startTime: string | null; endTime: str
   return v.startTime !== null && v.endTime !== null && v.startTime < v.endTime;
 }
 
-/** One day as the sheet parser or a manual edit hands it in. */
-export const hallTimeInputSchema = z
-  .strictObject({
-    date: dateSchema,
-    kind: z.enum(HALL_TIME_KINDS),
-    startTime: hhmm.nullable(),
-    endTime: hhmm.nullable(),
-    note: z.string().max(500).nullable(),
-  })
-  .refine(windowOrdered, {
-    message: "an open day needs startTime < endTime",
-    path: ["endTime"],
-  });
+const hallTimeWindowShape = {
+  kind: z.enum(HALL_TIME_KINDS),
+  startTime: hhmm.nullable(),
+  endTime: hhmm.nullable(),
+  note: z.string().max(500).nullable(),
+};
+const windowRefinement = {
+  message: "an open day needs startTime < endTime",
+  path: ["endTime"] as string[],
+};
 
 /** Body of PUT /admin/venues/:id/hall-times/:date — the date is in the path. */
 export const hallTimeUpsertBodySchema = z
-  .strictObject({
-    kind: z.enum(HALL_TIME_KINDS),
-    startTime: hhmm.nullable(),
-    endTime: hhmm.nullable(),
-    note: z.string().max(500).nullable(),
-  })
-  .refine(windowOrdered, {
-    message: "an open day needs startTime < endTime",
-    path: ["endTime"],
-  });
+  .strictObject(hallTimeWindowShape)
+  .refine(windowOrdered, windowRefinement);
+
+/** One day as the sheet parser hands it in: the window plus its date. */
+export const hallTimeInputSchema = z
+  .strictObject({ date: dateSchema, ...hallTimeWindowShape })
+  .refine(windowOrdered, windowRefinement);
 
 export const hallTimeImportBodySchema = z
   .strictObject({
     rows: z.array(hallTimeInputSchema).min(1).max(400),
-    updatedOn: dateSchema.nullable().optional(),
   })
   .refine((b) => new Set(b.rows.map((r) => r.date)).size === b.rows.length, {
     message: "rows must have distinct dates",

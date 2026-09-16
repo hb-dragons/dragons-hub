@@ -1,4 +1,5 @@
 import type { HallTimeInput } from "../hall-times";
+import { timeToMinutes } from "./coverage";
 
 /**
  * Parser for the city's "Anlage T zum Mietantrag" sheet.
@@ -143,11 +144,6 @@ function collectBlock(grid: Grid, headerRow: number, block: Block): RawDay[] {
   return days;
 }
 
-function toMinutes(t: string): number {
-  const [h, m] = t.split(":").map(Number) as [number, number];
-  return h * 60 + m;
-}
-
 export function parseAnlageT(grid: Grid): AnlageTParseResult {
   const { headerRow, blocks } = findBlocks(grid);
   const hallNameCell = findLabelValue(grid, "Sporthalle:");
@@ -189,7 +185,7 @@ export function parseAnlageT(grid: Grid): AnlageTParseResult {
       const end = parseSheetTime(day.to);
       if (start && end) {
         flushRun();
-        if (toMinutes(end) <= toMinutes(start)) {
+        if (timeToMinutes(end) <= timeToMinutes(start)) {
           warnings.push(`${day.date}: end time is not after start time`);
           return;
         }

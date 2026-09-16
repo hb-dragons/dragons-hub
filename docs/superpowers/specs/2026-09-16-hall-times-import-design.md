@@ -51,7 +51,8 @@ hall time means a rental request still has to go to the city.
 | `createdAt`, `updatedAt` | timestamptz | |
 
 Constraints: unique `(venueId, date)`; check `kind <> 'open' OR (start_time IS
-NOT NULL AND end_time IS NOT NULL)`; check `start_time < end_time`.
+NOT NULL AND end_time IS NOT NULL)`; check `start_time < end_time`. Index on
+`date` for the batch reads keyed by day.
 
 No `seasonId`. The sheet's first and last dates bound the season, and reads are
 always by venue and date range.
@@ -73,8 +74,8 @@ yields it, so the parser never touches `xlsx`. It reads:
 - hall name from the cell right of "Sporthalle:" (row 3, column E)
 - the update date from the cell right of "Datum dieser Aktualisierung:"
 - two side-by-side blocks, columns C–G and I–M: `Tag | Datum | von | - | bis`.
-  A `Tag` cell matching `/^(Sa|So)\*?$/` starts a data row; the block ends at
-  the first row whose `Tag` cell is empty in both blocks.
+  A `Tag` cell matching `/^(Sa|So)\*?$/` starts a data row; each block ends
+  on its own at the first row whose `Tag` cell is not one.
 - per data row: `Datum` is a `Date`, an ISO string, `m/d/yy` or `d.m.yyyy`;
   `von` and `bis` are `HH:mm` (or the sheet's numeric `HHmm`). Both present →
   `open`. Both absent and the separator column (`-`) holds text other than a
@@ -114,9 +115,10 @@ the hall time, `partial` when they overlap, `uncovered` when they do not or no
 row exists, `closed` when the row is a closure.
 
 The API attaches `hallTime: { kind, startTime, endTime, note, coverage,
-gapBeforeMinutes, gapAfterMinutes } | null` to `BookingListItem`,
-`BookingDetail` and the `booking` sub-object of `MatchListItem` /
-`MatchDetail`. `null` means no row for that venue and day, and the coverage in
+gapBeforeMinutes, gapAfterMinutes } | null` (`BookingHallTime`) to
+`BookingListItem`, `BookingDetail` and the `booking` sub-object of
+`MatchListItem` / `MatchDetail`. The finder's per-booking entries carry only
+`hallTimeCoverage`; the candidate carries the day's hall time once. `null` means no row for that venue and day, and the coverage in
 that case is `uncovered`; list consumers therefore read coverage as
 `hallTime?.coverage ?? "uncovered"` through a shared helper, not inline.
 
@@ -133,8 +135,9 @@ All under `requireAuth`; permission per route.
 | DELETE | `/admin/venues/:id/hall-times/:date` | `venue:update` | Remove one row |
 
 Import body (`packages/contracts/src/venue.ts`, `hallTimeImportBodySchema`):
-`{ rows: HallTimeInput[], updatedOn?: string }`, at least one row, dates
-distinct, `open` rows with both times and `start < end`.
+`{ rows: HallTimeInput[] }`, at least one row, dates distinct, `open` rows
+with both times and `start < end`. The sheet's update date is shown in the
+dialog and not sent: nothing server-side reads it.
 
 Preview response: `{ span: { from, to }, added, changed, removed, unchanged,
 bookings: { bookingId, date, before: HallTimeCoverage, after: HallTimeCoverage }[] }`.
@@ -143,7 +146,9 @@ Apply response: the same plus `eventsEmitted`.
 Replace semantics: inside `[min(rows.date), max(rows.date)]` every stored row
 with `source = anlage_t` is deleted and the incoming rows are inserted. A
 `manual` row on a day the sheet has a value is replaced; on a day the sheet is
-`-` or blank it stays.
+`-` or blank it stays. Apply reads, plans, writes and emits inside one
+transaction. Cancelled bookings are left out of the coverage comparison: they
+ask the city for nothing.
 
 Service: `apps/api/src/services/hall-times/hall-time.service.ts` (reads,
 upsert, delete, import with preview and apply sharing one pure planner in
@@ -152,7 +157,7 @@ upsert, delete, import with preview and apply sharing one pure planner in
 ## Flag surfaces
 
 - **Bookings list** (`/admin/bookings`): a coverage badge column and a
-  `coverage` filter (`uncovered | partial | closed`). Detail sheet shows the
+  `coverage` filter over all four values. Detail sheet shows the
   hall time, the booking window, and the gap in minutes.
 - **Game plan** (`/admin/matches`): a badge on home-game rows whose booking is
   not `covered`, styled like the ghost badge. Match detail shows the day's hall
@@ -165,7 +170,10 @@ upsert, delete, import with preview and apply sharing one pure planner in
   inside each tier unflagged before flagged, then chronological. The
   `AlternativeDateGroup` union grows by `hallTimeOpen` and `closed`.
 - **Event** `booking.hall_time.missing` (`BOOKING_HALL_TIME_MISSING`):
-  payload `{ bookingId, venueId, venueName, date, window, hallTime, coverage }`.
+  payload `{ bookingId, venueId, venueName, date, startTime, endTime,
+  coverage, hallTime }` where `hallTime` is the day's `{ kind, startTime,
+  endTime, note }` or null. Always immediate urgency, like
+  `booking.needs_reconfirmation`.
   Emitted by `reconcileAfterSync` and by the import apply, once per booking
   whose coverage changes from `covered` (or from no booking) to another state
   within that same operation: reconcile compares the booking window before
@@ -177,7 +185,7 @@ upsert, delete, import with preview and apply sharing one pure planner in
 
 ## Upload dialog
 
-`apps/web/src/components/admin/venues/hall-time-upload-dialog.tsx`: file
+`apps/web/src/components/admin/hall-times/hall-time-import-dialog.tsx`: file
 input → `await import("xlsx")` → `sheet_to_json` grid → `parseAnlageT` →
 venue picker preselected by case-insensitive name containment (`Goetheschule`
 in `Gymnasium Goetheschule`) → preview call → table of added / changed /

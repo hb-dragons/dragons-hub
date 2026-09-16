@@ -33,7 +33,10 @@ function getMapUrl(venue: VenueListItem): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts)}`;
 }
 
-function getColumns(t: ReturnType<typeof useTranslations<"venues">>): ColumnDef<VenueListItem, unknown>[] {
+function getColumns(
+  t: ReturnType<typeof useTranslations<"venues">>,
+  onOpenHallTimes: (venue: VenueListItem) => void,
+): ColumnDef<VenueListItem, unknown>[] {
   return [
     {
       accessorKey: "name",
@@ -80,13 +83,19 @@ function getColumns(t: ReturnType<typeof useTranslations<"venues">>): ColumnDef<
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.hallTimes")} />
       ),
-      cell: () => (
-        <span
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground"
-          title={t("hallTimes")}
+      cell: ({ row }) => (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`${t("hallTimes")}: ${row.original.name}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onOpenHallTimes(row.original)
+          }}
         >
           <CalendarClock className="h-4 w-4" />
-        </span>
+        </Button>
       ),
       enableSorting: false,
       meta: { label: t("columns.hallTimes") },
@@ -145,8 +154,8 @@ export function VenueListTable() {
   const { mutate: mutateKey } = useSWRConfig()
   const { data: session } = authClient.useSession()
   const canEdit = can(session?.user ?? null, "venue", "update")
-  const columns = useMemo(() => getColumns(t), [t])
   const [selectedVenue, setSelectedVenue] = useState<VenueListItem | null>(null)
+  const columns = useMemo(() => getColumns(t, setSelectedVenue), [t])
   const [showImport, setShowImport] = useState(false)
 
   // A failed request is not "no venues found" — never collapse the two.
