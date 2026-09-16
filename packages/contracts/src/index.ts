@@ -18,6 +18,8 @@ export {
 export {
   matchListQuerySchema,
   publicMatchListQuerySchema,
+  adminMatchListQuerySchema,
+  gamePlanGhostItemSchema,
   matchIdParamSchema,
   publicMatchIdParamSchema,
   matchUpdateBodySchema,
@@ -26,6 +28,7 @@ export {
   alternativeDatesQuerySchema,
   type MatchListQuery,
   type PublicMatchListQuery,
+  type AdminMatchListQuery,
   type MatchUpdateBody,
   type MatchIdParam,
   type MatchHistoryQuery,

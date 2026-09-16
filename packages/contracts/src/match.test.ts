@@ -7,7 +7,10 @@ import {
   matchHistoryQuerySchema,
   releaseOverrideParamsSchema,
   alternativeDatesQuerySchema,
+  adminMatchListQuerySchema,
+  gamePlanGhostItemSchema,
 } from "./match";
+import type { GamePlanGhostItem } from "@dragons/shared";
 
 describe("matchListQuerySchema", () => {
   it("parses minimal input with defaults", () => {
@@ -363,5 +366,65 @@ describe("alternativeDatesQuerySchema", () => {
     expect(
       alternativeDatesQuerySchema.parse({ from: "2026-03-14", to: "2026-03-14" }),
     ).toEqual({ from: "2026-03-14", to: "2026-03-14" });
+  });
+});
+
+describe("adminMatchListQuerySchema", () => {
+  it("leaves includeGhosts unset by default", () => {
+    expect(adminMatchListQuerySchema.parse({}).includeGhosts).toBeUndefined();
+  });
+
+  it("transforms includeGhosts strings to booleans", () => {
+    expect(adminMatchListQuerySchema.parse({ includeGhosts: "true" }).includeGhosts).toBe(true);
+    expect(adminMatchListQuerySchema.parse({ includeGhosts: "false" }).includeGhosts).toBe(false);
+  });
+
+  it("rejects any other includeGhosts value", () => {
+    expect(adminMatchListQuerySchema.safeParse({ includeGhosts: "yes" }).success).toBe(false);
+  });
+
+  it("keeps includeGhosts off the public list query", () => {
+    expect(publicMatchListQuerySchema.parse({ includeGhosts: "true" })).not.toHaveProperty("includeGhosts");
+  });
+});
+
+describe("gamePlanGhostItemSchema", () => {
+  const ghost = {
+    kind: "ghost",
+    id: 7,
+    kickoffDate: "2026-03-14",
+    kickoffTime: "18:00:00",
+    effectiveKickoffDate: "2026-03-21",
+    effectiveKickoffTime: "16:00:00",
+    overrideReason: "Hallensperrung",
+    overrideAuthorName: "Petra Planer",
+    homeTeamName: "Dragons",
+  } satisfies Partial<GamePlanGhostItem>;
+
+  it("parses a ghost item and keeps its display fields", () => {
+    const parsed = gamePlanGhostItemSchema.parse(ghost);
+    expect(parsed).toMatchObject(ghost);
+  });
+
+  it("rejects a real match item", () => {
+    expect(gamePlanGhostItemSchema.safeParse({ ...ghost, kind: "match" }).success).toBe(false);
+  });
+
+  it("accepts a ghost with neither reason nor author", () => {
+    const parsed = gamePlanGhostItemSchema.parse({ ...ghost, overrideReason: null, overrideAuthorName: null });
+    expect(parsed).toMatchObject({ overrideReason: null, overrideAuthorName: null });
+  });
+
+  it.each(["overrideReason", "overrideAuthorName"] as const)(
+    "rejects a ghost that omits %s instead of sending null",
+    (key) => {
+      const { [key]: _omit, ...rest } = ghost;
+      expect(gamePlanGhostItemSchema.safeParse(rest).success).toBe(false);
+    },
+  );
+
+  it("rejects a ghost without its effective kickoff", () => {
+    const { effectiveKickoffDate: _omit, ...rest } = ghost;
+    expect(gamePlanGhostItemSchema.safeParse(rest).success).toBe(false);
   });
 });

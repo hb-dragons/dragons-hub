@@ -125,8 +125,20 @@ The club's record that it needs one of its halls on one day for one or more home
 _Avoid_: venue slot, reservation, Hallenzeit
 
 **Rescheduling (Spielverlegung)**:
-Moving a game to another kickoff. Agreed between the two clubs and entered on the federation's side; the Hub learns of it through the sync.
+Moving a game to another kickoff. Agreed between the two clubs and entered on the federation's side; the Hub learns of it through the sync, or earlier through an override when the club knows before the federation has recorded it.
 _Avoid_: postponement, moving a match
+
+**Override**:
+A value the club sets on a game by hand that the sync leaves untouched until the federation publishes the same value. Carries a reason and who set it.
+_Avoid_: manual change, local value
+
+**Official kickoff (offizieller Termin)**:
+The kickoff the federation currently publishes for a game. Equals the game's kickoff unless an override is active.
+_Avoid_: remote kickoff, synced date
+
+**Ghost entry (Geisterzeile)**:
+A read-only row in the game plan on the official kickoff day of a game whose override moved it to another day. Marks where the federation still lists the game.
+_Avoid_: placeholder, shadow row, duplicate
 
 **Alternative date (Ausweichtermin)**:
 A weekend day on which a game to be rescheduled could take place: neither squad plays that day, and for a home game the hall situation on that day is shown so staff can judge it. A proposal for the other club, not a decision.

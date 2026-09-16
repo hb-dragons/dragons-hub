@@ -1,12 +1,14 @@
 import type {
   PaginatedResponse,
   MatchListItem,
+  GamePlanItem,
   MatchDetailResponse,
   MatchChangeHistoryResponse,
   AlternativeDatesResponse,
 } from "@dragons/shared";
 import type {
   MatchListQuery,
+  AdminMatchListQuery,
   MatchUpdateBody,
   MatchHistoryQuery,
   AlternativeDatesQuery,
@@ -20,6 +22,15 @@ export function matchEndpoints(client: ApiClient) {
         "/admin/matches",
         query as Record<string, string | number | boolean | undefined>,
       );
+    },
+    /** The admin game plan: the match list plus ghost entries. */
+    gamePlan(
+      query?: Partial<Omit<AdminMatchListQuery, "includeGhosts">>,
+    ): Promise<PaginatedResponse<GamePlanItem>> {
+      return client.get("/admin/matches", {
+        ...(query as Record<string, string | number | boolean | undefined>),
+        includeGhosts: true,
+      });
     },
     get(id: number): Promise<MatchDetailResponse> {
       return client.get(`/admin/matches/${id}`);

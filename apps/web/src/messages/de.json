@@ -266,6 +266,10 @@
       "active": "Aktiv",
       "cancelled": "Abgesagt",
       "forfeited": "Kampflos"
+    },
+    "ghost": {
+      "movedTo": "Verlegt → {kickoff}",
+      "tooltip": "Laut Verband noch am {official}. Im Hub verlegt auf {effective}{details, select, reasonAuthor { (Grund: {reason}, von {author})} reason { (Grund: {reason})} author { (von {author})} other {}}."
     }
   },
   "matchDetail": {

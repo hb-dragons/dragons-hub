@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { idParamSchema } from "./common";
-import { dateSchema, matchFormSchema } from "@dragons/shared";
+import { dateSchema, timeSchema, matchFormSchema } from "@dragons/shared";
 
 export const matchListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(1000).default(1000),
@@ -27,6 +27,36 @@ export const matchListQuerySchema = z.object({
 // shared one.
 export const publicMatchListQuerySchema = matchListQuerySchema.extend({
   opponentApiId: z.coerce.number().int().positive().optional(),
+});
+
+/**
+ * GET /admin/matches. `includeGhosts=true` is the admin game plan's opt-in to
+ * ghost entries; every other caller of the endpoint (dashboard, broadcast)
+ * leaves it off and gets plain match items. Kept off the shared schema so the
+ * public route, which spreads its whole query into the service, cannot ask
+ * for ghosts.
+ */
+export const adminMatchListQuerySchema = matchListQuerySchema.extend({
+  includeGhosts: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
+});
+
+/**
+ * Response shape of a ghost entry on the admin game plan. Only the fields that
+ * make a ghost a ghost are pinned here; the display fields it shares with a
+ * match list item pass through untouched.
+ */
+export const gamePlanGhostItemSchema = z.looseObject({
+  kind: z.literal("ghost"),
+  id: z.number().int().positive(),
+  kickoffDate: dateSchema,
+  kickoffTime: timeSchema,
+  effectiveKickoffDate: dateSchema,
+  effectiveKickoffTime: timeSchema,
+  overrideReason: z.string().min(1).nullable(),
+  overrideAuthorName: z.string().min(1).nullable(),
 });
 
 export const matchIdParamSchema = idParamSchema;
@@ -89,6 +119,7 @@ export const alternativeDatesQuerySchema = z
   });
 
 export type MatchListQuery = z.infer<typeof matchListQuerySchema>;
+export type AdminMatchListQuery = z.infer<typeof adminMatchListQuerySchema>;
 export type PublicMatchListQuery = z.infer<typeof publicMatchListQuerySchema>;
 export type MatchUpdateBody = z.infer<typeof matchUpdateBodySchema>;
 export type MatchIdParam = z.infer<typeof matchIdParamSchema>;
