@@ -55,6 +55,8 @@ export const gamePlanGhostItemSchema = z.looseObject({
   kickoffTime: timeSchema,
   effectiveKickoffDate: dateSchema,
   effectiveKickoffTime: timeSchema,
+  overrideReason: z.string().min(1).nullable(),
+  overrideAuthorName: z.string().min(1).nullable(),
 });
 
 export const matchIdParamSchema = idParamSchema;

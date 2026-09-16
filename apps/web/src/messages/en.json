@@ -268,7 +268,8 @@
       "forfeited": "Forfeited"
     },
     "ghost": {
-      "movedTo": "Moved → {kickoff}"
+      "movedTo": "Moved → {kickoff}",
+      "tooltip": "The federation still lists it on {official}. Moved in the Hub to {effective}{details, select, reasonAuthor { (reason: {reason}, by {author})} reason { (reason: {reason})} author { (by {author})} other {}}."
     }
   },
   "matchDetail": {

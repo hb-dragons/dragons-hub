@@ -64,6 +64,8 @@ const ghost: GamePlanGhostItem = {
   kickoffTime: "18:00:00",
   effectiveKickoffDate: "2026-03-21",
   effectiveKickoffTime: "16:00:00",
+  overrideReason: "Hallensperrung",
+  overrideAuthorName: "Petra Planer",
   homeScore: null,
   guestScore: null,
   anschreiber: null,
@@ -85,6 +87,13 @@ function renderTable(items: GamePlanItem[], locale: "de" | "en" = "de") {
       <MatchListTable />
     </NextIntlClientProvider>,
   );
+}
+
+/** Focus the ghost badge and return the tooltip's text. */
+async function openTooltip(badge: RegExp = /^Verlegt →/): Promise<string> {
+  fireEvent.focus(screen.getByText(badge));
+  const tooltip = await screen.findByRole("tooltip");
+  return tooltip.textContent ?? "";
 }
 
 function ghostRow(): HTMLElement {
@@ -115,6 +124,44 @@ describe("MatchListTable ghost entries", () => {
     expect(row.getByText(/14\.03\.26/)).toBeInTheDocument();
     expect(row.getByText("18:00")).toBeInTheDocument();
     expect(row.getByText("Verlegt → Sa 21.03. 16:00")).toBeInTheDocument();
+  });
+
+  it("explains the divergence in a tooltip with reason and author", async () => {
+    renderTable([ghost]);
+
+    expect(await openTooltip()).toBe(
+      "Laut Verband noch am Sa 14.03. 18:00. Im Hub verlegt auf Sa 21.03. 16:00 (Grund: Hallensperrung, von Petra Planer).",
+    );
+  });
+
+  it("drops the reason from the tooltip when none was given", async () => {
+    renderTable([{ ...ghost, overrideReason: null }]);
+
+    const text = await openTooltip();
+    expect(text).toBe("Laut Verband noch am Sa 14.03. 18:00. Im Hub verlegt auf Sa 21.03. 16:00 (von Petra Planer).");
+    expect(text).not.toContain("Grund");
+  });
+
+  it("drops the author from the tooltip when unknown", async () => {
+    renderTable([{ ...ghost, overrideAuthorName: null }]);
+
+    const text = await openTooltip();
+    expect(text).toBe("Laut Verband noch am Sa 14.03. 18:00. Im Hub verlegt auf Sa 21.03. 16:00 (Grund: Hallensperrung).");
+    expect(text).not.toContain("von");
+  });
+
+  it("drops the parenthesis when neither reason nor author is known", async () => {
+    renderTable([{ ...ghost, overrideReason: null, overrideAuthorName: null }]);
+
+    expect(await openTooltip()).toBe("Laut Verband noch am Sa 14.03. 18:00. Im Hub verlegt auf Sa 21.03. 16:00.");
+  });
+
+  it("uses the English tooltip text", async () => {
+    renderTable([ghost], "en");
+
+    expect(await openTooltip(/^Moved →/)).toBe(
+      "The federation still lists it on Sat 14.03. 18:00. Moved in the Hub to Sat 21.03. 16:00 (reason: Hallensperrung, by Petra Planer).",
+    );
   });
 
   it("uses the English badge text", () => {

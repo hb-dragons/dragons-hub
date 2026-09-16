@@ -32,7 +32,7 @@ import {
   getOwnTeamLabel,
   getOpponentName,
 } from "./utils"
-import type { GamePlanItem } from "./types"
+import type { GamePlanGhostItem, GamePlanItem } from "./types"
 import { MatchEditSheet } from "./match-edit-sheet"
 import { TeamBadge } from "@/components/admin/shared/team-badge"
 
@@ -47,6 +47,47 @@ function OverrideDot({ match, field }: { match: GamePlanItem; field: string }) {
       </TooltipTrigger>
       <TooltipContent>
         <p className="text-xs">{t("overrideActive")}</p>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** Which arm of the `matches.ghost.tooltip` select applies. */
+function ghostTooltipVariant(
+  ghost: GamePlanGhostItem,
+): "reasonAuthor" | "reason" | "author" | "none" {
+  if (ghost.overrideReason && ghost.overrideAuthorName) return "reasonAuthor"
+  if (ghost.overrideReason) return "reason"
+  if (ghost.overrideAuthorName) return "author"
+  return "none"
+}
+
+/** "Verlegt →" badge on a ghost entry; its tooltip says why the game moved. */
+function GhostBadge({ ghost, dateLocale }: { ghost: GamePlanGhostItem; dateLocale: string }) {
+  const t = useTranslations("matches.ghost")
+  const effective = formatKickoffCompact(
+    ghost.effectiveKickoffDate,
+    ghost.effectiveKickoffTime,
+    dateLocale,
+  )
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="secondary" className="ml-2 not-italic" tabIndex={0}>
+          {t("movedTo", { kickoff: effective })}
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="text-xs">
+          {t("tooltip", {
+            official: formatKickoffCompact(ghost.kickoffDate, ghost.kickoffTime, dateLocale),
+            effective,
+            details: ghostTooltipVariant(ghost),
+            reason: ghost.overrideReason ?? "",
+            author: ghost.overrideAuthorName ?? "",
+          })}
+        </p>
       </TooltipContent>
     </Tooltip>
   )
@@ -76,15 +117,7 @@ function getColumns(
           {format.dateTime(clubDayAnchor(row.original.kickoffDate), "matchDate")}
           <OverrideDot match={row.original} field="kickoffDate" />
           {row.original.kind === "ghost" && (
-            <Badge variant="secondary" className="ml-2 not-italic">
-              {t("ghost.movedTo", {
-                kickoff: formatKickoffCompact(
-                  row.original.effectiveKickoffDate,
-                  row.original.effectiveKickoffTime,
-                  dateLocale,
-                ),
-              })}
-            </Badge>
+            <GhostBadge ghost={row.original} dateLocale={dateLocale} />
           )}
         </span>
       ),

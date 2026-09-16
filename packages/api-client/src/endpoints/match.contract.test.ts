@@ -76,6 +76,8 @@ describe("match request bodies satisfy @dragons/contracts schemas", () => {
       kickoffTime: "18:00:00",
       effectiveKickoffDate: "2026-03-21",
       effectiveKickoffTime: "16:00:00",
+      overrideReason: null,
+      overrideAuthorName: "Petra Planer",
     };
     const fetchFn = vi.fn(async () =>
       new Response(JSON.stringify({ items: [ghost], total: 0, limit: 1000, offset: 0, hasMore: false }), {

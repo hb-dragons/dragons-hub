@@ -38,6 +38,7 @@ import {
   matches,
   matchOverrides,
   matchRemoteVersions,
+  user,
 } from "@dragons/db/schema";
 import {
   setupTestDb,
@@ -82,6 +83,7 @@ beforeEach(async () => {
     .returning({ id: leagues.id });
   leagueId = leagueRows[0]!.id;
   otherLeagueId = leagueRows[1]!.id;
+  await ctx.db.insert(user).values({ id: "user-1", name: "Petra Planer", email: "petra@example.test" });
   await ctx.db.insert(teams).values([
     { apiTeamPermanentId: OWN_SQUAD, seasonTeamId: 1, teamCompetitionId: 1, name: "Dragons 1", clubId: 1, isOwnClub: true },
     { apiTeamPermanentId: OWN_SECOND_SQUAD, seasonTeamId: 2, teamCompetitionId: 2, name: "Dragons 2", clubId: 1, isOwnClub: true },
@@ -111,6 +113,9 @@ async function seedGame(opts: {
   league?: number;
   home?: number;
   homeScore?: number;
+  /** Reason and author id recorded on the kickoff date override. */
+  reason?: string | null;
+  changedBy?: string | null;
 }): Promise<number> {
   const official = opts.official ?? opts.effective;
   apiMatchId++;
@@ -141,7 +146,12 @@ async function seedGame(opts: {
     { matchId: id, versionNumber: 2, snapshot: snapshot(official), dataHash: "b" },
   ]);
   for (const fieldName of opts.overrides ?? []) {
-    await ctx.db.insert(matchOverrides).values({ matchId: id, fieldName, changedBy: "user-1" });
+    await ctx.db.insert(matchOverrides).values({
+      matchId: id,
+      fieldName,
+      reason: opts.reason === undefined ? "Hallensperrung" : opts.reason,
+      changedBy: opts.changedBy === undefined ? "user-1" : opts.changedBy,
+    });
   }
   return id;
 }
@@ -187,6 +197,38 @@ describe("GET /matches?includeGhosts=true — ghost entries", () => {
       guestTeamName: "Rivals",
       leagueName: "Oberliga",
     });
+  });
+
+  it("carries the date override's reason and the name of who set it", async () => {
+    await seedMovedGame();
+
+    const [item] = ghosts(await gamePlan(MARCH_14));
+
+    expect(item).toMatchObject({ overrideReason: "Hallensperrung", overrideAuthorName: "Petra Planer" });
+  });
+
+  it.each([
+    ["no reason", { reason: null }],
+    ["an empty reason", { reason: "" }],
+    ["a blank reason", { reason: "   " }],
+  ])("reports %s as a null overrideReason", async (_label, extra) => {
+    await seedMovedGame(extra);
+
+    const [item] = ghosts(await gamePlan(MARCH_14));
+
+    expect(item).toMatchObject({ overrideReason: null, overrideAuthorName: "Petra Planer" });
+  });
+
+  it.each([
+    ["no author", { changedBy: null }],
+    ["the route's 'unknown' placeholder", { changedBy: "unknown" }],
+    ["a deleted account", { changedBy: "user-gone" }],
+  ])("reports %s as a null overrideAuthorName", async (_label, extra) => {
+    await seedMovedGame(extra);
+
+    const [item] = ghosts(await gamePlan(MARCH_14));
+
+    expect(item).toMatchObject({ overrideReason: "Hallensperrung", overrideAuthorName: null });
   });
 
   it("does not count the ghost in total", async () => {

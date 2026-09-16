@@ -396,6 +396,8 @@ describe("gamePlanGhostItemSchema", () => {
     kickoffTime: "18:00:00",
     effectiveKickoffDate: "2026-03-21",
     effectiveKickoffTime: "16:00:00",
+    overrideReason: "Hallensperrung",
+    overrideAuthorName: "Petra Planer",
     homeTeamName: "Dragons",
   } satisfies Partial<GamePlanGhostItem>;
 
@@ -407,6 +409,19 @@ describe("gamePlanGhostItemSchema", () => {
   it("rejects a real match item", () => {
     expect(gamePlanGhostItemSchema.safeParse({ ...ghost, kind: "match" }).success).toBe(false);
   });
+
+  it("accepts a ghost with neither reason nor author", () => {
+    const parsed = gamePlanGhostItemSchema.parse({ ...ghost, overrideReason: null, overrideAuthorName: null });
+    expect(parsed).toMatchObject({ overrideReason: null, overrideAuthorName: null });
+  });
+
+  it.each(["overrideReason", "overrideAuthorName"] as const)(
+    "rejects a ghost that omits %s instead of sending null",
+    (key) => {
+      const { [key]: _omit, ...rest } = ghost;
+      expect(gamePlanGhostItemSchema.safeParse(rest).success).toBe(false);
+    },
+  );
 
   it("rejects a ghost without its effective kickoff", () => {
     const { effectiveKickoffDate: _omit, ...rest } = ghost;

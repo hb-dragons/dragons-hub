@@ -15,6 +15,7 @@ import {
   refereeAssignmentIntents,
   matchChanges,
   teamEntries,
+  user,
 } from "@dragons/db/schema";
 import { eq, sql, and, or, inArray, gte, lte, asc, desc, isNull, isNotNull, ne } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
@@ -661,7 +662,13 @@ async function getGhostEntries(
   }
 
   const candidates = await getDb()
-    .select({ id: matches.id, officialDate, officialTime })
+    .select({
+      id: matches.id,
+      officialDate,
+      officialTime,
+      reason: matchOverrides.reason,
+      authorName: user.name,
+    })
     .from(matches)
     .innerJoin(
       matchOverrides,
@@ -677,6 +684,9 @@ async function getGhostEntries(
       ),
     )
     .leftJoin(leagues, eq(matches.leagueId, leagues.id))
+    // changedBy holds the account id; a deleted account or the route's
+    // "unknown" placeholder finds no row and leaves the author unnamed.
+    .leftJoin(user, eq(user.id, matchOverrides.changedBy))
     .where(and(...conditions));
 
   if (candidates.length === 0) return [];
@@ -693,6 +703,8 @@ async function getGhostEntries(
       kickoffTime: asTimeColumn(o.officialTime),
       effectiveKickoffDate: row.kickoffDate,
       effectiveKickoffTime: row.kickoffTime,
+      overrideReason: o.reason?.trim() || null,
+      overrideAuthorName: o.authorName?.trim() || null,
       // A ghost is a marker, not the game: no score, crew or booking on it.
       homeScore: null,
       guestScore: null,

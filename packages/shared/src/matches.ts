@@ -118,6 +118,10 @@ export interface GamePlanGhostItem extends MatchListItem {
   kind: "ghost";
   effectiveKickoffDate: string;
   effectiveKickoffTime: string;
+  /** Reason recorded on the kickoff date override; null when none was given. */
+  overrideReason: string | null;
+  /** Name of the account that set the override; null when it is unknown. */
+  overrideAuthorName: string | null;
 }
 
 export type GamePlanItem = GamePlanMatchItem | GamePlanGhostItem;
