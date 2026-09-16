@@ -161,9 +161,12 @@ upsert, delete, import with preview and apply sharing one pure planner in
 - **Event** `booking.hall_time.missing` (`BOOKING_HALL_TIME_MISSING`):
   payload `{ bookingId, venueId, venueName, date, window, hallTime, coverage }`.
   Emitted by `reconcileAfterSync` and by the import apply, once per booking
-  that moves from `covered` (or from having no booking) into another state.
-  Dedup key `(bookingId, coverage)` against the last emitted state, held in the
-  event payload history the pipeline already keeps for `booking.*` events.
+  whose coverage changes from `covered` (or from no booking) to another state
+  within that same operation: reconcile compares the booking window before
+  and after its update against the stored hall times; import compares the
+  stored bookings against the hall times before and after the replace. No
+  emitted-state history is kept, so a repeated import of the same sheet emits
+  nothing and a game that stays uncovered across syncs is reported once.
   Template in `templates/booking.ts`.
 
 ## Upload dialog
