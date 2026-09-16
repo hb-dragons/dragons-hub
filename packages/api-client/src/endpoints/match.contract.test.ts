@@ -1,10 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  adminMatchListQuerySchema,
+  gamePlanGhostItemSchema,
   matchListQuerySchema,
   matchUpdateBodySchema,
   matchHistoryQuerySchema,
   alternativeDatesQuerySchema,
 } from "@dragons/contracts";
+import type { GamePlanGhostItem } from "@dragons/shared";
 import { ApiClient } from "../client";
 import { matchEndpoints } from "./match";
 
@@ -40,6 +43,52 @@ describe("match request bodies satisfy @dragons/contracts schemas", () => {
     const query = Object.fromEntries(new URL(calls[0]!.url).searchParams);
     const parsed = matchListQuerySchema.safeParse(query);
     expect(parsed.error?.issues, "matchListQuerySchema rejected the list query").toBeUndefined();
+  });
+
+  it("game plan query asks for ghosts and parses against adminMatchListQuerySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.gamePlan({ seasonId: 3 });
+    const url = new URL(calls[0]!.url);
+    expect(url.pathname).toBe("/admin/matches");
+    const parsed = adminMatchListQuerySchema.safeParse(Object.fromEntries(url.searchParams));
+    expect(parsed.error?.issues, "adminMatchListQuerySchema rejected the game plan query").toBeUndefined();
+    expect(parsed.data).toMatchObject({ includeGhosts: true, seasonId: 3 });
+  });
+
+  it("game plan ghost items parse against gamePlanGhostItemSchema", async () => {
+    const ghost: GamePlanGhostItem = {
+      id: 7, apiMatchId: 70, matchNo: 1, matchDay: 1,
+      homeTeamApiId: 100, homeTeamName: "Dragons", homeTeamNameShort: null,
+      homeTeamCustomName: null, homeClubId: 1,
+      guestTeamApiId: 200, guestTeamName: "Rivals", guestTeamNameShort: null,
+      guestTeamCustomName: null, guestClubId: 2,
+      homeIsOwnClub: true, guestIsOwnClub: false,
+      homeBadgeColor: null, guestBadgeColor: null,
+      homeScore: null, guestScore: null,
+      leagueId: 1, leagueName: "Oberliga",
+      venueId: null, venueName: null, venueStreet: null, venuePostalCode: null,
+      venueCity: null, venueNameOverride: null,
+      isConfirmed: false, isForfeited: false, isCancelled: false,
+      anschreiber: null, zeitnehmer: null, shotclock: null, publicComment: null,
+      hasLocalChanges: true, overriddenFields: [], booking: null,
+      kind: "ghost",
+      kickoffDate: "2026-03-14",
+      kickoffTime: "18:00:00",
+      effectiveKickoffDate: "2026-03-21",
+      effectiveKickoffTime: "16:00:00",
+    };
+    const fetchFn = vi.fn(async () =>
+      new Response(JSON.stringify({ items: [ghost], total: 0, limit: 1000, offset: 0, hasMore: false }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const api = matchEndpoints(
+      new ApiClient({ baseUrl: "https://example.test", fetchFn: fetchFn as unknown as typeof fetch }),
+    );
+    const { items } = await api.gamePlan();
+    const parsed = gamePlanGhostItemSchema.safeParse(items[0]);
+    expect(parsed.error?.issues, "gamePlanGhostItemSchema rejected the ghost item").toBeUndefined();
   });
 
   it("history query parses against matchHistoryQuerySchema", async () => {

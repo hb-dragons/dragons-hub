@@ -3,6 +3,7 @@ import { describeRoute, validator } from "hono-openapi";
 import type { AppEnv } from "../../types";
 import {
   getOwnClubMatches,
+  getGamePlan,
   getMatchDetail,
   getMatchChangeHistory,
   updateMatchLocal,
@@ -13,7 +14,7 @@ import { validationHook } from "../../middleware/validation";
 import { reconcileMatch } from "../../services/venue-booking/venue-booking.service";
 import { findAlternativeDates } from "../../services/reschedule/alternative-dates.service";
 import {
-  matchListQuerySchema,
+  adminMatchListQuerySchema,
   matchIdParamSchema,
   matchHistoryQuerySchema,
   matchUpdateBodySchema,
@@ -29,17 +30,17 @@ const matchRoutes = new Hono<AppEnv>();
 matchRoutes.get(
   "/matches",
   requirePermission("match", "view"),
-  validator("query", matchListQuerySchema, validationHook),
+  validator("query", adminMatchListQuerySchema, validationHook),
   describeRoute({
-    description: "List own club matches",
+    description: "List own club matches; includeGhosts=true adds ghost entries for the game plan",
     tags: ["Matches"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = c.req.valid("query");
+    const { includeGhosts, ...query } = c.req.valid("query");
     const seasonId = query.seasonId ?? (await getActiveSeasonId()) ?? NO_SEASON;
-    const result = await getOwnClubMatches({ ...query, seasonId });
-    return c.json(result);
+    const loadMatches = includeGhosts ? getGamePlan : getOwnClubMatches;
+    return c.json(await loadMatches({ ...query, seasonId }));
   },
 );
 

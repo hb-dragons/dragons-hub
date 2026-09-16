@@ -3,6 +3,8 @@ export {
   type MatchFormValues,
   type FieldDiff,
   type MatchListItem,
+  type GamePlanItem,
+  type GamePlanGhostItem,
   type MatchDetail,
   type MatchDetailResponse,
   type MatchChangeHistoryItem,

@@ -102,6 +102,26 @@ export interface MatchListItem {
   } | null;
 }
 
+/** A real game on the admin game plan. */
+export interface GamePlanMatchItem extends MatchListItem {
+  kind: "match";
+}
+
+/**
+ * Ghost entry (see CONTEXT.md): a read-only row on the official kickoff day of
+ * a game whose kickoff date override moved it to another day. `id` is the real
+ * game's id, and `kickoffDate`/`kickoffTime` hold the official kickoff (the
+ * federation's current value) so the row sorts and filters by the day it
+ * stands on. The effective kickoff is where the real row sits.
+ */
+export interface GamePlanGhostItem extends MatchListItem {
+  kind: "ghost";
+  effectiveKickoffDate: string;
+  effectiveKickoffTime: string;
+}
+
+export type GamePlanItem = GamePlanMatchItem | GamePlanGhostItem;
+
 export interface MatchDetail extends MatchListItem {
   homeHalftimeScore: number | null;
   guestHalftimeScore: number | null;

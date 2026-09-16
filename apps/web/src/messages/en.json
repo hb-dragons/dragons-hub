@@ -266,6 +266,9 @@
       "active": "Active",
       "cancelled": "Cancelled",
       "forfeited": "Forfeited"
+    },
+    "ghost": {
+      "movedTo": "Moved → {kickoff}"
     }
   },
   "matchDetail": {

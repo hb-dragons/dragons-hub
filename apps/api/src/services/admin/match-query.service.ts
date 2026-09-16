@@ -16,12 +16,15 @@ import {
   matchChanges,
   teamEntries,
 } from "@dragons/db/schema";
-import { eq, sql, and, or, inArray, gte, lte, asc, desc, isNull, isNotNull } from "drizzle-orm";
+import { eq, sql, and, or, inArray, gte, lte, asc, desc, isNull, isNotNull, ne } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { computeDiffs } from "./match-diff.service";
 import type {
   OverrideInfo,
   MatchListItem,
+  GamePlanItem,
+  GamePlanGhostItem,
   MatchDetail,
   MatchDetailResponse,
   MatchChangeHistoryItem,
@@ -460,21 +463,22 @@ export async function buildDetailResponse(
   };
 }
 
-export async function getOwnClubMatches(params: MatchListParams) {
-  const { limit, offset, leagueId, dateFrom, dateTo, sort = "asc", hasScore, teamApiId, teamApiIds, opponentApiId, excludeInactive, seasonId } = params;
-
+async function loadOwnTeamIds(): Promise<number[]> {
   const ownTeams = await getDb()
     .select({ apiTeamPermanentId: teams.apiTeamPermanentId })
     .from(teams)
     .where(eq(teams.isOwnClub, true));
+  return ownTeams.map((t) => t.apiTeamPermanentId);
+}
 
-  const ownTeamIds = ownTeams.map((t) => t.apiTeamPermanentId);
+/**
+ * Every list filter except the date range. The season filter references
+ * `leagues.season_ref_id`, so the query these feed must join `leagues`.
+ */
+function listFilterConditions(ownTeamIds: number[], params: MatchListParams): SQL[] {
+  const { leagueId, hasScore, teamApiId, teamApiIds, opponentApiId, excludeInactive, seasonId } = params;
 
-  if (ownTeamIds.length === 0) {
-    return { items: [], total: 0, limit, offset, hasMore: false };
-  }
-
-  const conditions = [
+  const conditions: SQL[] = [
     or(
       inArray(matches.homeTeamApiId, ownTeamIds),
       inArray(matches.guestTeamApiId, ownTeamIds),
@@ -483,12 +487,6 @@ export async function getOwnClubMatches(params: MatchListParams) {
 
   if (leagueId) {
     conditions.push(eq(matches.leagueId, leagueId));
-  }
-  if (dateFrom) {
-    conditions.push(gte(matches.kickoffDate, dateFrom));
-  }
-  if (dateTo) {
-    conditions.push(lte(matches.kickoffDate, dateTo));
   }
   if (teamApiId) {
     conditions.push(
@@ -532,6 +530,25 @@ export async function getOwnClubMatches(params: MatchListParams) {
   }
   if (seasonId !== undefined) {
     conditions.push(eq(leagues.seasonRefId, seasonId));
+  }
+  return conditions;
+}
+
+export async function getOwnClubMatches(params: MatchListParams) {
+  const { limit, offset, dateFrom, dateTo, sort = "asc", seasonId } = params;
+
+  const ownTeamIds = await loadOwnTeamIds();
+
+  if (ownTeamIds.length === 0) {
+    return { items: [], total: 0, limit, offset, hasMore: false };
+  }
+
+  const conditions = listFilterConditions(ownTeamIds, params);
+  if (dateFrom) {
+    conditions.push(gte(matches.kickoffDate, dateFrom));
+  }
+  if (dateTo) {
+    conditions.push(lte(matches.kickoffDate, dateTo));
   }
 
   const whereClause = conditions.length === 1 ? conditions[0]! : and(...conditions)!;
@@ -603,6 +620,112 @@ export async function getOwnClubMatches(params: MatchListParams) {
   }));
 
   return { items, total, limit, offset, hasMore: offset + items.length < total };
+}
+
+/**
+ * Snapshots carry the federation's time string, which may lack seconds; the
+ * `time` column always has them. Ghost and real rows sort against each other,
+ * so the ghost uses the column's shape.
+ */
+function asTimeColumn(time: string): string {
+  return time.length === 5 ? `${time}:00` : time;
+}
+
+/**
+ * Ghost entries (see CONTEXT.md) for the admin game plan: one per game whose
+ * kickoff date override moved it off the day the federation currently
+ * publishes. The date range applies to that official day; every other list
+ * filter applies exactly as it does to the real game. Cancelled and forfeited
+ * games get none. Not paginated — the result is bounded by the day-moved games
+ * the filters admit, which are few.
+ */
+async function getGhostEntries(
+  ownTeamIds: number[],
+  params: MatchListParams,
+): Promise<GamePlanGhostItem[]> {
+  const officialDate = sql<string>`(${matchRemoteVersions.snapshot}->>'kickoffDate')`;
+  const officialTime = sql<string>`(${matchRemoteVersions.snapshot}->>'kickoffTime')`;
+
+  const conditions = listFilterConditions(ownTeamIds, params);
+  conditions.push(eq(matches.isCancelled, false));
+  conditions.push(eq(matches.isForfeited, false));
+  // Both sides are YYYY-MM-DD text, so text comparison is date comparison.
+  conditions.push(ne(sql`${matches.kickoffDate}::text`, officialDate));
+  // A snapshot without an official time names no kickoff to mark.
+  conditions.push(isNotNull(officialTime));
+  if (params.dateFrom) {
+    conditions.push(gte(officialDate, params.dateFrom));
+  }
+  if (params.dateTo) {
+    conditions.push(lte(officialDate, params.dateTo));
+  }
+
+  const candidates = await getDb()
+    .select({ id: matches.id, officialDate, officialTime })
+    .from(matches)
+    .innerJoin(
+      matchOverrides,
+      and(eq(matchOverrides.matchId, matches.id), eq(matchOverrides.fieldName, "kickoffDate")),
+    )
+    // The latest snapshot is the federation's current value; a sync that
+    // publishes the override's value releases the override with it.
+    .innerJoin(
+      matchRemoteVersions,
+      and(
+        eq(matchRemoteVersions.matchId, matches.id),
+        eq(matchRemoteVersions.versionNumber, matches.currentRemoteVersion),
+      ),
+    )
+    .leftJoin(leagues, eq(matches.leagueId, leagues.id))
+    .where(and(...conditions));
+
+  if (candidates.length === 0) return [];
+
+  const official = new Map(candidates.map((c) => [c.id, c]));
+  const rows = await queryMatchWithJoins().where(inArray(matches.id, [...official.keys()]));
+
+  return rows.map((row) => {
+    const o = official.get(row.id)!;
+    return {
+      ...rowToListItem(row, []),
+      kind: "ghost",
+      kickoffDate: o.officialDate,
+      kickoffTime: asTimeColumn(o.officialTime),
+      effectiveKickoffDate: row.kickoffDate,
+      effectiveKickoffTime: row.kickoffTime,
+      // A ghost is a marker, not the game: no score, crew or booking on it.
+      homeScore: null,
+      guestScore: null,
+      anschreiber: null,
+      zeitnehmer: null,
+      shotclock: null,
+      booking: null,
+    };
+  });
+}
+
+/**
+ * The admin game plan: the match list plus ghost entries. `total` and
+ * `hasMore` describe the real games only; ghosts are merged in by official
+ * kickoff and sort after a real game at the identical kickoff, in either
+ * direction.
+ */
+export async function getGamePlan(params: MatchListParams) {
+  const [list, ownTeamIds] = await Promise.all([getOwnClubMatches(params), loadOwnTeamIds()]);
+  const ghosts = ownTeamIds.length > 0 ? await getGhostEntries(ownTeamIds, params) : [];
+
+  const direction = params.sort === "desc" ? -1 : 1;
+  const kindRank = (item: GamePlanItem) => (item.kind === "ghost" ? 1 : 0);
+  const items: GamePlanItem[] = [
+    ...list.items.map((item) => ({ ...item, kind: "match" as const })),
+    ...ghosts,
+  ].sort((a, b) => {
+    const byKickoff =
+      a.kickoffDate.localeCompare(b.kickoffDate) || a.kickoffTime.localeCompare(b.kickoffTime);
+    return byKickoff * direction || kindRank(a) - kindRank(b);
+  });
+
+  return { ...list, items };
 }
 
 export async function getMatchDetail(id: number): Promise<MatchDetailResponse | null> {
