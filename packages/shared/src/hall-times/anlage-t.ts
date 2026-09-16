@@ -49,7 +49,7 @@ function text(cell: Cell): string | null {
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** Date cell → YYYY-MM-DD. Accepts Date objects, ISO, m/d/yy and d.m.yyyy. */
-export function parseSheetDate(cell: Cell): string | null {
+function parseSheetDate(cell: Cell): string | null {
   if (cell instanceof Date) {
     if (Number.isNaN(cell.getTime())) return null;
     return `${cell.getFullYear()}-${pad(cell.getMonth() + 1)}-${pad(cell.getDate())}`;
@@ -70,7 +70,7 @@ function fullYear(y: string): string {
 }
 
 /** Time cell → HH:mm. Accepts "HH:mm", "HH:mm:ss" and the sheet's numeric HHmm. */
-export function parseSheetTime(cell: Cell): string | null {
+function parseSheetTime(cell: Cell): string | null {
   if (typeof cell === "number" && Number.isInteger(cell) && cell >= 0 && cell <= 2359) {
     const h = Math.floor(cell / 100);
     const m = cell % 100;

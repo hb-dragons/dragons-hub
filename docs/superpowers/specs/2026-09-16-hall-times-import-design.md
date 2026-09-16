@@ -75,18 +75,24 @@ yields it, so the parser never touches `xlsx`. It reads:
 - two side-by-side blocks, columns C–G and I–M: `Tag | Datum | von | - | bis`.
   A `Tag` cell matching `/^(Sa|So)\*?$/` starts a data row; the block ends at
   the first row whose `Tag` cell is empty in both blocks.
-- per data row: `Datum` is a `Date`, an ISO string or `m/d/yy`; `von` and `bis`
-  are `HH:mm`. Both present → `open`. Both absent and `von` holds text other
-  than `-` → `closed` with that text as note. Two-line notes ("Sommerferien**"
-  over "02.07.-12.08.**") are joined onto the first row of the run; the second
-  row keeps the same note. Only one of `von`/`bis` present → warning, no row.
+- per data row: `Datum` is a `Date`, an ISO string, `m/d/yy` or `d.m.yyyy`;
+  `von` and `bis` are `HH:mm` (or the sheet's numeric `HHmm`). Both present →
+  `open`. Both absent and the separator column (`-`) holds text other than a
+  dash → `closed` with that text as note: the city writes the note across the
+  separator cell, not into `von`. Two-line notes ("Sommerferien**" over
+  "02.07.-12.08.**") are joined and every row of the run carries the whole
+  note. A blank row (no dash, no times) appears only inside a holiday block
+  where the merged note cell spans it, so a blank row next to a note run is
+  part of that closure, before the run as well as after it; a blank row that
+  touches no note yields nothing. Only one of `von`/`bis` present, an
+  inverted window or an unreadable date → warning, no row.
 - the `*` suffix on `Tag` and `**` on notes are stripped; the footnotes are not
   imported.
 
 Output: `{ hallName, updatedOn, rows: HallTimeInput[], warnings: string[] }`
 where `HallTimeInput = { date, kind, startTime, endTime, note }` in
 `YYYY-MM-DD` / `HH:mm`. Fixtures for the tests are cut from the two real sheets
-(Goetheschule: 30 open days and 12 closure notes; FES: 4 open days).
+(Goetheschule: 27 open days and 24 closed days; FES: 3 open days).
 
 ## Coverage
 

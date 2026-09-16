@@ -21,6 +21,15 @@ const bookings: BookingListItem[] = [
     needsReconfirmation: false,
     notes: null,
     matchCount: 2,
+    hallTime: {
+      kind: "open",
+      startTime: "18:00",
+      endTime: "20:00",
+      note: null,
+      coverage: "partial",
+      gapBeforeMinutes: 0,
+      gapAfterMinutes: 60,
+    },
   },
   {
     // A window that straddles midnight Berlin — the case a UTC container gets
@@ -39,6 +48,7 @@ const bookings: BookingListItem[] = [
     needsReconfirmation: false,
     notes: null,
     matchCount: 1,
+    hallTime: null,
   },
 ];
 
@@ -80,6 +90,7 @@ const messages = {
       timeWindow: "Zeitfenster",
       matches: "Spiele",
       status: "Status",
+      hallTime: "Hallenzeit",
     },
     status: {
       pending: "Ausstehend",
@@ -88,6 +99,14 @@ const messages = {
       cancelled: "Storniert",
     },
     create: { title: "Anlegen" },
+  },
+  hallTimes: {
+    coverage: {
+      covered: "Hallenzeit gedeckt",
+      partial: "Hallenzeit teilweise",
+      uncovered: "Keine Hallenzeit",
+      closed: "Halle geschlossen",
+    },
   },
 };
 
@@ -145,5 +164,23 @@ describe("BookingListTable time windows", () => {
     vi.stubEnv("TZ", "Europe/Berlin");
     const client = stable(renderTable().container.innerHTML);
     expect(client).toBe(server);
+  });
+});
+
+describe("BookingListTable hall-time coverage", () => {
+  it("shows each booking's coverage, reading a missing hall time as uncovered", () => {
+    renderTable();
+    const partial = screen.getByText("Hallenzeit teilweise");
+    expect(partial).toHaveAttribute("data-coverage", "partial");
+    expect(partial.closest("tr")).toHaveTextContent("Sporthalle Nord");
+    const uncovered = screen.getByText("Keine Hallenzeit");
+    expect(uncovered).toHaveAttribute("data-coverage", "uncovered");
+    expect(uncovered.closest("tr")).toHaveTextContent("Sporthalle Süd");
+  });
+
+  it("offers a coverage filter next to the status filter", () => {
+    renderTable();
+    // The column header's sort button and the faceted filter trigger.
+    expect(screen.getAllByRole("button", { name: /Hallenzeit/ }).length).toBeGreaterThanOrEqual(2);
   });
 });

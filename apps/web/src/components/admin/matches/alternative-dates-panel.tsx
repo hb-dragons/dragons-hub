@@ -299,6 +299,7 @@ const ROW_CLASS = "space-y-1 rounded-md bg-surface-low px-3 py-2 text-sm";
 function CandidateDetails({ candidate }: { candidate: AlternativeDateCandidate }) {
   const t = useTranslations("matchDetail.alternativeDates");
   const tStatus = useTranslations("bookings.status");
+  const tCoverage = useTranslations("hallTimes.coverage");
   const format = useFormatter();
 
   return (
@@ -320,7 +321,24 @@ function CandidateDetails({ candidate }: { candidate: AlternativeDateCandidate }
         <span className="text-muted-foreground block text-xs">{t("awayVenue")}</span>
       )}
       {candidate.group === "unbooked" && (
-        <span className="text-muted-foreground block text-xs">{t("noBooking")}</span>
+        <span className="text-muted-foreground block text-xs">
+          <span>{t("noBooking")}</span>
+          {" · "}
+          <span>{t("noHallTime")}</span>
+        </span>
+      )}
+      {candidate.hallTime?.kind === "open" && candidate.hallTime.startTime && candidate.hallTime.endTime && (
+        <span className="block text-xs">
+          {t("hallTime", {
+            start: format.dateTime(clubTimeAnchor(candidate.hallTime.startTime, candidate.date), "matchTime"),
+            end: format.dateTime(clubTimeAnchor(candidate.hallTime.endTime, candidate.date), "matchTime"),
+          })}
+        </span>
+      )}
+      {candidate.hallTime?.kind === "closed" && (
+        <span className="text-muted-foreground block text-xs">
+          {t("hallClosed", { note: candidate.hallTime.note ?? "none" })}
+        </span>
       )}
       {candidate.bookings.map((booking) => (
         <span key={booking.id} className="text-muted-foreground block text-xs">
@@ -334,6 +352,14 @@ function CandidateDetails({ candidate }: { candidate: AlternativeDateCandidate }
             "matchTime",
           )}{" "}
           · {tStatus(booking.status)}
+          {booking.hallTimeCoverage !== "covered" && (
+            <>
+              {" · "}
+              <span className={booking.hallTimeCoverage === "partial" ? "text-heat" : "text-destructive"}>
+                {tCoverage(booking.hallTimeCoverage)}
+              </span>
+            </>
+          )}
           {booking.needsReconfirmation && (
             <>
               {" · "}
@@ -357,7 +383,13 @@ function CandidateDetails({ candidate }: { candidate: AlternativeDateCandidate }
 }
 
 /** The order the piles are shown in; a pile with no day in it is not shown. */
-const GROUP_ORDER: AlternativeDateGroup[] = ["booked", "unbooked", "away"];
+const GROUP_ORDER: AlternativeDateGroup[] = [
+  "booked",
+  "hallTimeOpen",
+  "unbooked",
+  "closed",
+  "away",
+];
 
 /**
  * The candidates split into their piles, each keeping the order the server

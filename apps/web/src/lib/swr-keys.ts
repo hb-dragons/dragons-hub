@@ -50,6 +50,7 @@ export const SWR_KEYS = {
   standings: (seasonId?: number) =>
     seasonId === undefined ? "/admin/standings" : `/admin/standings?seasonId=${seasonId}`,
   venues: "/admin/venues",
+  venueHallTimes: (venueId: number) => `/admin/venues/${venueId}/hall-times`,
   settingsClub: "/admin/settings/club",
   settingsLeagues: "/admin/settings/leagues",
   users: "admin-users",

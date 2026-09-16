@@ -7,7 +7,8 @@ import type { ColumnDef, FilterFn, Row } from "@tanstack/react-table";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { queries } from "@/lib/swr-queries";
 import { authClient } from "@/lib/auth-client";
-import { can, clubDayAnchor, clubTimeAnchor } from "@dragons/shared";
+import { can, clubDayAnchor, clubTimeAnchor, hallTimeCoverage } from "@dragons/shared";
+import type { HallTimeCoverage } from "@dragons/shared";
 import { Badge } from "@dragons/ui/components/badge";
 import { Input } from "@dragons/ui/components/input";
 import { Sheet } from "@dragons/ui/components/sheet";
@@ -20,6 +21,7 @@ import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filte
 import { BookingDetailSheet } from "./booking-detail-sheet";
 import { CreateBookingDialog } from "./create-booking-dialog";
 import { ReconcileDialog } from "./reconcile-dialog";
+import { HallTimeCoverageBadge } from "@/components/admin/hall-times/hall-time-coverage-badge";
 import type { BookingListItem } from "./types";
 
 const statusVariantMap: Record<
@@ -38,6 +40,15 @@ const BOOKING_STATUSES: BookingListItem["status"][] = [
   "confirmed",
   "cancelled",
 ];
+
+const COVERAGES: HallTimeCoverage[] = ["covered", "partial", "uncovered", "closed"];
+
+/** A faceted filter over a column's string value; empty selection means all. */
+const includesFilterFn: FilterFn<BookingListItem> = (row, id, value) => {
+  const selected = value as string[] | undefined;
+  if (!selected || selected.length === 0) return true;
+  return selected.includes(row.getValue(id) as string);
+};
 
 /** Search across the columns a user would actually type into. */
 const bookingGlobalFilterFn: FilterFn<BookingListItem> = (
@@ -145,12 +156,23 @@ function getColumns(
           )}
         </div>
       ),
-      filterFn: (row, id, value) => {
-        const selected = value as string[] | undefined;
-        if (!selected || selected.length === 0) return true;
-        return selected.includes(row.getValue(id) as string);
-      },
+      filterFn: includesFilterFn,
       meta: { label: t("bookings.columns.status") },
+    },
+    {
+      id: "hallTime",
+      accessorFn: (row) => hallTimeCoverage(row.hallTime),
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          column={column}
+          title={t("bookings.columns.hallTime")}
+        />
+      ),
+      cell: ({ row }) => (
+        <HallTimeCoverageBadge coverage={hallTimeCoverage(row.original.hallTime)} className="text-xs" />
+      ),
+      filterFn: includesFilterFn,
+      meta: { label: t("bookings.columns.hallTime") },
     },
   ];
 }
@@ -172,6 +194,10 @@ export function BookingListTable() {
   const statusOptions = BOOKING_STATUSES.map((status) => ({
     label: t(`bookings.status.${status}`),
     value: status,
+  }));
+  const coverageOptions = COVERAGES.map((coverage) => ({
+    label: t(`hallTimes.coverage.${coverage}`),
+    value: coverage,
   }));
 
   return (
@@ -204,6 +230,11 @@ export function BookingListTable() {
               column={table.getColumn("status")!}
               title={t("bookings.columns.status")}
               options={statusOptions}
+            />
+            <DataTableFacetedFilter
+              column={table.getColumn("hallTime")!}
+              title={t("bookings.columns.hallTime")}
+              options={coverageOptions}
             />
             {canCreate && (
               <ReconcileDialog

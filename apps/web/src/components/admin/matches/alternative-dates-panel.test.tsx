@@ -42,6 +42,14 @@ const messages = {
     description: "An unexpected error occurred.",
     tryAgain: "Try again",
   },
+  hallTimes: {
+    coverage: {
+      covered: "Hall time covered",
+      partial: "Hall time partial",
+      uncovered: "No hall time",
+      closed: "Hall closed",
+    },
+  },
   matchDetail: {
     alternativeDates: {
       trigger: "Find alternative dates",
@@ -57,10 +65,15 @@ const messages = {
       awayGame: "Away game",
       groups: {
         booked: "With a hall booking",
+        hallTimeOpen: "Hall time held",
         unbooked: "Without a hall booking",
+        closed: "Hall closed",
         away: "Away",
       },
       noBooking: "no booking",
+      noHallTime: "no hall time",
+      hallTime: "Hall time {start} – {end}",
+      hallClosed: "Hall closed{note, select, none {} other {: {note}}}",
       awayVenue: "Hall: opponent",
       needsReconfirmation: "Needs re-confirmation",
       suggestedKickoff: "Suggested kickoff: {time}",
@@ -88,7 +101,15 @@ const formats = {
 } as const;
 
 function unbooked(date: string, weekday: ClubWeekendDay): AlternativeDateCandidate {
-  return { date, weekday, group: "unbooked", bookings: [], suggestedKickoffTime: null, flags: [] };
+  return {
+    date,
+    weekday,
+    group: "unbooked",
+    bookings: [],
+    suggestedKickoffTime: null,
+    hallTime: null,
+    flags: [],
+  };
 }
 
 function booked(
@@ -107,9 +128,11 @@ function booked(
         effectiveEndTime: "16:30:00",
         status: "confirmed",
         needsReconfirmation: false,
+        hallTimeCoverage: "covered",
       },
     ],
     suggestedKickoffTime: "17:00:00",
+    hallTime: null,
     flags: [],
     ...over,
   };
@@ -525,5 +548,83 @@ describe("AlternativeDatesPanel", () => {
     await settle();
 
     expect(screen.queryByRole("button", { name: "Copy as text" })).not.toBeInTheDocument();
+  });
+
+  describe("hall times", () => {
+    it("lists a held hall time under its own heading with the window", async () => {
+      mocks.alternativeDates.mockResolvedValue(
+        response({
+          candidates: [
+            {
+              ...unbooked("2026-03-14", "saturday"),
+              group: "hallTimeOpen",
+              hallTime: { kind: "open", startTime: "09:30", endTime: "22:00", note: null },
+            },
+          ],
+        }),
+      );
+      renderPanel();
+      await settle();
+
+      expect(screen.getByRole("heading", { name: "Hall time held" })).toBeInTheDocument();
+      expect(screen.getByText("Hall time 09:30 AM – 10:00 PM")).toBeInTheDocument();
+      expect(screen.queryByText("no booking")).not.toBeInTheDocument();
+    });
+
+    it("lists a closed day last with the city's note", async () => {
+      mocks.alternativeDates.mockResolvedValue(
+        response({
+          candidates: [
+            {
+              ...unbooked("2026-03-15", "sunday"),
+              group: "closed",
+              hallTime: { kind: "closed", startTime: null, endTime: null, note: "Osterferien" },
+            },
+            unbooked("2026-03-14", "saturday"),
+          ],
+        }),
+      );
+      renderPanel();
+      await settle();
+
+      const headings = screen.getAllByRole("heading", { level: 4 }).map((h) => h.textContent);
+      expect(headings).toEqual(["Without a hall booking", "Hall closed"]);
+      expect(screen.getByText("Hall closed: Osterferien")).toBeInTheDocument();
+    });
+
+    it("says a booked day sticks out of its hall time", async () => {
+      mocks.alternativeDates.mockResolvedValue(
+        response({
+          candidates: [
+            booked("2026-03-14", "saturday", {
+              hallTime: { kind: "open", startTime: "10:00", endTime: "14:00", note: null },
+              bookings: [
+                {
+                  id: 1,
+                  effectiveStartTime: "10:30:00",
+                  effectiveEndTime: "16:30:00",
+                  status: "confirmed",
+                  needsReconfirmation: false,
+                  hallTimeCoverage: "partial",
+                },
+              ],
+            }),
+          ],
+        }),
+      );
+      renderPanel();
+      await settle();
+
+      expect(screen.getByText("Hall time 10:00 AM – 02:00 PM")).toBeInTheDocument();
+      expect(screen.getByText("Hall time partial")).toBeInTheDocument();
+    });
+
+    it("names the missing hall time on a bare day", async () => {
+      mocks.alternativeDates.mockResolvedValue(response());
+      renderPanel();
+      await settle();
+
+      expect(screen.getAllByText("no hall time")).toHaveLength(2);
+    });
   });
 });

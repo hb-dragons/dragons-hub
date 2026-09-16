@@ -33,6 +33,8 @@ import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { can } from "@dragons/shared";
 import { TeamBadge } from "@/components/admin/shared/team-badge";
+import { HallTimeCoverageBadge } from "@/components/admin/hall-times/hall-time-coverage-badge";
+import { hallTimeCoverage } from "@dragons/shared";
 import type { BookingDetail } from "./types";
 
 const STATUSES = ["pending", "requested", "confirmed", "cancelled"] as const;
@@ -345,6 +347,43 @@ export function BookingDetailSheet({
                       disabled={!canUpdate}
                     />
                   </Field>
+                )}
+              </section>
+
+              <Separator />
+
+              {/* Hall time: what the club holds that day, and whether this window fits */}
+              <section className="space-y-3" data-testid="booking-hall-time">
+                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  {t("hallTimes.title")}
+                </h3>
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <HallTimeCoverageBadge coverage={hallTimeCoverage(booking.hallTime)} />
+                  {booking.hallTime?.kind === "open" && booking.hallTime.startTime && booking.hallTime.endTime && (
+                    <span className="tabular-nums">
+                      {format.dateTime(clubTimeAnchor(booking.hallTime.startTime, booking.date), "matchTime")}
+                      {" – "}
+                      {format.dateTime(clubTimeAnchor(booking.hallTime.endTime, booking.date), "matchTime")}
+                    </span>
+                  )}
+                  {booking.hallTime?.kind === "closed" && (
+                    <span>{t("hallTimes.closedNote", { note: booking.hallTime.note ?? "none" })}</span>
+                  )}
+                </div>
+                {booking.hallTime?.coverage === "partial" && (
+                  <p className="text-heat text-xs">
+                    {t("hallTimes.gap", {
+                      before: booking.hallTime.gapBeforeMinutes,
+                      after: booking.hallTime.gapAfterMinutes,
+                      both:
+                        booking.hallTime.gapBeforeMinutes > 0 && booking.hallTime.gapAfterMinutes > 0
+                          ? "yes"
+                          : "no",
+                    })}
+                  </p>
+                )}
+                {hallTimeCoverage(booking.hallTime) !== "covered" && booking.hallTime?.coverage !== "partial" && (
+                  <p className="text-muted-foreground text-xs">{t("hallTimes.noHallTime")}</p>
                 )}
               </section>
 

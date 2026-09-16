@@ -90,6 +90,10 @@ export function makeQueries(api: Api) {
       fetcher: () => api.standings.list(seasonId === undefined ? {} : { seasonId }),
     }),
     venues: () => ({ key: SWR_KEYS.venues, fetcher: () => api.venues.list() }),
+    venueHallTimes: (venueId: number) => ({
+      key: SWR_KEYS.venueHallTimes(venueId),
+      fetcher: () => api.venues.hallTimes(venueId),
+    }),
     // referee-admin
     refereesPaginated: (opts: Parameters<typeof normReferees>[0] = {}) => {
       const norm = normReferees(opts);

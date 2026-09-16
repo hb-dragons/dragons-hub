@@ -302,7 +302,9 @@
       "groups": {
         "booked": "With a hall booking",
         "unbooked": "Without a hall booking",
-        "away": "Away"
+        "away": "Away",
+        "hallTimeOpen": "Hall time held",
+        "closed": "Hall closed"
       },
       "noBooking": "no booking",
       "awayVenue": "Hall: opponent",
@@ -318,7 +320,10 @@
       "copy": "Copy as text",
       "copyHeader": "Possible alternative dates for {home} – {guest} ({league}, matchday {matchDay}):",
       "copied": "Alternative dates copied.",
-      "copyFailed": "Copying was not possible."
+      "copyFailed": "Copying was not possible.",
+      "hallTime": "Hall time {start} – {end}",
+      "hallClosed": "Hall closed{note, select, none {} other {: {note}}}",
+      "noHallTime": "no hall time"
     },
     "score": {
       "title": "Score",
@@ -613,8 +618,10 @@
       "street": "Street",
       "postalCode": "Postal Code",
       "city": "City",
-      "map": "Map"
-    }
+      "map": "Map",
+      "hallTimes": "Hall times"
+    },
+    "hallTimes": "Hall times"
   },
   "teams": {
     "title": "Teams",
@@ -921,7 +928,8 @@
       "venue": "Venue",
       "timeWindow": "Time Window",
       "matches": "Matches",
-      "status": "Status"
+      "status": "Status",
+      "hallTime": "Hall time"
     },
     "create": {
       "title": "New Booking",
@@ -1873,5 +1881,70 @@
     "deleteBlocked": "Could not delete the person — they are still attached to a team.",
     "saveFailed": "Could not save the person.",
     "deleteFailed": "Could not delete the person."
+  },
+  "hallTimes": {
+    "title": "Hall times",
+    "description": "When the club holds the hall per its rental application.",
+    "coverage": {
+      "covered": "Hall time covered",
+      "partial": "Hall time partial",
+      "uncovered": "No hall time",
+      "closed": "Hall closed"
+    },
+    "columns": {
+      "date": "Date",
+      "window": "Hall time",
+      "note": "Note",
+      "source": "Source"
+    },
+    "kind": {
+      "open": "Hall time",
+      "closed": "Closed"
+    },
+    "source": {
+      "anlage_t": "Anlage T",
+      "manual": "Manual"
+    },
+    "empty": "No hall times for this venue.",
+    "gap": "{before, plural, =0 {} other {{before} min before start}}{both, select, yes { and } other {}}{after, plural, =0 {} other {{after} min after end}} not covered",
+    "noHallTime": "The club holds no hall time that day – a rental request to the city is needed.",
+    "closedNote": "Hall closed{note, select, none {} other {: {note}}}",
+    "edit": {
+      "title": "Edit hall time",
+      "add": "Add day",
+      "date": "Date",
+      "kind": "Kind",
+      "startTime": "From",
+      "endTime": "To",
+      "note": "Note",
+      "save": "Save",
+      "delete": "Delete",
+      "deleteConfirmTitle": "Delete hall time?",
+      "deleteConfirmDescription": "The entry for this day will be removed.",
+      "saved": "Hall time saved",
+      "deleted": "Hall time deleted"
+    },
+    "import": {
+      "button": "Import Anlage T",
+      "title": "Import Anlage T",
+      "description": "Read the city's Excel sheet (Anlage T zum Mietantrag). Hall times inside the sheet's date span are replaced.",
+      "file": "File",
+      "venue": "Venue",
+      "venuePlaceholder": "Pick a venue…",
+      "parsed": "{count, plural, one {# day} other {# days}} read from “{hallName}”{updatedOn, select, none {} other {, updated {updatedOn}}}",
+      "warnings": "Notes from reading the sheet",
+      "preview": "Preview",
+      "added": "New",
+      "changed": "Changed",
+      "removed": "Removed",
+      "unchanged": "{count, plural, one {# day unchanged} other {# days unchanged}}",
+      "bookings": "Affected bookings",
+      "noChanges": "No changes against the stored hall times.",
+      "apply": "Import",
+      "applied": "{count, plural, one {# booking} other {# bookings}} reported without hall time",
+      "imported": "Hall times imported",
+      "parseFailed": "The file could not be read.",
+      "failed": "Import failed."
+    }
   }
 }

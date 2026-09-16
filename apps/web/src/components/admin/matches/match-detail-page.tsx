@@ -27,6 +27,7 @@ import { Can } from "@/components/rbac/can";
 import { MatchEditSheet } from "./match-edit-sheet";
 import type { MatchPrefill } from "./match-edit-sheet";
 import { AlternativeDatesPanel } from "./alternative-dates-panel";
+import { HallTimeCoverageBadge } from "@/components/admin/hall-times/hall-time-coverage-badge";
 import { MatchDivergenceTable } from "./match-divergence-table";
 import { MatchChangeHistory } from "./match-change-history";
 import { formatMatchTime, formatScore, formatPeriodScores } from "./utils";
@@ -295,6 +296,7 @@ export function MatchDetailPage({
                   {t("matchDetail.booking.needsReconfirmation")}
                 </Badge>
               )}
+              <HallTimeCoverageBadge coverage={match.booking.hallTimeCoverage} />
             </div>
           </CardContent>
         </Card>

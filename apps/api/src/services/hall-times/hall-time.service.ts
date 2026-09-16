@@ -110,7 +110,7 @@ export async function loadHallTimesByDay(
 }
 
 /** The booking-side view of one hall time, or null when the club holds none that day. */
-export function bookingHallTime(
+function bookingHallTime(
   window: { start: string; end: string },
   hallTime: HallTimeRow | null | undefined,
 ): BookingHallTime | null {

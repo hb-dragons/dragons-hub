@@ -54,7 +54,7 @@ const real: GamePlanMatchItem = {
   anschreiber: "Anna Schreiber", zeitnehmer: "Zeno Zeit", shotclock: "Shot Clock",
   publicComment: null,
   hasLocalChanges: true, overriddenFields: ["kickoffDate", "kickoffTime"],
-  booking: { id: 3, status: "confirmed", needsReconfirmation: false },
+  booking: { id: 3, status: "confirmed", needsReconfirmation: false, hallTimeCoverage: "covered" },
 };
 
 const ghost: GamePlanGhostItem = {
@@ -208,5 +208,29 @@ describe("MatchListTable ghost entries", () => {
 
     // The row itself is the one clickable element.
     expect(within(ghostRow()).queryAllByRole("button")).toEqual([]);
+  });
+});
+
+describe("MatchListTable hall-time coverage", () => {
+  it("shows no coverage badge on a covered booking", () => {
+    renderTable([real]);
+    expect(screen.queryByText(de.hallTimes.coverage.covered)).not.toBeInTheDocument();
+  });
+
+  it("shows no coverage badge on a ghost entry", () => {
+    renderTable([ghost]);
+    expect(screen.queryByText(de.hallTimes.coverage.uncovered)).not.toBeInTheDocument();
+  });
+
+  it("flags a home game whose booking has no hall time", () => {
+    renderTable([{ ...real, booking: { ...real.booking!, hallTimeCoverage: "uncovered" } }]);
+    const badge = screen.getByText(de.hallTimes.coverage.uncovered);
+    expect(badge).toHaveAttribute("data-coverage", "uncovered");
+    expect(badge.closest("tr")).toHaveTextContent("Rivals");
+  });
+
+  it("flags a partly covered booking in English too", () => {
+    renderTable([{ ...real, booking: { ...real.booking!, hallTimeCoverage: "partial" } }], "en");
+    expect(screen.getByText(en.hallTimes.coverage.partial)).toBeInTheDocument();
   });
 });

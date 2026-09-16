@@ -56,6 +56,14 @@ const messages = {
     description: "An unexpected error occurred.",
     tryAgain: "Try again",
   },
+  hallTimes: {
+    coverage: {
+      covered: "Hall time covered",
+      partial: "Hall time partial",
+      uncovered: "No hall time",
+      closed: "Hall closed",
+    },
+  },
   matchDetail: {
     alternativeDates: {
       trigger: "Find alternative dates",
@@ -291,5 +299,29 @@ describe("MatchDetailPage alternative-date finder", () => {
     expect(mocks.editSheet).toHaveBeenLastCalledWith(
       expect.objectContaining({ open: true, prefill: null }),
     );
+  });
+});
+
+describe("MatchDetailPage booking hall-time coverage", () => {
+  it("shows the booking's coverage next to its status", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <MatchDetailPage
+          matchId={1}
+          initialDetail={
+            {
+              ...detail,
+              match: {
+                ...detail.match,
+                booking: { id: 3, status: "pending", needsReconfirmation: false, hallTimeCoverage: "closed" },
+              },
+            } as never
+          }
+          initialHistory={{ entries: [], total: 0 } as never}
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText("Pending")).toBeInTheDocument();
+    expect(screen.getByText("Hall closed")).toHaveAttribute("data-coverage", "closed");
   });
 });

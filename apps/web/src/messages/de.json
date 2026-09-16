@@ -302,7 +302,9 @@
       "groups": {
         "booked": "Mit Hallenbuchung",
         "unbooked": "Ohne Hallenbuchung",
-        "away": "Auswärts"
+        "away": "Auswärts",
+        "hallTimeOpen": "Hallenzeit vorhanden",
+        "closed": "Halle geschlossen"
       },
       "noBooking": "keine Buchung",
       "awayVenue": "Halle: Gegner",
@@ -318,7 +320,10 @@
       "copy": "Als Text kopieren",
       "copyHeader": "Mögliche Ausweichtermine für {home} – {guest} ({league}, Spieltag {matchDay}):",
       "copied": "Ausweichtermine kopiert.",
-      "copyFailed": "Kopieren war nicht möglich."
+      "copyFailed": "Kopieren war nicht möglich.",
+      "hallTime": "Hallenzeit {start} – {end}",
+      "hallClosed": "Halle geschlossen{note, select, none {} other {: {note}}}",
+      "noHallTime": "keine Hallenzeit"
     },
     "score": {
       "title": "Ergebnis",
@@ -613,8 +618,10 @@
       "street": "Straße",
       "postalCode": "PLZ",
       "city": "Stadt",
-      "map": "Karte"
-    }
+      "map": "Karte",
+      "hallTimes": "Hallenzeiten"
+    },
+    "hallTimes": "Hallenzeiten"
   },
   "teams": {
     "title": "Teams",
@@ -921,7 +928,8 @@
       "venue": "Halle",
       "timeWindow": "Zeitfenster",
       "matches": "Spiele",
-      "status": "Status"
+      "status": "Status",
+      "hallTime": "Hallenzeit"
     },
     "create": {
       "title": "Neue Buchung",
@@ -1873,5 +1881,70 @@
     "deleteBlocked": "Person konnte nicht gelöscht werden — sie ist noch einem Team zugeordnet.",
     "saveFailed": "Person konnte nicht gespeichert werden.",
     "deleteFailed": "Person konnte nicht gelöscht werden."
+  },
+  "hallTimes": {
+    "title": "Hallenzeiten",
+    "description": "Wann der Verein die Halle laut Mietantrag hält.",
+    "coverage": {
+      "covered": "Hallenzeit gedeckt",
+      "partial": "Hallenzeit teilweise",
+      "uncovered": "Keine Hallenzeit",
+      "closed": "Halle geschlossen"
+    },
+    "columns": {
+      "date": "Datum",
+      "window": "Hallenzeit",
+      "note": "Hinweis",
+      "source": "Quelle"
+    },
+    "kind": {
+      "open": "Hallenzeit",
+      "closed": "Geschlossen"
+    },
+    "source": {
+      "anlage_t": "Anlage T",
+      "manual": "Manuell"
+    },
+    "empty": "Keine Hallenzeiten für diese Halle.",
+    "gap": "{before, plural, =0 {} other {{before} Min. vor Beginn}}{both, select, yes { und } other {}}{after, plural, =0 {} other {{after} Min. nach Ende}} nicht gedeckt",
+    "noHallTime": "Für diesen Tag hält der Verein keine Hallenzeit – Mietantrag an die Stadt nötig.",
+    "closedNote": "Halle geschlossen{note, select, none {} other {: {note}}}",
+    "edit": {
+      "title": "Hallenzeit bearbeiten",
+      "add": "Tag eintragen",
+      "date": "Datum",
+      "kind": "Art",
+      "startTime": "Von",
+      "endTime": "Bis",
+      "note": "Hinweis",
+      "save": "Speichern",
+      "delete": "Löschen",
+      "deleteConfirmTitle": "Hallenzeit löschen?",
+      "deleteConfirmDescription": "Der Eintrag für diesen Tag wird entfernt.",
+      "saved": "Hallenzeit gespeichert",
+      "deleted": "Hallenzeit gelöscht"
+    },
+    "import": {
+      "button": "Anlage T importieren",
+      "title": "Anlage T importieren",
+      "description": "Die Excel-Datei der Stadt (Anlage T zum Mietantrag) einlesen. Die Hallenzeiten im Zeitraum der Datei werden ersetzt.",
+      "file": "Datei",
+      "venue": "Halle",
+      "venuePlaceholder": "Halle wählen…",
+      "parsed": "{count, plural, one {# Tag} other {# Tage}} gelesen aus „{hallName}“{updatedOn, select, none {} other {, Stand {updatedOn}}}",
+      "warnings": "Hinweise beim Einlesen",
+      "preview": "Vorschau",
+      "added": "Neu",
+      "changed": "Geändert",
+      "removed": "Entfernt",
+      "unchanged": "{count, plural, one {# Tag unverändert} other {# Tage unverändert}}",
+      "bookings": "Betroffene Buchungen",
+      "noChanges": "Keine Änderungen gegenüber den gespeicherten Hallenzeiten.",
+      "apply": "Importieren",
+      "applied": "{count, plural, one {# Buchung} other {# Buchungen}} ohne Hallenzeit gemeldet",
+      "imported": "Hallenzeiten importiert",
+      "parseFailed": "Die Datei konnte nicht gelesen werden.",
+      "failed": "Import fehlgeschlagen."
+    }
   }
 }

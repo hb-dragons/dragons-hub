@@ -35,6 +35,7 @@ import {
 import type { GamePlanGhostItem, GamePlanItem } from "./types"
 import { MatchEditSheet } from "./match-edit-sheet"
 import { TeamBadge } from "@/components/admin/shared/team-badge"
+import { HallTimeCoverageBadge } from "@/components/admin/hall-times/hall-time-coverage-badge"
 
 function OverrideDot({ match, field }: { match: GamePlanItem; field: string }) {
   const t = useTranslations("matchDetail")
@@ -119,6 +120,15 @@ function getColumns(
           {row.original.kind === "ghost" && (
             <GhostBadge ghost={row.original} dateLocale={dateLocale} />
           )}
+          {/* The booking column is hidden by default; a hall the club does not hold that day must still show. */}
+          {row.original.kind === "match" &&
+            row.original.booking &&
+            row.original.booking.hallTimeCoverage !== "covered" && (
+              <HallTimeCoverageBadge
+                coverage={row.original.booking.hallTimeCoverage}
+                className="ml-2 text-[10px]"
+              />
+            )}
         </span>
       ),
       filterFn: dateRangeFilterFn,
@@ -262,20 +272,22 @@ function getColumns(
         const booking = row.original.booking;
         if (!booking || row.original.kind === "ghost") return null;
         return (
-          <Badge
-            variant={
-              booking.status === "confirmed"
-                ? "success"
-                : booking.status === "requested"
-                  ? "default"
-                  : booking.status === "cancelled"
-                    ? "destructive"
-                    : "secondary"
-            }
-          >
-            {booking.needsReconfirmation ? "\u26A0 " : ""}
-            {tBookings(`status.${booking.status}`)}
-          </Badge>
+          <span className="inline-flex flex-wrap items-center gap-1">
+            <Badge
+              variant={
+                booking.status === "confirmed"
+                  ? "success"
+                  : booking.status === "requested"
+                    ? "default"
+                    : booking.status === "cancelled"
+                      ? "destructive"
+                      : "secondary"
+              }
+            >
+              {booking.needsReconfirmation ? "\u26A0 " : ""}
+              {tBookings(`status.${booking.status}`)}
+            </Badge>
+          </span>
         );
       },
       enableSorting: false,
