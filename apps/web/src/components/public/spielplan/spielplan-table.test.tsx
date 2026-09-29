@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { MatchListItem } from "@dragons/shared";
 
 vi.mock("next-intl", () => ({
@@ -77,7 +77,7 @@ describe("<SpielplanTable>", () => {
     expect(screen.queryByText("Kampflos Gegner")).not.toBeInTheDocument();
   });
 
-  it("shows only the compact column set by default — no Nr./Liga/Halle, duties, score or comment", () => {
+  it("shows the Kampfgericht duties by default but hides Nr./Liga/Halle, score and comment", () => {
     render(
       <SpielplanTable
         matches={[
@@ -94,9 +94,9 @@ describe("<SpielplanTable>", () => {
     );
 
     expect(screen.getByText("TSV Musterstadt")).toBeInTheDocument();
-    expect(screen.queryByText("Damen 1")).not.toBeInTheDocument();
-    expect(screen.queryByText("U18")).not.toBeInTheDocument();
-    expect(screen.queryByText("Herren 1")).not.toBeInTheDocument();
+    expect(screen.getByText("Damen 1")).toBeInTheDocument();
+    expect(screen.getByText("U18")).toBeInTheDocument();
+    expect(screen.getByText("Herren 1")).toBeInTheDocument();
     expect(screen.queryByText("78:65")).not.toBeInTheDocument();
     expect(screen.queryByText("Kuchenverkauf")).not.toBeInTheDocument();
     expect(screen.queryByText("971001")).not.toBeInTheDocument();
@@ -104,6 +104,27 @@ describe("<SpielplanTable>", () => {
     expect(screen.queryByText("Sporthalle Musterstadt")).not.toBeInTheDocument();
     // The comment marker still flags the game even with its column hidden.
     expect(screen.getByLabelText("hasComment")).toBeInTheDocument();
+  });
+
+  it("colours a duty badge like the same team's badge in the team column", () => {
+    render(
+      <SpielplanTable
+        matches={[
+          makeMatch({ id: 1, guestBadgeColor: "rose" }),
+          makeMatch({
+            id: 2,
+            homeTeamName: "SC Anders",
+            guestTeamCustomName: "Damen 1",
+            guestBadgeColor: "teal",
+            anschreiber: "Herren 2",
+          }),
+        ]}
+      />,
+    );
+
+    const [teamBadge, dutyBadge] = screen.getAllByText("Herren 2");
+    expect(dutyBadge!.className).toBe(teamBadge!.className);
+    expect(screen.getByText("Damen 1").className).not.toBe(teamBadge!.className);
   });
 
   it("opens a read-only detail panel on row click with venue, score, Kampfgericht and comment", () => {
@@ -126,16 +147,17 @@ describe("<SpielplanTable>", () => {
     );
 
     fireEvent.click(screen.getByText("TSV Musterstadt"));
+    const sheet = within(screen.getByRole("dialog"));
 
-    expect(screen.getByText("Damen 1")).toBeInTheDocument();
-    expect(screen.getByText("U18")).toBeInTheDocument();
-    expect(screen.getByText("Herren 1")).toBeInTheDocument();
-    expect(screen.getByText("78:65")).toBeInTheDocument();
-    expect(screen.getByText("Kuchenverkauf")).toBeInTheDocument();
-    expect(screen.getByText("Sporthalle Musterstadt")).toBeInTheDocument();
-    expect(screen.getByText(/Musterweg 1/)).toBeInTheDocument();
-    expect(screen.getByText(/30159 Hannover/)).toBeInTheDocument();
-    expect(screen.getByText("Bezirksliga Mitte")).toBeInTheDocument();
+    expect(sheet.getByText("Damen 1")).toBeInTheDocument();
+    expect(sheet.getByText("U18")).toBeInTheDocument();
+    expect(sheet.getByText("Herren 1")).toBeInTheDocument();
+    expect(sheet.getByText("78:65")).toBeInTheDocument();
+    expect(sheet.getByText("Kuchenverkauf")).toBeInTheDocument();
+    expect(sheet.getByText("Sporthalle Musterstadt")).toBeInTheDocument();
+    expect(sheet.getByText(/Musterweg 1/)).toBeInTheDocument();
+    expect(sheet.getByText(/30159 Hannover/)).toBeInTheDocument();
+    expect(sheet.getByText("Bezirksliga Mitte")).toBeInTheDocument();
   });
 
   it("filters rows through the search box", () => {
