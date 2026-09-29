@@ -137,8 +137,8 @@ seasonRoutes.put(
   }),
   async (c) => {
     const { id } = c.req.valid("param");
-    const { ligaIds } = c.req.valid("json");
-    return c.json(await setSeasonLeagues(id, ligaIds));
+    const { ligaIds, cupLigaIds } = c.req.valid("json");
+    return c.json(await setSeasonLeagues(id, ligaIds, cupLigaIds));
   },
 );
 

@@ -1044,7 +1044,7 @@
       "manage": {
         "button": "Ligen verwalten",
         "title": "Ligen verwalten",
-        "description": "Ligen dieser Saison hinzufügen oder entfernen.",
+        "description": "Ligen dieser Saison hinzufügen oder entfernen. Eine als Pokal markierte Liga wird nie die Liga einer Mannschaft; Pokalspiele erscheinen trotzdem bei der Mannschaft.",
         "save": "Speichern & synchronisieren",
         "saved": "Ligen aktualisiert",
         "saveFailed": "Ligen konnten nicht gespeichert werden",
@@ -1058,6 +1058,8 @@
         "selectDescription": "Wähle die zu verfolgenden Vorabliga-Ligen für diese Saison aus.",
         "searchPlaceholder": "Ligen suchen…",
         "ownClubOnly": "Nur Ligen meines Vereins",
+        "cup": "Pokal",
+        "cupHint": "Pokalwettbewerb: wird nicht als Liga der Mannschaft verknüpft",
         "vorabligaOnly": "Nur vorläufige Ligen (Vorabliga)",
         "showTeams": "Mannschaften anzeigen",
         "hideTeams": "Mannschaften ausblenden",

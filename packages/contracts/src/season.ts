@@ -26,6 +26,9 @@ export const browseLeaguesQuerySchema = z.object({
 
 export const seasonLeaguesSchema = z.strictObject({
   ligaIds: z.array(z.number().int().positive()),
+  // The selected ligas that are cups (Pokal). Omitted, a newly tracked liga is
+  // flagged from its name and an already tracked one keeps its flag.
+  cupLigaIds: z.array(z.number().int().positive()).optional(),
 });
 
 export type CreateSeasonBody = z.infer<typeof createSeasonSchema>;

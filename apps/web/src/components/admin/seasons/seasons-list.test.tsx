@@ -10,6 +10,7 @@ vi.mock("swr", () => ({
     data: [
       { id: 1, name: "2025/26", status: "active", leagueCount: 3 },
       { id: 2, name: "2026/27", status: "upcoming", leagueCount: 0 },
+      { id: 3, name: "2024/25", status: "archived", leagueCount: 5 },
     ],
   }),
   useSWRConfig: () => ({ mutate: vi.fn() }),
@@ -36,8 +37,16 @@ describe("SeasonsList", () => {
 
   it("opens the manage-leagues dialog for the upcoming season", async () => {
     render(<SeasonsList />);
-    // Only the upcoming season (id 2) shows the button.
-    fireEvent.click(screen.getByText("settings.seasons.manage.button"));
+    fireEvent.click(screen.getAllByText("settings.seasons.manage.button")[1]!);
     expect(await screen.findByText("manage-open:2")).toBeInTheDocument();
+  });
+
+  it("lets the active season's leagues be managed too, but not activated again", async () => {
+    render(<SeasonsList />);
+    // Both live seasons offer the button; the archived one does not.
+    expect(screen.getAllByText("settings.seasons.manage.button")).toHaveLength(2);
+    expect(screen.getAllByText("settings.seasons.activate")).toHaveLength(1);
+    fireEvent.click(screen.getAllByText("settings.seasons.manage.button")[0]!);
+    expect(await screen.findByText("manage-open:1")).toBeInTheDocument();
   });
 });

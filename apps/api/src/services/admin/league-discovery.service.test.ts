@@ -35,6 +35,7 @@ import {
   getTrackedLeagues,
   setLeagueOwnClubRefs,
   getLeagueTeams,
+  looksLikeCup,
 } from "./league-discovery.service";
 import { leagues } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
@@ -210,6 +211,75 @@ describe("browseLeagues", () => {
     const rows = await browseLeagues({});
     expect(rows.find((r) => r.ligaId === 54136)?.conflictSeasonName).toBe("2025/26");
     expect(rows.find((r) => r.ligaId === 54137)?.conflictSeasonName).toBeNull();
+  });
+});
+
+describe("looksLikeCup", () => {
+  it("spots Pokal in the liga name or the Spielklasse, any case", () => {
+    expect(looksLikeCup({ liganame: "Kreispokal Herren", skName: "Kreisliga" })).toBe(true);
+    expect(looksLikeCup({ liganame: "Herren A", skName: "POKAL" })).toBe(true);
+    expect(looksLikeCup({ liganame: "Oberliga Herren", skName: null })).toBe(false);
+  });
+});
+
+describe("browseLeagues cup flag", () => {
+  it("guesses from the name for a liga this season has no row for", async () => {
+    const seasonId = await makeSeason("active");
+    getAllLigen.mockResolvedValue([
+      { ...liga(60001, false), liganame: "Bezirkspokal Damen" },
+      liga(54136, false),
+    ]);
+    const rows = await browseLeagues({ seasonId });
+    expect(rows.find((r) => r.ligaId === 60001)?.isCup).toBe(true);
+    expect(rows.find((r) => r.ligaId === 54136)?.isCup).toBe(false);
+  });
+
+  it("uses the season's stored flag over the name, even for an untracked row", async () => {
+    const seasonId = await makeSeason("active");
+    await ctx.client.query(
+      `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id, is_tracked, vorabliga, is_cup)
+       VALUES (60001, 0, 'Bezirkspokal Damen', 2026, '2026/27', $1, false, false, false),
+              (54136, 0, 'Liga 54136', 2026, '2026/27', $1, true, false, true)`,
+      [seasonId],
+    );
+    getAllLigen.mockResolvedValue([
+      { ...liga(60001, false), liganame: "Bezirkspokal Damen" },
+      liga(54136, false),
+    ]);
+    const rows = await browseLeagues({ seasonId });
+    expect(rows.find((r) => r.ligaId === 60001)?.isCup).toBe(false);
+    expect(rows.find((r) => r.ligaId === 54136)?.isCup).toBe(true);
+  });
+});
+
+describe("setSeasonLeagues cup flag", () => {
+  async function cupFlags(): Promise<Record<number, boolean>> {
+    const rows = await ctx.db.select({ apiLigaId: leagues.apiLigaId, isCup: leagues.isCup }).from(leagues);
+    return Object.fromEntries(rows.map((r) => [r.apiLigaId, r.isCup]));
+  }
+
+  it("flags a newly tracked liga from its name when no cup list is sent", async () => {
+    const seasonId = await makeSeason("upcoming");
+    getAllLigen.mockResolvedValue([{ ...liga(60001, false), liganame: "Kreispokal Herren" }, liga(54136, false)]);
+    await setSeasonLeagues(seasonId, [60001, 54136]);
+    expect(await cupFlags()).toEqual({ 60001: true, 54136: false });
+  });
+
+  it("stores exactly the sent cup list, overriding the name", async () => {
+    const seasonId = await makeSeason("active");
+    getAllLigen.mockResolvedValue([{ ...liga(60001, false), liganame: "Kreispokal Herren" }, liga(54136, false)]);
+    await setSeasonLeagues(seasonId, [60001, 54136], [54136]);
+    expect(await cupFlags()).toEqual({ 60001: false, 54136: true });
+  });
+
+  it("keeps an existing row's flag when no cup list is sent", async () => {
+    const seasonId = await makeSeason("active");
+    getAllLigen.mockResolvedValue([liga(54136, false)]);
+    await setSeasonLeagues(seasonId, [54136], [54136]);
+    await setSeasonLeagues(seasonId, [54136]);
+    expect(await cupFlags()).toEqual({ 54136: true });
+    const tracked = await getTrackedLeagues(seasonId);
+    expect(tracked.leagues[0]?.isCup).toBe(true);
   });
 });
 

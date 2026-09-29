@@ -26,11 +26,13 @@ async function seedSeason(name: string, status: string, startDate: string | null
   return r.rows[0]!.id;
 }
 
-async function seedLeague(apiLigaId: number, name: string, seasonId: number, vorabliga = false): Promise<number> {
+async function seedLeague(
+  apiLigaId: number, name: string, seasonId: number, vorabliga = false, isCup = false,
+): Promise<number> {
   const r = await ctx.client.query<{ id: number }>(
-    `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id, vorabliga, is_tracked)
-     VALUES ($1, $1, $2, 2026, 's', $3, $4, true) RETURNING id`,
-    [apiLigaId, name, seasonId, vorabliga]);
+    `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id, vorabliga, is_tracked, is_cup)
+     VALUES ($1, $1, $2, 2026, 's', $3, $4, true, $5) RETURNING id`,
+    [apiLigaId, name, seasonId, vorabliga, isCup]);
   return r.rows[0]!.id;
 }
 
@@ -500,5 +502,52 @@ describe("staff carry-forward", () => {
       `SELECT id FROM teams WHERE api_team_permanent_id = 9950`,
     );
     expect((await staffOfEntry(await entryIdOf(squadRow.rows[0]!.id, season))).rows).toEqual([]);
+  });
+
+  describe("cups", () => {
+    async function linkOf(permanentId: number): Promise<number | null> {
+      const r = await ctx.client.query<{ league_id: number | null }>(
+        `SELECT te.league_id FROM team_entries te
+         JOIN teams t ON t.id = te.team_id WHERE t.api_team_permanent_id = $1`, [permanentId]);
+      return r.rows[0]?.league_id ?? null;
+    }
+
+    it("links a squad to its regular league even when the cup is listed first", async () => {
+      await seedClubConfig(100);
+      const season = await seedSeason("2026/27", "active");
+      await seedLeague(90, "Kreispokal Herren", season, false, true);
+      const league = await seedLeague(40, "Oberliga Herren", season);
+      vi.mocked(fetchLeagueRoster).mockResolvedValue([ref(9500, "Dragons Herren 1", 100)]);
+
+      const result = await seedSeasonTeamEntries(season, [90, 40]);
+
+      expect(await linkOf(9500)).toBe(league);
+      expect(result.entriesSeeded).toBe(1);
+    });
+
+    it("leaves an existing league link alone and does not count the cup as seeded", async () => {
+      await seedClubConfig(100);
+      const season = await seedSeason("2026/27", "active");
+      const league = await seedLeague(41, "Oberliga Damen", season);
+      await seedLeague(91, "Bezirkspokal Damen", season, false, true);
+      vi.mocked(fetchLeagueRoster).mockResolvedValue([ref(9501, "Dragons Damen 1", 100)]);
+      await seedSeasonTeamEntries(season, [41]);
+
+      const result = await seedSeasonTeamEntries(season, [91]);
+
+      expect(await linkOf(9501)).toBe(league);
+      expect(result.entriesSeeded).toBe(0);
+    });
+
+    it("connects a squad that plays only in the cup", async () => {
+      await seedClubConfig(100);
+      const season = await seedSeason("2026/27", "active");
+      const cup = await seedLeague(92, "Kreispokal Herren", season, false, true);
+      vi.mocked(fetchLeagueRoster).mockResolvedValue([ref(9502, "Dragons Herren 3", 100)]);
+
+      await seedSeasonTeamEntries(season, [92]);
+
+      expect(await linkOf(9502)).toBe(cup);
+    });
   });
 });

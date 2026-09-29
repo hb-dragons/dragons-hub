@@ -12,5 +12,6 @@ Consequences to respect:
 
 - Club-facing fields live only on the entry. Do not re-add `custom_name`, `badge_color`, `estimated_game_duration`, or `display_order` to `teams`.
 - One entry per squad per season (`unique(team_id, season_id)`), one connected league per entry. Tracking a second competition for the same squad in the same season is a schema change, not a second link row.
+- A cup (Pokal) is the exception that did not need one: it is tracked like any league, but `leagues.is_cup` keeps it from becoming a connected league. Seeding and the sync rank a squad's evidence league-over-cup before committed-over-vorabliga, so a squad in its league and a cup links to the league with no conflict logged, and a cup only connects a squad found in nothing else. Cup games still reach the team, because matches find their entry by squad and season, not by league. The federation does not type its competitions, so the flag is the admin's call in the manage-leagues dialog, prefilled from the name (2026-09-29).
 - Manual link edits are gap-fillers: positive federation evidence supersedes them (logged in the sync log). Code that makes manual edits permanent breaks the reconciliation contract.
 - Custom names deliberately do not carry forward between seasons; they are age labels and go stale by design. Color, duration, and order do carry forward.

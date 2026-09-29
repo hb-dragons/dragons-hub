@@ -509,7 +509,7 @@ describe("collectUniqueTeams", () => {
     const refUpcoming = { ...refActive, teamname: "Dragons U16", teamnameSmall: "U16" };
     const mk = (status: "active" | "upcoming", team: typeof refActive): LeagueFetchedData => ({
       leagueApiId: status === "active" ? 1 : 2, leagueDbId: 1, leagueName: "L",
-      seasonRefId: 1, seasonStatus: status, vorabliga: false,
+      seasonRefId: 1, seasonStatus: status, vorabliga: false, isCup: false,
       spielplan: [], tabelle: [{ team } as never], gameDetails: new Map(),
     });
     // Upcoming listed FIRST — the sort must win, not array order.
@@ -551,6 +551,7 @@ describe("extractRefereeAssignments", () => {
       seasonRefId: null,
       seasonStatus: "active",
       vorabliga: false,
+      isCup: false,
       spielplan: [],
       tabelle: [],
       gameDetails: new Map([[1000, {
@@ -580,6 +581,7 @@ describe("extractRefereeAssignments", () => {
       seasonRefId: null,
       seasonStatus: "active",
       vorabliga: false,
+      isCup: false,
       spielplan: [],
       tabelle: [],
       gameDetails: new Map([[1000, {

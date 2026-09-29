@@ -111,7 +111,7 @@ tables (`user`, `session`, `account`, `verification`) use text ids,
 |-------|------|-------------|
 | `appSettings` | `packages/db/src/schema/app-settings.ts` | key (unique), value — stores club_id, club_name |
 | `seasons` | `packages/db/src/schema/seasons.ts` | id, name, sdkSeasonId (nullable int), status (`upcoming`\|`active`\|`archived`), startDate, endDate, createdAt, updatedAt — partial-unique index enforces at most one `active` row at a time; `activateSeason()` archives the current active in the same transaction |
-| `leagues` | `packages/db/src/schema/leagues.ts` | apiLigaId (unique), ligaNr, name, seasonId (legacy SDK int), seasonRefId (FK → seasons.id, NOT NULL), vorabliga (boolean), isTracked, discoveredAt, dataHash — season scoping for matches/standings flows through `leagues.seasonRefId`; sync gates to active+upcoming seasons; public reads are active-season-only; admin reads accept an optional `seasonId` query param (defaulting to the active season) |
+| `leagues` | `packages/db/src/schema/leagues.ts` | apiLigaId (unique), ligaNr, name, seasonId (legacy SDK int), seasonRefId (FK → seasons.id, NOT NULL), vorabliga (boolean), isCup (boolean, admin-set; never a team entry's league), isTracked, discoveredAt, dataHash — season scoping for matches/standings flows through `leagues.seasonRefId`; sync gates to active+upcoming seasons; public reads are active-season-only; admin reads accept an optional `seasonId` query param (defaulting to the active season) |
 | `teams` | `packages/db/src/schema/teams.ts` | apiTeamPermanentId (unique), name, clubId, isOwnClub, dataHash — the Squad (federation identity); club-facing fields live on `teamEntries` |
 | `teamEntries` | `packages/db/src/schema/team-entries.ts` | teamId FK + seasonId FK (unique pair), leagueId FK (nullable = not connected), linkSource (`seeded`\|`manual`), customName, badgeColor, estimatedGameDuration, displayOrder — the per-season Team entry; source of truth for team↔league (ADR 0004) |
 | `teamStaff` | `packages/db/src/schema/team-staff.ts` | teamEntryId FK (cascade), personId FK (restrict), role (`trainer`\|`co_trainer`), refereeContact, unique (teamEntryId, personId) — the assignment of a staff person to a team entry (ADR 0009); attached to the entry, so assignments are per season and copied forward by `team-entry-seeding.service.ts` with the same person |
@@ -264,8 +264,9 @@ Step 3: Parallel upserts (Promise.all)
   then:
   - syncTeamEntriesFromData(leagueData)
     Reconciles per-season team entries (team_entries) from federation
-    evidence: creates missing entries, moves links (committed beats
-    vorabliga), supersedes manual links and logs the supersession.
+    evidence: creates missing entries, moves links (a league beats a
+    cup, then committed beats vorabliga), supersedes manual links and
+    logs the supersession.
     Ambiguous evidence — one squad in two committed leagues of a season,
     or in two vorabligas with no committed league — keeps an existing
     link untouched and logs the conflict; a squad with no link yet falls
