@@ -38,7 +38,7 @@ import {
   getOwnTeamLabel,
 } from "@/components/admin/matches/utils"
 import { SubscribeButton } from "@/components/public/shared/subscribe-button"
-import { selectedTeamApiIds, spielplanRowClass } from "./utils"
+import { ownTeamBadgeColors, selectedTeamApiIds, spielplanRowClass } from "./utils"
 import { SpielplanDetailSheet } from "./spielplan-detail-sheet"
 
 /**
@@ -96,6 +96,7 @@ const spielplanGlobalFilterFn: FilterFn<MatchListItem> = (
 function getColumns(
   t: ReturnType<typeof useTranslations<"spielplan">>,
   format: ReturnType<typeof useFormatter>,
+  badgeColors: Map<string, string | null>,
 ): ColumnDef<MatchListItem, unknown>[] {
   return [
     {
@@ -193,21 +194,36 @@ function getColumns(
       accessorKey: "anschreiber",
       header: t("columns.anschreiber"),
       cell: ({ row }) =>
-        row.original.anschreiber ? <TeamBadge name={row.original.anschreiber} /> : null,
+        row.original.anschreiber ? (
+          <TeamBadge
+            name={row.original.anschreiber}
+            badgeColor={badgeColors.get(row.original.anschreiber)}
+          />
+        ) : null,
       meta: { label: t("columns.anschreiber") },
     },
     {
       accessorKey: "zeitnehmer",
       header: t("columns.zeitnehmer"),
       cell: ({ row }) =>
-        row.original.zeitnehmer ? <TeamBadge name={row.original.zeitnehmer} /> : null,
+        row.original.zeitnehmer ? (
+          <TeamBadge
+            name={row.original.zeitnehmer}
+            badgeColor={badgeColors.get(row.original.zeitnehmer)}
+          />
+        ) : null,
       meta: { label: t("columns.zeitnehmer") },
     },
     {
       accessorKey: "shotclock",
       header: t("columns.shotclock"),
       cell: ({ row }) =>
-        row.original.shotclock ? <TeamBadge name={row.original.shotclock} /> : null,
+        row.original.shotclock ? (
+          <TeamBadge
+            name={row.original.shotclock}
+            badgeColor={badgeColors.get(row.original.shotclock)}
+          />
+        ) : null,
       meta: { label: t("columns.shotclock") },
     },
     {
@@ -259,7 +275,11 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
   const format = useFormatter()
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [selectedGame, setSelectedGame] = useState<MatchListItem | null>(null)
-  const columns = useMemo(() => getColumns(t, format), [t, format])
+  const badgeColors = useMemo(() => ownTeamBadgeColors(matches), [matches])
+  const columns = useMemo(
+    () => getColumns(t, format, badgeColors),
+    [t, format, badgeColors],
+  )
 
   const teamFilterOptions = useMemo(
     () =>
@@ -301,9 +321,6 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
         leagueName: false,
         venue: false,
         score: false,
-        anschreiber: false,
-        zeitnehmer: false,
-        shotclock: false,
         publicComment: false,
         status: false,
         homeAway: false,
@@ -414,6 +431,7 @@ export function SpielplanTable({ matches }: SpielplanTableProps) {
       </DataTable>
       <SpielplanDetailSheet
         game={selectedGame}
+        badgeColors={badgeColors}
         onOpenChange={(open) => {
           if (!open) setSelectedGame(null)
         }}

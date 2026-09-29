@@ -49,3 +49,23 @@ export function selectedTeamApiIds(
   }
   return ids;
 }
+
+type BadgeColorMatch = TeamIdMatch & Pick<MatchListItem, "homeBadgeColor" | "guestBadgeColor">;
+
+/**
+ * Own-team label → configured badge colour, read off the schedule's games.
+ * The Kampfgericht columns hold a team name, not a team, so their badges look
+ * the colour up here; without it `TeamBadge` falls back to a hash of the name
+ * and the same team shows two colours in one row.
+ */
+export function ownTeamBadgeColors(
+  games: readonly BadgeColorMatch[],
+): Map<string, string | null> {
+  const colors = new Map<string, string | null>();
+  for (const game of games) {
+    const label = getOwnTeamLabel(game);
+    if (colors.get(label)) continue;
+    colors.set(label, game.homeIsOwnClub ? game.homeBadgeColor : game.guestBadgeColor);
+  }
+  return colors;
+}
