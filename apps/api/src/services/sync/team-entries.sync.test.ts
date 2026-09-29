@@ -23,7 +23,7 @@ const ref = (teamPermanentId: number, teamname: string, clubId: number) => ({
 function leagueData(overrides: Partial<LeagueFetchedData>): LeagueFetchedData {
   return {
     leagueApiId: 0, leagueDbId: null, leagueName: null, seasonRefId: null,
-    seasonStatus: "active", vorabliga: false, spielplan: [], tabelle: [],
+    seasonStatus: "active", vorabliga: false, isCup: false, spielplan: [], tabelle: [],
     gameDetails: new Map(), ...overrides,
   };
 }
@@ -283,5 +283,75 @@ describe("syncTeamEntriesFromData", () => {
     expect(res.conflicts).toBe(1);
     const rows = await ctx.client.query(`SELECT league_id FROM team_entries WHERE team_id = $1`, [squad]);
     expect(rows.rows).toEqual([{ league_id: lowerLiga }]);
+  });
+
+  describe("cups", () => {
+    it("keeps the regular league over a cup, with no conflict logged", async () => {
+      await seedClubConfig(100);
+      const season = await seedSeason("2026/27", "active");
+      // The cup has the lower liga id, so the old lowest-id fallback would pick it.
+      const cup = await seedLeague(60, "Kreispokal Herren", season);
+      const league = await seedLeague(70, "Oberliga Herren", season);
+      const squad = await seedTeam(6100, "Dragons Herren 1");
+      const { logger, entries } = fakeLogger();
+
+      const res = await syncTeamEntriesFromData([
+        leagueData({ leagueApiId: 60, leagueDbId: cup, seasonRefId: season, isCup: true, tabelle: [{ team: ref(6100, "Dragons Herren 1", 100) } as never] }),
+        leagueData({ leagueApiId: 70, leagueDbId: league, seasonRefId: season, tabelle: [{ team: ref(6100, "Dragons Herren 1", 100) } as never] }),
+      ], logger);
+
+      expect(res.conflicts).toBe(0);
+      expect(entries.filter((e) => e.action === "skipped")).toEqual([]);
+      const rows = await ctx.client.query(`SELECT league_id FROM team_entries WHERE team_id = $1`, [squad]);
+      expect(rows.rows).toEqual([{ league_id: league }]);
+    });
+
+    it("prefers even a vorabliga over a cup", async () => {
+      await seedClubConfig(100);
+      const season = await seedSeason("2026/27", "upcoming");
+      const cup = await seedLeague(61, "Kreispokal Damen", season);
+      const vorab = await seedLeague(71, "Damen Vorab", season, true);
+      const squad = await seedTeam(6101, "Dragons Damen 1");
+
+      await syncTeamEntriesFromData([
+        leagueData({ leagueApiId: 61, leagueDbId: cup, seasonRefId: season, isCup: true, tabelle: [{ team: ref(6101, "Dragons Damen 1", 100) } as never] }),
+        leagueData({ leagueApiId: 71, leagueDbId: vorab, seasonRefId: season, vorabliga: true, tabelle: [{ team: ref(6101, "Dragons Damen 1", 100) } as never] }),
+      ]);
+
+      const rows = await ctx.client.query(`SELECT league_id FROM team_entries WHERE team_id = $1`, [squad]);
+      expect(rows.rows).toEqual([{ league_id: vorab }]);
+    });
+
+    it("links a squad found only in a cup to that cup", async () => {
+      await seedClubConfig(100);
+      const season = await seedSeason("2026/27", "active");
+      const cup = await seedLeague(62, "Kreispokal Herren", season);
+      const squad = await seedTeam(6102, "Dragons Herren 3");
+
+      await syncTeamEntriesFromData([
+        leagueData({ leagueApiId: 62, leagueDbId: cup, seasonRefId: season, isCup: true, tabelle: [{ team: ref(6102, "Dragons Herren 3", 100) } as never] }),
+      ]);
+
+      const rows = await ctx.client.query(`SELECT league_id FROM team_entries WHERE team_id = $1`, [squad]);
+      expect(rows.rows).toEqual([{ league_id: cup }]);
+    });
+
+    it("moves a squad off the cup once its regular league turns up", async () => {
+      await seedClubConfig(100);
+      const season = await seedSeason("2026/27", "active");
+      const cup = await seedLeague(63, "Kreispokal Herren", season);
+      const league = await seedLeague(73, "Oberliga Herren", season);
+      const squad = await seedTeam(6103, "Dragons Herren 2");
+      await ctx.client.query(
+        `INSERT INTO team_entries (team_id, season_id, league_id) VALUES ($1, $2, $3)`, [squad, season, cup]);
+
+      await syncTeamEntriesFromData([
+        leagueData({ leagueApiId: 63, leagueDbId: cup, seasonRefId: season, isCup: true, tabelle: [{ team: ref(6103, "Dragons Herren 2", 100) } as never] }),
+        leagueData({ leagueApiId: 73, leagueDbId: league, seasonRefId: season, tabelle: [{ team: ref(6103, "Dragons Herren 2", 100) } as never] }),
+      ]);
+
+      const rows = await ctx.client.query(`SELECT league_id FROM team_entries WHERE team_id = $1`, [squad]);
+      expect(rows.rows).toEqual([{ league_id: league }]);
+    });
   });
 });

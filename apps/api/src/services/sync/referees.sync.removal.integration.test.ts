@@ -88,6 +88,7 @@ function leagueFetch(
       seasonRefId: null,
       seasonStatus: "active",
       vorabliga: false,
+      isCup: false,
       spielplan: requestedApiIds.map((matchId) => ({ matchId }) as SdkSpielplanMatch),
       tabelle: [],
       gameDetails: returned,

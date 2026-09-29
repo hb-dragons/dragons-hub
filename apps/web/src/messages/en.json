@@ -1044,7 +1044,7 @@
       "manage": {
         "button": "Manage leagues",
         "title": "Manage leagues",
-        "description": "Add or remove the leagues this season tracks.",
+        "description": "Add or remove the leagues this season tracks. A league marked as a cup is never a team's league; cup games still show under the team.",
         "save": "Save & sync",
         "saved": "Leagues updated",
         "saveFailed": "Could not save leagues",
@@ -1058,6 +1058,8 @@
         "selectDescription": "Select the preliminary (Vorabliga) leagues to track this season.",
         "searchPlaceholder": "Search leagues…",
         "ownClubOnly": "Only my club's leagues",
+        "cup": "Cup",
+        "cupHint": "Cup competition (Pokal): kept out of the team's league link",
         "vorabligaOnly": "Preliminary (Vorabliga) leagues only",
         "showTeams": "Show teams",
         "hideTeams": "Hide teams",

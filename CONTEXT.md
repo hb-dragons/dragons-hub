@@ -40,6 +40,10 @@ _Avoid_: year, period
 The one season the club is operating in, designated centrally on the server and changed only through new-season onboarding — never computed by a client. The Dragons App shows the current season exclusively; past seasons are a Web-App concern.
 _Avoid_: active season, latest season
 
+**Cup**:
+A knockout competition (Pokal) a squad plays beside its league in the same season. Tracked like a league, but never a team entry's connected league.
+_Avoid_: Pokal-Liga, cup league
+
 **Vorabliga**:
 A preliminary league the federation publishes before promotion/relegation is settled. Carries a full schedule; superseded by a committed league whose fixtures replace it.
 

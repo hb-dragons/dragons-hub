@@ -21,6 +21,7 @@ export interface LeagueFetchedData {
   seasonRefId: number | null;
   seasonStatus: "active" | "upcoming" | null;
   vorabliga: boolean;
+  isCup: boolean;
   spielplan: SdkSpielplanMatch[];
   tabelle: SdkTabelleEntry[];
   gameDetails: Map<number, SdkGetGameResponse>;
@@ -61,6 +62,7 @@ async function fetchLeagueData(
   seasonRefId: number | null,
   seasonStatus: "active" | "upcoming" | null,
   vorabliga: boolean,
+  isCup: boolean,
 ): Promise<LeagueFetchedData> {
   log.info({ leagueApiId }, "Fetching data for league");
 
@@ -88,6 +90,7 @@ async function fetchLeagueData(
     seasonRefId,
     seasonStatus,
     vorabliga,
+    isCup,
     spielplan,
     tabelle,
     gameDetails,
@@ -103,6 +106,7 @@ export async function fetchAllSyncData(): Promise<CollectedSyncData> {
       seasonRefId: leagues.seasonRefId,
       seasonStatus: seasons.status,
       vorabliga: leagues.vorabliga,
+      isCup: leagues.isCup,
     })
     .from(leagues)
     .innerJoin(seasons, eq(leagues.seasonRefId, seasons.id))
@@ -134,6 +138,7 @@ export async function fetchAllSyncData(): Promise<CollectedSyncData> {
           l.seasonRefId,
           l.seasonStatus as "active" | "upcoming",
           l.vorabliga,
+          l.isCup,
         ),
       ),
     ),

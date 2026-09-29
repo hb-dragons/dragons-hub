@@ -166,6 +166,7 @@ function leagueData(opts: {
     seasonRefId: null,
     seasonStatus: "active",
     vorabliga: false,
+    isCup: false,
     spielplan: [match],
     tabelle: [],
     gameDetails: gameDetailsMap,
