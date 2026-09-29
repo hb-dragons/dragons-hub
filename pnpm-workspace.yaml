@@ -39,7 +39,10 @@ overrides:
   '@prisma/dev>@hono/node-server': '>=1.19.13'
   tar: '>=7.5.11'
   flatted: '>=3.4.0'
-  undici: '>=7.24.0'
+  # Bounded to payload's own major: payload pins undici 7.x, and the open
+  # `>=7.24.0` this used to be dragged it onto 8.9.0. 7.29.1 fixes
+  # GHSA-rfgv-xxqx-mfg5 and GHSA-w293-vg96-wgc3.
+  undici: '>=7.29.1 <8'
   fast-xml-parser: '>=5.7.0'
   fast-xml-builder: '>=1.1.7'
   effect: '>=3.20.0'
