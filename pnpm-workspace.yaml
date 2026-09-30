@@ -70,8 +70,8 @@ overrides:
   # consumer silently dragged minimatch@3 onto brace-expansion@5. Where a
   # package has two live major lines, the floor is scoped per line with a
   # `@^N` selector so a v1 consumer is not dragged onto v5.
-  'brace-expansion@^1': '>=1.1.18 <2'
-  'brace-expansion@^5': '>=5.0.9 <6'
+  'brace-expansion@^1': '>=1.1.20 <2'
+  'brace-expansion@^5': '>=5.0.11 <6'
   fast-uri: '>=3.1.7 <4'
   'form-data@^2': '>=2.5.6 <3'
   ip-address: '>=10.3.1 <11'

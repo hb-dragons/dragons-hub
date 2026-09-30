@@ -14,7 +14,7 @@ import { computeEntityHash } from "./hash";
 import type { SyncLogger } from "./sync-logger";
 import type { CurrentRemoteSnapshot } from "@dragons/db/schema";
 import { logger } from "../../config/logger";
-import { publishDomainEvent } from "../events/event-publisher";
+import { publishDomainEvent, type TransactionClient } from "../events/event-publisher";
 import { EVENT_TYPES } from "@dragons/shared";
 import {
   extractPeriodScores,
@@ -24,6 +24,7 @@ import {
 import {
   computeEffectiveChanges as computeEffectiveChangesFn,
   classifyMatchChanges,
+  type FieldChange,
 } from "./match-change-classifier";
 
 const log = logger.child({ service: "matches-sync" });
@@ -253,6 +254,55 @@ function computeEffectiveChanges(
 }
 
 type FieldValueShape = string | number | boolean | null | undefined;
+
+/**
+ * Remote changes to fields the club has overridden. The sync never writes an
+ * overridden column, so these never appear in the persisted diff — yet they
+ * are new official values. Compared against the official value on record (the
+ * current remote snapshot), not against the override, so the snapshot and the
+ * remote audit trail move on while the override keeps the displayed value.
+ *
+ * Before this, a federation change confined to an overridden field (the usual
+ * case: an admin moved the kickoff, then the federation followed) wrote no
+ * snapshot but still advanced the hash, so the official value stayed stale for
+ * good — and clearing the override restored that stale value.
+ */
+async function officialChangesToOverriddenFields(
+  tx: TransactionClient,
+  locked: typeof matches.$inferSelect,
+  overriddenSet: ReadonlySet<string>,
+  remoteSnapshot: RemoteSnapshot,
+): Promise<FieldChange[]> {
+  const fields = SNAPSHOT_DB_FIELDS.filter((f) => overriddenSet.has(f));
+  if (fields.length === 0 || locked.currentRemoteVersion === 0) return [];
+  const [current] = await tx
+    .select({ snapshot: matchRemoteVersions.snapshot })
+    .from(matchRemoteVersions)
+    .where(
+      and(
+        eq(matchRemoteVersions.matchId, locked.id),
+        eq(matchRemoteVersions.versionNumber, locked.currentRemoteVersion),
+      ),
+    );
+  if (!current) return [];
+  const official = current.snapshot as unknown as Record<string, FieldValueShape>;
+  // A field a legacy snapshot does not carry has no official value on record.
+  const known = fields.filter((f) => f in official);
+  const next = Object.fromEntries(known.map((f) => [f, remoteSnapshot[f]]));
+  return computeEffectiveChangesFn(official, next, known);
+}
+
+/** Same value for the column, e.g. "19:30" from the federation vs "19:30:00" stored. */
+function sameFieldValue(
+  locked: typeof matches.$inferSelect,
+  field: string,
+  value: unknown,
+): boolean {
+  if (!(SNAPSHOT_DB_FIELDS as readonly string[]).includes(field)) {
+    return String(locked[field as keyof typeof locked] ?? "") === String(value ?? "");
+  }
+  return computeEffectiveChanges(locked, { [field]: value }).length === 0;
+}
 
 const SNAPSHOT_DB_FIELDS = [
   "matchNo",
@@ -553,19 +603,31 @@ export async function syncMatchesFromData(
               });
             }
 
+            const officialChanges = await officialChangesToOverriddenFields(
+              tx,
+              locked,
+              overriddenSet,
+              remoteSnapshot,
+            );
+            // What the federation changed: the persisted diff plus the official
+            // values behind overrides. Events stay on `effective` alone — an
+            // overridden field's displayed value did not move, and the conflict
+            // is reported as override.conflict below.
+            const remoteChanges = [...effective, ...officialChanges];
+
             // Only snapshot a new remote version, bump currentRemoteVersion, and
-            // write audit rows when something is actually persisted. A detail-fetch
+            // write audit rows when the federation actually changed something. A detail-fetch
             // failure leaves the snapshot's detail fields null, but the preservation
             // block above keeps the stored values, so `effective` is empty — we must
             // not churn the version history or write "X -> null" audit rows. Audit
             // rows derive from `effective` (the real persisted diff), never the raw
             // snapshot. (issue #49)
             const newVersionNumber =
-              effective.length > 0
+              remoteChanges.length > 0
                 ? locked.currentRemoteVersion + 1
                 : locked.currentRemoteVersion;
 
-            if (effective.length > 0) {
+            if (remoteChanges.length > 0) {
               await tx.insert(matchRemoteVersions).values({
                 matchId: locked.id,
                 versionNumber: newVersionNumber,
@@ -575,7 +637,7 @@ export async function syncMatchesFromData(
               });
 
               await tx.insert(matchChanges).values(
-                effective.map((change) => ({
+                remoteChanges.map((change) => ({
                   matchId: locked.id,
                   track: "remote" as const,
                   versionNumber: newVersionNumber,
@@ -594,7 +656,7 @@ export async function syncMatchesFromData(
               const lockedVal = String(
                 locked[fieldName as keyof typeof locked] ?? "",
               );
-              if (remoteVal === lockedVal) {
+              if (sameFieldValue(locked, fieldName, remoteSnapshot[fieldName as keyof RemoteSnapshot])) {
                 // Remote now matches local override — auto-release
                 await tx
                   .delete(matchOverrides)
