@@ -347,6 +347,18 @@ ids up front and defers any match naming an unknown one — nothing is written, 
 even the hash, and the next run applies it once the teams stage has committed the
 team.
 
+**Remote changes behind an override** (2026-09-30). The sync never writes an
+overridden column, but a federation change to that field is still a new
+official value: the run compares it against the current `matchRemoteVersions`
+snapshot, and a difference bumps the remote version, stores the snapshot and
+writes the `matchChanges` audit row, while the override keeps the displayed
+value and `override.conflict` fires. It emits no `match.*` event, since nothing
+visible moved. An override is auto-released once the federation value equals
+the local one, compared per column type (`"19:30"` from the federation equals
+`"19:30:00"` in the time column). Before this, such a change advanced the hash
+without a snapshot, so the official kickoff stayed stale for good; migration
+0055 cleared the hash on every edited match to repair them.
+
 Changing a payload's shape invalidates every stored hash of that entity. No
 migration is needed — the next sync recomputes and rewrites them. That one run
 takes the update path for every row instead of the O(1) skip; for `matches` the

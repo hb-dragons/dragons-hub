@@ -26,7 +26,7 @@ vi.mock("../events/event-publisher", () => ({
 }));
 
 import { syncMatchesFromData } from "./matches.sync";
-import { matches, matchRemoteVersions, matchChanges } from "@dragons/db/schema";
+import { matches, matchRemoteVersions, matchChanges, matchOverrides } from "@dragons/db/schema";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
 let ctx: TestDbContext;
@@ -264,5 +264,75 @@ describe("syncMatchesFromData — detail-fetch availability flip (issue #49)", (
     expect((await versions()).length).toBe(1);
     expect((await matchRow()).currentRemoteVersion).toBe(1);
     expect((await changeRows()).length).toBe(0);
+  });
+});
+
+describe("syncMatchesFromData — remote changes to an overridden field", () => {
+  /** A local kickoff-time override, as the admin match editor leaves it. */
+  async function overrideKickoffTime(time: string) {
+    const row = await matchRow();
+    await ctx.client.query(`UPDATE matches SET kickoff_time = $1 WHERE id = $2`, [time, row.id]);
+    await ctx.client.query(
+      `INSERT INTO match_overrides (match_id, field_name) VALUES ($1, 'kickoffTime')`,
+      [row.id],
+    );
+  }
+
+  async function latestSnapshot() {
+    const row = await matchRow();
+    const [v] = await ctx.db
+      .select()
+      .from(matchRemoteVersions)
+      .where(eq(matchRemoteVersions.versionNumber, row.currentRemoteVersion));
+    return v!.snapshot as { kickoffTime: string; kickoffDate: string };
+  }
+
+  async function overrideFields() {
+    return (await ctx.db.select().from(matchOverrides)).map((o) => o.fieldName);
+  }
+
+  it("records the new official time while the local override keeps the displayed one", async () => {
+    await syncMatchesFromData([leagueData({})], new Map(), 1);
+    await overrideKickoffTime("19:30:00");
+
+    // The federation moves the game to 20:00 — a change confined to the overridden field.
+    await syncMatchesFromData([leagueData({ match: basicMatch({ kickoffTime: "20:00" }) })], new Map(), 2);
+
+    const row = await matchRow();
+    expect(row.kickoffTime).toBe("19:30:00");
+    expect(row.currentRemoteVersion).toBe(2);
+    expect((await latestSnapshot()).kickoffTime).toBe("20:00");
+    const changes = await changeRows();
+    expect(changes.map((c) => [c.track, c.fieldName, c.oldValue, c.newValue])).toEqual([
+      ["remote", "kickoffTime", "18:00", "20:00"],
+    ]);
+    expect(await overrideFields()).toEqual(["kickoffTime"]);
+  });
+
+  it("releases the override when the federation adopts the local time", async () => {
+    await syncMatchesFromData([leagueData({})], new Map(), 1);
+    await overrideKickoffTime("19:30:00");
+
+    // "19:30" from the federation, "19:30:00" in the time column: the same time.
+    await syncMatchesFromData([leagueData({ match: basicMatch({ kickoffTime: "19:30" }) })], new Map(), 2);
+
+    const row = await matchRow();
+    expect(row.kickoffTime).toBe("19:30:00");
+    expect(await overrideFields()).toEqual([]);
+    expect((await latestSnapshot()).kickoffTime).toBe("19:30");
+  });
+
+  it("does not bump the version again once the new official time is recorded", async () => {
+    await syncMatchesFromData([leagueData({})], new Map(), 1);
+    await overrideKickoffTime("19:30:00");
+    const moved = leagueData({ match: basicMatch({ kickoffTime: "20:00" }) });
+    await syncMatchesFromData([moved], new Map(), 2);
+
+    // Force the slow path (as the repair migration does): no new remote change, so no new version.
+    await ctx.client.query(`UPDATE matches SET remote_data_hash = NULL`);
+    await syncMatchesFromData([moved], new Map(), 3);
+
+    expect((await matchRow()).currentRemoteVersion).toBe(2);
+    expect((await versions()).length).toBe(2);
   });
 });
