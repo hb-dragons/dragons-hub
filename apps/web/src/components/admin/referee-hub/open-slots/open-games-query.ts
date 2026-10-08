@@ -57,14 +57,3 @@ const OPEN_GAMES_KEY_PREFIX = "/referee/games?";
 export function isOpenGamesListKey(key: unknown): boolean {
   return typeof key === "string" && key.startsWith(OPEN_GAMES_KEY_PREFIX);
 }
-
-/**
- * The cache key for the first `pages` pages of a list whose first page is
- * cached under `firstPageKey`. One page is that key unchanged, so the server
- * prefetch still lands; more pages extend it, which keeps the key under
- * `OPEN_GAMES_KEY_PREFIX` and so inside the bulk revalidation an assignment
- * triggers.
- */
-export function openGamesPagesKey(firstPageKey: string, pages: number): string {
-  return pages === 1 ? firstPageKey : `${firstPageKey}&pages=${pages}`;
-}
