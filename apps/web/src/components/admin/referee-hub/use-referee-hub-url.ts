@@ -166,7 +166,11 @@ export function useRefereeHubUrl() {
     (patch: HubPatch) => {
       const current = parseHubUrl(new URLSearchParams(latestQs.current));
       const next = applyHubPatch(current, patch);
-      const nextQs = buildHubUrl(next);
+      // PROTOTYPE: carry the layout prototype's ?variant= through hub updates,
+      // which otherwise rebuild the query string from hub state alone.
+      const variant = new URLSearchParams(window.location.search).get("variant");
+      const built = buildHubUrl(next);
+      const nextQs = variant ? [built, `variant=${encodeURIComponent(variant)}`].filter(Boolean).join("&") : built;
       if (nextQs === latestQs.current) return;
       latestQs.current = nextQs;
       const href = nextQs ? `${pathname}?${nextQs}` : pathname;

@@ -2,7 +2,7 @@
 
 import { useRefereeHubUrl } from "./use-referee-hub-url";
 import { HubHeader } from "./hub-header";
-import { OpenSlotsTab } from "./open-slots/open-slots-tab";
+import { OpenSlotsPrototype } from "./open-slots/prototype";
 import { RefereesTab } from "./referees/referees-tab";
 
 export function RefereeHubPage() {
@@ -10,7 +10,7 @@ export function RefereeHubPage() {
   return (
     <div className="space-y-6">
       <HubHeader />
-      {state.tab === "open-slots" ? <OpenSlotsTab /> : <RefereesTab />}
+      {state.tab === "open-slots" ? <OpenSlotsPrototype /> : <RefereesTab />}
     </div>
   );
 }
