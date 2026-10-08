@@ -21,7 +21,7 @@ interface Props {
 }
 
 const STATUSES = ["open", "offered", "any"] as const;
-const DATE_PRESETS = ["14d", "30d", "season", "custom"] as const;
+const DATE_PRESETS = ["14d", "30d", "upcoming", "custom"] as const;
 type DatePreset = (typeof DATE_PRESETS)[number];
 
 export function SlotsFilterSidebar({ filters, onChange, leagueOptions }: Props) {
@@ -160,7 +160,8 @@ function isDefault(f: HubFilters): boolean {
 }
 
 function currentPreset(f: HubFilters): DatePreset {
-  if (f.dateFrom === null && f.dateTo === null) return "season";
+  // No dates means "from today on" (see `openGamesQueryOpts`), not the season.
+  if (f.dateFrom === null && f.dateTo === null) return "upcoming";
   if (f.dateFrom === todayInClubZone() && f.dateTo === plusDaysInClubZone(14)) return "14d";
   if (f.dateFrom === todayInClubZone() && f.dateTo === plusDaysInClubZone(30)) return "30d";
   return "custom";
@@ -173,7 +174,7 @@ function applyPreset(preset: DatePreset): Partial<HubFilters> {
   if (preset === "30d") {
     return { dateFrom: todayInClubZone(), dateTo: plusDaysInClubZone(30) };
   }
-  if (preset === "season") {
+  if (preset === "upcoming") {
     return { dateFrom: null, dateTo: null };
   }
   // custom — start from today; the pickers take it from there

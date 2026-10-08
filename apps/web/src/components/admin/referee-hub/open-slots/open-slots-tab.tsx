@@ -12,8 +12,11 @@ export function OpenSlotsTab() {
   const t = useTranslations("refereeHub.openSlots");
   const { state, update } = useRefereeHubUrl();
 
-  const settingsLeaguesQ = queries.settingsLeagues();
-  const { data: leagueData } = useSWR(settingsLeaguesQ.key, settingsLeaguesQ.fetcher);
+  // The leagues the referee games actually span. The tracked leagues offered
+  // before mostly missed them: the referee feed covers every league our club
+  // refs in, and few of those are tracked.
+  const leaguesQ = queries.refereeGameLeagues();
+  const { data: leagueData } = useSWR(leaguesQ.key, leaguesQ.fetcher);
   const leagueOptions = (leagueData?.leagues ?? []).map((l) => ({
     value: String(l.apiLigaId),
     label: l.name,

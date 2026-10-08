@@ -685,6 +685,7 @@ plugin under `/api/auth/*`, not by this route group.
 |--------|------|-------------|
 | GET | `/admin/referees` | List referees with pagination, search and sort. Query: `ownClub` (boolean, default true). Includes allowAllHomeGames, allowAwayGames, isOwnClub flags |
 | GET | `/admin/referees/counts` | Own-club and total referee counts |
+| GET | `/admin/referees/game-leagues` | Leagues that have a live referee game with an open own-club slot, for the referee hub's league filter |
 | GET | `/admin/referees/:id` | Single referee by id |
 | PATCH | `/admin/referees/:id/visibility` | Update referee visibility flags. Body: `{ allowAllHomeGames, allowAwayGames, isOwnClub }` |
 | GET | `/admin/referees/:id/eligible-open-games` | Open games the referee is eligible to take (used by the admin assign UI) |

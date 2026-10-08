@@ -140,6 +140,8 @@ export type {
   RefereeRule,
   RefereeRulesResponse,
   RefereeCountsResponse,
+  RefereeGameLeague,
+  RefereeGameLeaguesResponse,
   EligibleOpenGamesResponse,
 } from "./referees";
 export type { StandingItem, LeagueStandings } from "./standings";
