@@ -8,6 +8,10 @@ import {
   DEFAULT_FILTERS,
   openGamesQueryOpts,
 } from "@/components/admin/referee-hub/open-slots/open-games-query";
+import {
+  DEFAULT_REFEREE_LIST,
+  refereeListQueryOpts,
+} from "@/components/admin/referee-hub/referees/referee-list-query";
 import { RefereeHubPage } from "@/components/admin/referee-hub/referee-hub";
 
 export default async function RefereesPage() {
@@ -21,7 +25,7 @@ export default async function RefereesPage() {
   // asked for a 14-day window with no slotStatus, a key the client never
   // requests, so the whole server round trip was discarded.
   const prefetches = [
-    sq.refereesPaginated({ scope: "own", limit: 50 }),
+    sq.refereesPaginated(refereeListQueryOpts(DEFAULT_REFEREE_LIST)),
     // Must be Europe/Berlin "today", as the client computes it, or the key
     // differs between Berlin midnight and 01:00/02:00 UTC.
     sq.refereeGamesFiltered(openGamesQueryOpts(DEFAULT_FILTERS, todayInClubZone())),
