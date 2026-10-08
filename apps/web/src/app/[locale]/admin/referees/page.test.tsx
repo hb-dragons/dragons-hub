@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, renderHook, screen, cleanup } from "@testing-library/react";
 import useSWR from "swr";
 
 vi.mock("next/navigation", () => ({
@@ -41,7 +41,8 @@ vi.mock("swr", async (importActual) => {
 });
 
 import RefereesPage from "./page";
-import { OpenGamesList } from "@/components/admin/referee-hub/open-slots/open-games-list";
+import { DEFAULT_FILTERS } from "@/components/admin/referee-hub/open-slots/open-games-query";
+import { useOpenGames } from "@/components/admin/referee-hub/open-slots/use-open-games";
 
 const SESSION = {
   user: { id: "u1", name: "N", email: "a@b.com", role: "admin", refereeId: null },
@@ -73,21 +74,7 @@ describe("/admin/referees prefetch", () => {
       observed = key as string;
       return { data: { items: [] } } as never;
     });
-    render(
-      <OpenGamesList
-        filters={{
-          status: "open",
-          league: [],
-          dateFrom: null,
-          dateTo: null,
-          gameType: "both",
-          search: "",
-        }}
-        selectedGameId={null}
-        onSelect={() => {}}
-        onSearch={() => {}}
-      />,
-    );
+    renderHook(() => useOpenGames(DEFAULT_FILTERS));
 
     expect(Object.keys(fallback)).toContain(observed);
   });
