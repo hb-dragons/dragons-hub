@@ -18,7 +18,7 @@ overrides:
   react: 19.2.6
   react-native: 0.86.3
   expo-glass-effect: 57.0.4
-  expo-constants: 57.0.20
+  expo-constants: 57.0.21
   # Capped at 1.6.23: better-auth 1.6.24 regressed the client-plugin generics, so
   # any plugin declaring `getActions` stops being assignable to
   # `BetterAuthClientPlugin`. One bad plugin collapses inference for the whole
@@ -48,7 +48,8 @@ overrides:
   effect: '>=3.20.0'
   lodash: '>=4.18.0'
   '@xmldom/xmldom': '>=0.8.15 <0.9'
-  next: '>=16.3.7 <17'
+  # GHSA-cjq9-62q9-8jv4 (high): fixed in 16.3.8.
+  next: '>=16.3.8 <17'
   kysely: 0.28.17
   '@tootallnate/once': '>=3.0.1'
   postcss: '>=8.5.18 <9'
@@ -83,12 +84,21 @@ overrides:
   # via custom stats, both rated high. Reached only through @babel/core and
   # the expo toolchain; nothing declares it directly.
   browserslist: '>=4.28.7 <5'
-  sharp: '>=0.35.4 <0.36'
-  shell-quote: '>=1.8.5 <2'
+  sharp: '>=0.35.5 <0.36'
+  shell-quote: '>=1.11.0 <2'
   svgo: '>=3.3.5 <4'
   vite: '>=8.0.16 <9'
   'ws@^7': '>=7.5.11 <8'
   'ws@^8': '>=8.21.0 <9'
+  # Floors raised 2026-10-08 for advisories published since the last green
+  # audit, each to the lowest patched version GitHub names. All transitive:
+  # compression via @expo/cli, source-map-js via postcss/sass/magicast,
+  # devalue and http-cache-semantics via astro. `sharp`, `shell-quote` and
+  # `next` above were raised in the same pass.
+  compression: '>=1.8.2 <2'
+  source-map-js: '>=1.2.2 <2'
+  devalue: '>=5.9.3 <6'
+  http-cache-semantics: '>=4.2.1 <5'
   '@esbuild-kit/core-utils>esbuild': '>=0.25.0'
   '@instantdb/core>uuid': '>=11.1.1'
 auditConfig:
@@ -97,9 +107,18 @@ auditConfig:
   # package is Metro's, i.e. bundler tooling that never ships, and reaching it
   # needs a hostile ICNS/JXL/HEIF file already in the repo. Tracked in #211 —
   # drop these two the moment upstream publishes a patch.
+  #
+  # GHSA-vfj7-8cjw-p6xm (braces, high) and GHSA-86w9-cpqp-85rv (node-forge,
+  # high): same situation, `first_patched_version: null` and npm's newest
+  # release is the vulnerable one. braces arrives through micromatch, which
+  # the whole build/test toolchain uses, and only ever expands glob patterns
+  # we write; node-forge arrives only through @expo/cli (dev certificates,
+  # EAS update signing). Tracked in #376 and #377 respectively.
   ignoreGhsas:
     - GHSA-w3rx-r6r6-pgpr
     - GHSA-5p2g-fcmc-qvqq
+    - GHSA-vfj7-8cjw-p6xm
+    - GHSA-86w9-cpqp-85rv
 
 allowBuilds:
   esbuild: true

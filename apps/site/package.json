@@ -20,13 +20,13 @@
     "@dragons/contracts": "workspace:*",
     "@dragons/shared": "workspace:*",
     "@dragons/ui": "workspace:*",
-    "@payloadcms/richtext-lexical": "3.87.0",
+    "@payloadcms/richtext-lexical": "3.90.2",
     "astro": "^7.3.2",
     "blurhash": "^2.0.5",
     "ogl": "^1.0.11",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
