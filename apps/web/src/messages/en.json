@@ -1566,18 +1566,21 @@
       "referees": "Referees"
     },
     "openSlots": {
-      "searchPlaceholder": "Search game…",
+      "searchPlaceholder": "Search team or league",
       "loading": "Loading…",
       "loadError": "Failed to load games.",
       "empty": "No games match your filters.",
       "detail": {
         "notFound": "Game not found or no longer needs referees",
-        "selectGamePrompt": "Select a game on the left to see its open slots"
+        "otherClub": "Filled by the other club"
       },
       "slot": {
-        "label": "Slot {n} (SR{n})",
+        "label": "Referee {n}",
         "open": "Open",
-        "unassign": "Unassign"
+        "offered": "Offered",
+        "unassign": "Remove",
+        "assignFailed": "Assigning failed",
+        "unassignFailed": "Removing failed"
       },
       "errorChip": {
         "dismiss": "Dismiss"
@@ -1587,7 +1590,6 @@
         "assign": "Assign SR{n}",
         "empty": "No eligible referees",
         "workload": "{n} games",
-        "assignTrigger": "Assign referee…",
         "showIneligible": "Show {n} ineligible",
         "hideIneligible": "Hide ineligible",
         "loadingMore": "Loading more…",
@@ -1604,34 +1606,46 @@
       "filters": {
         "status": "Status",
         "statusValue": {
-          "open": "Open only",
-          "offered": "Open + Offered",
-          "any": "Any"
+          "open": "Open",
+          "offered": "+ Offered",
+          "any": "All"
         },
         "league": "League",
         "noLeagues": "No leagues with open games",
         "date": "Date",
         "datePreset": {
-          "14d": "Next 14 days",
-          "30d": "Next 30 days",
+          "14d": "14 days",
+          "30d": "30 days",
           "upcoming": "All upcoming",
-          "custom": "Custom range"
+          "custom": "Range"
         },
         "dateFrom": "From",
         "dateTo": "To",
         "gameType": "Game type",
         "gameTypeValue": {
+          "both": "Home + away",
           "home": "Home",
           "away": "Away"
         },
-        "reset": "Reset filters"
+        "reset": "Reset",
+        "leagueSelected": "League ({n})"
       },
       "matchup": "{home} vs {guest}",
       "resultCount": "{n} games",
-      "slotBadge": {
-        "assigned": "SR{n} {name}",
-        "offered": "SR{n} offered",
-        "open": "SR{n} open"
+      "loadingMore": "Loading more games…",
+      "agenda": {
+        "relativeDay": "{days, plural, =0 {today} =1 {tomorrow} other {in # days}}",
+        "daysAgo": "{days, plural, =1 {yesterday} other {# days ago}}",
+        "dayOpenSlots": "{n, plural, =0 {all staffed} one {# open slot} other {# open slots}}",
+        "against": "vs {opponent}",
+        "at": "at {opponent}",
+        "home": "Home",
+        "away": "Away",
+        "slotOpen": "open",
+        "slotOffered": "offered",
+        "openCount": "{n} open",
+        "staffed": "staffed",
+        "slotShort": "SR{n}"
       }
     },
     "referees": {

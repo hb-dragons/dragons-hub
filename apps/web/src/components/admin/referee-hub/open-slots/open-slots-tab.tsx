@@ -1,16 +1,22 @@
 "use client";
 
 import useSWR from "swr";
-import { useTranslations } from "next-intl";
 import { useRefereeHubUrl } from "../use-referee-hub-url";
 import { queries } from "@/lib/swr-queries";
-import { SlotsFilterSidebar } from "./slots-filter-sidebar";
-import { OpenGamesList } from "./open-games-list";
-import { OpenSlotDetail } from "./open-slot-detail";
+import { SlotsFilterToolbar } from "./slots-filter-toolbar";
+import { OpenGamesAgenda } from "./open-games-agenda";
+import { OpenGameSheet } from "./open-game-sheet";
+import { useOpenGames } from "./use-open-games";
 
+/**
+ * The hub's open-games tab: filters in a row on top, the games as a full-width
+ * agenda, and staffing in a sheet. Chosen over a three-pane layout and a
+ * weekend board in a prototype (branch `prototype/referee-hub-layout`): the
+ * three panes left most of the screen empty and truncated the team names.
+ */
 export function OpenSlotsTab() {
-  const t = useTranslations("refereeHub.openSlots");
   const { state, update } = useRefereeHubUrl();
+  const games = useOpenGames(state.filters);
 
   // The leagues the referee games actually span. The tracked leagues offered
   // before mostly missed them: the referee feed covers every league our club
@@ -20,34 +26,29 @@ export function OpenSlotsTab() {
   const leagueOptions = (leagueData?.leagues ?? []).map((l) => ({
     value: String(l.apiLigaId),
     label: l.name,
+    short: l.short,
   }));
 
-  // Stacks below lg: the three-pane layout needs ~800px and was unusable on a
-  // phone, which is where this hub gets opened on a match day.
   return (
-    <div className="bg-border/15 grid min-h-[600px] grid-cols-1 gap-px overflow-hidden rounded-md lg:grid-cols-[220px_340px_1fr]">
-      <SlotsFilterSidebar
+    <div className="space-y-4">
+      <SlotsFilterToolbar
         filters={state.filters}
         onChange={(patch) => update({ filters: patch })}
         leagueOptions={leagueOptions}
+        total={games.total}
       />
-      <div className="bg-surface-low">
-        <OpenGamesList
-          filters={state.filters}
-          selectedGameId={state.gameId}
-          onSelect={(gameId) => update({ gameId })}
-          onSearch={(search) => update({ filters: { search } })}
-        />
-      </div>
-      <div className="bg-card">
-        {state.gameId !== null ? (
-          <OpenSlotDetail selectedGameId={state.gameId} />
-        ) : (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            {t("detail.selectGamePrompt")}
-          </div>
-        )}
-      </div>
+      <OpenGamesAgenda
+        games={games.games}
+        error={games.error}
+        isLoading={games.isLoading}
+        hasMore={games.hasMore}
+        isLoadingMore={games.isLoadingMore}
+        onLoadMore={games.loadMore}
+        onRetry={games.retry}
+        selectedGameId={state.gameId}
+        onSelect={(gameId) => update({ gameId })}
+      />
+      <OpenGameSheet gameId={state.gameId} onClose={() => update({ gameId: null })} />
     </div>
   );
 }

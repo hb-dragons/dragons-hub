@@ -1566,18 +1566,21 @@
       "referees": "Schiedsrichter"
     },
     "openSlots": {
-      "searchPlaceholder": "Spiel suchen…",
+      "searchPlaceholder": "Team oder Liga suchen",
       "loading": "Lädt…",
       "loadError": "Spiele konnten nicht geladen werden.",
       "empty": "Keine Spiele entsprechen Ihren Filtern.",
       "detail": {
         "notFound": "Spiel nicht gefunden oder benötigt keine Schiedsrichter mehr",
-        "selectGamePrompt": "Spiel links auswählen, um offene Slots zu sehen"
+        "otherClub": "Stellt der andere Verein"
       },
       "slot": {
-        "label": "Slot {n} (SR{n})",
+        "label": "Schiedsrichter {n}",
         "open": "Offen",
-        "unassign": "Aufheben"
+        "offered": "Angeboten",
+        "unassign": "Entfernen",
+        "assignFailed": "Zuweisen fehlgeschlagen",
+        "unassignFailed": "Entfernen fehlgeschlagen"
       },
       "errorChip": {
         "dismiss": "Schließen"
@@ -1587,7 +1590,6 @@
         "assign": "SR{n} zuweisen",
         "empty": "Keine passenden Schiedsrichter",
         "workload": "{n} Spiele",
-        "assignTrigger": "Schiedsrichter zuweisen…",
         "showIneligible": "{n} nicht Einsetzbare anzeigen",
         "hideIneligible": "Nicht Einsetzbare ausblenden",
         "loadingMore": "Lade mehr…",
@@ -1604,34 +1606,46 @@
       "filters": {
         "status": "Status",
         "statusValue": {
-          "open": "Nur offen",
-          "offered": "Offen + Angeboten",
-          "any": "Beliebig"
+          "open": "Offen",
+          "offered": "+ Angeboten",
+          "any": "Alle"
         },
         "league": "Liga",
         "noLeagues": "Keine Ligen mit offenen Spielen",
         "date": "Datum",
         "datePreset": {
-          "14d": "Nächste 14 Tage",
-          "30d": "Nächste 30 Tage",
+          "14d": "14 Tage",
+          "30d": "30 Tage",
           "upcoming": "Alle kommenden",
-          "custom": "Benutzerdefiniert"
+          "custom": "Zeitraum"
         },
         "dateFrom": "Von",
         "dateTo": "Bis",
         "gameType": "Spielart",
         "gameTypeValue": {
+          "both": "Heim + Auswärts",
           "home": "Heim",
           "away": "Auswärts"
         },
-        "reset": "Filter zurücksetzen"
+        "reset": "Zurücksetzen",
+        "leagueSelected": "Liga ({n})"
       },
       "matchup": "{home} vs. {guest}",
       "resultCount": "{n} Spiele",
-      "slotBadge": {
-        "assigned": "SR{n} {name}",
-        "offered": "SR{n} angeboten",
-        "open": "SR{n} offen"
+      "loadingMore": "Lade weitere Spiele…",
+      "agenda": {
+        "relativeDay": "{days, plural, =0 {heute} =1 {morgen} other {in # Tagen}}",
+        "daysAgo": "{days, plural, =1 {gestern} other {vor # Tagen}}",
+        "dayOpenSlots": "{n, plural, =0 {alle besetzt} one {# offener Slot} other {# offene Slots}}",
+        "against": "gegen {opponent}",
+        "at": "bei {opponent}",
+        "home": "Heim",
+        "away": "Auswärts",
+        "slotOpen": "offen",
+        "slotOffered": "angeboten",
+        "openCount": "{n} offen",
+        "staffed": "besetzt",
+        "slotShort": "SR{n}"
       }
     },
     "referees": {

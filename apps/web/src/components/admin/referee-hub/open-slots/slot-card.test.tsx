@@ -5,9 +5,6 @@ import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/re
 import { NextIntlClientProvider } from "next-intl";
 import { SlotCard } from "./slot-card";
 
-const toast = { success: vi.fn(), error: vi.fn() };
-vi.mock("sonner", () => ({ toast }));
-
 const assignReferee = vi.fn();
 const unassignReferee = vi.fn();
 vi.mock("@/lib/api", () => ({
@@ -17,151 +14,116 @@ vi.mock("@/lib/api", () => ({
       unassignReferee: (...a: unknown[]) => unassignReferee(...a),
     },
   },
-  APIError: class extends Error {},
 }));
 
 vi.mock("./candidate-picker", () => ({
-  CandidatePicker: ({ onPick }: { onPick: (n: number) => void }) =>
-    <button onClick={() => onPick(7)} data-testid="pick">pick</button>,
+  CandidatePicker: ({ onPick, disabled }: { onPick: (n: number) => void; disabled?: boolean }) => (
+    <button type="button" disabled={disabled} onClick={() => onPick(7)} data-testid="pick">
+      pick
+    </button>
+  ),
 }));
 
 const messages = { refereeHub: { openSlots: {
-  slot: { label: "SR{n}", open: "Open", unassign: "Unassign" },
+  slot: {
+    label: "Referee {n}", open: "Open", offered: "Offered", unassign: "Remove",
+    assignFailed: "Assigning failed", unassignFailed: "Removing failed",
+  },
   errorChip: { dismiss: "Dismiss" },
-  picker: { assignTrigger: "Assign referee…" },
 } } };
 
 function wrap(ui: React.ReactNode) {
   return <NextIntlClientProvider locale="en" messages={messages as never}>{ui}</NextIntlClientProvider>;
 }
 
-const openAssignment = { refereeApiId: null, refereeName: null, status: "open" as const };
+const open = { refereeApiId: null, refereeName: null, status: "open" as const };
+const assigned = { refereeApiId: 9, refereeName: "Lena Bauer", status: "assigned" as const };
 
-function openPicker() {
-  fireEvent.click(screen.getByRole("button", { name: /assign referee/i }));
-}
-
-beforeEach(() => { assignReferee.mockReset(); unassignReferee.mockReset(); toast.success.mockReset(); toast.error.mockReset(); });
-afterEach(() => cleanup());
+beforeEach(() => {
+  assignReferee.mockReset();
+  unassignReferee.mockReset();
+});
+afterEach(cleanup);
 
 describe("SlotCard", () => {
-  it("renders a compact trigger instead of an inline candidate list", () => {
-    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={openAssignment} onChange={() => {}} />));
-    expect(screen.getByRole("button", { name: /assign referee/i })).toBeInTheDocument();
+  it("lists the candidates inline for an open slot", () => {
+    render(wrap(<SlotCard gameApiId={1} slotNumber={2} assignment={open} onChange={() => {}} />));
+    expect(screen.getByText("Referee 2")).toBeInTheDocument();
+    expect(screen.getByText("Open")).toBeInTheDocument();
+    expect(screen.getByTestId("pick")).toBeInTheDocument();
+  });
+
+  it("offers candidates for an offered slot too", () => {
+    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={{ ...open, status: "offered" }} onChange={() => {}} />));
+    expect(screen.getByText("Offered")).toBeInTheDocument();
+    expect(screen.getByTestId("pick")).toBeInTheDocument();
+  });
+
+  it("assigns the picked referee to its slot and reports the change", async () => {
+    assignReferee.mockResolvedValue({});
+    const onChange = vi.fn();
+    render(wrap(<SlotCard gameApiId={11} slotNumber={2} assignment={open} onChange={onChange} />));
+
+    fireEvent.click(screen.getByTestId("pick"));
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledOnce());
+    expect(assignReferee).toHaveBeenCalledWith(11, { slotNumber: 2, refereeApiId: 7 });
+  });
+
+  it("disables the candidates while an assignment is in flight", async () => {
+    let resolve!: () => void;
+    assignReferee.mockReturnValue(new Promise<void>((r) => { resolve = r; }));
+    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={open} onChange={() => {}} />));
+
+    fireEvent.click(screen.getByTestId("pick"));
+    expect(screen.getByTestId("pick")).toBeDisabled();
+
+    resolve();
+    await waitFor(() => expect(screen.getByTestId("pick")).toBeEnabled());
+  });
+
+  it("shows a failed assignment and lets it be dismissed", async () => {
+    assignReferee.mockRejectedValue(new Error("Federation said no"));
+    const onChange = vi.fn();
+    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={open} onChange={onChange} />));
+
+    fireEvent.click(screen.getByTestId("pick"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Federation said no");
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("falls back to a translated message when the error carries none", async () => {
+    assignReferee.mockRejectedValue("boom");
+    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={open} onChange={() => {}} />));
+
+    fireEvent.click(screen.getByTestId("pick"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Assigning failed");
+  });
+
+  it("shows the assigned referee with a remove action instead of candidates", async () => {
+    unassignReferee.mockResolvedValue({});
+    const onChange = vi.fn();
+    render(wrap(<SlotCard gameApiId={11} slotNumber={1} assignment={assigned} onChange={onChange} />));
+
+    expect(screen.getByText("Lena Bauer")).toBeInTheDocument();
     expect(screen.queryByTestId("pick")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledOnce());
+    expect(unassignReferee).toHaveBeenCalledWith(11, 1);
   });
 
-  it("opens the picker popover from the trigger", () => {
-    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={openAssignment} onChange={() => {}} />));
-    openPicker();
-    expect(screen.getByTestId("pick")).toBeInTheDocument();
-  });
+  it("shows a failed removal", async () => {
+    unassignReferee.mockRejectedValue("boom");
+    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={assigned} onChange={() => {}} />));
 
-  it("closes the popover and calls onChange after a successful assign", async () => {
-    assignReferee.mockResolvedValueOnce({});
-    const onChange = vi.fn();
-    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={openAssignment} onChange={onChange} />));
-    openPicker();
-    fireEvent.click(screen.getByTestId("pick"));
-    await waitFor(() => expect(onChange).toHaveBeenCalled());
-    await waitFor(() => expect(screen.queryByTestId("pick")).not.toBeInTheDocument());
-    expect(toast.success).not.toHaveBeenCalled();
-  });
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
-  it("shows the error in the popover while open, and as a chip after closing", async () => {
-    assignReferee.mockRejectedValueOnce(new Error("federation down"));
-    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={openAssignment} onChange={() => {}} />));
-    openPicker();
-    fireEvent.click(screen.getByTestId("pick"));
-    await waitFor(() => expect(screen.getByTestId("popover-error")).toHaveTextContent("federation down"));
-    // popover stays open for retry; chip is suppressed while open
-    expect(screen.getByTestId("pick")).toBeInTheDocument();
-    expect(screen.getAllByText(/federation down/)).toHaveLength(1);
-    expect(toast.error).not.toHaveBeenCalled();
-
-    openPicker(); // toggle closed
-    await waitFor(() => expect(screen.queryByTestId("pick")).not.toBeInTheDocument());
-    expect(screen.getByText(/federation down/)).toBeInTheDocument(); // chip now visible
-  });
-
-  it("dismiss clears the chip", async () => {
-    assignReferee.mockRejectedValueOnce(new Error("nope"));
-    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={openAssignment} onChange={() => {}} />));
-    openPicker();
-    fireEvent.click(screen.getByTestId("pick"));
-    await waitFor(() => expect(screen.getByTestId("popover-error")).toBeInTheDocument());
-    openPicker(); // close popover so the chip shows
-    await waitFor(() => expect(screen.getByText("nope")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
-    expect(screen.queryByText("nope")).not.toBeInTheDocument();
-  });
-
-  it("clears a stale error when the picker is reopened", async () => {
-    assignReferee.mockRejectedValueOnce(new Error("old failure"));
-    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={openAssignment} onChange={() => {}} />));
-    openPicker();
-    fireEvent.click(screen.getByTestId("pick"));
-    await waitFor(() => expect(screen.getByTestId("popover-error")).toBeInTheDocument());
-    openPicker(); // close
-    await waitFor(() => expect(screen.getByText("old failure")).toBeInTheDocument());
-    openPicker(); // reopen → error cleared
-    await waitFor(() => expect(screen.getByTestId("pick")).toBeInTheDocument());
-    expect(screen.queryByTestId("popover-error")).not.toBeInTheDocument();
-    expect(screen.queryByText("old failure")).not.toBeInTheDocument();
-  });
-
-  it("unassigns and fires onChange for an assigned slot", async () => {
-    unassignReferee.mockResolvedValueOnce({});
-    const onChange = vi.fn();
-    render(wrap(
-      <SlotCard gameApiId={1} slotNumber={2} assignment={{ refereeApiId: 9, refereeName: "Kim Becker", status: "assigned" }} onChange={onChange} />,
-    ));
-    fireEvent.click(screen.getByRole("button", { name: /unassign/i }));
-    await waitFor(() => expect(onChange).toHaveBeenCalled());
-    expect(unassignReferee).toHaveBeenCalledWith(1, 2);
-  });
-
-  it("shows the error chip when unassign fails", async () => {
-    unassignReferee.mockRejectedValueOnce(new Error("locked"));
-    render(wrap(
-      <SlotCard gameApiId={1} slotNumber={2} assignment={{ refereeApiId: 9, refereeName: "Kim Becker", status: "assigned" }} onChange={() => {}} />,
-    ));
-    fireEvent.click(screen.getByRole("button", { name: /unassign/i }));
-    await waitFor(() => expect(screen.getByText("locked")).toBeInTheDocument());
-  });
-
-  it("disables the trigger while an assign is in flight", async () => {
-    let resolveAssign: (v: unknown) => void = () => {};
-    assignReferee.mockReturnValueOnce(new Promise((res) => { resolveAssign = res; }));
-    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={openAssignment} onChange={() => {}} />));
-    openPicker();
-    fireEvent.click(screen.getByTestId("pick"));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /assign referee/i })).toBeDisabled(),
-    );
-    resolveAssign({});
-    await waitFor(() => expect(screen.queryByTestId("pick")).not.toBeInTheDocument());
-  });
-
-  it("shows the assign error inside the open popover", async () => {
-    assignReferee.mockRejectedValueOnce(new Error("federation down"));
-    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={openAssignment} onChange={() => {}} />));
-    openPicker();
-    fireEvent.click(screen.getByTestId("pick"));
-    await waitFor(() => expect(screen.getByTestId("popover-error")).toHaveTextContent("federation down"));
-  });
-
-  it("renders the unassign button (not the trigger) for an assigned slot", () => {
-    render(wrap(
-      <SlotCard
-        gameApiId={1}
-        slotNumber={1}
-        assignment={{ refereeApiId: 9, refereeName: "Kim Becker", status: "assigned" }}
-        onChange={() => {}}
-      />,
-    ));
-    expect(screen.getByRole("button", { name: /unassign/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /assign referee/i })).not.toBeInTheDocument();
-    expect(screen.getByText("Kim Becker")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Removing failed");
   });
 });

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import useSWR from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { OpenSlotsTab } from "./open-slots-tab";
@@ -22,7 +22,7 @@ vi.mock("swr", async (importActual) => {
 afterEach(cleanup);
 
 describe("OpenSlotsTab", () => {
-  it("offers the leagues the referee games span as league filters", () => {
+  it("offers the leagues the referee games span as league filters", async () => {
     const keys: unknown[] = [];
     vi.mocked(useSWR).mockImplementation((key: unknown) => {
       keys.push(key);
@@ -38,6 +38,17 @@ describe("OpenSlotsTab", () => {
 
     expect(keys).toContain(SWR_KEYS.refereeGameLeagues);
     expect(keys).not.toContain(SWR_KEYS.settingsLeagues);
-    expect(screen.getByLabelText("U12 Kreisliga")).toBeInTheDocument();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "league" }), { button: 0, ctrlKey: false });
+    expect(await screen.findByRole("menuitemcheckbox", { name: /U12 Kreisliga/ })).toBeInTheDocument();
+  });
+
+  it("lays out the toolbar, the agenda, and no sheet until a game is picked", () => {
+    vi.mocked(useSWR).mockReturnValue({ data: { items: [], total: 0, hasMore: false }, isLoading: false } as never);
+
+    render(<OpenSlotsTab />);
+
+    expect(screen.getByRole("radiogroup", { name: "status" })).toBeInTheDocument();
+    expect(screen.getByText("empty")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

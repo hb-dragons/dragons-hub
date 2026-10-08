@@ -6,7 +6,7 @@ import useSWR from "swr";
 
 vi.mock("next-intl", () => ({
   useTranslations: () => (k: string, v?: Record<string, unknown>) =>
-    k === "matchup" && v ? `${v.home} vs ${v.guest}` : k,
+    k === "matchup" && v ? `${v.home} vs ${v.guest}` : k === "slot.label" && v ? `SR${v.n}` : k,
   useFormatter: () => ({ dateTime: (d: Date) => d.toISOString().slice(0, 10) }),
 }));
 
@@ -27,7 +27,7 @@ vi.mock("./slot-card", () => ({
   ),
 }));
 
-import { OpenSlotDetail } from "./open-slot-detail";
+import { OpenGameSheet } from "./open-game-sheet";
 
 const GAME = {
   id: 1,
@@ -46,9 +46,14 @@ const GAME = {
   sr2Name: null,
   sr1RefereeApiId: null,
   sr2RefereeApiId: null,
+  sr1OurClub: true,
+  sr2OurClub: true,
+  isHomeGame: true,
+  homeTeamCustomName: null,
+  guestTeamCustomName: null,
 };
 
-describe("<OpenSlotDetail>", () => {
+describe("<OpenGameSheet>", () => {
   beforeEach(() => {
     vi.mocked(useSWR).mockReset();
     globalMutate.mockReset();
@@ -63,7 +68,7 @@ describe("<OpenSlotDetail>", () => {
       mutate: vi.fn(),
     } as never);
 
-    render(<OpenSlotDetail selectedGameId={500} />);
+    render(<OpenGameSheet gameId={500} onClose={() => {}} />);
     expect(screen.getByRole("status")).toBeInTheDocument();
     expect(screen.queryByText("detail.notFound")).not.toBeInTheDocument();
   });
@@ -77,7 +82,7 @@ describe("<OpenSlotDetail>", () => {
       mutate,
     } as never);
 
-    render(<OpenSlotDetail selectedGameId={500} />);
+    render(<OpenGameSheet gameId={500} onClose={() => {}} />);
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.queryByText("detail.notFound")).not.toBeInTheDocument();
 
@@ -93,7 +98,7 @@ describe("<OpenSlotDetail>", () => {
       mutate: vi.fn(),
     } as never);
 
-    render(<OpenSlotDetail selectedGameId={500} />);
+    render(<OpenGameSheet gameId={500} onClose={() => {}} />);
     expect(screen.getByText("detail.notFound")).toBeInTheDocument();
   });
 
@@ -105,9 +110,9 @@ describe("<OpenSlotDetail>", () => {
       mutate: vi.fn(),
     } as never);
 
-    render(<OpenSlotDetail selectedGameId={500} />);
+    render(<OpenGameSheet gameId={500} onClose={() => {}} />);
     expect(screen.getByRole("heading", { name: "Dragons vs Bears" })).toBeInTheDocument();
-    expect(screen.getByText("Sporthalle Nord, Hamburg")).toBeInTheDocument();
+    expect(screen.getByText("agenda.home · Sporthalle Nord, Hamburg")).toBeInTheDocument();
   });
 
   it("refreshes the open-games list, not just the detail, after an assignment", () => {
@@ -119,16 +124,47 @@ describe("<OpenSlotDetail>", () => {
       mutate,
     } as never);
 
-    render(<OpenSlotDetail selectedGameId={500} />);
+    render(<OpenGameSheet gameId={500} onClose={() => {}} />);
     fireEvent.click(screen.getByText("change-sr1"));
 
     expect(mutate).toHaveBeenCalled();
     expect(globalMutate).toHaveBeenCalled();
 
-    // The global revalidation must cover the list keys the left pane uses,
+    // The global revalidation must cover the list keys the agenda uses,
     // otherwise it keeps showing "SR1 open" after the assignment.
     const matcher = globalMutate.mock.calls[0]![0] as (key: unknown) => boolean;
     expect(matcher("/referee/games?status=active&limit=200&offset=0&slotStatus=open")).toBe(true);
     expect(matcher("/admin/referees?scope=own")).toBe(false);
+  });
+
+  it("stays closed without a game and asks for none", () => {
+    render(<OpenGameSheet gameId={null} onClose={() => {}} />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(useSWR).not.toHaveBeenCalled();
+  });
+
+  it("closes through onClose", () => {
+    vi.mocked(useSWR).mockReturnValue({ data: GAME, error: undefined, isLoading: false, mutate: vi.fn() } as never);
+    const onClose = vi.fn();
+    render(<OpenGameSheet gameId={500} onClose={onClose} />);
+
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("shows the other club's slot read-only instead of offering candidates", () => {
+    vi.mocked(useSWR).mockReturnValue({
+      data: { ...GAME, sr2OurClub: false, sr2Name: "Jonas Krüger" },
+      error: undefined,
+      isLoading: false,
+      mutate: vi.fn(),
+    } as never);
+
+    render(<OpenGameSheet gameId={500} onClose={() => {}} />);
+
+    expect(screen.getByText("change-sr1")).toBeInTheDocument();
+    expect(screen.queryByText("change-sr2")).not.toBeInTheDocument();
+    expect(screen.getByText("detail.otherClub · Jonas Krüger")).toBeInTheDocument();
   });
 });
