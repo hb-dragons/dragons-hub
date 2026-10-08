@@ -27,6 +27,7 @@ vi.mock("../../config/database", () => ({
 import {
   getRefereeGames,
   getRefereeGameById,
+  getRefereeGameLeagues,
   computeMySlot,
 } from "./referee-games.service";
 import { eq } from "drizzle-orm";
@@ -660,5 +661,41 @@ describe("getRefereeGameById", () => {
     });
 
     expect(await getRefereeGameById(id)).toBeNull();
+  });
+});
+
+describe("getRefereeGameLeagues", () => {
+  it("lists each league with an open own-club slot once, sorted by name", async () => {
+    await seedGame({ apiMatchId: 1, leagueApiId: 202, leagueName: "U14 Kreisliga", leagueShort: "RKu14mm" });
+    await seedGame({ apiMatchId: 2, leagueApiId: 202, leagueName: "U14 Kreisliga", leagueShort: "RKu14mm" });
+    await seedGame({ apiMatchId: 3, leagueApiId: 101, leagueName: "U12 Kreisliga", leagueShort: "RKu12mo" });
+
+    expect(await getRefereeGameLeagues()).toEqual({
+      leagues: [
+        { apiLigaId: 101, name: "U12 Kreisliga", short: "RKu12mo" },
+        { apiLigaId: 202, name: "U14 Kreisliga", short: "RKu14mm" },
+      ],
+    });
+  });
+
+  // The admin list only ever shows games with an open own-club slot that are
+  // still live, so a league outside that set would be a filter option that
+  // can only ever produce an empty list.
+  it("leaves out leagues the admin list can never show", async () => {
+    await seedGame({ apiMatchId: 1, leagueApiId: 101, leagueName: "Visible" });
+    await seedGame({ apiMatchId: 2, leagueApiId: 202, leagueName: "Filled", sr1Status: "assigned", sr2Status: "open", sr2OurClub: false });
+    await seedGame({ apiMatchId: 3, leagueApiId: 303, leagueName: "Cancelled", isCancelled: true });
+    await seedGame({ apiMatchId: 4, leagueApiId: 404, leagueName: "Forfeited", isForfeited: true });
+    await seedGame({ apiMatchId: 5, leagueApiId: 505, leagueName: "Removed", removedAt: new Date("2026-04-01T00:00:00Z") });
+    await seedGame({ apiMatchId: 6, leagueApiId: null, leagueName: "No id" });
+
+    expect((await getRefereeGameLeagues()).leagues.map((l) => l.name)).toEqual(["Visible"]);
+  });
+
+  it("falls back to the short name, then the id, when the league has no name", async () => {
+    await seedGame({ apiMatchId: 1, leagueApiId: 101, leagueName: null, leagueShort: "RKu12mo" });
+    await seedGame({ apiMatchId: 2, leagueApiId: 202, leagueName: null, leagueShort: null });
+
+    expect((await getRefereeGameLeagues()).leagues.map((l) => l.name)).toEqual(["202", "RKu12mo"]);
   });
 });

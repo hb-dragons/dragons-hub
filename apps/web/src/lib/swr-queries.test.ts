@@ -22,6 +22,7 @@ function mockApi() {
     refereeAdmin: {
       listReferees: rec("refereeAdmin.listReferees"),
       refereeCounts: rec("refereeAdmin.refereeCounts"),
+      gameLeagues: rec("refereeAdmin.gameLeagues"),
       getReferee: rec("refereeAdmin.getReferee"),
       getRules: rec("refereeAdmin.getRules"),
       eligibleOpenGames: rec("refereeAdmin.eligibleOpenGames"),
@@ -256,6 +257,14 @@ describe("makeQueries", () => {
     expect(q.key).toBe(SWR_KEYS.refereeCounts);
     await q.fetcher();
     expect(calls[0]).toEqual({ method: "refereeAdmin.refereeCounts", args: [] });
+  });
+
+  it("refereeGameLeagues: key + dispatch to refereeAdmin.gameLeagues()", async () => {
+    const { api, calls } = mockApi();
+    const q = makeQueries(api).refereeGameLeagues();
+    expect(q.key).toBe(SWR_KEYS.refereeGameLeagues);
+    await q.fetcher();
+    expect(calls[0]).toEqual({ method: "refereeAdmin.gameLeagues", args: [] });
   });
 
   it("referee(id): key + dispatch to refereeAdmin.getReferee(id)", async () => {

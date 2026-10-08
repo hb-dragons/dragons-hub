@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import useSWR from "swr";
-import { FixedSizeList as List, type ListChildComponentProps } from "react-window";
+import { FixedSizeList as List, type ListChildComponentProps, type ListOnItemsRenderedProps } from "react-window";
 import { useTranslations, useFormatter } from "next-intl";
 import { formatKickoff } from "@/lib/format-kickoff";
 import { queries } from "@/lib/swr-queries";
@@ -12,7 +12,9 @@ import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/loading-state";
 import { cn } from "@dragons/ui/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
-import { OPEN_GAMES_PAGE_SIZE } from "./open-games-query";
+import { todayInClubZone } from "@dragons/shared";
+import type { PaginatedResponse, RefereeGameListItem } from "@dragons/shared";
+import { openGamesPagesKey, openGamesQueryOpts } from "./open-games-query";
 import type { HubFilters } from "../use-referee-hub-url";
 
 interface Props {
@@ -27,8 +29,8 @@ interface Props {
 // so the slot must clear ~76px of content or the badges clip at the bottom.
 const ROW_HEIGHT = 80;
 
-/** The server ignores shorter search terms, so the key does too. */
-const MIN_SEARCH_LENGTH = 3;
+/** Ask for the next page once the last rendered row is this close to the end. */
+const LOAD_MORE_THRESHOLD = 10;
 
 export function OpenGamesList({ filters, selectedGameId, onSelect, onSearch }: Props) {
   const t = useTranslations("refereeHub.openSlots");
@@ -61,28 +63,35 @@ export function OpenGamesList({ filters, selectedGameId, onSelect, onSearch }: P
     return () => ro.disconnect();
   }, []);
 
-  const slotStatus =
-    filters.status === "open" ? "open" :
-    filters.status === "offered" ? "offered" :
-    undefined; // "any" → no slotStatus, server returns everything active
+  const today = todayInClubZone();
+  const firstPageKey = queries.refereeGamesFiltered(openGamesQueryOpts(filters, today)).key;
 
-  const gamesQ = queries.refereeGamesFiltered({
-    status: "active",
-    slotStatus,
-    league: filters.league,
-    dateFrom: filters.dateFrom ?? undefined,
-    dateTo: filters.dateTo ?? undefined,
-    gameType: filters.gameType,
-    search: filters.search.length >= MIN_SEARCH_LENGTH ? filters.search : undefined,
-    limit: OPEN_GAMES_PAGE_SIZE,
-    offset: 0,
-  });
+  // How many pages are loaded. The list used to stop at the first page and
+  // silently drop everything past it, although the count above showed the
+  // full total. Back to one page whenever the filters change.
+  const [pages, setPages] = useState(1);
+  const [pagesFor, setPagesFor] = useState(firstPageKey);
+  if (pagesFor !== firstPageKey) {
+    setPagesFor(firstPageKey);
+    setPages(1);
+  }
 
-  const { data, error, isLoading, mutate } = useSWR(gamesQ.key, gamesQ.fetcher, {
-    dedupingInterval: 5000,
-  });
+  // All loaded pages refetch under one key, so revalidating it (an assignment
+  // does, see `isOpenGamesListKey`) refreshes every row on screen, not only
+  // the first page's.
+  const { data, error, isLoading, isValidating, mutate } = useSWR(
+    openGamesPagesKey(firstPageKey, pages),
+    () => fetchPages(filters, today, pages),
+    // Keep the loaded rows on screen while the next page arrives.
+    { dedupingInterval: 5000, keepPreviousData: true },
+  );
 
   const rows = data?.items ?? [];
+
+  const onItemsRendered = ({ visibleStopIndex }: ListOnItemsRenderedProps) => {
+    if (!data?.hasMore || isValidating) return;
+    if (visibleStopIndex >= rows.length - LOAD_MORE_THRESHOLD) setPages(pages + 1);
+  };
 
   const Row = ({ index, style }: ListChildComponentProps) => {
     const g = rows[index]!;
@@ -146,6 +155,7 @@ export function OpenGamesList({ filters, selectedGameId, onSelect, onSearch }: P
             itemCount={rows.length}
             itemSize={ROW_HEIGHT}
             width="100%"
+            onItemsRendered={onItemsRendered}
           >
             {Row}
           </List>
@@ -153,6 +163,21 @@ export function OpenGamesList({ filters, selectedGameId, onSelect, onSearch }: P
       </div>
     </div>
   );
+}
+
+/** Pages `0..pages-1` of the list, fetched together and joined into one. */
+async function fetchPages(
+  filters: HubFilters,
+  today: string,
+  pages: number,
+): Promise<PaginatedResponse<RefereeGameListItem>> {
+  const responses = await Promise.all(
+    Array.from({ length: pages }, (_, page) =>
+      queries.refereeGamesFiltered(openGamesQueryOpts(filters, today, page)).fetcher(),
+    ),
+  );
+  const last = responses[responses.length - 1]!;
+  return { ...last, items: responses.flatMap((r) => r.items), offset: 0 };
 }
 
 function SlotBadge({ n, status, who }: { n: 1 | 2; status: string; who: string | null }) {

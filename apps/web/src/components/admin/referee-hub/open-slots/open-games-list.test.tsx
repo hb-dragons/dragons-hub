@@ -6,7 +6,9 @@ import { SWRConfig } from "swr";
 import useSWR from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { normalizeRefereeGamesQuery } from "@/lib/referee-games-query";
-import { OPEN_GAMES_PREFETCH_OPTS } from "./open-games-query";
+import { todayInClubZone } from "@dragons/shared";
+import { api } from "@/lib/api";
+import { DEFAULT_FILTERS, OPEN_GAMES_PAGE_SIZE, openGamesQueryOpts } from "./open-games-query";
 import { OpenGamesList } from "./open-games-list";
 
 vi.mock("next-intl", () => ({
@@ -127,7 +129,7 @@ describe("OpenGamesList", () => {
     // SSR payload is silently discarded and the pane shows "Loading…".
     expect(observed).toBe(
       SWR_KEYS.refereeGamesFiltered(
-        normalizeRefereeGamesQuery(OPEN_GAMES_PREFETCH_OPTS),
+        normalizeRefereeGamesQuery(openGamesQueryOpts(DEFAULT_FILTERS, todayInClubZone())),
       ),
     );
   });
@@ -181,4 +183,72 @@ describe("OpenGamesList", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(300); });
     expect(onSearch).toHaveBeenCalledTimes(1);
   });
+
+  it("loads the next page when the list is scrolled near its end", () => {
+    const keys: string[] = [];
+    vi.mocked(useSWR).mockImplementation((key: unknown) => {
+      keys.push(key as string);
+      return {
+        data: { items: [game(1), game(2)], total: 250, limit: 200, offset: 0, hasMore: true },
+        error: undefined,
+        isLoading: false,
+        isValidating: false,
+      } as never;
+    });
+    render(wrap(<OpenGamesList filters={baseFilters} selectedGameId={null} onSelect={noop} onSearch={noop} />));
+    // Both rows are on screen, which is within reach of the end.
+    expect(keys.some((k) => k.endsWith("&pages=2"))).toBe(true);
+  });
+
+  it("does not ask for more once the last page is in", () => {
+    const keys: string[] = [];
+    vi.mocked(useSWR).mockImplementation((key: unknown) => {
+      keys.push(key as string);
+      return {
+        data: { items: [game(1)], total: 1, limit: 200, offset: 0, hasMore: false },
+        error: undefined,
+        isLoading: false,
+        isValidating: false,
+      } as never;
+    });
+    render(wrap(<OpenGamesList filters={baseFilters} selectedGameId={null} onSelect={noop} onSearch={noop} />));
+    expect(keys.every((k) => !k.includes("pages="))).toBe(true);
+  });
+
+  it("fetches every loaded page and joins them in order", async () => {
+    let fetcher: (() => Promise<{ items: Array<{ apiMatchId: number }>; hasMore: boolean }>) | undefined;
+    vi.mocked(useSWR).mockImplementation((key: unknown, f: unknown) => {
+      if ((key as string).includes("pages=2")) fetcher = f as typeof fetcher;
+      return {
+        data: { items: [game(1)], total: 250, limit: 200, offset: 0, hasMore: true },
+        error: undefined,
+        isLoading: false,
+        isValidating: false,
+      } as never;
+    });
+    const getGames = vi.spyOn(api.referees, "getGames").mockImplementation(async (q) => ({
+      items: [game(q!.offset! + 1)],
+      total: 250,
+      limit: 200,
+      offset: q!.offset!,
+      hasMore: q!.offset! === 0,
+    }) as never);
+    render(wrap(<OpenGamesList filters={baseFilters} selectedGameId={null} onSelect={noop} onSearch={noop} />));
+
+    const result = await fetcher!();
+
+    expect(getGames.mock.calls.map(([q]) => q!.offset)).toEqual([0, OPEN_GAMES_PAGE_SIZE]);
+    expect(result.items.map((i) => i.apiMatchId)).toEqual([1, OPEN_GAMES_PAGE_SIZE + 1]);
+    expect(result.hasMore).toBe(false);
+    getGames.mockRestore();
+  });
 });
+
+function game(apiMatchId: number) {
+  return {
+    id: apiMatchId, apiMatchId, kickoffDate: "2026-11-22", kickoffTime: "10:00",
+    leagueShort: "RKu12mo", homeTeamName: `Home ${apiMatchId}`, guestTeamName: "Guest",
+    sr1Status: "open", sr2Status: "open", sr1Name: null, sr2Name: null,
+    sr1RefereeApiId: null, sr2RefereeApiId: null,
+  };
+}

@@ -1,7 +1,7 @@
 import { getDb } from "../../config/database";
 import { refereeGames } from "@dragons/db/schema";
-import { and, eq, gte, isNull, lte, or, ilike, sql, asc, inArray } from "drizzle-orm";
-import type { RefereeGameBrief, RefereeGameListItem } from "@dragons/shared";
+import { and, eq, gte, isNotNull, isNull, lte, or, ilike, sql, asc, inArray } from "drizzle-orm";
+import type { RefereeGameBrief, RefereeGameLeaguesResponse, RefereeGameListItem } from "@dragons/shared";
 import { federationGameUrl } from "@dragons/shared";
 
 const isTrackedLeagueExpr = sql<boolean>`${refereeGames.matchId} IS NOT NULL`.as("is_tracked_league");
@@ -317,4 +317,52 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
     total, limit, offset,
     hasMore: offset + items.length < total,
   };
+}
+
+/**
+ * A game with at least one slot our club must fill that nobody has taken yet.
+ * The admin open-games list (`getVisibleRefereeGames` with no referee) shows
+ * only these, so anything that offers choices for that list scopes to it too.
+ */
+export function openOurClubSlotCondition() {
+  return or(
+    and(eq(refereeGames.sr1OurClub, true), eq(refereeGames.sr1Status, "open")),
+    and(eq(refereeGames.sr2OurClub, true), eq(refereeGames.sr2Status, "open")),
+  )!;
+}
+
+/**
+ * The leagues the admin open-games list can show, for its league filter.
+ *
+ * Taken from the referee games themselves rather than the tracked leagues: the
+ * referee feed covers every league our club refs in, and most of those are
+ * never tracked, so the tracked list offered either nothing or leagues with no
+ * open games.
+ */
+export async function getRefereeGameLeagues(): Promise<RefereeGameLeaguesResponse> {
+  const rows = await getDb()
+    .select({
+      apiLigaId: refereeGames.leagueApiId,
+      // One league can carry slightly different names across synced rows; any
+      // one of them labels it, so take one deterministically.
+      name: sql<string | null>`max(${refereeGames.leagueName})`,
+      short: sql<string | null>`max(${refereeGames.leagueShort})`,
+    })
+    .from(refereeGames)
+    .where(and(
+      isNull(refereeGames.removedAt),
+      isNotNull(refereeGames.leagueApiId),
+      eq(refereeGames.isCancelled, false),
+      eq(refereeGames.isForfeited, false),
+      openOurClubSlotCondition(),
+    ))
+    .groupBy(refereeGames.leagueApiId);
+
+  const leagues = rows.map((r) => ({
+    apiLigaId: r.apiLigaId!,
+    name: r.name ?? r.short ?? String(r.apiLigaId),
+    short: r.short,
+  }));
+  leagues.sort((a, b) => a.name.localeCompare(b.name, "de"));
+  return { leagues };
 }
