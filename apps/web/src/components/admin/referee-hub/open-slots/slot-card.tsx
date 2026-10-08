@@ -2,14 +2,9 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { ChevronDown, TriangleAlert } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@dragons/ui/components/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@dragons/ui/components/popover";
+import { cn } from "@dragons/ui/lib/utils";
 import { CandidatePicker } from "./candidate-picker";
 
 type SlotStatus = "open" | "offered" | "assigned";
@@ -27,95 +22,87 @@ interface Props {
   onChange: () => void;
 }
 
+/**
+ * One of our referee slots in the game sheet. An unfilled slot lists its
+ * candidates inline: the sheet has the room, and a popover inside a sheet hid
+ * the list behind one more click.
+ */
 export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props) {
   const t = useTranslations("refereeHub.openSlots");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
 
-  async function handleAssign(refereeApiId: number) {
+  async function run(action: () => Promise<unknown>, fallback: string) {
     setBusy(true);
     setError(null);
     try {
-      await api.referees.assignReferee(gameApiId, { slotNumber, refereeApiId });
-      setPickerOpen(false);
+      await action();
       onChange();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Assign failed");
+      setError(err instanceof Error ? err.message : fallback);
     } finally {
       setBusy(false);
     }
   }
 
-  async function handleUnassign() {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.referees.unassignReferee(gameApiId, slotNumber);
-      onChange();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unassign failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const isOpen = assignment.status === "open";
+  const assigned = assignment.status === "assigned";
 
   return (
-    <div className="bg-surface-low rounded-md p-3 space-y-3">
-      <div className="flex justify-between items-start">
-        <div>
-          <div className="text-xs text-muted-foreground">{t("slot.label", { n: String(slotNumber) })}</div>
-          {isOpen ? (
-            <div className="flex items-center gap-1 text-sm font-semibold text-heat">
-              <TriangleAlert className="size-4" aria-hidden="true" />
-              {t("slot.open")}
-            </div>
-          ) : (
-            <div className="text-sm font-semibold">{assignment.refereeName ?? "—"}</div>
-          )}
-        </div>
-        {!isOpen && (
-          <Button variant="outline" size="sm" disabled={busy} onClick={() => { void handleUnassign(); }}>{t("slot.unassign")}</Button>
-        )}
-        {isOpen && (
-          <Popover
-            open={pickerOpen}
-            onOpenChange={(open) => {
-              if (open) setError(null);
-              setPickerOpen(open);
+    <section className="bg-surface-low space-y-3 rounded-md p-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-display text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          {t("slot.label", { n: String(slotNumber) })}
+        </h3>
+        {assigned ? (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => {
+              void run(() => api.referees.unassignReferee(gameApiId, slotNumber), t("slot.unassignFailed"));
             }}
           >
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" disabled={busy}>
-                {t("picker.assignTrigger")}
-                <ChevronDown className="size-4 opacity-60" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-96 p-2" align="end">
-              {error && (
-                <div className="text-xs text-destructive pb-2" data-testid="popover-error">
-                  {error}
-                </div>
-              )}
-              <CandidatePicker
-                gameApiId={gameApiId}
-                slotNumber={slotNumber}
-                onPick={(id) => { void handleAssign(id); }}
-                disabled={busy}
-              />
-            </PopoverContent>
-          </Popover>
+            {t("slot.unassign")}
+          </Button>
+        ) : (
+          <span
+            className={cn(
+              "rounded-4xl px-2 py-0.5 text-xs font-medium",
+              assignment.status === "open" ? "bg-heat/15 text-heat" : "bg-muted text-muted-foreground",
+            )}
+          >
+            {t(assignment.status === "open" ? "slot.open" : "slot.offered")}
+          </span>
         )}
       </div>
 
-      {error && !pickerOpen && (
-        <div className="flex items-center justify-between text-xs rounded-md bg-destructive/10 text-destructive px-2 py-1">
+      {error && (
+        <div
+          role="alert"
+          className="bg-destructive/10 text-destructive flex items-center justify-between rounded-md px-2 py-1 text-xs"
+        >
           <span>{error}</span>
-          <Button variant="ghost" size="sm" onClick={() => setError(null)}>{t("errorChip.dismiss")}</Button>
+          <Button variant="ghost" size="sm" onClick={() => setError(null)}>
+            {t("errorChip.dismiss")}
+          </Button>
         </div>
       )}
-    </div>
+
+      {assigned ? (
+        <p className="text-sm font-semibold">{assignment.refereeName ?? "—"}</p>
+      ) : (
+        <CandidatePicker
+          gameApiId={gameApiId}
+          slotNumber={slotNumber}
+          disabled={busy}
+          onPick={(refereeApiId) => {
+            void run(
+              () => api.referees.assignReferee(gameApiId, { slotNumber, refereeApiId }),
+              t("slot.assignFailed"),
+            );
+          }}
+        />
+      )}
+    </section>
   );
 }
