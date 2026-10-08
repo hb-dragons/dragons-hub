@@ -38,8 +38,8 @@ export function openGamesQueryOpts(
 ): RawRefereeGamesOpts {
   return {
     status: "active",
-    // "any" sends no slotStatus: the server then returns everything active.
-    slotStatus: filters.status === "any" ? undefined : filters.status,
+    // Sent for "any" too: with no slotStatus the API falls back to "open".
+    slotStatus: filters.status,
     league: filters.league,
     dateFrom: filters.dateFrom ?? today,
     dateTo: filters.dateTo ?? undefined,
