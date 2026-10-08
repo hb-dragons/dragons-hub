@@ -48,8 +48,12 @@ overrides:
   effect: '>=3.20.0'
   lodash: '>=4.18.0'
   '@xmldom/xmldom': '>=0.8.15 <0.9'
-  # GHSA-cjq9-62q9-8jv4 (high): fixed in 16.3.8.
-  next: '>=16.3.8 <17'
+  # GHSA-cjq9-62q9-8jv4 (high): fixed in 16.3.8. Bounded to the minor line
+  # the apps pin, not the major: an override wins over a workspace's exact
+  # pin, so the `<17` this used to have resolved to the newest 16.x the moment
+  # the override changed (16.4.0 while apps/web and apps/cms pinned 16.3.8).
+  # Move this bound together with those pins.
+  next: '>=16.4.0 <16.5'
   kysely: 0.28.17
   '@tootallnate/once': '>=3.0.1'
   postcss: '>=8.5.18 <9'
