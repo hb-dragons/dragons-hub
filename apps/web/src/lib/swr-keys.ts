@@ -42,6 +42,7 @@ export const SWR_KEYS = {
     return `/admin/referees?${qs.toString()}`;
   },
   refereeCounts: "/admin/referees/counts",
+  refereeGameLeagues: "/admin/referees/game-leagues",
   referee: (id: number) => `/admin/referees/${id}`,
   refereeEligibleGames: (refereeId: number) =>
     `/admin/referees/${refereeId}/eligible-open-games`,

@@ -1609,12 +1609,12 @@
           "any": "Beliebig"
         },
         "league": "Liga",
-        "noLeagues": "Keine Ligen geladen",
+        "noLeagues": "Keine Ligen mit offenen Spielen",
         "date": "Datum",
         "datePreset": {
           "14d": "Nächste 14 Tage",
           "30d": "Nächste 30 Tage",
-          "season": "Ganze Saison",
+          "upcoming": "Alle kommenden",
           "custom": "Benutzerdefiniert"
         },
         "dateFrom": "Von",

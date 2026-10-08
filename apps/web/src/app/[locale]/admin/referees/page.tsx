@@ -1,10 +1,13 @@
 import { notFound } from "next/navigation";
 import { SWRConfig } from "swr";
-import { can } from "@dragons/shared";
+import { can, todayInClubZone } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
 import { getServerApi } from "@/lib/api.server";
 import { makeQueries } from "@/lib/swr-queries";
-import { OPEN_GAMES_PREFETCH_OPTS } from "@/components/admin/referee-hub/open-slots/open-games-query";
+import {
+  DEFAULT_FILTERS,
+  openGamesQueryOpts,
+} from "@/components/admin/referee-hub/open-slots/open-games-query";
 import { RefereeHubPage } from "@/components/admin/referee-hub/referee-hub";
 
 export default async function RefereesPage() {
@@ -19,7 +22,9 @@ export default async function RefereesPage() {
   // requests, so the whole server round trip was discarded.
   const prefetches = [
     sq.refereesPaginated({ scope: "own", limit: 50 }),
-    sq.refereeGamesFiltered(OPEN_GAMES_PREFETCH_OPTS),
+    // Must be Europe/Berlin "today", as the client computes it, or the key
+    // differs between Berlin midnight and 01:00/02:00 UTC.
+    sq.refereeGamesFiltered(openGamesQueryOpts(DEFAULT_FILTERS, todayInClubZone())),
   ];
 
   // The two fetches are independent; awaiting them in sequence doubled the
