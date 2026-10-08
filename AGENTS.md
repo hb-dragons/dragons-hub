@@ -809,7 +809,7 @@ their own games via `c.get("refereeId")`. The native app depends on `/referee/ga
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/referee/games` | referee/admin | List games the caller may see. Query: `search`, `league`, `status`, `dateFrom`, `dateTo`, `limit`, `offset` |
+| GET | `/referee/games` | referee/admin | List games the caller may see. Query: `search`, `league`, `status`, `dateFrom`, `dateTo`, `gameType`, `assignedRefereeApiId`, `slotStatus`, `limit`, `offset`. For an admin with no linked referee, `slotStatus` scopes to our club's slots: `open` (the default when omitted) needs an open own-club slot, `offered` an open or offered one, `any` any own-club slot; `assignedRefereeApiId` with no `slotStatus` returns all of that referee's games |
 | GET | `/referee/games/:id` | referee/admin | Single game by `refereeGames.id`, as `RefereeGameDetail` — the list item plus a `brief` block (venue street/PLZ/city, per-slot `tentative`, venue/time-changed flags, basketball-bund.net game link). Adds `kampfgericht` (home games with a linked match; the Dragons team named for Anschreiber/Zeitnehmer/Shotclock, collapsed into one entry when they match) and `contacts` (the Dragons team playing, both in a derby) **only** when the caller holds a slot (`mySlot !== null`) or reads unscoped as an admin — for anyone else both keys are absent |
 | GET | `/referee/games/by-api-match/:apiMatchId` | referee/admin | Single game by Basketball-Bund `apiMatchId` (deep-link landing from take-intent URLs) |
 | GET | `/referee/matches/:matchId` | referee/admin | Single game by local `matches.id` |

@@ -134,7 +134,7 @@ describe("OpenGamesList", () => {
     );
   });
 
-  it("maps filters.status=any to no slotStatus param (server returns all)", () => {
+  it("maps filters.status=any to slotStatus=any (no param would mean open)", () => {
     let observed = "";
     vi.mocked(useSWR).mockImplementation((key: unknown) => {
       observed = key as string;
@@ -146,7 +146,7 @@ describe("OpenGamesList", () => {
       onSelect={noop}
       onSearch={noop}
     />));
-    expect(observed).not.toContain("slotStatus=");
+    expect(observed).toContain("slotStatus=any");
   });
 
   it("puts a search of three or more characters in the key, shorter ones not", () => {
