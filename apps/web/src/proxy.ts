@@ -84,6 +84,28 @@ function redirectsToSpielplan(logicalPathname: string): boolean {
   );
 }
 
+/**
+ * `/login` is not a route, but people bookmark or type it. Left to the auth
+ * gate it bounced to sign-in with `redirectTo=/login`, so a successful login
+ * landed on a 404. Aliasing it to the dashboard sends a signed-out visitor
+ * through sign-in with `redirectTo=/admin` and a signed-in one straight there.
+ */
+const LOGIN_ALIAS_PATH = "/login";
+
+/**
+ * The locale prefix to keep on a redirect target. The default locale's
+ * canonical URLs are unprefixed ("as-needed"), so "/de/..." maps to "" rather
+ * than taking a second hop through the intl middleware.
+ */
+function localePrefixOf(pathname: string, logicalPathname: string): string {
+  // A bare locale root ("/en") maps to logical "/" without being suffixed
+  // by it — there the whole pathname is the locale prefix.
+  const rawPrefix = pathname.endsWith(logicalPathname)
+    ? pathname.slice(0, pathname.length - logicalPathname.length)
+    : pathname;
+  return rawPrefix === `/${routing.defaultLocale}` ? "" : rawPrefix;
+}
+
 function isPublicPath(logicalPathname: string): boolean {
   return (
     logicalPathname === PUBLIC_ROOT_PATH ||
@@ -98,16 +120,13 @@ export function proxy(request: NextRequest) {
   // Parked content pages — send to the spielplan, keeping the locale prefix
   // (`/en/teams` → `/en/spielplan`, `/teams` → `/spielplan`).
   if (redirectsToSpielplan(logicalPathname)) {
-    // A bare locale root ("/en") maps to logical "/" without being suffixed
-    // by it — there the whole pathname is the locale prefix.
-    const rawPrefix = pathname.endsWith(logicalPathname)
-      ? pathname.slice(0, pathname.length - logicalPathname.length)
-      : pathname;
-    // The default locale's canonical URLs are unprefixed ("as-needed") —
-    // redirect "/de/schedule" straight to "/spielplan" instead of taking a
-    // second hop through the intl middleware.
-    const localePrefix = rawPrefix === `/${routing.defaultLocale}` ? "" : rawPrefix;
+    const localePrefix = localePrefixOf(pathname, logicalPathname);
     return NextResponse.redirect(new URL(`${localePrefix}/spielplan`, request.url), 307);
+  }
+
+  if (logicalPathname === LOGIN_ALIAS_PATH) {
+    const localePrefix = localePrefixOf(pathname, logicalPathname);
+    return NextResponse.redirect(new URL(`${localePrefix}/admin`, request.url), 307);
   }
 
   // Public paths — skip auth, just handle locale
