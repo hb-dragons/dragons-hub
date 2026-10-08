@@ -20,7 +20,7 @@ import {
   refereeGameColumns,
   refereeGameBriefColumns,
   computeMySlot,
-  openOurClubSlotCondition,
+  ownClubSlotCondition,
   splitRefereeGameBrief,
   toRefereeGameListItem,
 } from "./referee-games.service";
@@ -61,9 +61,20 @@ export async function getVisibleRefereeGames(
   const { limit, offset, search, status, league, dateFrom, dateTo, gameType, assignedRefereeApiId, slotStatus } = params;
 
   if (refereeId === null) {
-    const openOurClubSlot = openOurClubSlotCondition();
     // Withdrawn games are tombstoned, never visible (issue #105).
-    const conditions = [isNull(refereeGames.removedAt), openOurClubSlot];
+    const conditions = [isNull(refereeGames.removedAt)];
+
+    // The slot filter applies to our club's slots only, and defaults to
+    // "open" so callers that send none (the native app) keep getting the
+    // games they can still staff. The one exception is a referee's own games
+    // (assignedRefereeApiId with no slotStatus, the hub's "upcoming" view):
+    // those are wanted staffed or not, and whether or not the slot is ours.
+    // Before, every admin read was pinned to an open own-club slot, so
+    // "offered" and "any" listed the same games as "open" and a referee's
+    // fully staffed games never showed as upcoming.
+    if (assignedRefereeApiId == null || slotStatus !== undefined) {
+      conditions.push(ownClubSlotCondition(slotStatus ?? "open"));
+    }
 
     if (status === "cancelled") conditions.push(eq(refereeGames.isCancelled, true));
     else if (status === "forfeited") conditions.push(eq(refereeGames.isForfeited, true));
@@ -89,22 +100,6 @@ export async function getVisibleRefereeGames(
         eq(refereeGames.sr2RefereeApiId, assignedRefereeApiId),
       )!);
     }
-
-    if (slotStatus === "open") {
-      conditions.push(
-        or(eq(refereeGames.sr1Status, "open"), eq(refereeGames.sr2Status, "open"))!,
-      );
-    } else if (slotStatus === "offered") {
-      conditions.push(
-        or(
-          eq(refereeGames.sr1Status, "open"),
-          eq(refereeGames.sr2Status, "open"),
-          eq(refereeGames.sr1Status, "offered"),
-          eq(refereeGames.sr2Status, "offered"),
-        )!,
-      );
-    }
-    // slotStatus === "any" or undefined: no extra clause
 
     if (search) {
       const words = search.split(/\s+/).filter(Boolean);
