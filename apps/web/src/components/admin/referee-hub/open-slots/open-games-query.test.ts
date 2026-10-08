@@ -33,8 +33,8 @@ describe("openGamesQueryOpts", () => {
     expect(opts.dateTo).toBe("2026-06-30");
   });
 
-  it("sends no slotStatus for status any", () => {
-    expect(openGamesQueryOpts({ ...DEFAULT_FILTERS, status: "any" }, TODAY).slotStatus).toBeUndefined();
+  it("sends every status explicitly, any included", () => {
+    expect(openGamesQueryOpts({ ...DEFAULT_FILTERS, status: "any" }, TODAY).slotStatus).toBe("any");
     expect(openGamesQueryOpts({ ...DEFAULT_FILTERS, status: "offered" }, TODAY).slotStatus).toBe("offered");
   });
 

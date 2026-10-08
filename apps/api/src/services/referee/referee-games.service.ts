@@ -319,20 +319,30 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
   };
 }
 
+/** Which own-club slot statuses each admin `slotStatus` filter admits. */
+const OWN_CLUB_SLOT_STATUSES = {
+  open: ["open"],
+  offered: ["open", "offered"],
+  any: ["open", "offered", "assigned"],
+} as const;
+
 /**
- * A game with at least one slot our club must fill that nobody has taken yet.
- * The admin open-games list (`getVisibleRefereeGames` with no referee) shows
- * only these, so anything that offers choices for that list scopes to it too.
+ * A game with at least one slot our club must fill whose status the filter
+ * admits: an untaken one for "open", untaken or offered for "offered", and any
+ * own-club slot at all for "any". The slot has to be ours: the admin list is
+ * our club's duty roster, and a slot the other club fills is not on it.
  */
-export function openOurClubSlotCondition() {
+export function ownClubSlotCondition(slotStatus: "open" | "offered" | "any") {
+  const statuses = [...OWN_CLUB_SLOT_STATUSES[slotStatus]];
   return or(
-    and(eq(refereeGames.sr1OurClub, true), eq(refereeGames.sr1Status, "open")),
-    and(eq(refereeGames.sr2OurClub, true), eq(refereeGames.sr2Status, "open")),
+    and(eq(refereeGames.sr1OurClub, true), inArray(refereeGames.sr1Status, statuses)),
+    and(eq(refereeGames.sr2OurClub, true), inArray(refereeGames.sr2Status, statuses)),
   )!;
 }
 
 /**
- * The leagues the admin open-games list can show, for its league filter.
+ * The leagues the admin open-games list can show under its widest status
+ * filter ("any"), for its league filter.
  *
  * Taken from the referee games themselves rather than the tracked leagues: the
  * referee feed covers every league our club refs in, and most of those are
@@ -354,7 +364,7 @@ export async function getRefereeGameLeagues(): Promise<RefereeGameLeaguesRespons
       isNotNull(refereeGames.leagueApiId),
       eq(refereeGames.isCancelled, false),
       eq(refereeGames.isForfeited, false),
-      openOurClubSlotCondition(),
+      ownClubSlotCondition("any"),
     ))
     .groupBy(refereeGames.leagueApiId);
 
