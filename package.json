@@ -4,6 +4,7 @@
   "private": true,
   "packageManager": "pnpm@11.21.0",
   "scripts": {
+    "prototype:referee-hub": "pnpm --filter @dragons/web prototype:referee-hub",
     "dev": "turbo dev --parallel",
     "build": "turbo build",
     "lint": "turbo lint",
