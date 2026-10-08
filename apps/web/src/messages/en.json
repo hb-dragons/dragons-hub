@@ -1649,20 +1649,18 @@
       }
     },
     "referees": {
-      "kpi": {
-        "ownClubRefs": "Own-club refs",
-        "avgMatches": "Avg matches/ref"
-      },
       "columns": {
         "ref": "Referee",
-        "own": "Own-club",
+        "own": "Own club",
+        "home": "Home games",
+        "away": "Away",
         "games": "Games"
       },
       "search": "Search referees…",
       "sort": {
-        "name": "Sort: Name",
-        "workloadDesc": "Games (most first)",
-        "workloadAsc": "Games (fewest first)"
+        "name": "Name",
+        "workloadDesc": "Most games",
+        "workloadAsc": "Fewest games"
       },
       "empty": "No referees match your filters",
       "profile": {
@@ -1730,13 +1728,28 @@
         "upcoming": "Upcoming",
         "history": "History"
       },
-      "selectPrompt": "Pick a referee to see their config + history",
       "scope": {
         "own": "Own ({n})",
         "all": "All ({n})"
       },
       "licenseLabel": "Lic {number}",
-      "apiIdLabel": "API {id}"
+      "apiIdLabel": "API {id}",
+      "scopeLabel": "Scope",
+      "sortLabel": "Sort",
+      "summary": "{n, plural, one {# referee} other {# referees}}",
+      "average": "avg {avg} games",
+      "loadingMore": "Loading more referees…",
+      "flags": {
+        "homeAll": "all",
+        "homeRules": "by rules",
+        "awayYes": "yes",
+        "awayNo": "no"
+      },
+      "ownClubToggleFailed": "Could not save the own-club setting",
+      "scopePlain": {
+        "own": "Own",
+        "all": "All"
+      }
     }
   },
   "errors": {

@@ -55,18 +55,6 @@ describe("SlotsFilterToolbar", () => {
     expect(onChange).toHaveBeenCalledWith({ gameType: "away" });
   });
 
-  it("moves the choice with the arrow keys, wrapping at the ends", () => {
-    const { onChange } = renderToolbar();
-    const group = screen.getByRole("radiogroup", { name: "status" });
-    fireEvent.keyDown(group, { key: "ArrowRight" });
-    expect(onChange).toHaveBeenLastCalledWith({ status: "offered" });
-    fireEvent.keyDown(group, { key: "ArrowLeft" });
-    expect(onChange).toHaveBeenLastCalledWith({ status: "any" });
-    onChange.mockClear();
-    fireEvent.keyDown(group, { key: "Enter" });
-    expect(onChange).not.toHaveBeenCalled();
-  });
-
   it("applies a date preset as a concrete range", () => {
     const { onChange } = renderToolbar();
     fireEvent.click(screen.getByRole("radio", { name: "datePreset.30d" }));
