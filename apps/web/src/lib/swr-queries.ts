@@ -102,6 +102,10 @@ export function makeQueries(api: Api) {
       key: SWR_KEYS.refereeCounts,
       fetcher: () => api.refereeAdmin.refereeCounts(),
     }),
+    refereeGameLeagues: () => ({
+      key: SWR_KEYS.refereeGameLeagues,
+      fetcher: () => api.refereeAdmin.gameLeagues(),
+    }),
     referee: (id: number) => ({
       key: SWR_KEYS.referee(id),
       fetcher: () => api.refereeAdmin.getReferee(id),

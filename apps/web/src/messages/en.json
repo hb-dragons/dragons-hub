@@ -1609,12 +1609,12 @@
           "any": "Any"
         },
         "league": "League",
-        "noLeagues": "No leagues loaded",
+        "noLeagues": "No leagues with open games",
         "date": "Date",
         "datePreset": {
           "14d": "Next 14 days",
           "30d": "Next 30 days",
-          "season": "Whole season",
+          "upcoming": "All upcoming",
           "custom": "Custom range"
         },
         "dateFrom": "From",

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { DEFAULT_FILTERS } from "./open-slots/open-games-query";
 
 export type HubTab = "open-slots" | "referees";
 export type HubSubtab = "profile" | "upcoming" | "history" | "rules";
@@ -41,14 +42,10 @@ const GAME_TYPES: readonly HubGameType[] = ["home", "away", "both"];
 const SCOPES: readonly HubScope[] = ["own", "all"];
 const SORTS: readonly HubSort[] = ["name", "workloadAsc", "workloadDesc"];
 
-export const DEFAULT_FILTERS: HubFilters = {
-  status: "open",
-  league: [],
-  dateFrom: null,
-  dateTo: null,
-  gameType: "both",
-  search: "",
-};
+// Defined beside the open-games query so the server page can read it too: a
+// value exported from this "use client" module reaches a server component as a
+// client reference, not as the object.
+export { DEFAULT_FILTERS } from "./open-slots/open-games-query";
 
 const DEFAULT_STATE: HubState = {
   tab: "open-slots",

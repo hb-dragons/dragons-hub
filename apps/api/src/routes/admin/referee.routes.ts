@@ -7,6 +7,7 @@ import {
   updateRefereeVisibility,
   updateRefereeRules,
 } from "../../services/admin/referee-admin.service";
+import { getRefereeGameLeagues } from "../../services/referee/referee-games.service";
 import { requirePermission } from "../../middleware/rbac";
 import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
@@ -45,6 +46,20 @@ refereeRoutes.get(
   }),
   async (c) => {
     const result = await getRefereeCounts();
+    return c.json(result);
+  },
+);
+
+refereeRoutes.get(
+  "/referees/game-leagues",
+  requirePermission("referee", "view"),
+  describeRoute({
+    description: "Leagues with games the admin open-games list can show, for its league filter",
+    tags: ["Referees"],
+    responses: { 200: { description: "Leagues" } },
+  }),
+  async (c) => {
+    const result = await getRefereeGameLeagues();
     return c.json(result);
   },
 );

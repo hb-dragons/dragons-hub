@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getRefereeById: vi.fn(),
   updateRefereeVisibility: vi.fn(),
   updateRefereeRules: vi.fn(),
+  getRefereeGameLeagues: vi.fn(),
 }));
 
 vi.mock("../../services/admin/referee-admin.service", () => ({
@@ -18,6 +19,10 @@ vi.mock("../../services/admin/referee-admin.service", () => ({
   getRefereeById: mocks.getRefereeById,
   updateRefereeVisibility: mocks.updateRefereeVisibility,
   updateRefereeRules: mocks.updateRefereeRules,
+}));
+
+vi.mock("../../services/referee/referee-games.service", () => ({
+  getRefereeGameLeagues: mocks.getRefereeGameLeagues,
 }));
 
 vi.mock("../../middleware/rbac", () => ({
@@ -214,6 +219,18 @@ describe("GET /referees/counts", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual({ own: 0, all: 0 });
+  });
+});
+
+describe("GET /referees/game-leagues", () => {
+  it("returns the leagues the open-games list can show", async () => {
+    const payload = { leagues: [{ apiLigaId: 101, name: "U12 Kreisliga", short: "RKu12mo" }] };
+    mocks.getRefereeGameLeagues.mockResolvedValue(payload);
+
+    const res = await app.request("/referees/game-leagues");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(payload);
   });
 });
 

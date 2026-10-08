@@ -35,7 +35,7 @@ describe("SlotsFilterSidebar", () => {
     expect(document.querySelector('input[type="radio"]')).toBeNull();
     expect(document.querySelector('input[type="date"]')).toBeNull();
     expect(screen.getByRole("radio", { name: /statusValue\.open/ })).toHaveAttribute("data-state", "checked");
-    expect(screen.getByRole("radio", { name: /datePreset\.season/ })).toHaveAttribute("data-state", "checked");
+    expect(screen.getByRole("radio", { name: /datePreset\.upcoming/ })).toHaveAttribute("data-state", "checked");
   });
 
   it("calls onChange with gameType when checkbox toggles", () => {

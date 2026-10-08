@@ -20,6 +20,7 @@ import {
   refereeGameColumns,
   refereeGameBriefColumns,
   computeMySlot,
+  openOurClubSlotCondition,
   splitRefereeGameBrief,
   toRefereeGameListItem,
 } from "./referee-games.service";
@@ -60,10 +61,7 @@ export async function getVisibleRefereeGames(
   const { limit, offset, search, status, league, dateFrom, dateTo, gameType, assignedRefereeApiId, slotStatus } = params;
 
   if (refereeId === null) {
-    const openOurClubSlot = or(
-      and(eq(refereeGames.sr1OurClub, true), eq(refereeGames.sr1Status, "open")),
-      and(eq(refereeGames.sr2OurClub, true), eq(refereeGames.sr2Status, "open")),
-    )!;
+    const openOurClubSlot = openOurClubSlotCondition();
     // Withdrawn games are tombstoned, never visible (issue #105).
     const conditions = [isNull(refereeGames.removedAt), openOurClubSlot];
 

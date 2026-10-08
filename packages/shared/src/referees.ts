@@ -35,6 +35,18 @@ export interface RefereeCountsResponse {
   all: number;
 }
 
+/** A league that has at least one referee game the admin open-games list can show. */
+export interface RefereeGameLeague {
+  /** Federation league id — the value the `league` filter on `/referee/games` takes. */
+  apiLigaId: number;
+  name: string;
+  short: string | null;
+}
+
+export interface RefereeGameLeaguesResponse {
+  leagues: RefereeGameLeague[];
+}
+
 export interface EligibleOpenGamesResponse {
   items: RefereeGameListItem[];
 }
