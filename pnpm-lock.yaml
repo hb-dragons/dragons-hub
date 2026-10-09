@@ -22,7 +22,7 @@ overrides:
   effect: '>=3.20.0'
   lodash: '>=4.18.0'
   '@xmldom/xmldom': '>=0.8.15 <0.9'
-  next: '>=16.3.8 <17'
+  next: '>=16.4.0 <16.5'
   kysely: 0.28.17
   '@tootallnate/once': '>=3.0.1'
   postcss: '>=8.5.18 <9'
@@ -251,7 +251,7 @@ importers:
         specifier: ^2.0.5
         version: 2.0.5
       next:
-        specifier: '>=16.3.8 <17'
+        specifier: '>=16.4.0 <16.5'
         version: 16.4.0(@babel/core@7.29.0(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@types/node@25.8.0)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4)
       payload:
         specifier: 3.90.2
@@ -581,7 +581,7 @@ importers:
         specifier: ^1.16.0
         version: 1.16.0(react@19.2.6)
       next:
-        specifier: '>=16.3.8 <17'
+        specifier: '>=16.4.0 <16.5'
         version: 16.4.0(@babel/core@7.29.0(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@types/node@25.8.0)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4)
       next-intl:
         specifier: ^4.12.0
@@ -3562,7 +3562,7 @@ packages:
     engines: {node: ^18.20.2 || >=20.9.0}
     peerDependencies:
       graphql: ^16.8.1
-      next: '>=16.3.8 <17'
+      next: '>=16.4.0 <16.5'
       payload: 3.90.2
 
   '@payloadcms/plugin-cloud-storage@3.90.2':
@@ -3596,7 +3596,7 @@ packages:
     resolution: {integrity: sha512-9OXA/WI+3u+Xa8xcvVTv4VtpAecRxx/39k9uBRlRnI20lWPGRvbOG4vIWUZKxHFQjZGGQke71HdLV4x2kFveQg==}
     engines: {node: ^18.20.2 || >=20.9.0}
     peerDependencies:
-      next: '>=16.3.8 <17'
+      next: '>=16.4.0 <16.5'
       payload: 3.90.2
       react: 19.2.6
       react-dom: ^19.0.1 || ^19.1.2 || ^19.2.1
@@ -6159,7 +6159,7 @@ packages:
   '@wrksz/themes@0.9.2':
     resolution: {integrity: sha512-7b28hvbb44aWlZWUQQLOe5GMK1Ki8qx5YjoZMtFYSyvv1K3PDKiK5gVN6TSBM5xQ/JS8RqCMyzXR29Oa+K/Leg==}
     peerDependencies:
-      next: '>=16.3.8 <17'
+      next: '>=16.4.0 <16.5'
       react: 19.2.6
       react-dom: ^18.0.0 || ^19.0.0
       typescript: '>=4.5.0'
@@ -6490,7 +6490,7 @@ packages:
       drizzle-orm: ^0.45.2
       mongodb: ^6.0.0 || ^7.0.0
       mysql2: ^3.0.0
-      next: '>=16.3.8 <17'
+      next: '>=16.4.0 <16.5'
       pg: ^8.0.0
       prisma: ^5.0.0 || ^6.0.0 || ^7.0.0
       react: 19.2.6
@@ -9664,7 +9664,7 @@ packages:
   next-intl@4.12.0:
     resolution: {integrity: sha512-v8KpppWG0yLLlChJ3Of6uoPew9LeRDBAtY6vpJmF7YJmBZlHEzzoEL4w1g1dAU+VleEPNoXNm9hg1eEsKWV5hw==}
     peerDependencies:
-      next: '>=16.3.8 <17'
+      next: '>=16.4.0 <16.5'
       react: 19.2.6
       typescript: '*'
     peerDependenciesMeta:
