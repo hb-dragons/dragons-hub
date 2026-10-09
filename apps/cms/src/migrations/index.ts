@@ -4,6 +4,7 @@ import * as migration_20260830_133823_add_teams_order from './20260830_133823_ad
 import * as migration_20260830_133916_drop_teams_order_index from './20260830_133916_drop_teams_order_index';
 import * as migration_20260904_102644_drop_trainers_and_league_fields from './20260904_102644_drop_trainers_and_league_fields';
 import * as migration_20261008_101018_payload_3_90_security_fields from './20261008_101018_payload_3_90_security_fields';
+import * as migration_20261009_064939_gcs_object_key from './20261009_064939_gcs_object_key';
 
 export const migrations = [
   {
@@ -34,6 +35,11 @@ export const migrations = [
   {
     up: migration_20261008_101018_payload_3_90_security_fields.up,
     down: migration_20261008_101018_payload_3_90_security_fields.down,
-    name: '20261008_101018_payload_3_90_security_fields'
+    name: '20261008_101018_payload_3_90_security_fields',
+  },
+  {
+    up: migration_20261009_064939_gcs_object_key.up,
+    down: migration_20261009_064939_gcs_object_key.down,
+    name: '20261009_064939_gcs_object_key'
   },
 ];
