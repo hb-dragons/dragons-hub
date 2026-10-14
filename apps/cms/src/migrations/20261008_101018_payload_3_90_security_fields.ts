@@ -5,9 +5,9 @@ import { sql } from '@payloadcms/db-postgres'
  * Payload 3.90.0 (security release) adds `resetPasswordRequestedAt` to every
  * auth collection, to throttle forgot-password requests. Its release notes ask
  * relational projects to generate a migration for it; this is that migration,
- * created with `payload migrate:create` against a fresh database. The other
- * column 3.90 introduces, `_objectKey`, only exists on collections with
- * `clientUploads`, which this CMS does not use.
+ * created with `payload migrate:create` against a fresh database. It missed
+ * the other column 3.90 introduces, `media._objectkey`, because it was
+ * generated with GCS_MEDIA_BUCKET unset; 20261009_064939_gcs_object_key adds it.
  */
 
 export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {

@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { DEFAULT_FILTERS } from "./open-slots/open-games-query";
+import { DEFAULT_REFEREE_LIST, type RefereeScope, type RefereeSort } from "./referees/referee-list-query";
 
 export type HubTab = "open-slots" | "referees";
 export type HubSubtab = "profile" | "upcoming" | "history" | "rules";
 type HubStatus = "open" | "offered" | "any";
 type HubGameType = "home" | "away" | "both";
-type HubScope = "own" | "all";
-type HubSort = "name" | "workloadAsc" | "workloadDesc";
+type HubScope = RefereeScope;
+type HubSort = RefereeSort;
 
 export interface HubFilters {
   status: HubStatus;
@@ -53,9 +54,7 @@ const DEFAULT_STATE: HubState = {
   refereeId: null,
   subtab: "profile",
   filters: DEFAULT_FILTERS,
-  scope: "own",
-  search: "",
-  sort: "name",
+  ...DEFAULT_REFEREE_LIST,
 };
 
 /**

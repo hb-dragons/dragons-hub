@@ -1649,20 +1649,18 @@
       }
     },
     "referees": {
-      "kpi": {
-        "ownClubRefs": "Vereinseigene SR",
-        "avgMatches": "Schnitt Spiele/SR"
-      },
       "columns": {
         "ref": "Schiedsrichter",
         "own": "Vereinseigen",
+        "home": "Heimspiele",
+        "away": "Auswärts",
         "games": "Spiele"
       },
       "search": "Schiedsrichter suchen…",
       "sort": {
-        "name": "Sortieren: Name",
-        "workloadDesc": "Spiele (meiste zuerst)",
-        "workloadAsc": "Spiele (wenigste zuerst)"
+        "name": "Name",
+        "workloadDesc": "Meiste Spiele",
+        "workloadAsc": "Wenigste Spiele"
       },
       "empty": "Keine Schiedsrichter passen zu den Filtern",
       "profile": {
@@ -1730,13 +1728,28 @@
         "upcoming": "Bevorstehend",
         "history": "Historie"
       },
-      "selectPrompt": "Schiedsrichter wählen, um Konfiguration und Historie zu sehen",
       "scope": {
         "own": "Vereinseigen ({n})",
         "all": "Alle ({n})"
       },
       "licenseLabel": "Lizenz {number}",
-      "apiIdLabel": "API {id}"
+      "apiIdLabel": "API {id}",
+      "scopeLabel": "Umfang",
+      "sortLabel": "Sortierung",
+      "summary": "{n, plural, one {# Schiedsrichter} other {# Schiedsrichter}}",
+      "average": "Ø {avg} Spiele",
+      "loadingMore": "Lade weitere Schiedsrichter…",
+      "flags": {
+        "homeAll": "alle",
+        "homeRules": "nach Regeln",
+        "awayYes": "ja",
+        "awayNo": "nein"
+      },
+      "ownClubToggleFailed": "Vereinseigen konnte nicht gespeichert werden",
+      "scopePlain": {
+        "own": "Vereinseigen",
+        "all": "Alle"
+      }
     }
   },
   "errors": {

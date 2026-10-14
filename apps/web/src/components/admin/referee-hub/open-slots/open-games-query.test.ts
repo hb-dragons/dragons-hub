@@ -3,7 +3,6 @@ import {
   DEFAULT_FILTERS,
   OPEN_GAMES_PAGE_SIZE,
   isOpenGamesListKey,
-  openGamesPagesKey,
   openGamesQueryOpts,
 } from "./open-games-query";
 
@@ -48,17 +47,11 @@ describe("openGamesQueryOpts", () => {
   });
 });
 
-describe("openGamesPagesKey", () => {
-  const first = "/referee/games?status=active&limit=200&offset=0";
-
-  it("leaves the first page's key alone, so the server prefetch lands", () => {
-    expect(openGamesPagesKey(first, 1)).toBe(first);
-  });
-
-  it("extends the key for more pages and stays inside the bulk revalidation", () => {
-    const key = openGamesPagesKey(first, 3);
-    expect(key).not.toBe(first);
-    expect(key).not.toBe(openGamesPagesKey(first, 2));
-    expect(isOpenGamesListKey(key)).toBe(true);
+describe("isOpenGamesListKey", () => {
+  it("matches every open-games page key, the paged ones included", () => {
+    expect(isOpenGamesListKey("/referee/games?status=active&limit=200&offset=0")).toBe(true);
+    expect(isOpenGamesListKey("/referee/games?status=active&limit=200&offset=0&pages=3")).toBe(true);
+    expect(isOpenGamesListKey("/admin/referees?scope=own")).toBe(false);
+    expect(isOpenGamesListKey(["referee-candidates", 1])).toBe(false);
   });
 });

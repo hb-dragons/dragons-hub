@@ -43,7 +43,9 @@ export default buildConfig({
     pool: { connectionString: process.env.DATABASE_URL_CMS! },
     // Dev manages the schema in push mode; prod runs the committed migrations
     // at boot (NODE_ENV=production only — src/instrumentation.ts forces the
-    // init). Generated with `payload migrate:create` against a fresh local db.
+    // init). Generated with `payload migrate:create` against a fresh local db,
+    // with GCS_MEDIA_BUCKET set: the storage plugin adds columns to media
+    // (`_objectkey`), and a migration generated without it silently omits them.
     migrationDir: path.resolve(dirname, "migrations"),
     prodMigrations: migrations,
   }),
