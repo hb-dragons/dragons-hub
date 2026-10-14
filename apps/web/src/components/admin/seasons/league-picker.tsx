@@ -20,6 +20,13 @@ export interface LeaguePickerProps {
   vorabligaOnly: boolean;
   onVorabligaOnlyChange: (v: boolean) => void;
   loading: boolean;
+  /**
+   * The ligas marked as cups. Passed together with `onCupToggle`, a selected
+   * row offers a cup switch; the new-season wizard leaves both out and lets the
+   * API guess from the name.
+   */
+  cups?: Set<number>;
+  onCupToggle?: (ligaId: number, isCup: boolean) => void;
 }
 
 export function LeaguePicker({
@@ -33,6 +40,8 @@ export function LeaguePicker({
   vorabligaOnly,
   onVorabligaOnlyChange,
   loading,
+  cups,
+  onCupToggle,
 }: LeaguePickerProps) {
   const t = useTranslations();
 
@@ -105,6 +114,8 @@ export function LeaguePicker({
                   league={l}
                   checked={selected.has(l.ligaId)}
                   onToggle={onToggle}
+                  isCup={cups?.has(l.ligaId) ?? false}
+                  onCupToggle={onCupToggle}
                 />
               ))
             )}
@@ -119,10 +130,14 @@ function LeagueRow({
   league,
   checked,
   onToggle,
+  isCup,
+  onCupToggle,
 }: {
   league: BrowsableLeague;
   checked: boolean;
   onToggle: (ligaId: number, checked: boolean) => void;
+  isCup: boolean;
+  onCupToggle?: (ligaId: number, isCup: boolean) => void;
 }) {
   const t = useTranslations();
   const [expanded, setExpanded] = useState(false);
@@ -165,6 +180,19 @@ function LeagueRow({
         <span className="flex flex-1 flex-col">
           <span className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium">{league.name}</span>
+            {onCupToggle && checked && (
+              <label
+                className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground"
+                title={t("settings.seasons.wizard.cupHint")}
+              >
+                <Checkbox
+                  checked={isCup}
+                  aria-label={`${t("settings.seasons.wizard.cup")}: ${league.name}`}
+                  onCheckedChange={(c) => onCupToggle(league.ligaId, c === true)}
+                />
+                {t("settings.seasons.wizard.cup")}
+              </label>
+            )}
             {conflictSeason !== null && (
               <Badge variant="outline">
                 {t("settings.seasons.wizard.leagueOwnedByOtherSeason", { season: conflictSeason })}

@@ -3,6 +3,7 @@ import { describeRoute, validator } from "hono-openapi";
 import type { AppEnv } from "../../types";
 import {
   getOwnClubMatches,
+  getGamePlan,
   getMatchDetail,
   getMatchChangeHistory,
   updateMatchLocal,
@@ -11,12 +12,14 @@ import {
 import { requirePermission } from "../../middleware/rbac";
 import { validationHook } from "../../middleware/validation";
 import { reconcileMatch } from "../../services/venue-booking/venue-booking.service";
+import { findAlternativeDates } from "../../services/reschedule/alternative-dates.service";
 import {
-  matchListQuerySchema,
+  adminMatchListQuerySchema,
   matchIdParamSchema,
   matchHistoryQuerySchema,
   matchUpdateBodySchema,
   releaseOverrideParamsSchema,
+  alternativeDatesQuerySchema,
 } from "@dragons/contracts";
 import { getActiveSeasonId } from "../../services/admin/season.service";
 import { NO_SEASON } from "../../services/season-scope";
@@ -27,17 +30,17 @@ const matchRoutes = new Hono<AppEnv>();
 matchRoutes.get(
   "/matches",
   requirePermission("match", "view"),
-  validator("query", matchListQuerySchema, validationHook),
+  validator("query", adminMatchListQuerySchema, validationHook),
   describeRoute({
-    description: "List own club matches",
+    description: "List own club matches; includeGhosts=true adds ghost entries for the game plan",
     tags: ["Matches"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = c.req.valid("query");
+    const { includeGhosts, ...query } = c.req.valid("query");
     const seasonId = query.seasonId ?? (await getActiveSeasonId()) ?? NO_SEASON;
-    const result = await getOwnClubMatches({ ...query, seasonId });
-    return c.json(result);
+    const loadMatches = includeGhosts ? getGamePlan : getOwnClubMatches;
+    return c.json(await loadMatches({ ...query, seasonId }));
   },
 );
 
@@ -83,6 +86,33 @@ matchRoutes.get(
     const { id } = c.req.valid("param");
     const query = c.req.valid("query");
     const result = await getMatchChangeHistory(id, query);
+    return c.json(result);
+  },
+);
+
+// GET /admin/matches/:id/alternative-dates - Weekend days the game could move to
+matchRoutes.get(
+  "/matches/:id/alternative-dates",
+  requirePermission("match", "view"),
+  validator("param", matchIdParamSchema, validationHook),
+  validator("query", alternativeDatesQuerySchema, validationHook),
+  describeRoute({
+    description: "Weekend days in a range on which neither squad of the game plays",
+    tags: ["Matches"],
+    responses: {
+      200: { description: "Success" },
+      404: { description: "Match not found" },
+    },
+  }),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    const query = c.req.valid("query");
+    const result = await findAlternativeDates(id, query);
+
+    if (!result) {
+      return c.json({ error: "Match not found", code: "NOT_FOUND" }, 404);
+    }
+
     return c.json(result);
   },
 );

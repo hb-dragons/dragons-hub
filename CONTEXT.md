@@ -40,8 +40,16 @@ _Avoid_: year, period
 The one season the club is operating in, designated centrally on the server and changed only through new-season onboarding — never computed by a client. The Dragons App shows the current season exclusively; past seasons are a Web-App concern.
 _Avoid_: active season, latest season
 
+**Cup**:
+A knockout competition (Pokal) a squad plays beside its league in the same season. Tracked like a league, but never a team entry's connected league.
+_Avoid_: Pokal-Liga, cup league
+
 **Vorabliga**:
 A preliminary league the federation publishes before promotion/relegation is settled. Carries a full schedule; superseded by a committed league whose fixtures replace it.
+
+**Calendar feed**:
+The ICS document a fan or staff member adds to their calendar app. Always the current season; covers every Dragons game, or only the games of the squads named in it. Follows squads, not team entries, so the feed keeps working as a squad ages up.
+_Avoid_: calendar subscription, ICS export, team calendar
 
 ### Native app
 
@@ -101,3 +109,49 @@ _Avoid_: trainer (in code), head coach
 **Team contact**:
 The staff people an assigned referee reaches before a referee game: those whose assignment is flagged as referee contact, or every coach of that team entry when none is flagged. Only exists for Dragons teams.
 _Avoid_: contact person, Ansprechpartner (in code)
+
+### Scheduling
+
+**Game**:
+One fixture of a league in a season: two squads, a kickoff date and time, a venue. Synced from the federation; a moved game is the same game with a new kickoff, not a new record.
+_Avoid_: match (in prose; keep for referee games and code names), fixture
+
+**Home game**:
+A game whose home squad belongs to the club. Determines who owes the hall and the Kampfgericht.
+_Avoid_: own game, Dragons game (ambiguous — covers away games too)
+
+**Venue (Halle)**:
+The hall a game is played in, as published by the federation. The club knows for itself which halls it holds and when; that knowledge is not modeled.
+_Avoid_: home hall, location, Spielfeld
+
+**Hall booking (Hallenbuchung)**:
+The club's record that it needs one of its halls on one day for one or more home games, with the time window those games span. Exists only where a home game is already scheduled.
+_Avoid_: venue slot, reservation, Hallenzeit
+
+**Rescheduling (Spielverlegung)**:
+Moving a game to another kickoff. Agreed between the two clubs and entered on the federation's side; the Hub learns of it through the sync, or earlier through an override when the club knows before the federation has recorded it.
+_Avoid_: postponement, moving a match
+
+**Override**:
+A value the club sets on a game by hand that the sync leaves untouched until the federation publishes the same value. Carries a reason and who set it.
+_Avoid_: manual change, local value
+
+**Official kickoff (offizieller Termin)**:
+The kickoff the federation currently publishes for a game. Equals the game's kickoff unless an override is active.
+_Avoid_: remote kickoff, synced date
+
+**Ghost entry (Geisterzeile)**:
+A read-only row in the game plan on the official kickoff day of a game whose override moved it to another day. Marks where the federation still lists the game.
+_Avoid_: placeholder, shadow row, duplicate
+
+**Alternative date (Ausweichtermin)**:
+A weekend day on which a game to be rescheduled could take place: neither squad plays that day, and for a home game the hall situation on that day is shown so staff can judge it. A proposal for the other club, not a decision.
+_Avoid_: free date, candidate slot, suggestion
+
+**Round window (Spieltagsfenster)**:
+The span from the first to the last kickoff date on which a league plays one match day. An alternative date outside it is the one the federation is most likely to question.
+_Avoid_: game week, matchday weekend, round dates
+
+**Flag**:
+A note on an alternative date that informs the staff member without removing the day from the list — outside the round window, or a coach committed to another team entry that day. The decision stays with the person writing the mail.
+_Avoid_: warning, conflict, blocker (a flag never blocks)

@@ -29,6 +29,13 @@
         "EXPO_PUBLIC_CHATBOT_ENABLED": "true"
       }
     },
+    "preview-internal": {
+      "extends": "preview",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "extends": "base",
       "autoIncrement": true,

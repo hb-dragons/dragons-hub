@@ -35,15 +35,31 @@ export interface AppTab {
  */
 export type AppTabsMinimizeBehavior = NonNullable<NativeTabsProps["minimizeBehavior"]>;
 
+/**
+ * The colour and label options the app sets on the bar itself. Empty on iOS,
+ * where the system's glass is the appearance; see `tabBarAppearance` in
+ * `lib/nav/tabs.ts`.
+ */
+export type AppTabsAppearance = Pick<
+  NativeTabsProps,
+  | "backgroundColor"
+  | "iconColor"
+  | "labelStyle"
+  | "indicatorColor"
+  | "rippleColor"
+  | "labelVisibilityMode"
+>;
+
 export interface AppTabsProps {
   tabs: AppTab[];
   tintColor: string;
   minimizeBehavior: AppTabsMinimizeBehavior;
+  appearance: AppTabsAppearance;
 }
 
-export function AppTabs({ tabs, tintColor, minimizeBehavior }: AppTabsProps) {
+export function AppTabs({ tabs, tintColor, minimizeBehavior, appearance }: AppTabsProps) {
   return (
-    <NativeTabs tintColor={tintColor} minimizeBehavior={minimizeBehavior}>
+    <NativeTabs tintColor={tintColor} minimizeBehavior={minimizeBehavior} {...appearance}>
       {tabs.map((tab) => (
         <NativeTabs.Trigger key={tab.name} name={tab.name}>
           <NativeTabs.Trigger.Label>{tab.label}</NativeTabs.Trigger.Label>

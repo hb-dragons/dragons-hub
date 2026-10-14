@@ -85,6 +85,34 @@ describe("proxy — content pages redirect to /spielplan", () => {
   });
 });
 
+describe("proxy — /login alias", () => {
+  // /login is not a route. Before this alias, an anonymous /en/login bounced
+  // to sign-in with redirectTo=/en/login, so a successful login landed on a
+  // 404 that a reload could not clear.
+  const aliasCases: Array<[string, string]> = [
+    ["/login", "/admin"],
+    ["/en/login", "/en/admin"],
+    ["/de/login", "/admin"],
+  ];
+
+  it.each(aliasCases)("redirects %s to %s", (pathname, destination) => {
+    const request = new NextRequest(`http://localhost:3000${pathname}`);
+    const response = proxy(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(`http://localhost:3000${destination}`);
+  });
+
+  it("redirects an authenticated /login straight to the dashboard", () => {
+    const request = new NextRequest("http://localhost:3000/en/login", {
+      headers: { cookie: "__Secure-dragons.session_token=some-session-value" },
+    });
+    const response = proxy(request);
+
+    expect(response.headers.get("location")).toBe("http://localhost:3000/en/admin");
+  });
+});
+
 describe("proxy — anonymous access to public pages", () => {
   const publicPaths = [
     "/spielplan",

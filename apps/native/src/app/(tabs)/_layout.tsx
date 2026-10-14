@@ -1,9 +1,10 @@
+import { Platform } from "react-native";
 import { selectTabs } from "@dragons/shared";
 import { AppTabs } from "@/components/nav/AppTabs";
 import { useTheme } from "@/hooks/useTheme";
 import { useGateUser } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
-import { TAB_BAR_MINIMIZE_BEHAVIOR, TAB_CONFIG } from "@/lib/nav/tabs";
+import { TAB_BAR_MINIMIZE_BEHAVIOR, TAB_CONFIG, tabBarAppearance } from "@/lib/nav/tabs";
 
 export default function TabLayout() {
   const { colors } = useTheme();
@@ -20,6 +21,7 @@ export default function TabLayout() {
       tabs={tabs}
       tintColor={colors.primary}
       minimizeBehavior={TAB_BAR_MINIMIZE_BEHAVIOR}
+      appearance={tabBarAppearance({ os: Platform.OS, colors })}
     />
   );
 }

@@ -78,7 +78,7 @@ export function SchedulePageClient({
           />
         </div>
         <SubscribeButton
-          teamApiId={selectedTeamApiId}
+          teamApiIds={selectedTeamApiId ? [selectedTeamApiId] : []}
           translations={{
             subscribe: translations.subscribe,
             subscribeTitle: translations.subscribeTitle,

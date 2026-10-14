@@ -15,13 +15,14 @@ function mockApi() {
     };
   const api = {
     sync: { status: rec("sync.status"), logs: rec("sync.logs"), schedule: rec("sync.schedule") },
-    matches: { get: rec("matches.get"), list: rec("matches.list"), history: rec("matches.history") },
+    matches: { get: rec("matches.get"), list: rec("matches.list"), gamePlan: rec("matches.gamePlan"), history: rec("matches.history") },
     teams: { list: rec("teams.list") },
     standings: { list: rec("standings.list") },
     venues: { list: rec("venues.list") },
     refereeAdmin: {
       listReferees: rec("refereeAdmin.listReferees"),
       refereeCounts: rec("refereeAdmin.refereeCounts"),
+      gameLeagues: rec("refereeAdmin.gameLeagues"),
       getReferee: rec("refereeAdmin.getReferee"),
       getRules: rec("refereeAdmin.getRules"),
       eligibleOpenGames: rec("refereeAdmin.eligibleOpenGames"),
@@ -136,14 +137,14 @@ describe("makeQueries", () => {
   });
 
   // --- matches ---
-  it("matches: key + dispatch to matches.list()", async () => {
+  it("matches: key + dispatch to matches.gamePlan()", async () => {
     const { api, calls } = mockApi();
     const q = makeQueries(api).matches();
     expect(q.key).toBe(SWR_KEYS.matches());
     await q.fetcher();
-    // No season named: the API picks the active one, and the key stays the bare
-    // path so this shares a cache entry with the server prefetch.
-    expect(calls[0]).toEqual({ method: "matches.list", args: [undefined] });
+    // No season named: the API picks the active one, and the key carries no
+    // seasonId so this shares a cache entry with the server prefetch.
+    expect(calls[0]).toEqual({ method: "matches.gamePlan", args: [undefined] });
   });
 
   it("matches(seasonId): keys and filters by the named season", async () => {
@@ -152,7 +153,7 @@ describe("makeQueries", () => {
     expect(q.key).toBe(SWR_KEYS.matches(7));
     expect(q.key).not.toBe(SWR_KEYS.matches());
     await q.fetcher();
-    expect(calls[0]).toEqual({ method: "matches.list", args: [{ seasonId: 7 }] });
+    expect(calls[0]).toEqual({ method: "matches.gamePlan", args: [{ seasonId: 7 }] });
   });
 
   it("dashboardTodayMatches(date): key + dispatch with date filters", async () => {
@@ -256,6 +257,14 @@ describe("makeQueries", () => {
     expect(q.key).toBe(SWR_KEYS.refereeCounts);
     await q.fetcher();
     expect(calls[0]).toEqual({ method: "refereeAdmin.refereeCounts", args: [] });
+  });
+
+  it("refereeGameLeagues: key + dispatch to refereeAdmin.gameLeagues()", async () => {
+    const { api, calls } = mockApi();
+    const q = makeQueries(api).refereeGameLeagues();
+    expect(q.key).toBe(SWR_KEYS.refereeGameLeagues);
+    await q.fetcher();
+    expect(calls[0]).toEqual({ method: "refereeAdmin.gameLeagues", args: [] });
   });
 
   it("referee(id): key + dispatch to refereeAdmin.getReferee(id)", async () => {

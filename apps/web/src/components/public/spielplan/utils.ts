@@ -30,16 +30,42 @@ type TeamIdMatch = Pick<
 >;
 
 /**
- * The own-club team api id behind a single-team filter selection, for the
- * per-team ICS feed. Anything but exactly one known team resolves to null —
- * the feed then covers the whole club.
+ * The squad ids (`apiTeamPermanentId`) behind the team filter selection, for
+ * the squad-filtered ICS feed, in selection order with each squad once.
+ * Labels that match no game in the schedule are dropped; an empty result
+ * means the feed covers the whole club.
  */
-export function selectedTeamApiId(
+export function selectedTeamApiIds(
   games: readonly TeamIdMatch[],
   selected: readonly string[] | undefined,
-): number | null {
-  if (!selected || selected.length !== 1) return null;
-  const match = games.find((game) => getOwnTeamLabel(game) === selected[0]);
-  if (!match) return null;
-  return match.homeIsOwnClub ? match.homeTeamApiId : match.guestTeamApiId;
+): number[] {
+  if (!selected || selected.length === 0) return [];
+  const ids: number[] = [];
+  for (const label of selected) {
+    const match = games.find((game) => getOwnTeamLabel(game) === label);
+    if (!match) continue;
+    const id = match.homeIsOwnClub ? match.homeTeamApiId : match.guestTeamApiId;
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+type BadgeColorMatch = TeamIdMatch & Pick<MatchListItem, "homeBadgeColor" | "guestBadgeColor">;
+
+/**
+ * Own-team label → configured badge colour, read off the schedule's games.
+ * The Kampfgericht columns hold a team name, not a team, so their badges look
+ * the colour up here; without it `TeamBadge` falls back to a hash of the name
+ * and the same team shows two colours in one row.
+ */
+export function ownTeamBadgeColors(
+  games: readonly BadgeColorMatch[],
+): Map<string, string | null> {
+  const colors = new Map<string, string | null>();
+  for (const game of games) {
+    const label = getOwnTeamLabel(game);
+    if (colors.get(label)) continue;
+    colors.set(label, game.homeIsOwnClub ? game.homeBadgeColor : game.guestBadgeColor);
+  }
+  return colors;
 }

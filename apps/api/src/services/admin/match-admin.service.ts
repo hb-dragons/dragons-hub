@@ -76,6 +76,7 @@ export { computeDiffs } from "./match-diff.service";
 export type { MatchDetailResponse } from "@dragons/shared";
 export {
   getOwnClubMatches,
+  getGamePlan,
   getMatchDetail,
   getMatchChangeHistory,
 } from "./match-query.service";

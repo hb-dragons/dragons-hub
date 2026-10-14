@@ -155,7 +155,9 @@ export function SeasonsList() {
                     <TableCell className="text-right tabular-nums">{s.leagueCount}</TableCell>
                     <TableCell className="text-right tabular-nums">{s.gameCount}</TableCell>
                     <TableCell className="text-right">
-                      {s.status === "upcoming" && (
+                      {/* The sync only works active and upcoming seasons, so an
+                          archived season's leagues are history, not config. */}
+                      {s.status !== "archived" && (
                         <div className="flex justify-end gap-2">
                           <Button
                             variant="outline"
@@ -164,9 +166,11 @@ export function SeasonsList() {
                           >
                             {t("settings.seasons.manage.button")}
                           </Button>
-                          <Button size="sm" onClick={() => requestActivate(s)}>
-                            {t("settings.seasons.activate")}
-                          </Button>
+                          {s.status === "upcoming" && (
+                            <Button size="sm" onClick={() => requestActivate(s)}>
+                              {t("settings.seasons.activate")}
+                            </Button>
+                          )}
                         </div>
                       )}
                     </TableCell>

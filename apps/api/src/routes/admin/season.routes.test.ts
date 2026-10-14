@@ -199,7 +199,17 @@ describe("PUT /seasons/:id/leagues", () => {
       body: JSON.stringify({ ligaIds: [54136] }),
     });
     expect(res.status).toBe(200);
-    expect(mocks.setSeasonLeagues).toHaveBeenCalledWith(3, [54136]);
+    expect(mocks.setSeasonLeagues).toHaveBeenCalledWith(3, [54136], undefined);
+  });
+  it("passes the cup list through", async () => {
+    mocks.setSeasonLeagues.mockResolvedValue({ tracked: 2, untracked: 0 });
+    const res = await app.request("/seasons/3/leagues", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ligaIds: [54136, 60001], cupLigaIds: [60001] }),
+    });
+    expect(res.status).toBe(200);
+    expect(mocks.setSeasonLeagues).toHaveBeenCalledWith(3, [54136, 60001], [60001]);
   });
   it("returns 400 for a non-array ligaIds", async () => {
     const res = await app.request("/seasons/3/leagues", {

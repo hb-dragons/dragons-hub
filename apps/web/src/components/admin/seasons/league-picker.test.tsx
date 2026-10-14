@@ -11,8 +11,8 @@ import { LeaguePicker } from "./league-picker";
 import type { BrowsableLeague } from "@dragons/shared";
 
 const LEAGUES: BrowsableLeague[] = [
-  { ligaId: 1, ligaNr: null, name: "Landesliga Herren 2", skName: "Landesliga", akName: "Senioren", geschlecht: "männlich", vorabliga: true, alreadyTracked: false, conflictSeasonName: null },
-  { ligaId: 2, ligaNr: null, name: "Landesliga Damen 2", skName: "Landesliga", akName: "Senioren", geschlecht: "weiblich", vorabliga: true, alreadyTracked: false, conflictSeasonName: null },
+  { ligaId: 1, ligaNr: null, name: "Landesliga Herren 2", skName: "Landesliga", akName: "Senioren", geschlecht: "männlich", vorabliga: true, alreadyTracked: false, conflictSeasonName: null, isCup: false },
+  { ligaId: 2, ligaNr: null, name: "Landesliga Damen 2", skName: "Landesliga", akName: "Senioren", geschlecht: "weiblich", vorabliga: true, alreadyTracked: false, conflictSeasonName: null, isCup: false },
 ];
 
 function renderPicker(props: Partial<React.ComponentProps<typeof LeaguePicker>> = {}) {
@@ -82,5 +82,21 @@ describe("LeaguePicker", () => {
     expect(sw).toBeChecked();
     fireEvent.click(sw);
     expect(onVorabligaOnlyChange).toHaveBeenCalledWith(false);
+  });
+
+  it("shows no cup switch unless the caller manages cups", () => {
+    renderPicker({ selected: new Set([1]) });
+    expect(screen.queryByText("settings.seasons.wizard.cup")).not.toBeInTheDocument();
+  });
+
+  it("reports a cup switch flip for a selected league", () => {
+    const onCupToggle = vi.fn();
+    renderPicker({ selected: new Set([1]), cups: new Set([1]), onCupToggle });
+    const cup = screen.getByRole("checkbox", { name: "settings.seasons.wizard.cup: Landesliga Herren 2" });
+    expect(cup).toBeChecked();
+    fireEvent.click(cup);
+    expect(onCupToggle).toHaveBeenCalledWith(1, false);
+    // League 2 is not selected, so it offers no cup switch.
+    expect(screen.getAllByText("settings.seasons.wizard.cup")).toHaveLength(1);
   });
 });

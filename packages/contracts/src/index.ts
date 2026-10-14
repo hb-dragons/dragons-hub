@@ -18,17 +18,22 @@ export {
 export {
   matchListQuerySchema,
   publicMatchListQuerySchema,
+  adminMatchListQuerySchema,
+  gamePlanGhostItemSchema,
   matchIdParamSchema,
   publicMatchIdParamSchema,
   matchUpdateBodySchema,
   matchHistoryQuerySchema,
   releaseOverrideParamsSchema,
+  alternativeDatesQuerySchema,
   type MatchListQuery,
   type PublicMatchListQuery,
+  type AdminMatchListQuery,
   type MatchUpdateBody,
   type MatchIdParam,
   type MatchHistoryQuery,
   type ReleaseOverrideParams,
+  type AlternativeDatesQuery,
 } from "./match";
 
 export {
@@ -299,11 +304,6 @@ export {
 } from "./notification-test";
 
 export { qaChatBodySchema, type QaChatBody } from "./qa";
-
-export {
-  assistantRescheduleChatBodySchema,
-  type AssistantRescheduleChatBody,
-} from "./assistant";
 
 export {
   unsubscribeQuerySchema,

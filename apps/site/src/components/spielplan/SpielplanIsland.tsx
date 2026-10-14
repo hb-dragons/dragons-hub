@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@dragons/ui/components/dropdown-menu";
 import { Skeleton } from "@dragons/ui/components/skeleton";
-import { api } from "../../lib/api";
+import { API_BASE, api } from "../../lib/api";
 import type { PlanGame } from "../../lib/full-plan";
 import {
   fetchFullPlan,
@@ -27,6 +27,7 @@ import {
 } from "../../lib/spielplan";
 import { strings } from "../../lib/strings";
 import { GamesTable } from "../game/GamesTable";
+import { CalendarSubscribe } from "./CalendarSubscribe";
 import { TeamBadge } from "./TeamBadge";
 
 function ChevronDownIcon() {
@@ -162,6 +163,15 @@ export default function SpielplanIsland({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {/* The popover's squad picker starts from the team filter; home/away
+            is a view filter only, the feed always carries both. */}
+        <CalendarSubscribe
+          apiBase={API_BASE}
+          games={games ?? []}
+          teams={teams}
+          filterSelection={selectedTeams}
+        />
       </div>
 
       {games === null && !failed && (

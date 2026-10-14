@@ -1,5 +1,9 @@
 # Game Rescheduling Copilot Implementation Plan
 
+> **Status: superseded by ADR-0010** (`docs/adr/0010-deterministic-alternative-date-finder.md`).
+> The copilot shipped and was removed on 2026-09-10 in favour of a deterministic
+> alternative-date finder. Kept as the record of what was built.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship an AI chat copilot that suggests alternative dates/times/venues for a game that must move — the AI reasons over synced club data from natural-language rules, with one deterministic `verify_slot` tool flooring physical correctness, suggest-only against the read-only federation.

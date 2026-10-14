@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useTranslations, useFormatter } from "next-intl"
+import { useTranslations, useFormatter, useLocale } from "next-intl"
 import useSWR, { useSWRConfig } from "swr"
 import { queries } from "@/lib/swr-queries"
 import { SeasonContextSelect } from "@/components/admin/seasons/season-context-select"
@@ -18,7 +18,7 @@ import { cn } from "@dragons/ui/lib/utils"
 import { Ban, Calendar, CircleOff, SearchIcon, SquareActivity } from "lucide-react"
 import { Input } from "@dragons/ui/components/input"
 
-import { clubDayAnchor } from "@dragons/shared"
+import { clubDayAnchor, formatKickoffCompact, resolveDateLocale } from "@dragons/shared"
 import { DataTable } from "@/components/ui/data-table"
 import { dateRangeFilterFn } from "@/components/ui/data-table-filters"
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar"
@@ -32,13 +32,13 @@ import {
   getOwnTeamLabel,
   getOpponentName,
 } from "./utils"
-import type { MatchListItem } from "./types"
+import type { GamePlanGhostItem, GamePlanItem } from "./types"
 import { MatchEditSheet } from "./match-edit-sheet"
 import { TeamBadge } from "@/components/admin/shared/team-badge"
 
-function OverrideDot({ match, field }: { match: MatchListItem; field: string }) {
+function OverrideDot({ match, field }: { match: GamePlanItem; field: string }) {
   const t = useTranslations("matchDetail")
-  if (!match.overriddenFields.includes(field)) return null
+  if (match.kind === "ghost" || !match.overriddenFields.includes(field)) return null
 
   return (
     <Tooltip>
@@ -52,9 +52,60 @@ function OverrideDot({ match, field }: { match: MatchListItem; field: string }) 
   )
 }
 
+/** Which arm of the `matches.ghost.tooltip` select applies. */
+function ghostTooltipVariant(
+  ghost: GamePlanGhostItem,
+): "reasonAuthor" | "reason" | "author" | "none" {
+  if (ghost.overrideReason && ghost.overrideAuthorName) return "reasonAuthor"
+  if (ghost.overrideReason) return "reason"
+  if (ghost.overrideAuthorName) return "author"
+  return "none"
+}
+
+/** "Verlegt →" badge on a ghost entry; its tooltip says why the game moved. */
+function GhostBadge({ ghost, dateLocale }: { ghost: GamePlanGhostItem; dateLocale: string }) {
+  const t = useTranslations("matches.ghost")
+  const effective = formatKickoffCompact(
+    ghost.effectiveKickoffDate,
+    ghost.effectiveKickoffTime,
+    dateLocale,
+  )
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="secondary" className="ml-2 not-italic" tabIndex={0}>
+          {t("movedTo", { kickoff: effective })}
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="text-xs">
+          {t("tooltip", {
+            official: formatKickoffCompact(ghost.kickoffDate, ghost.kickoffTime, dateLocale),
+            effective,
+            details: ghostTooltipVariant(ghost),
+            reason: ghost.overrideReason ?? "",
+            author: ghost.overrideAuthorName ?? "",
+          })}
+        </p>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 export { dateRangeFilterFn }
 
-function getColumns(t: ReturnType<typeof useTranslations<"matches">>, tBookings: ReturnType<typeof useTranslations<"bookings">>, format: ReturnType<typeof useFormatter>): ColumnDef<MatchListItem, unknown>[] {
+/** A ghost entry's own cells stay blank: it marks a day, it is not the game. */
+function unlessGhost(match: GamePlanItem, value: string | null): string {
+  return match.kind === "ghost" ? "" : (value ?? "")
+}
+
+function getColumns(
+  t: ReturnType<typeof useTranslations<"matches">>,
+  tBookings: ReturnType<typeof useTranslations<"bookings">>,
+  format: ReturnType<typeof useFormatter>,
+  dateLocale: string,
+): ColumnDef<GamePlanItem, unknown>[] {
   return [
     {
       accessorKey: "kickoffDate",
@@ -65,6 +116,9 @@ function getColumns(t: ReturnType<typeof useTranslations<"matches">>, tBookings:
         <span className="whitespace-nowrap text-sm">
           {format.dateTime(clubDayAnchor(row.original.kickoffDate), "matchDate")}
           <OverrideDot match={row.original} field="kickoffDate" />
+          {row.original.kind === "ghost" && (
+            <GhostBadge ghost={row.original} dateLocale={dateLocale} />
+          )}
         </span>
       ),
       filterFn: dateRangeFilterFn,
@@ -127,7 +181,8 @@ function getColumns(t: ReturnType<typeof useTranslations<"matches">>, tBookings:
     },
     {
       id: "score",
-      accessorFn: (row) => formatScore(row.homeScore, row.guestScore),
+      accessorFn: (row) =>
+        row.kind === "ghost" ? "" : formatScore(row.homeScore, row.guestScore),
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.score")} />
       ),
@@ -153,7 +208,7 @@ function getColumns(t: ReturnType<typeof useTranslations<"matches">>, tBookings:
       ),
       cell: ({ row }) => (
         <span className="text-sm">
-          {row.original.anschreiber ?? ""}
+          {unlessGhost(row.original, row.original.anschreiber)}
           <OverrideDot match={row.original} field="anschreiber" />
         </span>
       ),
@@ -166,7 +221,7 @@ function getColumns(t: ReturnType<typeof useTranslations<"matches">>, tBookings:
       ),
       cell: ({ row }) => (
         <span className="text-sm">
-          {row.original.zeitnehmer ?? ""}
+          {unlessGhost(row.original, row.original.zeitnehmer)}
           <OverrideDot match={row.original} field="zeitnehmer" />
         </span>
       ),
@@ -179,7 +234,7 @@ function getColumns(t: ReturnType<typeof useTranslations<"matches">>, tBookings:
       ),
       cell: ({ row }) => (
         <span className="text-sm">
-          {row.original.shotclock ?? ""}
+          {unlessGhost(row.original, row.original.shotclock)}
           <OverrideDot match={row.original} field="shotclock" />
         </span>
       ),
@@ -205,7 +260,7 @@ function getColumns(t: ReturnType<typeof useTranslations<"matches">>, tBookings:
       ),
       cell: ({ row }) => {
         const booking = row.original.booking;
-        if (!booking) return null;
+        if (!booking || row.original.kind === "ghost") return null;
         return (
           <Badge
             variant={
@@ -247,7 +302,7 @@ function getColumns(t: ReturnType<typeof useTranslations<"matches">>, tBookings:
   ]
 }
 
-const matchGlobalFilterFn: FilterFn<MatchListItem> = (
+const matchGlobalFilterFn: FilterFn<GamePlanItem> = (
   row,
   _columnId,
   filterValue,
@@ -280,13 +335,17 @@ export function MatchListTable() {
   const t = useTranslations("matches")
   const tBookings = useTranslations("bookings")
   const format = useFormatter()
+  const dateLocale = resolveDateLocale(useLocale())
   const { mutate } = useSWRConfig()
   // `undefined` means the active season, which is also what the server prefetch
   // asked for — so the first render reuses that data rather than refetching it.
   const [seasonId, setSeasonId] = useState<number | undefined>(undefined)
   const matchesQ = queries.matches(seasonId)
   const { data: response } = useSWR(matchesQ.key, matchesQ.fetcher)
-  const columns = useMemo(() => getColumns(t, tBookings, format), [t, tBookings, format])
+  const columns = useMemo(
+    () => getColumns(t, tBookings, format, dateLocale),
+    [t, tBookings, format, dateLocale],
+  )
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null)
 
   const allItems = useMemo(() => response?.items ?? [], [response?.items])
@@ -306,7 +365,7 @@ export function MatchListTable() {
     { label: t("status.forfeited"), value: "forfeited", icon: CircleOff },
   ]
 
-  function handleRowClick(row: Row<MatchListItem>, e: React.MouseEvent | React.KeyboardEvent) {
+  function handleRowClick(row: Row<GamePlanItem>, e: React.MouseEvent | React.KeyboardEvent) {
     const href = `/admin/matches/${row.original.id}`
     if (e.metaKey || e.ctrlKey) {
       window.open(href, "_blank")
@@ -315,7 +374,10 @@ export function MatchListTable() {
     }
   }
 
-  function getRowClassName(row: Row<MatchListItem>) {
+  function getRowClassName(row: Row<GamePlanItem>) {
+    // A ghost opens the real game's sheet like the real row (same id); it has
+    // no row actions of its own.
+    if (row.original.kind === "ghost") return "opacity-50 italic"
     return cn(
       row.original.homeIsOwnClub && "border-l-2 border-l-primary/50 bg-primary/5",
       row.original.isCancelled && "line-through text-muted-foreground opacity-60",

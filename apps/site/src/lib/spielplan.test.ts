@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
+  calendarFeedSquadIds,
+  calendarFeedUrl,
   dragonsTeamName,
   fetchFullPlan,
   filterGames,
@@ -124,6 +126,54 @@ describe("teamFilterOptions", () => {
     expect(teamFilterOptions(games)).toEqual([
       { name: "Herren 1", badgeColor: "teal" },
     ]);
+  });
+});
+
+describe("calendarFeedSquadIds", () => {
+  const withIds = (g: SpielplanGame, home: number, guest: number) => ({
+    ...g,
+    homeTeamApiId: home,
+    guestTeamApiId: guest,
+  });
+  const games = [
+    withIds(game(), 160402, 900001), // Herren 1 at home
+    withIds(awayGame(), 900002, 320674), // Damen 1 away
+    withIds(game({ homeTeamCustomName: "U18" }), 159888, 900003),
+    withIds(game(), 160402, 900004), // Herren 1 again
+  ];
+
+  test("no explicit choice means the club-wide feed", () => {
+    expect(calendarFeedSquadIds(games, null)).toEqual([]);
+  });
+
+  test("every team selected is the club-wide feed too", () => {
+    expect(calendarFeedSquadIds(games, new Set(["Herren 1", "Damen 1", "U18"]))).toEqual([]);
+  });
+
+  test("a partial selection yields each squad once, in the filter order", () => {
+    expect(calendarFeedSquadIds(games, new Set(["U18", "Herren 1"]))).toEqual([160402, 159888]);
+  });
+
+  test("the own side's id is used whether the team plays home or away", () => {
+    expect(calendarFeedSquadIds(games, new Set(["Damen 1"]))).toEqual([320674]);
+  });
+
+  test("an empty selection falls back to the club-wide feed", () => {
+    expect(calendarFeedSquadIds(games, new Set())).toEqual([]);
+  });
+});
+
+describe("calendarFeedUrl", () => {
+  test("is the bare feed without squads", () => {
+    expect(calendarFeedUrl("https://api.example", [])).toBe(
+      "https://api.example/public/schedule.ics",
+    );
+  });
+
+  test("repeats teamApiId once per squad", () => {
+    expect(calendarFeedUrl("https://api.example", [160402, 320674])).toBe(
+      "https://api.example/public/schedule.ics?teamApiId=160402&teamApiId=320674",
+    );
   });
 });
 

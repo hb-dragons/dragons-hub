@@ -1,10 +1,18 @@
 import type {
   PaginatedResponse,
   MatchListItem,
+  GamePlanItem,
   MatchDetailResponse,
   MatchChangeHistoryResponse,
+  AlternativeDatesResponse,
 } from "@dragons/shared";
-import type { MatchListQuery, MatchUpdateBody, MatchHistoryQuery } from "@dragons/contracts";
+import type {
+  MatchListQuery,
+  AdminMatchListQuery,
+  MatchUpdateBody,
+  MatchHistoryQuery,
+  AlternativeDatesQuery,
+} from "@dragons/contracts";
 import type { ApiClient } from "../client";
 
 export function matchEndpoints(client: ApiClient) {
@@ -15,6 +23,15 @@ export function matchEndpoints(client: ApiClient) {
         query as Record<string, string | number | boolean | undefined>,
       );
     },
+    /** The admin game plan: the match list plus ghost entries. */
+    gamePlan(
+      query?: Partial<Omit<AdminMatchListQuery, "includeGhosts">>,
+    ): Promise<PaginatedResponse<GamePlanItem>> {
+      return client.get("/admin/matches", {
+        ...(query as Record<string, string | number | boolean | undefined>),
+        includeGhosts: true,
+      });
+    },
     get(id: number): Promise<MatchDetailResponse> {
       return client.get(`/admin/matches/${id}`);
     },
@@ -24,6 +41,15 @@ export function matchEndpoints(client: ApiClient) {
     ): Promise<MatchChangeHistoryResponse> {
       return client.get(
         `/admin/matches/${id}/history`,
+        query as Record<string, string | number | boolean | undefined>,
+      );
+    },
+    alternativeDates(
+      id: number,
+      query?: AlternativeDatesQuery,
+    ): Promise<AlternativeDatesResponse> {
+      return client.get(
+        `/admin/matches/${id}/alternative-dates`,
         query as Record<string, string | number | boolean | undefined>,
       );
     },

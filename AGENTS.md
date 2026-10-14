@@ -30,7 +30,7 @@ Two dependency edges are easy to get wrong and matter:
 - **`@dragons/db` is not a leaf.** It depends on `@dragons/shared` and re-exports
   `SyncRunSummary` from it, so a schema-only import still crosses that edge.
 
-**Request contracts:** `@dragons/contracts` (`packages/contracts/src/<group>.ts`) is the sole declaration of each API endpoint's request schema. The API validates via `hono-openapi`'s `validator(..., validationHook)` (which also registers the schema into `/openapi.json`); `@dragons/api-client` infers `z.infer` request types from the same schemas; `*.contract.test.ts` files guard against client/server drift. Every route body goes through `validator()` + `c.req.valid(...)`, as does every query and path param outside the one exception named below. A few endpoints still read something by hand because it isn't a validator-shaped request at all: `GET /public/scoreboard/stream` parses the `Last-Event-ID` SSE reconnection header with `scoreboardLastEventIdSchema` (whose own `.catch(undefined)` degrades a malformed header to a fresh stream rather than rejecting the connection); `POST /mcp` reads its JSON-RPC body with `c.req.json()` and hands it untouched to the MCP SDK's own transport; `POST /api/scoreboard/ingest` reads a raw hex string from the Pi plus a device-id header; and the public unsubscribe `POST` reads its body as raw text only to tell an RFC 8058 one-click ping apart from the confirmation form's submit, never parsing it as JSON; and `POST /public/probetraining`'s honeypot guard peeks at `website` via `c.req.json()` **before** the route's regular `validator()` runs, because a filled honeypot must get the same fake 201 as a real submission instead of the validation 400 the schema would give it (Hono caches the parsed body, so the validator does not re-read the stream). None of these hand-roll a body-schema `schema.parse()` in place of `validator()`. One route file does still read a path param raw and is the exception to the sentence above, not a pattern to copy: `public/assets.routes.ts` hand-parses its `:id` because the router pattern `:id{[0-9]+\.webp}` already does the real validation.
+**Request contracts:** `@dragons/contracts` (`packages/contracts/src/<group>.ts`) is the sole declaration of each API endpoint's request schema. The API validates via `hono-openapi`'s `validator(..., validationHook)` (which also registers the schema into `/openapi.json`); `@dragons/api-client` infers `z.infer` request types from the same schemas; `*.contract.test.ts` files guard against client/server drift. Every route body goes through `validator()` + `c.req.valid(...)`, as does every query and path param outside the one exception named below. A few endpoints still read something by hand because it isn't a validator-shaped request at all: `GET /public/scoreboard/stream` parses the `Last-Event-ID` SSE reconnection header with `scoreboardLastEventIdSchema` (whose own `.catch(undefined)` degrades a malformed header to a fresh stream rather than rejecting the connection); `POST /api/scoreboard/ingest` reads a raw hex string from the Pi plus a device-id header; and the public unsubscribe `POST` reads its body as raw text only to tell an RFC 8058 one-click ping apart from the confirmation form's submit, never parsing it as JSON; and `POST /public/probetraining`'s honeypot guard peeks at `website` via `c.req.json()` **before** the route's regular `validator()` runs, because a filled honeypot must get the same fake 201 as a real submission instead of the validation 400 the schema would give it (Hono caches the parsed body, so the validator does not re-read the stream). None of these hand-roll a body-schema `schema.parse()` in place of `validator()`. One route file does still read a path param raw and is the exception to the sentence above, not a pattern to copy: `public/assets.routes.ts` hand-parses its `:id` because the router pattern `:id{[0-9]+\.webp}` already does the real validation.
 
 ## Data Model
 
@@ -111,7 +111,7 @@ tables (`user`, `session`, `account`, `verification`) use text ids,
 |-------|------|-------------|
 | `appSettings` | `packages/db/src/schema/app-settings.ts` | key (unique), value — stores club_id, club_name |
 | `seasons` | `packages/db/src/schema/seasons.ts` | id, name, sdkSeasonId (nullable int), status (`upcoming`\|`active`\|`archived`), startDate, endDate, createdAt, updatedAt — partial-unique index enforces at most one `active` row at a time; `activateSeason()` archives the current active in the same transaction |
-| `leagues` | `packages/db/src/schema/leagues.ts` | apiLigaId (unique), ligaNr, name, seasonId (legacy SDK int), seasonRefId (FK → seasons.id, NOT NULL), vorabliga (boolean), isTracked, discoveredAt, dataHash — season scoping for matches/standings flows through `leagues.seasonRefId`; sync gates to active+upcoming seasons; public reads are active-season-only; admin reads accept an optional `seasonId` query param (defaulting to the active season) |
+| `leagues` | `packages/db/src/schema/leagues.ts` | apiLigaId (unique), ligaNr, name, seasonId (legacy SDK int), seasonRefId (FK → seasons.id, NOT NULL), vorabliga (boolean), isCup (boolean, admin-set; never a team entry's league), isTracked, discoveredAt, dataHash — season scoping for matches/standings flows through `leagues.seasonRefId`; sync gates to active+upcoming seasons; public reads are active-season-only; admin reads accept an optional `seasonId` query param (defaulting to the active season) |
 | `teams` | `packages/db/src/schema/teams.ts` | apiTeamPermanentId (unique), name, clubId, isOwnClub, dataHash — the Squad (federation identity); club-facing fields live on `teamEntries` |
 | `teamEntries` | `packages/db/src/schema/team-entries.ts` | teamId FK + seasonId FK (unique pair), leagueId FK (nullable = not connected), linkSource (`seeded`\|`manual`), customName, badgeColor, estimatedGameDuration, displayOrder — the per-season Team entry; source of truth for team↔league (ADR 0004) |
 | `teamStaff` | `packages/db/src/schema/team-staff.ts` | teamEntryId FK (cascade), personId FK (restrict), role (`trainer`\|`co_trainer`), refereeContact, unique (teamEntryId, personId) — the assignment of a staff person to a team entry (ADR 0009); attached to the entry, so assignments are per season and copied forward by `team-entry-seeding.service.ts` with the same person |
@@ -264,8 +264,9 @@ Step 3: Parallel upserts (Promise.all)
   then:
   - syncTeamEntriesFromData(leagueData)
     Reconciles per-season team entries (team_entries) from federation
-    evidence: creates missing entries, moves links (committed beats
-    vorabliga), supersedes manual links and logs the supersession.
+    evidence: creates missing entries, moves links (a league beats a
+    cup, then committed beats vorabliga), supersedes manual links and
+    logs the supersession.
     Ambiguous evidence — one squad in two committed leagues of a season,
     or in two vorabligas with no committed league — keeps an existing
     link untouched and logs the conflict; a squad with no link yet falls
@@ -345,6 +346,18 @@ identity, not user-editable data. Both columns are non-deferrable FKs on
 ids up front and defers any match naming an unknown one — nothing is written, not
 even the hash, and the next run applies it once the teams stage has committed the
 team.
+
+**Remote changes behind an override** (2026-09-30). The sync never writes an
+overridden column, but a federation change to that field is still a new
+official value: the run compares it against the current `matchRemoteVersions`
+snapshot, and a difference bumps the remote version, stores the snapshot and
+writes the `matchChanges` audit row, while the override keeps the displayed
+value and `override.conflict` fires. It emits no `match.*` event, since nothing
+visible moved. An override is auto-released once the federation value equals
+the local one, compared per column type (`"19:30"` from the federation equals
+`"19:30:00"` in the time column). Before this, such a change advanced the hash
+without a snapshot, so the official kickoff stayed stale for good; migration
+0055 cleared the hash on every edited match to repair them.
 
 Changing a payload's shape invalidates every stored hash of that entity. No
 migration is needed — the next sync recomputes and rewrites them. That one run
@@ -564,44 +577,20 @@ now picked per season through the endpoints below.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/matches` | List own club matches (with booking info) |
+| GET | `/admin/matches` | List own club matches (with booking info); `includeGhosts=true` adds the game plan's ghost entries (`kind: "ghost"` with the date override's reason and author name, not counted in `total`) |
 | GET | `/admin/matches/:id` | Match detail with remote/local diffs (includes booking info) |
 | GET | `/admin/matches/:id/history` | Match change history (remote + local track) |
+| GET | `/admin/matches/:id/alternative-dates` | Weekend days in a range on which neither squad plays |
 | PATCH | `/admin/matches/:id` | Update match local fields |
 | DELETE | `/admin/matches/:id/overrides/:fieldName` | Release a local override |
 
 Match list and detail responses include associated venue booking data when available.
-
-### Admin - Assistant
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/admin/assistant/reschedule/chat` | Rescheduling copilot chat (AI SDK UI message stream). 503 when ASSISTANT_ENABLED=false. Permission: match:update. Body capped at 512 KiB (413) and rate-limited (429). |
 
 ### Club Q&A Assistant
 
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/qa/chat` | Members-only club Q&A assistant (AI SDK UI message stream); auth-gated (`requireAuth`), rate-limited, gated by `CHATBOT_ENABLED`. Returns 503 when `CHATBOT_ENABLED=false`. |
-
-### MCP server
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/mcp` | Streamable-HTTP MCP endpoint. Bearer-token auth (`Authorization: Bearer $MCP_TOKEN`), not the admin session gate. Exposes the read-only reschedule tools (`get_match`, `list_club_matches`, `list_venue_bookings`, `list_club_venues`, `get_round_window`, `get_referee_context`, `verify_slot`). Stateless. Gated by `ASSISTANT_ENABLED` (503 when off, same flag as the in-app copilot it shares tools with). Body capped at 256 KiB (413) and rate-limited (429). The bearer check is constant-time; 401 on missing/invalid token. |
-
-The same provider-neutral tool registry that backs the in-app chat is served here for external hosts (Claude Desktop, Cursor). The tools are read-only: they never write to the federation. Attach a host with:
-
-```json
-{
-  "mcpServers": {
-    "dragons-reschedule": {
-      "url": "https://<api-host>/mcp",
-      "headers": { "Authorization": "Bearer <MCP_TOKEN>" }
-    }
-  }
-}
-```
 
 ### Admin - Bookings
 
@@ -696,6 +685,7 @@ plugin under `/api/auth/*`, not by this route group.
 |--------|------|-------------|
 | GET | `/admin/referees` | List referees with pagination, search and sort. Query: `ownClub` (boolean, default true). Includes allowAllHomeGames, allowAwayGames, isOwnClub flags |
 | GET | `/admin/referees/counts` | Own-club and total referee counts |
+| GET | `/admin/referees/game-leagues` | Leagues that have a live referee game with an open own-club slot, for the referee hub's league filter |
 | GET | `/admin/referees/:id` | Single referee by id |
 | PATCH | `/admin/referees/:id/visibility` | Update referee visibility flags. Body: `{ allowAllHomeGames, allowAwayGames, isOwnClub }` |
 | GET | `/admin/referees/:id/eligible-open-games` | Open games the referee is eligible to take (used by the admin assign UI) |
@@ -791,7 +781,7 @@ for a device that does not exist.
 | GET | `/public/matches` | List own club matches, supports `opponentApiId` filter (no auth) |
 | GET | `/public/matches/:id` | Single match with quarter scores (no auth) |
 | GET | `/public/matches/:id/context` | H2H record and form for both teams (no auth) |
-| GET | `/public/schedule.ics` | ICS calendar subscription feed for own-club matches. Default window: 30 days back to 180 days forward (no auth) |
+| GET | `/public/schedule.ics` | ICS calendar feed for own-club matches. `teamApiId` may repeat to narrow the feed to those squads (unknown ids are dropped, not rejected) and then names the calendar after them in the club's display order (three names, then "+N"). Each event runs from one hour before kickoff to two hours after. Default window: 30 days back to 180 days forward (no auth) |
 | GET | `/public/standings` | League standings (no auth) |
 | GET | `/public/teams` | List teams (no auth). Own-club rows carry `staff[]` (assignment id, personId, first/last name, role, licence, portrait path) — never phone or email |
 | GET | `/public/teams/:id/stats` | Season stats and recent form for a team (no auth) |
@@ -819,7 +809,7 @@ their own games via `c.get("refereeId")`. The native app depends on `/referee/ga
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/referee/games` | referee/admin | List games the caller may see. Query: `search`, `league`, `status`, `dateFrom`, `dateTo`, `limit`, `offset` |
+| GET | `/referee/games` | referee/admin | List games the caller may see. Query: `search`, `league`, `status`, `dateFrom`, `dateTo`, `gameType`, `assignedRefereeApiId`, `slotStatus`, `limit`, `offset`. For an admin with no linked referee, `slotStatus` scopes to our club's slots: `open` (the default when omitted) needs an open own-club slot, `offered` an open or offered one, `any` any own-club slot; `assignedRefereeApiId` with no `slotStatus` returns all of that referee's games |
 | GET | `/referee/games/:id` | referee/admin | Single game by `refereeGames.id`, as `RefereeGameDetail` — the list item plus a `brief` block (venue street/PLZ/city, per-slot `tentative`, venue/time-changed flags, basketball-bund.net game link). Adds `kampfgericht` (home games with a linked match; the Dragons team named for Anschreiber/Zeitnehmer/Shotclock, collapsed into one entry when they match) and `contacts` (the Dragons team playing, both in a derby) **only** when the caller holds a slot (`mySlot !== null`) or reads unscoped as an admin — for anyone else both keys are absent |
 | GET | `/referee/games/by-api-match/:apiMatchId` | referee/admin | Single game by Basketball-Bund `apiMatchId` (deep-link landing from take-intent URLs) |
 | GET | `/referee/matches/:matchId` | referee/admin | Single game by local `matches.id` |
@@ -872,9 +862,9 @@ the app hides the "Meine Kontaktdaten" section on.
 | PATCH | `/admin/social/backgrounds/:id/default` | Set default background |
 | POST | `/admin/social/generate` | Generate social post PNG (Satori + Sharp compositing) |
 
-Route files: `apps/api/src/routes/health.routes.ts`, `apps/api/src/routes/mcp.routes.ts`, `apps/api/src/routes/qa.routes.ts`, `apps/api/src/routes/device.routes.ts`, `apps/api/src/routes/admin/*.routes.ts`, `apps/api/src/routes/api/*.routes.ts`, `apps/api/src/routes/public/*.routes.ts`, `apps/api/src/routes/referee/*.routes.ts`. Mount table: `apps/api/src/routes/index.ts`; app-level routes: `apps/api/src/app.ts`.
+Route files: `apps/api/src/routes/health.routes.ts`, `apps/api/src/routes/qa.routes.ts`, `apps/api/src/routes/device.routes.ts`, `apps/api/src/routes/admin/*.routes.ts`, `apps/api/src/routes/api/*.routes.ts`, `apps/api/src/routes/public/*.routes.ts`, `apps/api/src/routes/referee/*.routes.ts`. Mount table: `apps/api/src/routes/index.ts`; app-level routes: `apps/api/src/app.ts`.
 Request schemas: `packages/contracts/src/<group>.ts` (never redeclared in the route).
-Service layer: `apps/api/src/services/admin/*.service.ts`, `apps/api/src/services/referee/`, `apps/api/src/services/venue-booking/`, `apps/api/src/services/notifications/`, `apps/api/src/services/social/`
+Service layer: `apps/api/src/services/admin/*.service.ts`, `apps/api/src/services/referee/`, `apps/api/src/services/venue-booking/`, `apps/api/src/services/reschedule/`, `apps/api/src/services/notifications/`, `apps/api/src/services/social/`
 
 ## Access Control (RBAC)
 

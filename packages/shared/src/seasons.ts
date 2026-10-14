@@ -38,6 +38,12 @@ export interface BrowsableLeague {
    * to move the row (see `LeagueSeasonConflict`), so the picker says so up front.
    */
   conflictSeasonName: string | null;
+  /**
+   * Whether the liga is a cup (Pokal). The season's own row decides once the
+   * liga is tracked there; before that the name does, since the federation
+   * does not type its competitions.
+   */
+  isCup: boolean;
 }
 
 /**

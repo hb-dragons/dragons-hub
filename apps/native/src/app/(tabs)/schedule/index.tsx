@@ -75,6 +75,11 @@ function MatchList({
     [router],
   );
 
+  // The native tab bar clears itself (the inset behaviour below on iOS, the
+  // padded tab content on Android); this is only the breathing room `Screen`
+  // gives every scroll view.
+  const listContentStyle = useMemo(() => ({ paddingBottom: spacing.xl }), [spacing.xl]);
+
   return (
     <SectionList
       sections={sections}
@@ -121,14 +126,12 @@ function MatchList({
         </View>
       )}
       refreshControl={refreshControl}
-      contentContainerStyle={SECTION_LIST_CONTENT_STYLE}
+      contentContainerStyle={listContentStyle}
       showsVerticalScrollIndicator={false}
       stickySectionHeadersEnabled={false}
     />
   );
 }
-
-const SECTION_LIST_CONTENT_STYLE = { paddingBottom: 100 } as const;
 
 /* ── Main Screen ── */
 export default function ScheduleScreen() {

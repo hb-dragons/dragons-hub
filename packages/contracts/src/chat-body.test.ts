@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { chatBodySchema } from "./chat-body";
 import { qaChatBodySchema } from "./qa";
-import { assistantRescheduleChatBodySchema } from "./assistant";
 
 const message = (partCount: number) => ({
   id: "1",
@@ -57,10 +56,11 @@ describe("chatBodySchema", () => {
 });
 
 /**
- * The per-route bounds are the one thing the factory deliberately does not
- * share. A refactor that "tidied" them into a single constant would reintroduce
- * exactly the bug the factory exists to prevent, so pin both numbers and pin the
- * fact that they differ.
+ * The per-route part bound is the one thing the factory deliberately does not
+ * share: each route derives its own ceiling from its step budget and tool list
+ * (`apps/api/src/ai/chat-part-budget.test.ts`). A refactor that "tidied" the
+ * bounds into a single shared constant would reintroduce exactly the bug the
+ * factory exists to prevent, so pin the live route's number here.
  */
 describe("per-route part bounds stay separate", () => {
   it("holds the Q&A chat to 30 parts per message", () => {
@@ -68,20 +68,10 @@ describe("per-route part bounds stay separate", () => {
     expect(qaChatBodySchema.safeParse({ messages: [message(31)] }).success).toBe(false);
   });
 
-  it("gives the reschedule copilot 80 parts per message", () => {
-    expect(
-      assistantRescheduleChatBodySchema.safeParse({ messages: [message(80)] }).success,
-    ).toBe(true);
-    expect(
-      assistantRescheduleChatBodySchema.safeParse({ messages: [message(81)] }).success,
-    ).toBe(false);
-  });
-
-  it("does not apply one route's bound to the other", () => {
-    // 31 parts: over the Q&A bound, comfortably inside the copilot's.
+  it("does not read its bound from the factory default", () => {
+    // A route that passed no bound of its own would accept far more than 30.
+    const unbounded = chatBodySchema({ maxPartsPerMessage: 200, extra: {} });
+    expect(unbounded.safeParse({ messages: [message(31)] }).success).toBe(true);
     expect(qaChatBodySchema.safeParse({ messages: [message(31)] }).success).toBe(false);
-    expect(
-      assistantRescheduleChatBodySchema.safeParse({ messages: [message(31)] }).success,
-    ).toBe(true);
   });
 });

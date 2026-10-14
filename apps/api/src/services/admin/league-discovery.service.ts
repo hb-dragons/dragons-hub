@@ -25,6 +25,15 @@ function isOnboardableTopTier(l: SdkLiga): boolean {
   return (l.skName ?? "").toLowerCase().includes("regionalliga");
 }
 
+/**
+ * The federation does not type its competitions, so a cup (Pokal) is told
+ * apart by name — the Spielklasse or the liga name, e.g. "Kreispokal Herren".
+ * Only a prefill: the admin's choice in the picker is what gets stored.
+ */
+export function looksLikeCup(l: { liganame: string; skName: string | null }): boolean {
+  return [l.liganame, l.skName ?? ""].some((s) => s.toLowerCase().includes("pokal"));
+}
+
 // The WAM liga-list carries no club/team reference, so to narrow the browse to
 // leagues our own club plays in we ask the federation's club-matches endpoint
 // which leagues our club has fixtures in and intersect by ligaId. One call, and
@@ -52,12 +61,18 @@ export async function browseLeagues(
   const filtered = ourLigaIds ? byTier.filter((l) => ourLigaIds.has(l.ligaId)) : byTier;
 
   const trackedIds = new Set<number>();
+  // This season's own rows carry the admin's cup choice, tracked or not — an
+  // untracked row keeps its flag for when it is picked again.
+  const cupByLigaId = new Map<number, boolean>();
   if (opts.seasonId !== undefined) {
-    const tracked = await getDb()
-      .select({ apiLigaId: leagues.apiLigaId })
+    const rows = await getDb()
+      .select({ apiLigaId: leagues.apiLigaId, isTracked: leagues.isTracked, isCup: leagues.isCup })
       .from(leagues)
-      .where(and(eq(leagues.seasonRefId, opts.seasonId), eq(leagues.isTracked, true)));
-    for (const t of tracked) trackedIds.add(t.apiLigaId);
+      .where(eq(leagues.seasonRefId, opts.seasonId));
+    for (const r of rows) {
+      if (r.isTracked) trackedIds.add(r.apiLigaId);
+      cupByLigaId.set(r.apiLigaId, r.isCup);
+    }
   }
 
   // A liga whose row belongs to another season cannot be tracked here — the
@@ -82,12 +97,14 @@ export async function browseLeagues(
     vorabliga: l.vorabliga,
     alreadyTracked: trackedIds.has(l.ligaId),
     conflictSeasonName: conflictSeasonByLigaId.get(l.ligaId) ?? null,
+    isCup: cupByLigaId.get(l.ligaId) ?? looksLikeCup(l),
   }));
 }
 
 export async function setSeasonLeagues(
   seasonId: number,
   ligaIds: number[],
+  cupLigaIds?: number[],
 ): Promise<SetSeasonLeaguesResult> {
   const all = await sdkClient.getAllLigen();
   const byId = new Map<number, SdkLiga>(all.map((l) => [l.ligaId, l]));
@@ -102,6 +119,7 @@ export async function setSeasonLeagues(
   // becomes a single atomic upsert on the `api_liga_id` unique constraint, so
   // two callers selecting the same league cannot both take the insert branch.
   const selectedIds = selected.map((l) => l.ligaId);
+  const cupSet = cupLigaIds ? new Set(cupLigaIds) : null;
   const { conflicts, keepIds, untrackedCount } = await getDb().transaction(async (tx) => {
     const now = new Date();
 
@@ -153,6 +171,9 @@ export async function setSeasonLeagues(
         vorabliga: l.vorabliga,
         isTracked: true,
         updatedAt: now,
+        // Without an explicit cup list (the new-season wizard) an existing
+        // row keeps the flag an admin may have set; only a new row is guessed.
+        ...(cupSet ? { isCup: cupSet.has(l.ligaId) } : {}),
       };
 
       await tx
@@ -161,6 +182,7 @@ export async function setSeasonLeagues(
           apiLigaId: l.ligaId,
           isActive: true,
           discoveredAt: now,
+          isCup: looksLikeCup(l),
           ...values,
         })
         .onConflictDoUpdate({
@@ -218,6 +240,7 @@ export async function getTrackedLeagues(seasonId?: number): Promise<TrackedLeagu
       name: leagues.name,
       seasonName: leagues.seasonName,
       ownClubRefs: leagues.ownClubRefs,
+      isCup: leagues.isCup,
     })
     .from(leagues)
     .where(where);

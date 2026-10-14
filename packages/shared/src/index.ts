@@ -33,6 +33,9 @@ export type {
   FieldDiff,
   OverrideInfo,
   MatchListItem,
+  GamePlanMatchItem,
+  GamePlanGhostItem,
+  GamePlanItem,
   MatchDetail,
   MatchDetailResponse,
   MatchFieldChange,
@@ -40,6 +43,13 @@ export type {
   MatchChangeHistoryItem,
   MatchChangeHistoryResponse,
   RefereeSlotInfo,
+  DateRange,
+  AlternativeDateBooking,
+  AlternativeDateCandidate,
+  AlternativeDateGroup,
+  AlternativeDateFlag,
+  AlternativeDatesCaveat,
+  AlternativeDatesResponse,
 } from "./matches";
 
 export type {
@@ -130,6 +140,8 @@ export type {
   RefereeRule,
   RefereeRulesResponse,
   RefereeCountsResponse,
+  RefereeGameLeague,
+  RefereeGameLeaguesResponse,
   EligibleOpenGamesResponse,
 } from "./referees";
 export type { StandingItem, LeagueStandings } from "./standings";

@@ -107,6 +107,7 @@ function makeLeagueData(overrides: Partial<LeagueFetchedData> = {}): LeagueFetch
     seasonRefId: null,
     seasonStatus: "active",
     vorabliga: false,
+    isCup: false,
     spielplan: [],
     tabelle: [makeEntry()],
     gameDetails: new Map(),

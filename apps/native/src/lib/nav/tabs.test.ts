@@ -3,7 +3,9 @@ import {
   STANDINGS_SHORTCUT_ROUTE,
   TAB_BAR_MINIMIZE_BEHAVIOR,
   TAB_CONFIG,
+  tabBarAppearance,
 } from "@/lib/nav/tabs";
+import { colors } from "@/theme/colors";
 
 describe("TAB_CONFIG", () => {
   it("defines a config for every tab id with a route name and label key", () => {
@@ -58,5 +60,41 @@ describe("STANDINGS_SHORTCUT_ROUTE", () => {
     // users who need the shortcut are exactly the ones for whom the tab route
     // does not exist.
     expect(STANDINGS_SHORTCUT_ROUTE).not.toBe(`/${TAB_CONFIG.standings.name}`);
+  });
+});
+
+describe("tabBarAppearance", () => {
+  it("leaves the iOS bar entirely to the system", () => {
+    // iOS 26 draws the bar's glass; any colour we set replaces it with a
+    // solid bar (the same reasoning as the native headers, #216).
+    expect(tabBarAppearance({ os: "ios", colors: colors.light })).toEqual({});
+  });
+
+  it.each([
+    ["light", colors.light],
+    ["dark", colors.dark],
+  ] as const)("styles the Android bar from the %s theme's tokens", (_scheme, palette) => {
+    // Without this the Material bottom navigation falls back to the device
+    // theme — a lavender pill on a grey bar on a phone with no dynamic colour.
+    const appearance = tabBarAppearance({ os: "android", colors: palette });
+    expect(appearance.backgroundColor).toBe(palette.surfaceLow);
+    expect(appearance.indicatorColor).toBe(palette.secondary);
+    expect(appearance.rippleColor).toBe(palette.primary);
+    expect(appearance.iconColor).toEqual({
+      default: palette.mutedForeground,
+      selected: palette.primary,
+    });
+    expect(appearance.labelStyle).toEqual({
+      default: { color: palette.mutedForeground },
+      selected: { color: palette.primary },
+    });
+  });
+
+  it("labels every Android tab, not only the selected one", () => {
+    // Material's "auto" mode drops the labels of unselected tabs past three
+    // items; the app has up to six.
+    expect(tabBarAppearance({ os: "android", colors: colors.light }).labelVisibilityMode).toBe(
+      "labeled",
+    );
   });
 });

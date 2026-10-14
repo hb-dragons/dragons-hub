@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCalendarFeed } from "./calendar.service";
+import { buildCalendarFeed, buildCalendarName } from "./calendar.service";
 import type { MatchListItem } from "@dragons/shared";
 
 /** Unfold ICS line continuations (RFC 5545 §3.1) so toContain works across folds */
@@ -182,6 +182,18 @@ describe("buildCalendarFeed", () => {
     expect(ics).not.toContain("BEGIN:VEVENT");
   });
 
+  it("opens the event one hour before kickoff and closes it two hours after", () => {
+    const ics = unfold(buildCalendarFeed([makeMatch({ kickoffDate: "2026-04-15", kickoffTime: "14:00" })], {}));
+    expect(ics).toContain("DTSTART;TZID=Europe/Berlin:20260415T130000");
+    expect(ics).toContain("DTEND;TZID=Europe/Berlin:20260415T160000");
+  });
+
+  it("keeps the window on the club wall clock across midnight", () => {
+    const ics = unfold(buildCalendarFeed([makeMatch({ kickoffDate: "2026-04-15", kickoffTime: "00:30" })], {}));
+    expect(ics).toContain("DTSTART;TZID=Europe/Berlin:20260414T233000");
+    expect(ics).toContain("DTEND;TZID=Europe/Berlin:20260415T023000");
+  });
+
   it("includes Europe/Berlin timezone", () => {
     const ics = buildCalendarFeed([makeMatch()], {});
     expect(ics).toContain("Europe/Berlin");
@@ -274,5 +286,24 @@ describe("buildCalendarFeed", () => {
       {},
     ));
     expect(ics).not.toContain("U14 Kreisliga");
+  });
+});
+
+describe("buildCalendarName", () => {
+  it("is the club-wide name when no squad is selected", () => {
+    expect(buildCalendarName([])).toBe("Dragons Spielplan");
+  });
+
+  it("lists up to three selected squads by name", () => {
+    expect(buildCalendarName(["Damen 1"])).toBe("Dragons: Damen 1");
+    expect(buildCalendarName(["Damen 1", "Herren 1", "U16"])).toBe(
+      "Dragons: Damen 1, Herren 1, U16",
+    );
+  });
+
+  it("truncates a longer selection to three names plus a count", () => {
+    expect(buildCalendarName(["Damen 1", "Herren 1", "U16", "U14", "U12"])).toBe(
+      "Dragons: Damen 1, Herren 1, U16 +2",
+    );
   });
 });

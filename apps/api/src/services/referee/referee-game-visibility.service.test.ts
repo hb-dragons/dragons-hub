@@ -947,6 +947,47 @@ describe("getVisibleRefereeGames (admin mode)", () => {
     ).toEqual([1, 2]);
   });
 
+  describe("slotStatus scopes to our club's slots", () => {
+    beforeEach(async () => {
+      await seedGame({ apiMatchId: 1, sr1Status: "open", sr2Status: "assigned" });
+      await seedGame({ apiMatchId: 2, sr1Status: "offered", sr2Status: "assigned" });
+      await seedGame({ apiMatchId: 3, sr1Status: "assigned", sr2Status: "assigned" });
+      // Open and offered, but neither slot is ours to fill.
+      await seedGame({ apiMatchId: 4, sr1OurClub: false, sr2OurClub: false, sr1Status: "open", sr2Status: "offered" });
+      // Our slot is taken; the open one belongs to the other club.
+      await seedGame({ apiMatchId: 5, sr1Status: "assigned", sr2OurClub: false, sr2Status: "open" });
+    });
+
+    it("'open' and no slotStatus show games with an open own-club slot", async () => {
+      expect(apiIds(await getVisibleRefereeGames(null, { ...PAGE, slotStatus: "open" }))).toEqual([1]);
+      expect(apiIds(await getVisibleRefereeGames(null, PAGE))).toEqual([1]);
+    });
+
+    it("'offered' adds games whose own-club slot is offered", async () => {
+      expect(apiIds(await getVisibleRefereeGames(null, { ...PAGE, slotStatus: "offered" }))).toEqual([1, 2]);
+    });
+
+    it("'any' shows every game with an own-club slot, staffed ones included", async () => {
+      expect(apiIds(await getVisibleRefereeGames(null, { ...PAGE, slotStatus: "any" }))).toEqual([1, 2, 3, 5]);
+    });
+  });
+
+  it("assignedRefereeApiId alone lists all of that referee's games, staffed or not", async () => {
+    await seedGame({ apiMatchId: 1, sr1RefereeApiId: 4242, sr1Status: "assigned", sr2Status: "open" });
+    // Fully staffed: hidden from the referee's upcoming games before.
+    await seedGame({ apiMatchId: 2, sr1RefereeApiId: 4242, sr1Status: "assigned", sr2Status: "assigned" });
+    // A slot that is not our club's to fill.
+    await seedGame({ apiMatchId: 3, sr1OurClub: false, sr1RefereeApiId: 4242, sr1Status: "assigned", sr2Status: "assigned" });
+    await seedGame({ apiMatchId: 4 });
+
+    expect(
+      apiIds(await getVisibleRefereeGames(null, { ...PAGE, assignedRefereeApiId: 4242 })),
+    ).toEqual([1, 2, 3]);
+    expect(
+      apiIds(await getVisibleRefereeGames(null, { ...PAGE, assignedRefereeApiId: 4242, slotStatus: "open" })),
+    ).toEqual([1]);
+  });
+
   it("multiple league ids use inArray", async () => {
     await seedGame({ apiMatchId: 1, leagueApiId: 101 });
     await seedGame({ apiMatchId: 2, leagueApiId: 202 });

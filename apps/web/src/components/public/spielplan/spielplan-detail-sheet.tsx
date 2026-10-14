@@ -38,15 +38,17 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 interface SpielplanDetailSheetProps {
   game: MatchListItem | null
+  /** Own-team label → badge colour, so duty badges match the team column. */
+  badgeColors: Map<string, string | null>
   onOpenChange: (open: boolean) => void
 }
 
 /**
  * Read-only game detail panel — the public counterpart of the admin edit
  * sheet. Carries everything the compact table hides by default (venue,
- * score, Kampfgericht duties, comment), all from the already-loaded row.
+ * score, comment) plus the Kampfgericht duties, all from the already-loaded row.
  */
-export function SpielplanDetailSheet({ game, onOpenChange }: SpielplanDetailSheetProps) {
+export function SpielplanDetailSheet({ game, badgeColors, onOpenChange }: SpielplanDetailSheetProps) {
   const t = useTranslations("spielplan")
   const format = useFormatter()
 
@@ -112,13 +114,19 @@ export function SpielplanDetailSheet({ game, onOpenChange }: SpielplanDetailShee
               <SectionHeading>{t("kampfgericht")}</SectionHeading>
               <dl className="space-y-3">
                 <DetailRow label={t("columns.anschreiber")}>
-                  {game.anschreiber ? <TeamBadge name={game.anschreiber} /> : "—"}
+                  {game.anschreiber ? (
+                    <TeamBadge name={game.anschreiber} badgeColor={badgeColors.get(game.anschreiber)} />
+                  ) : "—"}
                 </DetailRow>
                 <DetailRow label={t("columns.zeitnehmer")}>
-                  {game.zeitnehmer ? <TeamBadge name={game.zeitnehmer} /> : "—"}
+                  {game.zeitnehmer ? (
+                    <TeamBadge name={game.zeitnehmer} badgeColor={badgeColors.get(game.zeitnehmer)} />
+                  ) : "—"}
                 </DetailRow>
                 <DetailRow label={t("columns.shotclock")}>
-                  {game.shotclock ? <TeamBadge name={game.shotclock} /> : "—"}
+                  {game.shotclock ? (
+                    <TeamBadge name={game.shotclock} badgeColor={badgeColors.get(game.shotclock)} />
+                  ) : "—"}
                 </DetailRow>
               </dl>
             </div>

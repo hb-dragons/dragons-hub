@@ -23,8 +23,7 @@ qaRoutes.post(
   requireAuth,
   rateLimit({ limit: 20, windowSeconds: 60, keyPrefix: "qa-chat" }),
   // The contract's per-message bounds still admit ~9.6 MB (60 messages x 30
-  // parts x 8000 chars), so this is the route's real size gate. Same 512 KB as
-  // the reschedule copilot.
+  // parts x 8000 chars), so this is the route's real size gate.
   bodyLimit({ maxSize: 512 * 1024 }),
   validator("json", qaChatBodySchema, validationHook),
   describeRoute({

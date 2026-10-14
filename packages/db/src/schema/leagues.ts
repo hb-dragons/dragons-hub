@@ -24,6 +24,12 @@ export const leagues = pgTable("leagues", {
     .notNull()
     .references(() => seasons.id),
   vorabliga: boolean("vorabliga").notNull().default(false),
+  // A cup (Pokal) runs alongside a squad's regular league in the same season.
+  // It never becomes a team entry's league (ADR 0004): seeding and the sync
+  // only fall back to a cup when a squad has no other league. The federation
+  // does not type its competitions, so this is set by the admin, prefilled
+  // from the name. The league sync never writes it.
+  isCup: boolean("is_cup").notNull().default(false),
   isActive: boolean("is_active").default(true),
   isTracked: boolean("is_tracked").default(true),
   ownClubRefs: boolean("own_club_refs").default(false),

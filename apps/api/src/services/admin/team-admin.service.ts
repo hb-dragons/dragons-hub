@@ -42,6 +42,41 @@ export async function getOwnClubTeams(seasonId?: number): Promise<OwnClubTeam[]>
     .sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name));
 }
 
+/**
+ * Display names of the given squads (`apiTeamPermanentId`) as they appear in
+ * `seasonId` — the team entry's custom name, else the short name, else the
+ * federation name — in the club's display order. Squads without a team entry
+ * that season, foreign teams, and unknown ids are left out, so the result may
+ * be shorter than the input.
+ */
+export async function getOwnClubSquadNames(
+  seasonId: number,
+  squadApiIds: readonly number[],
+): Promise<string[]> {
+  if (squadApiIds.length === 0) return [];
+
+  const rows = await getDb()
+    .select({
+      name: teams.name,
+      nameShort: teams.nameShort,
+      customName: teamEntries.customName,
+      displayOrder: teamEntries.displayOrder,
+    })
+    .from(teamEntries)
+    .innerJoin(teams, eq(teamEntries.teamId, teams.id))
+    .where(
+      and(
+        eq(teamEntries.seasonId, seasonId),
+        eq(teams.isOwnClub, true),
+        inArray(teams.apiTeamPermanentId, [...squadApiIds]),
+      ),
+    );
+
+  return rows
+    .sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name))
+    .map((r) => r.customName ?? r.nameShort ?? r.name);
+}
+
 export async function updateTeamEntry(
   entryId: number,
   data: {

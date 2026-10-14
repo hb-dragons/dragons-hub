@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import * as eventPublisher from "../services/events/event-publisher";
 import { eq } from "drizzle-orm";
 import type { Database } from "@dragons/db";
@@ -100,9 +100,26 @@ async function setup(options: {
   return { taskId: 1, userId, boardId: 1 };
 }
 
+/**
+ * Pin the clock to 04:00 UTC on 15 Jul (06:00 in Berlin, before the 08:00
+ * day-of gate) and return a due date 20h ahead: tomorrow in the club zone.
+ * Off the wall clock, "now + 20h" is the club's *today* from 22:00 UTC on
+ * (00:00 Berlin), where the lead query rightly excludes it (#149), so these
+ * tests failed for two hours every night.
+ */
+function freezeBeforeTomorrow(): string {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-07-15T04:00:00Z"));
+  return "2026-07-16";
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("runTaskReminderSweep", () => {
   it("emits task.due.reminder lead for tasks due within the next 24h", async () => {
-    const dueIn20h = new Date(Date.now() + 20 * 60 * 60 * 1000);
+    const dueIn20h = freezeBeforeTomorrow();
     const { taskId, userId } = await setup({ dueDate: dueIn20h });
 
     await runTaskReminderSweep();
@@ -119,7 +136,7 @@ describe("runTaskReminderSweep", () => {
   });
 
   it("marks leadReminderSentAt so the sweep does not re-emit", async () => {
-    const dueIn20h = new Date(Date.now() + 20 * 60 * 60 * 1000);
+    const dueIn20h = freezeBeforeTomorrow();
     const { taskId } = await setup({ dueDate: dueIn20h });
 
     await runTaskReminderSweep();
@@ -139,7 +156,7 @@ describe("runTaskReminderSweep", () => {
   });
 
   it("skips tasks whose column is flagged isDoneColumn", async () => {
-    const dueIn20h = new Date(Date.now() + 20 * 60 * 60 * 1000);
+    const dueIn20h = freezeBeforeTomorrow();
     const { taskId } = await setup({ dueDate: dueIn20h, isDoneColumn: true });
 
     await runTaskReminderSweep();
@@ -152,7 +169,7 @@ describe("runTaskReminderSweep", () => {
   });
 
   it("skips tasks with no assignees", async () => {
-    const dueIn20h = new Date(Date.now() + 20 * 60 * 60 * 1000);
+    const dueIn20h = freezeBeforeTomorrow();
     const { taskId } = await setup({ dueDate: dueIn20h, hasAssignee: false });
 
     await runTaskReminderSweep();
@@ -345,7 +362,7 @@ describe("runTaskReminderSweep", () => {
   });
 
   it("logs a warning and continues when lead emitAndMark throws — catch branch", async () => {
-    const dueIn20h = new Date(Date.now() + 20 * 60 * 60 * 1000);
+    const dueIn20h = freezeBeforeTomorrow();
     const { taskId } = await setup({ dueDate: dueIn20h });
 
     // Force publishDomainEvent to throw — exercises the try/catch in runTaskReminderSweep

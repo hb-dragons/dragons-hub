@@ -267,16 +267,9 @@
       "cancelled": "Cancelled",
       "forfeited": "Forfeited"
     },
-    "reschedule": {
-      "trigger": "Suggest reschedule",
-      "title": "Reschedule assistant",
-      "description": "Describe your constraints; I'll suggest valid dates and venues.",
-      "placeholder": "e.g. next 3 weeks, prefer Saturday evenings, keep our gym",
-      "stop": "Stop",
-      "retry": "Retry",
-      "newChat": "Start a new chat",
-      "error": "Something went wrong. Please try again.",
-      "send": "Send"
+    "ghost": {
+      "movedTo": "Moved → {kickoff}",
+      "tooltip": "The federation still lists it on {official}. Moved in the Hub to {effective}{details, select, reasonAuthor { (reason: {reason}, by {author})} reason { (reason: {reason})} author { (by {author})} other {}}."
     }
   },
   "matchDetail": {
@@ -294,6 +287,38 @@
       "date": "Date",
       "time": "Time",
       "venue": "Venue"
+    },
+    "alternativeDates": {
+      "trigger": "Find alternative dates",
+      "title": "Alternative dates",
+      "back": "Back to the game",
+      "caveats": {
+        "opponentGamesOutsideTrackedLeagues": "Games of the opponent outside the leagues we track are unknown."
+      },
+      "from": "From",
+      "to": "To",
+      "homeGame": "Home game",
+      "awayGame": "Away game",
+      "groups": {
+        "booked": "With a hall booking",
+        "unbooked": "Without a hall booking",
+        "away": "Away"
+      },
+      "noBooking": "no booking",
+      "awayVenue": "Hall: opponent",
+      "needsReconfirmation": "Needs re-confirmation",
+      "suggestedKickoff": "Suggested kickoff: {time}",
+      "loading": "Searching for dates",
+      "flags": {
+        "outsideRoundWindow": "Outside the round window",
+        "coachCollision": "Trainer also with {team}"
+      },
+      "empty": "No free weekend day in this range.",
+      "error": "The alternative dates could not be loaded.",
+      "copy": "Copy as text",
+      "copyHeader": "Possible alternative dates for {home} – {guest} ({league}, matchday {matchDay}):",
+      "copied": "Alternative dates copied.",
+      "copyFailed": "Copying was not possible."
     },
     "score": {
       "title": "Score",
@@ -392,10 +417,7 @@
       "fieldCleared": "{field}: cleared (was {oldValue})",
       "showMore": "Load more"
     },
-    "edit": "Edit",
-    "reschedule": {
-      "trigger": "Suggest reschedule"
-    }
+    "edit": "Edit"
   },
   "sync": {
     "title": "Sync Management",
@@ -1022,7 +1044,7 @@
       "manage": {
         "button": "Manage leagues",
         "title": "Manage leagues",
-        "description": "Add or remove the leagues this season tracks.",
+        "description": "Add or remove the leagues this season tracks. A league marked as a cup is never a team's league; cup games still show under the team.",
         "save": "Save & sync",
         "saved": "Leagues updated",
         "saveFailed": "Could not save leagues",
@@ -1036,6 +1058,8 @@
         "selectDescription": "Select the preliminary (Vorabliga) leagues to track this season.",
         "searchPlaceholder": "Search leagues…",
         "ownClubOnly": "Only my club's leagues",
+        "cup": "Cup",
+        "cupHint": "Cup competition (Pokal): kept out of the team's league link",
         "vorabligaOnly": "Preliminary (Vorabliga) leagues only",
         "showTeams": "Show teams",
         "hideTeams": "Hide teams",
@@ -1542,18 +1566,21 @@
       "referees": "Referees"
     },
     "openSlots": {
-      "searchPlaceholder": "Search game…",
+      "searchPlaceholder": "Search team or league",
       "loading": "Loading…",
       "loadError": "Failed to load games.",
       "empty": "No games match your filters.",
       "detail": {
         "notFound": "Game not found or no longer needs referees",
-        "selectGamePrompt": "Select a game on the left to see its open slots"
+        "otherClub": "Filled by the other club"
       },
       "slot": {
-        "label": "Slot {n} (SR{n})",
+        "label": "Referee {n}",
         "open": "Open",
-        "unassign": "Unassign"
+        "offered": "Offered",
+        "unassign": "Remove",
+        "assignFailed": "Assigning failed",
+        "unassignFailed": "Removing failed"
       },
       "errorChip": {
         "dismiss": "Dismiss"
@@ -1563,7 +1590,6 @@
         "assign": "Assign SR{n}",
         "empty": "No eligible referees",
         "workload": "{n} games",
-        "assignTrigger": "Assign referee…",
         "showIneligible": "Show {n} ineligible",
         "hideIneligible": "Hide ineligible",
         "loadingMore": "Loading more…",
@@ -1580,51 +1606,61 @@
       "filters": {
         "status": "Status",
         "statusValue": {
-          "open": "Open only",
-          "offered": "Open + Offered",
-          "any": "Any"
+          "open": "Open",
+          "offered": "+ Offered",
+          "any": "All"
         },
         "league": "League",
-        "noLeagues": "No leagues loaded",
+        "noLeagues": "No leagues with open games",
         "date": "Date",
         "datePreset": {
-          "14d": "Next 14 days",
-          "30d": "Next 30 days",
-          "season": "Whole season",
-          "custom": "Custom range"
+          "14d": "14 days",
+          "30d": "30 days",
+          "upcoming": "All upcoming",
+          "custom": "Range"
         },
         "dateFrom": "From",
         "dateTo": "To",
         "gameType": "Game type",
         "gameTypeValue": {
+          "both": "Home + away",
           "home": "Home",
           "away": "Away"
         },
-        "reset": "Reset filters"
+        "reset": "Reset",
+        "leagueSelected": "League ({n})"
       },
       "matchup": "{home} vs {guest}",
       "resultCount": "{n} games",
-      "slotBadge": {
-        "assigned": "SR{n} {name}",
-        "offered": "SR{n} offered",
-        "open": "SR{n} open"
+      "loadingMore": "Loading more games…",
+      "agenda": {
+        "relativeDay": "{days, plural, =0 {today} =1 {tomorrow} other {in # days}}",
+        "daysAgo": "{days, plural, =1 {yesterday} other {# days ago}}",
+        "dayOpenSlots": "{n, plural, =0 {all staffed} one {# open slot} other {# open slots}}",
+        "against": "vs {opponent}",
+        "at": "at {opponent}",
+        "home": "Home",
+        "away": "Away",
+        "slotOpen": "open",
+        "slotOffered": "offered",
+        "openCount": "{n} open",
+        "staffed": "staffed",
+        "slotShort": "SR{n}"
       }
     },
     "referees": {
-      "kpi": {
-        "ownClubRefs": "Own-club refs",
-        "avgMatches": "Avg matches/ref"
-      },
       "columns": {
         "ref": "Referee",
-        "own": "Own-club",
+        "own": "Own club",
+        "home": "Home games",
+        "away": "Away",
         "games": "Games"
       },
       "search": "Search referees…",
       "sort": {
-        "name": "Sort: Name",
-        "workloadDesc": "Games (most first)",
-        "workloadAsc": "Games (fewest first)"
+        "name": "Name",
+        "workloadDesc": "Most games",
+        "workloadAsc": "Fewest games"
       },
       "empty": "No referees match your filters",
       "profile": {
@@ -1692,13 +1728,28 @@
         "upcoming": "Upcoming",
         "history": "History"
       },
-      "selectPrompt": "Pick a referee to see their config + history",
       "scope": {
         "own": "Own ({n})",
         "all": "All ({n})"
       },
       "licenseLabel": "Lic {number}",
-      "apiIdLabel": "API {id}"
+      "apiIdLabel": "API {id}",
+      "scopeLabel": "Scope",
+      "sortLabel": "Sort",
+      "summary": "{n, plural, one {# referee} other {# referees}}",
+      "average": "avg {avg} games",
+      "loadingMore": "Loading more referees…",
+      "flags": {
+        "homeAll": "all",
+        "homeRules": "by rules",
+        "awayYes": "yes",
+        "awayNo": "no"
+      },
+      "ownClubToggleFailed": "Could not save the own-club setting",
+      "scopePlain": {
+        "own": "Own",
+        "all": "All"
+      }
     }
   },
   "errors": {

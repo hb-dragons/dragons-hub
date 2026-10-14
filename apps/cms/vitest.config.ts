@@ -28,15 +28,15 @@ export default defineConfig({
         // 2026-08-10 widening re-measured in the other direction (see
         // CLAUDE.md, Testing Requirements). Measured 98.76/94.28/100/98.57.
         //
-        // Statements and lines read lower than the 99 they were only because
-        // the importer's ~1,000 near-fully-covered lines no longer outweigh
-        // payload.config.ts, whose one uncovered line (the GCS plugin branch)
-        // is now a much larger share of a much smaller scope. Functions reach
-        // 100 for the first time. Ratchet up as tests grow; never lower.
-        branches: 94,
+        // Ratcheted 2026-10-09: migrations.test.ts boots the config with
+        // GCS_MEDIA_BUCKET set, covering the GCS plugin branch of
+        // payload.config.ts — the one line that held statements and lines
+        // below 100. Measured 100/97.14/100/100. Ratchet up as tests grow;
+        // never lower.
+        branches: 97,
         functions: 100,
-        lines: 98,
-        statements: 98,
+        lines: 100,
+        statements: 100,
       },
     },
   },

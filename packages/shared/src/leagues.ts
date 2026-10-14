@@ -19,6 +19,8 @@ interface TrackedLeague {
   name: string;
   seasonName: string;
   ownClubRefs: boolean;
+  /** A cup runs beside a squad's regular league and never becomes its team entry's league. */
+  isCup: boolean;
 }
 
 export interface TrackedLeaguesResponse {

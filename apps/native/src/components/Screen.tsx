@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 import { useRefresh, type RefreshFn } from "@/hooks/useRefresh";
 import { contentInsetBehaviorForEdges } from "@/lib/ui/scroll-inset";
+import { screenContentPadding } from "@/lib/ui/screen-padding";
 
 const DEFAULT_EDGES: readonly Edge[] = ["top"];
 
@@ -56,12 +57,11 @@ export function Screen({
     [colors.background],
   );
 
+  // Bottom padding only where this component owns the scroll view; see
+  // lib/ui/screen-padding.ts for why the non-scrolling wrapper gets none.
   const contentStyle = useMemo(
-    () => ({
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.xl,
-    }),
-    [spacing.lg, spacing.xl],
+    () => screenContentPadding({ scroll, spacing: { lg: spacing.lg, xl: spacing.xl } }),
+    [scroll, spacing.lg, spacing.xl],
   );
 
   const refreshControl = useMemo(() => {

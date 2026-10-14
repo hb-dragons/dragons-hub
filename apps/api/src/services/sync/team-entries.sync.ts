@@ -25,8 +25,9 @@ export interface TeamEntriesSyncResult {
 
 /**
  * Reconcile team entries from federation evidence. One squad appearing in two
- * of a season's leagues in one run resolves committed-beats-vorabliga (spec
- * 2026-08-12); evidence beats a manual link and the supersession is logged.
+ * of a season's leagues in one run resolves league-beats-cup, then
+ * committed-beats-vorabliga (spec 2026-08-12); evidence beats a manual link and
+ * the supersession is logged.
  *
  * Ambiguous evidence — two committed leagues, or two vorabligas with no
  * committed league — is a conflict (issue #228): an existing link is kept
@@ -63,7 +64,7 @@ export async function syncTeamEntriesFromData(
     {
       permanentId: number;
       seasonRefId: number;
-      leagues: { leagueDbId: number; leagueApiId: number; vorabliga: boolean }[];
+      leagues: { leagueDbId: number; leagueApiId: number; vorabliga: boolean; isCup: boolean }[];
     }
   >();
   for (const data of leagueData) {
@@ -84,14 +85,23 @@ export async function syncTeamEntriesFromData(
         bucket = { permanentId: pid, seasonRefId: data.seasonRefId, leagues: [] };
         candidates.set(key, bucket);
       }
-      bucket.leagues.push({ leagueDbId: data.leagueDbId, leagueApiId: data.leagueApiId, vorabliga: data.vorabliga });
+      bucket.leagues.push({
+        leagueDbId: data.leagueDbId,
+        leagueApiId: data.leagueApiId,
+        vorabliga: data.vorabliga,
+        isCup: data.isCup,
+      });
     }
   }
 
-  // committed (vorabliga=false) beats vorabliga; anything left over is a conflict.
+  // A cup runs beside the regular league, so it is evidence only when the
+  // squad plays nowhere else this season. Then committed (vorabliga=false)
+  // beats vorabliga; anything left over is a conflict.
   const evidence = [...candidates.values()].map((bucket) => {
-    const committed = bucket.leagues.filter((l) => !l.vorabliga);
-    const byDbId = new Map((committed.length > 0 ? committed : bucket.leagues).map((l) => [l.leagueDbId, l]));
+    const nonCup = bucket.leagues.filter((l) => !l.isCup);
+    const leagues = nonCup.length > 0 ? nonCup : bucket.leagues;
+    const committed = leagues.filter((l) => !l.vorabliga);
+    const byDbId = new Map((committed.length > 0 ? committed : leagues).map((l) => [l.leagueDbId, l]));
     const pool = [...byDbId.values()].sort((a, b) => a.leagueApiId - b.leagueApiId);
     return {
       permanentId: bucket.permanentId,

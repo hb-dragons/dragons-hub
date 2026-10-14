@@ -5,7 +5,6 @@ import { is } from "drizzle-orm";
 import { PgTable } from "drizzle-orm/pg-core";
 import * as schema from "@dragons/db/schema";
 import { routes } from "../routes/index";
-import { mcpRoutes } from "../routes/mcp.routes";
 import { envSchema } from "../config/env";
 import { fullSync } from "../services/sync";
 
@@ -79,11 +78,9 @@ function normalizePath(p: string): string {
 
 function registeredEndpoints(): Set<string> {
   const found = new Set<string>(APP_LEVEL_ENDPOINTS);
-  for (const router of [routes, mcpRoutes]) {
-    for (const route of router.routes) {
-      if (route.method === "ALL") continue;
-      found.add(`${route.method} ${normalizePath(route.path)}`);
-    }
+  for (const route of routes.routes) {
+    if (route.method === "ALL") continue;
+    found.add(`${route.method} ${normalizePath(route.path)}`);
   }
   return found;
 }

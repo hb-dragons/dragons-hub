@@ -171,14 +171,21 @@ export async function seedSeasonTeamEntries(
   if (ownClubId === null || apiLigaIds.length === 0) return result;
 
   const leagueRows = await getDb()
-    .select({ id: leagues.id, apiLigaId: leagues.apiLigaId })
+    .select({ id: leagues.id, apiLigaId: leagues.apiLigaId, isCup: leagues.isCup })
     .from(leagues)
     .where(and(eq(leagues.seasonRefId, seasonId), inArray(leagues.apiLigaId, apiLigaIds)));
-  const dbIdByLigaId = new Map(leagueRows.map((l) => [l.apiLigaId, l.id]));
+  const rowByLigaId = new Map(leagueRows.map((l) => [l.apiLigaId, l]));
 
-  for (const ligaId of apiLigaIds) {
-    const leagueDbId = dbIdByLigaId.get(ligaId);
-    if (leagueDbId === undefined) continue;
+  // Cups go last and never displace a link: a squad's entry names its regular
+  // league, and a cup only connects a squad that has nothing else (ADR 0004).
+  const ordered = [...apiLigaIds].sort(
+    (a, b) => Number(rowByLigaId.get(a)?.isCup ?? false) - Number(rowByLigaId.get(b)?.isCup ?? false),
+  );
+
+  for (const ligaId of ordered) {
+    const row = rowByLigaId.get(ligaId);
+    if (row === undefined) continue;
+    const leagueDbId = row.id;
     let roster: SdkTeamRef[];
     try {
       roster = await fetchLeagueRoster(ligaId);
@@ -190,8 +197,10 @@ export async function seedSeasonTeamEntries(
     for (const ref of roster) {
       if (ref.clubId !== ownClubId) continue;
       const teamId = await upsertSquad(ref, true);
-      const outcome = await upsertEntryFromEvidence(teamId, seasonId, leagueDbId);
-      if (outcome.action !== "unchanged") result.entriesSeeded++;
+      const outcome = await upsertEntryFromEvidence(teamId, seasonId, leagueDbId, {
+        keepExistingLink: row.isCup,
+      });
+      if (outcome.action === "created" || outcome.action === "moved") result.entriesSeeded++;
     }
   }
   return result;

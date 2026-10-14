@@ -267,16 +267,9 @@
       "cancelled": "Abgesagt",
       "forfeited": "Kampflos"
     },
-    "reschedule": {
-      "trigger": "Terminverschiebung vorschlagen",
-      "title": "Terminverschiebungs-Assistent",
-      "description": "Beschreibe deine Einschränkungen; ich schlage gültige Termine und Hallen vor.",
-      "placeholder": "z. B. nächste 3 Wochen, lieber Samstagabend, gleiche Halle",
-      "stop": "Stopp",
-      "retry": "Erneut versuchen",
-      "newChat": "Neuen Chat starten",
-      "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
-      "send": "Senden"
+    "ghost": {
+      "movedTo": "Verlegt → {kickoff}",
+      "tooltip": "Laut Verband noch am {official}. Im Hub verlegt auf {effective}{details, select, reasonAuthor { (Grund: {reason}, von {author})} reason { (Grund: {reason})} author { (von {author})} other {}}."
     }
   },
   "matchDetail": {
@@ -294,6 +287,38 @@
       "date": "Datum",
       "time": "Uhrzeit",
       "venue": "Halle"
+    },
+    "alternativeDates": {
+      "trigger": "Ausweichtermine finden",
+      "title": "Ausweichtermine",
+      "back": "Zurück zum Spiel",
+      "caveats": {
+        "opponentGamesOutsideTrackedLeagues": "Spiele des Gegners außerhalb der von uns verfolgten Ligen sind nicht bekannt."
+      },
+      "from": "Von",
+      "to": "Bis",
+      "homeGame": "Heimspiel",
+      "awayGame": "Auswärtsspiel",
+      "groups": {
+        "booked": "Mit Hallenbuchung",
+        "unbooked": "Ohne Hallenbuchung",
+        "away": "Auswärts"
+      },
+      "noBooking": "keine Buchung",
+      "awayVenue": "Halle: Gegner",
+      "needsReconfirmation": "Rückbestätigung nötig",
+      "suggestedKickoff": "Vorschlag: {time} Uhr",
+      "loading": "Termine werden gesucht",
+      "flags": {
+        "outsideRoundWindow": "Außerhalb des Spieltagsfensters",
+        "coachCollision": "Trainer auch bei {team}"
+      },
+      "empty": "In diesem Zeitraum ist kein Wochenendtag frei.",
+      "error": "Die Ausweichtermine konnten nicht geladen werden.",
+      "copy": "Als Text kopieren",
+      "copyHeader": "Mögliche Ausweichtermine für {home} – {guest} ({league}, Spieltag {matchDay}):",
+      "copied": "Ausweichtermine kopiert.",
+      "copyFailed": "Kopieren war nicht möglich."
     },
     "score": {
       "title": "Ergebnis",
@@ -392,10 +417,7 @@
       "fieldCleared": "{field}: gelöscht (war {oldValue})",
       "showMore": "Mehr laden"
     },
-    "edit": "Bearbeiten",
-    "reschedule": {
-      "trigger": "Terminverschiebung vorschlagen"
-    }
+    "edit": "Bearbeiten"
   },
   "sync": {
     "title": "Synchronisation",
@@ -1022,7 +1044,7 @@
       "manage": {
         "button": "Ligen verwalten",
         "title": "Ligen verwalten",
-        "description": "Ligen dieser Saison hinzufügen oder entfernen.",
+        "description": "Ligen dieser Saison hinzufügen oder entfernen. Eine als Pokal markierte Liga wird nie die Liga einer Mannschaft; Pokalspiele erscheinen trotzdem bei der Mannschaft.",
         "save": "Speichern & synchronisieren",
         "saved": "Ligen aktualisiert",
         "saveFailed": "Ligen konnten nicht gespeichert werden",
@@ -1036,6 +1058,8 @@
         "selectDescription": "Wähle die zu verfolgenden Vorabliga-Ligen für diese Saison aus.",
         "searchPlaceholder": "Ligen suchen…",
         "ownClubOnly": "Nur Ligen meines Vereins",
+        "cup": "Pokal",
+        "cupHint": "Pokalwettbewerb: wird nicht als Liga der Mannschaft verknüpft",
         "vorabligaOnly": "Nur vorläufige Ligen (Vorabliga)",
         "showTeams": "Mannschaften anzeigen",
         "hideTeams": "Mannschaften ausblenden",
@@ -1542,18 +1566,21 @@
       "referees": "Schiedsrichter"
     },
     "openSlots": {
-      "searchPlaceholder": "Spiel suchen…",
+      "searchPlaceholder": "Team oder Liga suchen",
       "loading": "Lädt…",
       "loadError": "Spiele konnten nicht geladen werden.",
       "empty": "Keine Spiele entsprechen Ihren Filtern.",
       "detail": {
         "notFound": "Spiel nicht gefunden oder benötigt keine Schiedsrichter mehr",
-        "selectGamePrompt": "Spiel links auswählen, um offene Slots zu sehen"
+        "otherClub": "Stellt der andere Verein"
       },
       "slot": {
-        "label": "Slot {n} (SR{n})",
+        "label": "Schiedsrichter {n}",
         "open": "Offen",
-        "unassign": "Aufheben"
+        "offered": "Angeboten",
+        "unassign": "Entfernen",
+        "assignFailed": "Zuweisen fehlgeschlagen",
+        "unassignFailed": "Entfernen fehlgeschlagen"
       },
       "errorChip": {
         "dismiss": "Schließen"
@@ -1563,7 +1590,6 @@
         "assign": "SR{n} zuweisen",
         "empty": "Keine passenden Schiedsrichter",
         "workload": "{n} Spiele",
-        "assignTrigger": "Schiedsrichter zuweisen…",
         "showIneligible": "{n} nicht Einsetzbare anzeigen",
         "hideIneligible": "Nicht Einsetzbare ausblenden",
         "loadingMore": "Lade mehr…",
@@ -1580,51 +1606,61 @@
       "filters": {
         "status": "Status",
         "statusValue": {
-          "open": "Nur offen",
-          "offered": "Offen + Angeboten",
-          "any": "Beliebig"
+          "open": "Offen",
+          "offered": "+ Angeboten",
+          "any": "Alle"
         },
         "league": "Liga",
-        "noLeagues": "Keine Ligen geladen",
+        "noLeagues": "Keine Ligen mit offenen Spielen",
         "date": "Datum",
         "datePreset": {
-          "14d": "Nächste 14 Tage",
-          "30d": "Nächste 30 Tage",
-          "season": "Ganze Saison",
-          "custom": "Benutzerdefiniert"
+          "14d": "14 Tage",
+          "30d": "30 Tage",
+          "upcoming": "Alle kommenden",
+          "custom": "Zeitraum"
         },
         "dateFrom": "Von",
         "dateTo": "Bis",
         "gameType": "Spielart",
         "gameTypeValue": {
+          "both": "Heim + Auswärts",
           "home": "Heim",
           "away": "Auswärts"
         },
-        "reset": "Filter zurücksetzen"
+        "reset": "Zurücksetzen",
+        "leagueSelected": "Liga ({n})"
       },
       "matchup": "{home} vs. {guest}",
       "resultCount": "{n} Spiele",
-      "slotBadge": {
-        "assigned": "SR{n} {name}",
-        "offered": "SR{n} angeboten",
-        "open": "SR{n} offen"
+      "loadingMore": "Lade weitere Spiele…",
+      "agenda": {
+        "relativeDay": "{days, plural, =0 {heute} =1 {morgen} other {in # Tagen}}",
+        "daysAgo": "{days, plural, =1 {gestern} other {vor # Tagen}}",
+        "dayOpenSlots": "{n, plural, =0 {alle besetzt} one {# offener Slot} other {# offene Slots}}",
+        "against": "gegen {opponent}",
+        "at": "bei {opponent}",
+        "home": "Heim",
+        "away": "Auswärts",
+        "slotOpen": "offen",
+        "slotOffered": "angeboten",
+        "openCount": "{n} offen",
+        "staffed": "besetzt",
+        "slotShort": "SR{n}"
       }
     },
     "referees": {
-      "kpi": {
-        "ownClubRefs": "Vereinseigene SR",
-        "avgMatches": "Schnitt Spiele/SR"
-      },
       "columns": {
         "ref": "Schiedsrichter",
         "own": "Vereinseigen",
+        "home": "Heimspiele",
+        "away": "Auswärts",
         "games": "Spiele"
       },
       "search": "Schiedsrichter suchen…",
       "sort": {
-        "name": "Sortieren: Name",
-        "workloadDesc": "Spiele (meiste zuerst)",
-        "workloadAsc": "Spiele (wenigste zuerst)"
+        "name": "Name",
+        "workloadDesc": "Meiste Spiele",
+        "workloadAsc": "Wenigste Spiele"
       },
       "empty": "Keine Schiedsrichter passen zu den Filtern",
       "profile": {
@@ -1692,13 +1728,28 @@
         "upcoming": "Bevorstehend",
         "history": "Historie"
       },
-      "selectPrompt": "Schiedsrichter wählen, um Konfiguration und Historie zu sehen",
       "scope": {
         "own": "Vereinseigen ({n})",
         "all": "Alle ({n})"
       },
       "licenseLabel": "Lizenz {number}",
-      "apiIdLabel": "API {id}"
+      "apiIdLabel": "API {id}",
+      "scopeLabel": "Umfang",
+      "sortLabel": "Sortierung",
+      "summary": "{n, plural, one {# Schiedsrichter} other {# Schiedsrichter}}",
+      "average": "Ø {avg} Spiele",
+      "loadingMore": "Lade weitere Schiedsrichter…",
+      "flags": {
+        "homeAll": "alle",
+        "homeRules": "nach Regeln",
+        "awayYes": "ja",
+        "awayNo": "nein"
+      },
+      "ownClubToggleFailed": "Vereinseigen konnte nicht gespeichert werden",
+      "scopePlain": {
+        "own": "Vereinseigen",
+        "all": "Alle"
+      }
     }
   },
   "errors": {

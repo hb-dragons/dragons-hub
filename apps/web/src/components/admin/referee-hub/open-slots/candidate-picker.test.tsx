@@ -63,7 +63,6 @@ const messages = {
         assign: "Assign SR{n}",
         empty: "No eligible referees",
         workload: "{n} games",
-        assignTrigger: "Assign referee…",
         showIneligible: "Show {n} ineligible",
         hideIneligible: "Hide ineligible",
         loadingMore: "Loading more…",

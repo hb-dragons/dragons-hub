@@ -31,6 +31,7 @@ export function ManageLeaguesDialog({
   const { mutate } = useSWRConfig();
   const [leagues, setLeaguesState] = useState<BrowsableLeague[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [cups, setCups] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState("");
   const [ownClubOnly, setOwnClubOnly] = useState(true);
   // Off by default: mid-season the leagues being added are committed ones,
@@ -39,6 +40,9 @@ export function ManageLeaguesDialog({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const openRef = useRef(open);
+  // Ligas this dialog session has shown, so a refilter only prefills the cup
+  // flag of ones the admin has not had a chance to change.
+  const seen = useRef<Set<number>>(new Set());
   useEffect(() => {
     openRef.current = open;
   }, [open]);
@@ -71,11 +75,26 @@ export function ManageLeaguesDialog({
             alreadyTracked: true,
             // Tracked by this very season, so never another season's row.
             conflictSeasonName: null,
+            isCup: l.isCup,
           });
         }
       }
       setLeaguesState([...byId.values()]);
-      if (seed) setSelected(trackedIds);
+      if (seed) {
+        setSelected(trackedIds);
+        setCups(new Set([...byId.values()].filter((l) => l.isCup).map((l) => l.ligaId)));
+      } else {
+        // A refilter brings in ligas not seen yet: take their suggested flag,
+        // but never undo a choice the admin already made in this dialog.
+        setCups((prev) => {
+          const next = new Set(prev);
+          for (const c of candidates) {
+            if (c.isCup && !seen.current.has(c.ligaId)) next.add(c.ligaId);
+          }
+          return next;
+        });
+      }
+      for (const id of byId.keys()) seen.current.add(id);
     } catch {
       if (!openRef.current) return;
       toast.error(t("settings.seasons.manage.loadFailed"));
@@ -90,6 +109,7 @@ export function ManageLeaguesDialog({
       setFilter("");
       setOwnClubOnly(true);
       setVorabligaOnly(false);
+      seen.current = new Set();
       void load(true, false, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -114,11 +134,23 @@ export function ManageLeaguesDialog({
     });
   }
 
+  function toggleCup(ligaId: number, isCup: boolean) {
+    setCups((prev) => {
+      const next = new Set(prev);
+      if (isCup) next.add(ligaId);
+      else next.delete(ligaId);
+      return next;
+    });
+  }
+
   async function save() {
     if (saving) return;
     setSaving(true);
     try {
-      const result = await api.seasons.setLeagues(seasonId, { ligaIds: [...selected] });
+      const result = await api.seasons.setLeagues(seasonId, {
+        ligaIds: [...selected],
+        cupLigaIds: [...selected].filter((id) => cups.has(id)),
+      });
       // A liga the federation reused from an earlier season is refused rather
       // than moved, so say which ones were skipped instead of reporting a clean
       // save the admin cannot square with the list.
@@ -169,6 +201,8 @@ export function ManageLeaguesDialog({
           vorabligaOnly={vorabligaOnly}
           onVorabligaOnlyChange={toggleVorabligaOnly}
           loading={loading}
+          cups={cups}
+          onCupToggle={toggleCup}
         />
         <DialogFooter>
           <Button disabled={saving || loading} onClick={() => { void save(); }}>

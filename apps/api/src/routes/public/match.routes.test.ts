@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import type { AppEnv } from "../../types";
+import type * as CalendarService from "../../services/public/calendar.service";
 
 // --- Mocks (hoisted before imports) ---
 
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getPublicMatchDetail: vi.fn(),
   getMatchContext: vi.fn(),
   getActiveSeasonId: vi.fn(),
+  getOwnClubSquadNames: vi.fn(),
 }));
 
 vi.mock("../../services/admin/match-admin.service", () => ({
@@ -24,8 +26,14 @@ vi.mock("../../services/public/match-context.service", () => ({
   getMatchContext: mocks.getMatchContext,
 }));
 
-vi.mock("../../services/public/calendar.service", () => ({
+vi.mock("../../services/public/calendar.service", async (importOriginal) => ({
+  // buildCalendarName stays real: the tests assert the name the route derives.
+  ...(await importOriginal<typeof CalendarService>()),
   buildCalendarFeed: mocks.buildCalendarFeed,
+}));
+
+vi.mock("../../services/admin/team-admin.service", () => ({
+  getOwnClubSquadNames: mocks.getOwnClubSquadNames,
 }));
 
 vi.mock("../../services/admin/season.service", () => ({
@@ -210,13 +218,50 @@ describe("GET /schedule.ics", () => {
     expect(mocks.buildCalendarFeed).toHaveBeenCalledWith(items, expect.objectContaining({ calendarName: "Dragons Spielplan" }));
   });
 
-  it("passes teamApiId filter to service", async () => {
+  it("passes a single teamApiId to the service as a one-squad list", async () => {
     mocks.getOwnClubMatches.mockResolvedValue({ items: [], total: 0, limit: 1000, offset: 0, hasMore: false });
     mocks.buildCalendarFeed.mockReturnValue("BEGIN:VCALENDAR\r\nEND:VCALENDAR");
 
     await app.request("/schedule.ics?teamApiId=42");
 
-    expect(mocks.getOwnClubMatches).toHaveBeenCalledWith(expect.objectContaining({ teamApiId: 42 }));
+    expect(mocks.getOwnClubMatches).toHaveBeenCalledWith(expect.objectContaining({ teamApiIds: [42] }));
+  });
+
+  it("passes a repeated teamApiId to the service as the full squad list", async () => {
+    mocks.getOwnClubMatches.mockResolvedValue({ items: [], total: 0, limit: 1000, offset: 0, hasMore: false });
+    mocks.buildCalendarFeed.mockReturnValue("BEGIN:VCALENDAR\r\nEND:VCALENDAR");
+
+    await app.request("/schedule.ics?teamApiId=42&teamApiId=7");
+
+    expect(mocks.getOwnClubMatches).toHaveBeenCalledWith(expect.objectContaining({ teamApiIds: [42, 7] }));
+  });
+
+  it("names a squad-filtered calendar after the squads in the current season", async () => {
+    mocks.getActiveSeasonId.mockResolvedValue(3);
+    mocks.getOwnClubSquadNames.mockResolvedValue(["Damen 1", "Herren 1"]);
+    mocks.getOwnClubMatches.mockResolvedValue({ items: [], total: 0, limit: 1000, offset: 0, hasMore: false });
+    mocks.buildCalendarFeed.mockReturnValue("BEGIN:VCALENDAR\r\nEND:VCALENDAR");
+
+    await app.request("/schedule.ics?teamApiId=42&teamApiId=7");
+
+    expect(mocks.getOwnClubSquadNames).toHaveBeenCalledWith(3, [42, 7]);
+    expect(mocks.buildCalendarFeed).toHaveBeenCalledWith([], expect.objectContaining({ calendarName: "Dragons: Damen 1, Herren 1" }));
+  });
+
+  it("keeps the club-wide calendar name without looking squads up when no squad is selected", async () => {
+    mocks.getOwnClubMatches.mockResolvedValue({ items: [], total: 0, limit: 1000, offset: 0, hasMore: false });
+    mocks.buildCalendarFeed.mockReturnValue("BEGIN:VCALENDAR\r\nEND:VCALENDAR");
+
+    await app.request("/schedule.ics");
+
+    expect(mocks.getOwnClubSquadNames).not.toHaveBeenCalled();
+    expect(mocks.buildCalendarFeed).toHaveBeenCalledWith([], expect.objectContaining({ calendarName: "Dragons Spielplan" }));
+  });
+
+  it("returns 400 when one of several teamApiId values is malformed", async () => {
+    const res = await app.request("/schedule.ics?teamApiId=42&teamApiId=abc");
+    expect(res.status).toBe(400);
+    expect(mocks.getOwnClubMatches).not.toHaveBeenCalled();
   });
 
   it("passes leagueId filter to service", async () => {

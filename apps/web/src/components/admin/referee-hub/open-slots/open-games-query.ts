@@ -1,24 +1,54 @@
 import type { RawRefereeGamesOpts } from "@/lib/referee-games-query";
+import type { HubFilters } from "../use-referee-hub-url";
+
+/** The open-games filters a plain `/admin/referees` URL stands for. */
+export const DEFAULT_FILTERS: HubFilters = {
+  status: "open",
+  league: [],
+  dateFrom: null,
+  dateTo: null,
+  gameType: "both",
+  search: "",
+};
 
 /** The referee hub asks for one page of 200 games at a time. */
 export const OPEN_GAMES_PAGE_SIZE = 200;
 
+/** The server ignores shorter search terms, so the query does too. */
+const MIN_SEARCH_LENGTH = 3;
+
 /**
- * The exact query `OpenGamesList` issues on first paint, i.e. with the default
- * hub filters (`status: "open"`, no league, no date range, both game types).
+ * The query for one page of the open-games list under the given filters.
  *
- * `admin/referees/page.tsx` primes the SWR cache with the key derived from
- * these options. If the two drift apart the server round trip is written under
- * a key nobody reads and the pane still renders "Loading…", so both sides read
- * this constant instead of restating the query.
+ * `admin/referees/page.tsx` primes the SWR cache with the first page under the
+ * default filters, and `OpenGamesList` requests it on first paint. If the two
+ * built the query separately and drifted apart, the server round trip would be
+ * written under a key nobody reads and the pane would still render "Loading…",
+ * so both go through here.
+ *
+ * With no start date the list begins at `today` (a Europe/Berlin `YYYY-MM-DD`),
+ * not at the start of the season: a past game's open slot can no longer be
+ * filled, and sorted oldest first those games sat on top of every list. A past
+ * range is still reachable through the custom date filter.
  */
-export const OPEN_GAMES_PREFETCH_OPTS: RawRefereeGamesOpts = {
-  status: "active",
-  slotStatus: "open",
-  gameType: "both",
-  limit: OPEN_GAMES_PAGE_SIZE,
-  offset: 0,
-};
+export function openGamesQueryOpts(
+  filters: HubFilters,
+  today: string,
+  page = 0,
+): RawRefereeGamesOpts {
+  return {
+    status: "active",
+    // Sent for "any" too: with no slotStatus the API falls back to "open".
+    slotStatus: filters.status,
+    league: filters.league,
+    dateFrom: filters.dateFrom ?? today,
+    dateTo: filters.dateTo ?? undefined,
+    gameType: filters.gameType,
+    search: filters.search.length >= MIN_SEARCH_LENGTH ? filters.search : undefined,
+    limit: OPEN_GAMES_PAGE_SIZE,
+    offset: page * OPEN_GAMES_PAGE_SIZE,
+  };
+}
 
 /** Cache keys of every open-games list page, for bulk revalidation. */
 const OPEN_GAMES_KEY_PREFIX = "/referee/games?";

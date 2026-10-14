@@ -48,6 +48,7 @@ function league(
     seasonRefId: null,
     seasonStatus: "active",
     vorabliga: false,
+    isCup: false,
     spielplan: spielplanOf(requestedMatchIds),
     tabelle: [],
     gameDetails: new Map(returnedMatchIds.map((id) => [id, gameDetail(id)])),
