@@ -5,6 +5,7 @@ import * as migration_20260830_133916_drop_teams_order_index from './20260830_13
 import * as migration_20260904_102644_drop_trainers_and_league_fields from './20260904_102644_drop_trainers_and_league_fields';
 import * as migration_20261008_101018_payload_3_90_security_fields from './20261008_101018_payload_3_90_security_fields';
 import * as migration_20261009_064939_gcs_object_key from './20261009_064939_gcs_object_key';
+import * as migration_20261014_123142_drop_people_phone from './20261014_123142_drop_people_phone';
 
 export const migrations = [
   {
@@ -40,6 +41,11 @@ export const migrations = [
   {
     up: migration_20261009_064939_gcs_object_key.up,
     down: migration_20261009_064939_gcs_object_key.down,
-    name: '20261009_064939_gcs_object_key'
+    name: '20261009_064939_gcs_object_key',
+  },
+  {
+    up: migration_20261014_123142_drop_people_phone.up,
+    down: migration_20261014_123142_drop_people_phone.down,
+    name: '20261014_123142_drop_people_phone'
   },
 ];
