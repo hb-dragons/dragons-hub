@@ -677,6 +677,12 @@ nested under their task.
 | PUT | `/admin/venues/:id/hall-times/:date` | Create or replace one day's hall time by hand (`venue:update`) |
 | DELETE | `/admin/venues/:id/hall-times/:date` | Remove one day's hall time (`venue:update`) |
 
+### Admin - Hall occupancy
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/hall-occupancy` | Home games at the club's halls grouped by venue and day, with the programme window and hall-time coverage. Query: `dateFrom`, `dateTo` (default today through the active season end), `venueId`, `coverage` (`booking:view`) |
+
 ### Admin - Users
 
 | Method | Path | Description |

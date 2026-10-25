@@ -184,6 +184,8 @@ export {
   type HallTimeImportBody,
 } from "./venue";
 
+export { hallOccupancyQuerySchema, type HallOccupancyQuery } from "./hall-occupancy";
+
 export {
   taskBoardIdParamSchema,
   taskIdParamSchema,

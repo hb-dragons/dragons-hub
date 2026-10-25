@@ -56,6 +56,7 @@ export { eventEndpoints } from "./event";
 export type { TriggerEventBody } from "@dragons/contracts";
 
 export { venueEndpoints } from "./venue";
+export { hallOccupancyEndpoints } from "./hall-occupancy";
 
 export { scoreboardEndpoints } from "./scoreboard";
 
