@@ -943,8 +943,8 @@
       }
     },
     "booking": {
-      "title": "Hallenbuchungs-Einstellungen",
-      "description": "Standardwerte für die Berechnung der Hallenbuchungszeiten konfigurieren",
+      "title": "Hallenbelegung: Zeitfenster",
+      "description": "Vorlauf vor dem ersten und Nachlauf nach dem letzten Spiel sowie die Standard-Spieldauer, aus denen das Zeitfenster eines Heimspieltags berechnet wird",
       "bufferBefore": "Vorlauf vor erstem Spiel (min)",
       "bufferAfter": "Nachlauf nach letztem Spiel (min)",
       "gameDuration": "Standard-Spieldauer (min)"

@@ -654,7 +654,7 @@ nested under their task.
 | GET | `/admin/venues/search` | Search venues by name. Query: `q` |
 | GET | `/admin/venues/:id/hall-times` | Hall times the club holds at a venue. Query: `from`, `to` |
 | POST | `/admin/venues/:id/hall-times/import/preview` | Diff Anlage T rows against stored hall times (added, changed, removed, unchanged); writes nothing (`venue:update`) |
-| POST | `/admin/venues/:id/hall-times/import` | Apply Anlage T rows: replace sheet rows inside the sheet span; judges no bookings and emits no event (`venue:update`) |
+| POST | `/admin/venues/:id/hall-times/import` | Apply Anlage T rows: replace sheet rows inside the sheet span; judges no home game days and emits no event (`venue:update`) |
 | PUT | `/admin/venues/:id/hall-times/:date` | Create or replace one day's hall time by hand (`venue:update`) |
 | DELETE | `/admin/venues/:id/hall-times/:date` | Remove one day's hall time (`venue:update`) |
 
@@ -898,7 +898,7 @@ All resources, actions, and role → permission mappings live in `packages/share
 | `superadmin` | Superset of `admin`. Additionally gates the Bull Board queue UI (`/admin/queues/*`) via `requireAnyRole("superadmin")`. **Operational note:** existing `admin` users do NOT inherit this — each must be explicitly granted `superadmin` to keep Bull Board access. `superadmin` is also listed in better-auth's `adminRoles`. |
 | `admin` | Full access to every resource and action (except Bull Board, which now requires `superadmin`). |
 | `refereeAdmin` | Full referee + assignment CRUD; view matches and teams; board view/create/update. |
-| `venueManager` | Full venue + booking CRUD; view matches; board view/create/update. |
+| `venueManager` | Full venue CRUD, hall occupancy view; view matches; board view/create/update. |
 | `teamManager` | `team:view,manage`; view matches, standings, referees; board view/create/update. |
 | `coach` | Read-only: view teams, matches, standings and boards. |
 | *(no role, refereeId set)* | Referee self-service (own assignments via `isReferee`). |

@@ -943,8 +943,8 @@
       }
     },
     "booking": {
-      "title": "Venue Booking Settings",
-      "description": "Configure default values for venue booking time calculations",
+      "title": "Hall occupancy: time window",
+      "description": "Buffers before the first and after the last game, and the default game length, used to compute a home game day's window",
       "bufferBefore": "Buffer Before First Game (min)",
       "bufferAfter": "Buffer After Last Game (min)",
       "gameDuration": "Default Game Duration (min)"
