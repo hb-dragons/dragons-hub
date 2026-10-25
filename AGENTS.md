@@ -587,7 +587,7 @@ now picked per season through the endpoints below.
 | PATCH | `/admin/matches/:id` | Update match local fields |
 | DELETE | `/admin/matches/:id/overrides/:fieldName` | Release a local override |
 
-Match list and detail responses include associated venue booking data when available.
+Match list and detail responses carry `hallCoverage` (the day's hall time against the window its home games need); null for away games and games not at one of our halls.
 
 ### Club Q&A Assistant
 

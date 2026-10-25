@@ -135,6 +135,7 @@ const messages = {
       none: "No hall time",
     },
   },
+  // The alternative-date finder still names its candidate bookings by status.
   bookings: {
     status: {
       pending: "Pending",
@@ -380,7 +381,6 @@ describe("MatchEditSheet hall coverage", () => {
     expect(screen.getByText("Hall time partial")).toHaveAttribute("data-coverage", "partial");
     expect(screen.getByText("08:00 – 17:00")).toBeInTheDocument();
     expect(screen.getByText("Window needed: 09:00 – 17:30")).toBeInTheDocument();
-    expect(screen.queryByText("Pending")).not.toBeInTheDocument();
   });
 
   it("shows no hall section for a game without coverage", async () => {

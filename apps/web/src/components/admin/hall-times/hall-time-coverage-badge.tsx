@@ -14,9 +14,9 @@ const VARIANT: Record<HallTimeCoverage, "success" | "outline" | "destructive" | 
 };
 
 /**
- * Whether the club holds the hall for a booking's window: the one badge every
- * screen uses for it, so a `partial` reads the same on the bookings list, the
- * game plan and the finder.
+ * Whether the club holds the hall for a home game day's programme window: the
+ * one badge every screen uses for it, so a `partial` reads the same on the
+ * game plan, match detail, edit sheet and the alternative-date finder.
  */
 export function HallTimeCoverageBadge({
   coverage,
