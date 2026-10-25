@@ -1887,7 +1887,9 @@
       "hall": "Halle",
       "allHalls": "Alle Hallen",
       "coverage": "Abdeckung",
-      "allCoverages": "Alle"
+      "allCoverages": "Alle",
+      "from": "Von",
+      "to": "Bis"
     },
     "versus": "gegen {guest}",
     "noHallTime": "Keine Hallenzeit",

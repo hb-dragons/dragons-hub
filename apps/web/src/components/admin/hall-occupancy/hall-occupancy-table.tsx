@@ -7,6 +7,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { CalendarDays } from "lucide-react";
 import { clubDayAnchor, clubTimeAnchor, HALL_TIME_COVERAGES } from "@dragons/shared";
 import type { HallOccupancyDay, HallTimeCoverage } from "@dragons/shared";
+import { DatePicker } from "@dragons/ui/components/date-picker";
 import { Label } from "@dragons/ui/components/label";
 import {
   Select,
@@ -149,15 +150,30 @@ export function HallOccupancyTable() {
   const tCoverage = useTranslations("hallTimes.coverage");
   const format = useFormatter();
   const [venueId, setVenueId] = useState<number | undefined>(undefined);
+  const [dateFrom, setDateFrom] = useState<string | null>(null);
+  const [dateTo, setDateTo] = useState<string | null>(null);
   const [coverage, setCoverage] = useState<HallTimeCoverage | undefined>(undefined);
 
+  // Empty dates leave the server default (today to season end) in place.
+  const range = {
+    ...(dateFrom ? { dateFrom } : {}),
+    ...(dateTo ? { dateTo } : {}),
+  };
   const occupancyQ = queries.hallOccupancy({
+    ...range,
     ...(venueId !== undefined ? { venueId } : {}),
     ...(coverage ? { coverage } : {}),
   });
   const { data, error, isLoading, mutate } = useSWR(occupancyQ.key, occupancyQ.fetcher);
-  const venuesQ = queries.venues();
-  const { data: venues } = useSWR(venuesQ.key, venuesQ.fetcher);
+  // Our halls are the venues with hall times, which is exactly who appears in
+  // the unfiltered list for this date range; the hall filter offers those.
+  const hallsQ = queries.hallOccupancy(range);
+  const { data: allDays } = useSWR(hallsQ.key, hallsQ.fetcher);
+  const halls = useMemo(() => {
+    const byId = new Map<number, string>();
+    for (const d of allDays ?? []) byId.set(d.venueId, d.venueName);
+    return [...byId].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allDays]);
 
   const columns = useMemo(() => getColumns(t, format), [t, format]);
 
@@ -178,6 +194,14 @@ export function HallOccupancyTable() {
       {() => (
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
+            <Label htmlFor="hall-occupancy-from">{t("filters.from")}</Label>
+            <DatePicker id="hall-occupancy-from" value={dateFrom} onChange={setDateFrom} className="h-9 w-[180px]" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="hall-occupancy-to">{t("filters.to")}</Label>
+            <DatePicker id="hall-occupancy-to" value={dateTo} onChange={setDateTo} className="h-9 w-[180px]" />
+          </div>
+          <div className="space-y-1">
             <Label htmlFor="hall-occupancy-hall">{t("filters.hall")}</Label>
             <Select
               value={venueId === undefined ? ALL : String(venueId)}
@@ -188,7 +212,7 @@ export function HallOccupancyTable() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>{t("filters.allHalls")}</SelectItem>
-                {(venues ?? []).map((venue) => (
+                {halls.map((venue) => (
                   <SelectItem key={venue.id} value={String(venue.id)}>
                     {venue.name}
                   </SelectItem>

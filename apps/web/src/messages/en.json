@@ -1887,7 +1887,9 @@
       "hall": "Hall",
       "allHalls": "All halls",
       "coverage": "Coverage",
-      "allCoverages": "All"
+      "allCoverages": "All",
+      "from": "From",
+      "to": "To"
     },
     "versus": "vs {guest}",
     "noHallTime": "No hall time",

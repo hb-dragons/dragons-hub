@@ -17,15 +17,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock("swr", () => ({
   default: (key: unknown) => {
     mocks.keys.push(key);
-    if (key === "/admin/venues") {
-      return {
-        data: [
-          { id: 7, name: "Gymnasium Goetheschule" },
-          { id: 8, name: "Sporthalle Nord" },
-        ],
-        mutate: vi.fn(),
-      };
-    }
     return { data: mocks.days, error: mocks.error, isLoading: false, mutate: vi.fn() };
   },
 }));
@@ -173,7 +164,7 @@ describe("HallOccupancyTable", () => {
   });
 
   it("changes the SWR key when the hall filter changes", () => {
-    mocks.days = [day()];
+    mocks.days = [day(), day({ venueId: 8, venueName: "Sporthalle Nord" })];
     renderTable();
     expect(mocks.keys).toContain(SWR_KEYS.hallOccupancy({}));
     fireEvent.keyDown(screen.getByRole("combobox", { name: de.hallOccupancy.filters.hall }), { key: "ArrowDown" });
@@ -187,5 +178,22 @@ describe("HallOccupancyTable", () => {
     fireEvent.keyDown(screen.getByRole("combobox", { name: de.hallOccupancy.filters.coverage }), { key: "ArrowDown" });
     fireEvent.click(screen.getByRole("option", { name: "Außerhalb der Hallenzeit" }));
     expect(mocks.keys).toContain(SWR_KEYS.hallOccupancy({ coverage: "uncovered" }));
+  });
+
+  it("offers only halls present in the occupancy data, not every venue", () => {
+    mocks.days = [day(), day({ venueId: 8, venueName: "Sporthalle Nord" })];
+    renderTable();
+    fireEvent.keyDown(screen.getByRole("combobox", { name: de.hallOccupancy.filters.hall }), { key: "ArrowDown" });
+    const names = screen.getAllByRole("option").map((o) => o.textContent);
+    expect(names).toEqual([de.hallOccupancy.filters.allHalls, "Gymnasium Goetheschule", "Sporthalle Nord"]);
+    expect(mocks.keys).not.toContain("/admin/venues");
+  });
+
+  it("changes the SWR key when a date is picked", () => {
+    mocks.days = [day()];
+    renderTable();
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(de.hallOccupancy.filters.from) }));
+    fireEvent.click(screen.getAllByRole("gridcell").find((c) => c.textContent === "15")!.querySelector("button")!);
+    expect(mocks.keys.some((k) => typeof k === "string" && /dateFrom=\d{4}-\d{2}-15/.test(k))).toBe(true);
   });
 });
