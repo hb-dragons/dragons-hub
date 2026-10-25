@@ -172,16 +172,18 @@ Your app may crash outside of Expo Go without this dependency.
 same kind of reason — it is the OTA infrastructure `RELEASES.md`
 describes, driven by the config plugin rather than by an import.
 
-### Android adaptive icon — monochrome
+### Android adaptive icon — monochrome — done (2026-10-25)
 
 Android 13+ themed icons look bad without a monochrome layer.
 
-- [ ] Generate a single-color monochrome PNG (same silhouette as the
-      adaptive icon foreground, white on transparent).
-- [ ] Add to `app.json > android.adaptiveIcon`:
-  ```json
-  "monochromeImage": "./assets/adaptive-icon-mono.png"
-  ```
+- [x] `assets/adaptive-icon-mono.png`: the adaptive foreground with every
+      coloured pixel turned white and the crest's white artwork (lettering,
+      ball, shield rim) cut out, so the themed icon keeps the crest's
+      detail instead of a solid blob.
+- [x] Wired as `app.json > android.adaptiveIcon.monochromeImage`;
+      `src/lib/app-config.test.ts` fails if the key or the file goes
+      missing. Check the themed icon on a device with the next Android
+      build.
 
 ### Privacy / compliance
 
@@ -324,20 +326,28 @@ hook so you can swap providers. Add to `PrivacyInfo.xcprivacy`.
 Testers will tolerate rough a11y; public reviewers may not. Audit
 before launch:
 
-- [ ] All `Pressable`s get an `accessibilityRole` and
-      `accessibilityLabel`.
+- [x] All `Pressable`s get an `accessibilityRole` and
+      `accessibilityLabel` (2026-10-25). Every Pressable has a role; the
+      ones whose only content is a single readable text label let that
+      text serve as the label, everything else (icon buttons, cards,
+      spinner buttons, colour swatches) carries an explicit localized one.
 - [x] Segment controls + filter pills expose
       `accessibilityState={{ selected: boolean }}`. Done in #218: both pill
       families (`FilterPill`, board `FilterChips`) build their props with
       `filterPillA11y` in `src/lib/ui/a11y.ts`, and a test fails the build
       if either stops using it. Segment controls need nothing — `Segmented`
       wraps the platform `SegmentedControl`, which carries its own traits.
-      Still open elsewhere: the board's column pills are a pager selector,
-      not a filter, and announce no selected state.
-- [ ] Score cards read something meaningful, not just digits (e.g.
-      `"Dragons 75 vs Rhein Stars 62, final"`).
+      The board's column pills are a pager selector, not a filter: they
+      use `pagerTabA11y` (role `tab` + selected state, "Name, N tasks")
+      inside a `tablist` (2026-10-25).
+- [x] Score cards read something meaningful, not just digits (e.g.
+      `"Dragons 75 vs Rhein Stars 62, final"`). Built by
+      `src/lib/ui/match-a11y.ts`, `standing-a11y.ts` and
+      `src/lib/referee/game-card-a11y.ts` (2026-10-25).
 - [ ] VoiceOver + TalkBack smoke test on the top 5 screens.
-- [ ] Minimum tappable area ≥ 44×44 on all interactive elements.
+- [x] Minimum tappable area ≥ 44×44 on all interactive elements
+      (2026-10-25): `MIN_TAP_TARGET`, `tapTargetSlop` and `TEXT_LINK_SLOP`
+      in `src/lib/ui/a11y.ts`; checklist rows get `minHeight: 44`.
 - [ ] Color contrast: verify destructive red + muted text meet WCAG AA
       on both light and dark palettes.
 

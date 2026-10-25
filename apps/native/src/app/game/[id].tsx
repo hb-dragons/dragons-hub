@@ -105,6 +105,7 @@ export default function GameDetailScreen() {
             </Text>
             {!isNotFound ? (
               <Pressable
+                accessibilityRole="button"
                 onPress={() => {
                   void mutateMatch();
                 }}

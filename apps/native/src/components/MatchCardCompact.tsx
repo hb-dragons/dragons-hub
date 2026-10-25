@@ -5,6 +5,7 @@ import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
 import { kickoffCompact } from "../lib/format/kickoff";
+import { matchA11yLabel } from "../lib/ui/match-a11y";
 import { fontFamilies } from "../theme/typography";
 import { ClubLogo } from "./brand/ClubLogo";
 
@@ -209,6 +210,18 @@ function MatchCardCompactImpl({ match, onPress, highlighted }: MatchCardCompactP
     return (
       <Pressable
         onPress={() => onPress(match)}
+        accessibilityRole="button"
+        accessibilityLabel={matchA11yLabel({
+          homeName: isHomeGame ? ownLabel : opponentName,
+          guestName: isHomeGame ? opponentName : ownLabel,
+          homeScore: match.homeScore,
+          guestScore: match.guestScore,
+          kickoffDate: match.kickoffDate,
+          kickoffTime: match.kickoffTime,
+          isCancelled: match.isCancelled,
+          isForfeited: match.isForfeited,
+          ownSide: isHomeGame ? "home" : "guest",
+        })}
         style={({ pressed }) => (pressed ? { opacity: 0.85 } : undefined)}
       >
         {content}

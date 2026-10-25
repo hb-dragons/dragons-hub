@@ -1,6 +1,11 @@
 import { Pressable, Text, View } from "react-native";
-import { COLUMN_COLOR_PRESETS } from "@/lib/board/column-colors";
+import { COLUMN_COLOR_PRESETS, columnColorLabelKey } from "@/lib/board/column-colors";
 import { useTheme } from "@/hooks/useTheme";
+import { i18n } from "@/lib/i18n";
+import { tapTargetSlop } from "@/lib/ui/a11y";
+
+/** Drawn diameter of a swatch; `tapTargetSlop` grows its tap area to the minimum. */
+const SWATCH_SIZE = 32;
 
 interface Props {
   /** `null` is the "no colour" swatch, drawn as a dash. */
@@ -26,10 +31,11 @@ export function ColumnColorPicker({ value, onChange }: Props) {
             onPress={() => onChange(preset)}
             accessibilityRole="radio"
             accessibilityState={{ selected }}
-            hitSlop={6}
+            accessibilityLabel={i18n.t(columnColorLabelKey(preset))}
+            hitSlop={tapTargetSlop(SWATCH_SIZE)}
             style={{
-              width: 32,
-              height: 32,
+              width: SWATCH_SIZE,
+              height: SWATCH_SIZE,
               borderRadius: 16,
               backgroundColor: preset ?? colors.surfaceHigh,
               borderWidth: selected ? 3 : 1,

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { COLUMN_COLOR_PRESETS } from "@/lib/board/column-colors";
+import { COLUMN_COLOR_PRESETS, columnColorLabelKey } from "@/lib/board/column-colors";
+import de from "@/i18n/de.json";
+import en from "@/i18n/en.json";
+import { lookup } from "../../../test/i18n-bundles";
 
 describe("COLUMN_COLOR_PRESETS", () => {
   it("starts with the 'no colour' option", () => {
@@ -15,5 +18,18 @@ describe("COLUMN_COLOR_PRESETS", () => {
     for (const hex of hexValues) {
       expect(hex).toMatch(/^#[0-9a-f]{6}$/i);
     }
+  });
+});
+
+describe("columnColorLabelKey", () => {
+  it.each(COLUMN_COLOR_PRESETS)("names swatch %s with a key both bundles carry", (preset) => {
+    const key = columnColorLabelKey(preset);
+    expect(lookup(de, key)).toEqual(expect.any(String));
+    expect(lookup(en, key)).toEqual(expect.any(String));
+  });
+
+  it("gives every swatch its own name", () => {
+    const keys = COLUMN_COLOR_PRESETS.map(columnColorLabelKey);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });

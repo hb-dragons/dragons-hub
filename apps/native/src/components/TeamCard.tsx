@@ -55,6 +55,7 @@ function TeamCardImpl({ team, featured = false, onPress }: TeamCardProps) {
   if (onPress) {
     return (
       <Pressable
+        accessibilityRole="button"
         onPress={() => onPress(team)}
         style={({ pressed }) =>
           pressed ? { opacity: 0.85 } : undefined

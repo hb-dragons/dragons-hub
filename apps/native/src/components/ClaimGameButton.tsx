@@ -166,6 +166,9 @@ export function ClaimGameButton({
       <Pressable
         onPress={confirmDrop}
         disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={i18n.t("refereeGame.drop")}
+        accessibilityState={{ busy: isBusy }}
         style={({ pressed }) => [
           style,
           {
@@ -213,6 +216,9 @@ export function ClaimGameButton({
       <Pressable
         onPress={() => confirmClaim(slotNumber)}
         disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={i18n.t(slotLabelKey(slotNumber))}
+        accessibilityState={{ busy: isBusy }}
         style={({ pressed }) => [
           {
             flex: 1,

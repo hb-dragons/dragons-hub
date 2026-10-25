@@ -46,6 +46,7 @@ import type { BoardColumnData } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 import { i18n } from "@/lib/i18n";
+import { TEXT_LINK_SLOP } from "@/lib/ui/a11y";
 import { authClient } from "@/lib/auth-client";
 import type { TaskCardData, TaskPriority } from "@dragons/shared";
 import type { TaskListQuery } from "@dragons/api-client";
@@ -424,7 +425,7 @@ function BoardDetailBody() {
                 onPress={() => setSearchQuery("")}
                 accessibilityRole="button"
                 accessibilityLabel={i18n.t("common.clear")}
-                hitSlop={12}
+                hitSlop={TEXT_LINK_SLOP}
               >
                 <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "600" }}>
                   {i18n.t("common.clear")}

@@ -76,6 +76,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           {this.state.error?.message ?? ""}
         </Text>
         <Pressable
+          accessibilityRole="button"
           onPress={this.handleReload}
           style={{
             backgroundColor: dark.primary,

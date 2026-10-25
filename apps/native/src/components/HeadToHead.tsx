@@ -3,6 +3,7 @@ import type { HeadToHead as HeadToHeadData } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
 import { kickoffShortNumeric } from "../lib/format/kickoff";
+import { matchA11yLabel } from "../lib/ui/match-a11y";
 import { fontFamilies } from "../theme/typography";
 import { ClubLogo } from "./brand/ClubLogo";
 
@@ -257,6 +258,15 @@ export function HeadToHead({
                 <Pressable
                   key={meeting.matchId}
                   onPress={() => onMatchPress(meeting.matchId)}
+                  accessibilityRole="button"
+                  accessibilityLabel={matchA11yLabel({
+                    homeName: meeting.homeIsOwnClub ? ownLabel : opponentName,
+                    guestName: meeting.homeIsOwnClub ? opponentName : ownLabel,
+                    homeScore: meeting.homeScore,
+                    guestScore: meeting.guestScore,
+                    kickoffDate: meeting.date,
+                    ownSide: meeting.homeIsOwnClub ? "home" : "guest",
+                  })}
                   style={({ pressed }) => (pressed ? { opacity: 0.85 } : undefined)}
                 >
                   {row}

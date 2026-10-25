@@ -6,6 +6,7 @@ import { authClient } from "@/lib/auth-client";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/hooks/useToast";
 import { i18n } from "@/lib/i18n";
+import { TEXT_LINK_SLOP } from "@/lib/ui/a11y";
 import { haptics } from "@/lib/haptics";
 import { adminBoardApi } from "@/lib/api";
 import { multilineInput } from "@/components/ui/inputStyles";
@@ -147,6 +148,8 @@ export function CommentsSection({ task }: Props) {
                 />
                 <View style={{ flexDirection: "row", gap: spacing.sm }}>
                   <Pressable
+                    accessibilityRole="button"
+                    hitSlop={TEXT_LINK_SLOP}
                     onPress={() => setEditingId(null)}
                     style={{
                       paddingHorizontal: spacing.md,
@@ -158,6 +161,8 @@ export function CommentsSection({ task }: Props) {
                     <Text style={{ color: colors.foreground }}>{i18n.t("common.cancel")}</Text>
                   </Pressable>
                   <Pressable
+                    accessibilityRole="button"
+                    hitSlop={TEXT_LINK_SLOP}
                     onPress={() => { void saveEdit(c.id); }}
                     style={{
                       paddingHorizontal: spacing.md,
