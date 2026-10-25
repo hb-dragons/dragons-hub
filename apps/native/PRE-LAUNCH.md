@@ -99,7 +99,7 @@ Remaining, still-open:
       binary, so it has to be in a build *before* the web side goes
       live, and it is inert until then.
 
-The file must contain the app's `TeamID.de.hbdragons.app` under
+The file must contain the app's `TeamID.de.hbdragons.club` under
 `applinks.details[].appIDs` plus the path patterns to claim. Which paths
 is the companion ticket's call, but note how the two URL spaces line up:
 
@@ -227,19 +227,21 @@ Android 13+ themed icons look bad without a monochrome layer.
       in `app.json`, GitHub org re-linked. projectId and updates URL
       unchanged; dashboard check 2026-09-01 confirmed the iOS credentials
       and the Android keystore survived the transfer.
-- [ ] Apple: the harder half, which this list used to skip. Team
-      `2ZDTV3KLV2` (the `appleTeamId` in `app.json`) is the maintainer's
-      personal membership, and the bundle id `de.hbdragons.app` has been
-      locked to it since the April 2026 TestFlight uploads; with no
-      released version, Apple's app-transfer path is closed. Decided
-      2026-08-25: ask Apple Developer Support to convert the membership
-      into an organization membership for the e.V. — keeps the Team ID,
-      the bundle id and the App Store Connect record, so `appleTeamId`
-      stays correct. Needs the club's D-U-N-S number (requested
-      2026-08-25). Fallback: a fresh organization enrollment plus a new
-      bundle id. Do not ship v1.0 under a personal name. Audit §4.2.
-- [ ] App Store Connect: create the app under that organization team,
-      not a personal one.
+- [x] Apple: organization membership for the e.V., Team `Z28P2F9QQR`
+      (2026-10-25). Apple declined converting the maintainer's personal
+      team `2ZDTV3KLV2` (case 102950604623: a board Vollmacht does not
+      make the applicant a founder), so the club enrolled separately. The
+      old bundle id `de.hbdragons.app` stays locked to the personal team
+      by the April 2026 TestFlight uploads, and app transfer needs a
+      released version, so iOS ships as **`de.hbdragons.club`**. Android
+      keeps `de.hbdragons.app`. Audit §4.2.
+- [x] App Store Connect: app "HB Dragons" created under the organization
+      team (Apple ID `6826908010`, SKU `hbdragons-ios`, primary language
+      German) and set as `ascAppId` in `eas.json`.
+- [ ] iOS credentials under the new team: `eas credentials -p ios`,
+      signed in with the club's Apple Account (distribution certificate,
+      provisioning profile, APNs key). Then a `preview` build to
+      TestFlight and a test push.
 - [ ] Google Play Console: club-owned organization account. It needs the
       same D-U-N-S number.
 

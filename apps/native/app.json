@@ -8,9 +8,9 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "de.hbdragons.app",
+      "bundleIdentifier": "de.hbdragons.club",
       "icon": "./assets/dragons.icon",
-      "appleTeamId": "2ZDTV3KLV2",
+      "appleTeamId": "Z28P2F9QQR",
       "supportsTablet": true,
       "deploymentTarget": "16.4",
       "associatedDomains": [
