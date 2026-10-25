@@ -103,12 +103,19 @@ export function findFit(input: {
 
   const fitsAt = (k: number): boolean => {
     if (k < 0) return false;
-    const prev = [...sorted].reverse().find((s) => s.kickoff <= k);
+    // The earlier game that ends latest: games can overlap, so the last one
+    // by kickoff is not necessarily the one still running at k.
+    const prev = sorted
+      .filter((s) => s.kickoff <= k)
+      .reduce<(typeof sorted)[number] | undefined>(
+        (latest, s) => (latest && latest.end >= s.end ? latest : s),
+        undefined,
+      );
     const next = sorted.find((s) => s.kickoff > k);
     if (prev && prev.end + after > k) return false;
     if (next && k + durationMinutes + after > next.kickoff) return false;
     const slotStart = prev ? k : k - before;
-    const slotEnd = next ? k + durationMinutes : k + durationMinutes + after;
+    const slotEnd = k + durationMinutes + after;
     return slotStart >= hs && slotEnd <= he && k + durationMinutes <= LAST_MINUTE_OF_DAY;
   };
 

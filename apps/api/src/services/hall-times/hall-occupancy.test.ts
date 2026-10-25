@@ -183,6 +183,28 @@ describe("findFit", () => {
     });
   });
 
+  it("keeps the after buffer inside the hall even when a later game follows", () => {
+    // 12:30 clears the 15:00 game (12:30 + 90 + 60 = 15:00) but its after
+    // buffer runs to 15:00, past the 14:00 hall end.
+    expect(fit(open("10:00", "14:00"), [g("15:00:00")])).toEqual({
+      fits: false,
+      suggestedKickoffTime: null,
+    });
+  });
+
+  it("checks the after buffer against the game ending latest, not the last kickoff", () => {
+    // 10:00 runs to 14:00; the 11:00 game ends at 11:30. The 12:30 gap
+    // candidate clears the 11:00 game and the 16:00 one but collides with the
+    // long 10:00 game.
+    expect(
+      fit(open("07:00", "20:00"), [
+        g("10:00:00", 240),
+        g("11:00:00", 30),
+        g("16:00:00"),
+      ]),
+    ).toEqual({ fits: false, suggestedKickoffTime: null });
+  });
+
   it("rejects a game that would run past 23:59", () => {
     expect(fit(open("18:00", "23:59"), [g("21:00:00")])).toEqual({
       fits: false,

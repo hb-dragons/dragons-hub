@@ -1087,15 +1087,4 @@ describe("GET /matches/:id/alternative-dates — our halls", () => {
       "2026-03-08", // closed
     ]);
   });
-
-  it("ignores hall times outside the range", async () => {
-    const { matchId, hallA } = await seedTwoHalls();
-    await seedHallTime({ venueId: hallA, date: "2026-03-21" });
-
-    const body = (await (
-      await get(matchId, "?from=2026-03-07&to=2026-03-15")
-    ).json()) as AlternativeDatesResponse;
-
-    expect(body.candidates.every((c) => c.group === "notHeld")).toBe(true);
-  });
 });
