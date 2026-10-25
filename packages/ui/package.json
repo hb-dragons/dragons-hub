@@ -43,7 +43,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^4.1.6",
-    "happy-dom": "^20.9.0",
+    "happy-dom": "^21.0.4",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "tailwindcss": "^4.3.0",

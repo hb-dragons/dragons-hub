@@ -46,7 +46,7 @@
     "satori": "^0.26.0",
     "sharp": "^0.35.5",
     "ulid": "^3.0.2",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.4.5",
@@ -61,7 +61,7 @@
     "tsdown": "^0.21.8",
     "tsx": "^4.22.0",
     "typescript": "^6.0.3",
-    "vite": "^8.0.16",
+    "vite": "^8.3.5",
     "vitest": "^4.1.6"
   }
 }
