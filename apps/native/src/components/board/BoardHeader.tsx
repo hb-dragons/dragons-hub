@@ -11,6 +11,7 @@ import type { BoardColumnData, TaskCardData } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { Icon } from "@/components/ui/Icon";
+import { pagerTabA11y } from "@/lib/ui/a11y";
 
 interface BoardHeaderProps {
   columns: BoardColumnData[];
@@ -70,6 +71,7 @@ export function BoardHeader({
   return (
     <ScrollView
       testID="board-header"
+      accessibilityRole="tablist"
       horizontal
       showsHorizontalScrollIndicator={false}
       style={{ flexGrow: 0, flexShrink: 0 }}
@@ -297,8 +299,12 @@ function ColumnPill({
           onPress={onPress}
           onLongPress={onLongPress ? () => onLongPress(column) : undefined}
           delayLongPress={400}
-          accessibilityRole="button"
-          accessibilityLabel={column.name}
+          // A pager tab, not a filter: it picks the column on screen, so it
+          // announces itself as a tab and says which one is showing.
+          {...pagerTabA11y(
+            i18n.t("a11y.boardColumnPill", { name: column.name, count }),
+            active,
+          )}
           testID={`board-header-pill-${column.id}`}
         >
           {pill}

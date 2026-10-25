@@ -1,9 +1,11 @@
 import { View, Text, Pressable } from "react-native";
-import type { RefereeGameListItem } from "@dragons/shared";
+import { resolveDateLocale, type RefereeGameListItem } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
 import { kickoffCompact } from "../lib/format/kickoff";
 import { refereeGameTeamNames } from "../lib/referee/einsatz";
+import { adminSlotA11yActions, refereeGameA11yLabel } from "../lib/referee/game-card-a11y";
+import { MIN_TAP_TARGET, tapTargetSlop } from "../lib/ui/a11y";
 import { fontFamilies } from "../theme/typography";
 
 interface RefereeGameCardProps {
@@ -102,6 +104,12 @@ function SlotRow({ label, name, status, isMine, ourClub }: SlotRowProps) {
   );
 }
 
+/** Drawn height of a slot action: an 11pt label plus 4pt padding above and below. */
+const SLOT_ACTION_HEIGHT = 22;
+
+/** Bridges `i18n.t` to the a11y builders' `Translate` shape. */
+const translate = (key: string, options?: Record<string, string | number>) => i18n.t(key, options);
+
 interface AdminSlotActionProps {
   status: RefereeGameListItem["sr1Status"];
   name: string | null;
@@ -123,7 +131,12 @@ function AdminSlotAction({
     return (
       <Pressable
         onPress={() => onUnassign(slotNumber, name)}
-        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel={i18n.t("a11y.refereeSlot.remove", {
+          name,
+          slot: i18n.t(slotNumber === 1 ? "refereeGame.sr1Short" : "refereeGame.sr2Short"),
+        })}
+        hitSlop={tapTargetSlop(MIN_TAP_TARGET, SLOT_ACTION_HEIGHT)}
         style={({ pressed }) => ({
           paddingHorizontal: spacing.sm,
           paddingVertical: 4,
@@ -156,7 +169,8 @@ function AdminSlotAction({
     return (
       <Pressable
         onPress={() => onAssign(slotNumber)}
-        hitSlop={6}
+        accessibilityRole="button"
+        hitSlop={tapTargetSlop(MIN_TAP_TARGET, SLOT_ACTION_HEIGHT)}
         style={({ pressed }) => ({
           paddingHorizontal: spacing.sm,
           paddingVertical: 4,
@@ -349,9 +363,24 @@ export function RefereeGameCard({
   );
 
   if (onPress) {
+    // The card is one accessible element, and VoiceOver cannot focus the slot
+    // buttons nested inside it — so an admin gets them as custom actions too.
+    const slotActions =
+      isAdmin && !game.isCancelled && !game.isForfeited && onAdminAssign && onAdminUnassign
+        ? adminSlotA11yActions(game, translate)
+        : [];
     return (
       <Pressable
         onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={refereeGameA11yLabel(game, translate, resolveDateLocale(i18n.locale))}
+        accessibilityActions={slotActions.map(({ name, label }) => ({ name, label }))}
+        onAccessibilityAction={(event) => {
+          const action = slotActions.find((a) => a.name === event.nativeEvent.actionName);
+          if (!action) return;
+          if (action.kind === "assign") onAdminAssign?.(action.slotNumber);
+          else if (action.refereeName) onAdminUnassign?.(action.slotNumber, action.refereeName);
+        }}
         style={({ pressed }) => (pressed ? { opacity: 0.85 } : undefined)}
       >
         {content}

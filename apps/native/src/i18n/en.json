@@ -507,7 +507,39 @@
     "dragHandle": "Drag handle. Long-press and drag to move.",
     "pickedUpTask": "Picked up task: %{title}",
     "droppedTaskInColumn": "Dropped task in column: %{column}",
-    "dropCancelled": "Drop cancelled"
+    "dropCancelled": "Drop cancelled",
+    "match": {
+      "score": "%{home} %{homeScore} vs %{guest} %{guestScore}",
+      "fixture": "%{home} vs %{guest}",
+      "final": "final",
+      "won": "won",
+      "lost": "lost",
+      "cancelled": "cancelled",
+      "forfeited": "forfeited",
+      "dayAt": "%{day} at %{time}"
+    },
+    "refereeSlot": {
+      "holder": "%{slot}: %{name}",
+      "remove": "Remove %{name} from %{slot}"
+    },
+    "boardColumnPill": {
+      "one": "%{name}, 1 task",
+      "other": "%{name}, %{count} tasks"
+    },
+    "columnColor": {
+      "none": "No colour",
+      "gray": "Grey",
+      "green": "Green",
+      "blue": "Blue",
+      "amber": "Amber",
+      "red": "Red",
+      "violet": "Violet",
+      "pink": "Pink"
+    },
+    "standing": {
+      "row": "Place %{position}, %{team}, %{played} played, %{won} won, %{lost} lost, point difference %{diff}, %{points} points",
+      "withdrawn": "withdrawn"
+    }
   },
   "teamStaff": {
     "role": {

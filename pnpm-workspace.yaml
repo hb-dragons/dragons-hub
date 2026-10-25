@@ -18,7 +18,7 @@ overrides:
   react: 19.2.6
   react-native: 0.86.3
   expo-glass-effect: 57.0.4
-  expo-constants: 57.0.21
+  expo-constants: 57.0.22
   # Capped at 1.6.23: better-auth 1.6.24 regressed the client-plugin generics, so
   # any plugin declaring `getActions` stops being assignable to
   # `BetterAuthClientPlugin`. One bad plugin collapses inference for the whole
@@ -41,8 +41,8 @@ overrides:
   flatted: '>=3.4.0'
   # Bounded to payload's own major: payload pins undici 7.x, and the open
   # `>=7.24.0` this used to be dragged it onto 8.9.0. 7.29.1 fixes
-  # GHSA-rfgv-xxqx-mfg5 and GHSA-w293-vg96-wgc3.
-  undici: '>=7.29.1 <8'
+  # GHSA-rfgv-xxqx-mfg5 and GHSA-w293-vg96-wgc3; 7.30.1 GHSA-xjj6-f33q-929c.
+  undici: '>=7.30.1 <8'
   fast-xml-parser: '>=5.7.0'
   fast-xml-builder: '>=1.1.7'
   effect: '>=3.20.0'
@@ -53,7 +53,7 @@ overrides:
   # pin, so the `<17` this used to have resolved to the newest 16.x the moment
   # the override changed (16.4.0 while apps/web and apps/cms pinned 16.3.8).
   # Move this bound together with those pins.
-  next: '>=16.4.0 <16.5'
+  next: '>=16.4.3 <16.5'
   kysely: 0.28.17
   '@tootallnate/once': '>=3.0.1'
   postcss: '>=8.5.18 <9'
@@ -91,7 +91,7 @@ overrides:
   sharp: '>=0.35.5 <0.36'
   shell-quote: '>=1.11.0 <2'
   svgo: '>=3.3.5 <4'
-  vite: '>=8.0.16 <9'
+  vite: '>=8.2.4 <9'
   'ws@^7': '>=7.5.11 <8'
   'ws@^8': '>=8.21.0 <9'
   # Floors raised 2026-10-08 for advisories published since the last green
@@ -103,6 +103,16 @@ overrides:
   source-map-js: '>=1.2.2 <2'
   devalue: '>=5.9.3 <6'
   http-cache-semantics: '>=4.2.1 <5'
+  # Floors raised 2026-10-25, same rule. dompurify via monaco-editor in the
+  # Payload admin (GHSA-cg2g-xh64-v4q7 critical, GHSA-mrv2-3pqr-j5jr);
+  # happy-dom via better-auth's vitest peer (GHSA-834v-8h66-3h79); the
+  # workspaces that declare happy-dom were raised to ^21.0.4 alongside.
+  # `next`, `undici` and `vite` above were raised in the same pass.
+  dompurify: '>=3.4.17 <4'
+  happy-dom: '>=21.0.4 <22'
+  # zod GHSA-mrhx-c7xc-m3w5: the declared ranges were raised to ^4.6.7;
+  # this reaches the copy @better-auth/core resolves on its own.
+  zod: '>=4.6.6 <5'
   '@esbuild-kit/core-utils>esbuild': '>=0.25.0'
   '@instantdb/core>uuid': '>=11.1.1'
 auditConfig:

@@ -4,6 +4,7 @@ import type { StandingItem } from "@dragons/shared";
 import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
+import { standingA11yLabel } from "../lib/ui/standing-a11y";
 import { fontFamilies } from "../theme/typography";
 import { ClubLogo } from "./brand/ClubLogo";
 
@@ -175,6 +176,8 @@ function StandingRowImpl({ item, isOwn, badgeColor, onPress }: StandingRowProps)
     onPress?.(item.teamApiId);
   }, [onPress, item.teamApiId]);
 
+  const a11yLabel = standingA11yLabel(item, item.teamName, (key, options) => i18n.t(key, options));
+
   const row = (
     <View
       style={{
@@ -293,6 +296,8 @@ function StandingRowImpl({ item, isOwn, badgeColor, onPress }: StandingRowProps)
   if (onPress) {
     return (
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={a11yLabel}
         onPress={handlePress}
         style={({ pressed }) => (pressed ? { opacity: 0.85 } : undefined)}
       >
@@ -301,7 +306,11 @@ function StandingRowImpl({ item, isOwn, badgeColor, onPress }: StandingRowProps)
     );
   }
 
-  return <View>{row}</View>;
+  return (
+    <View accessible accessibilityLabel={a11yLabel}>
+      {row}
+    </View>
+  );
 }
 
 const StandingRow = memo(StandingRowImpl);

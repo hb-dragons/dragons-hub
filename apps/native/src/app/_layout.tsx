@@ -152,6 +152,7 @@ function UnlockScreen({ onRetry }: { onRetry: () => void }) {
         DRAGONS
       </Text>
       <Pressable
+        accessibilityRole="button"
         onPress={onRetry}
         style={{
           backgroundColor: dark.primary,

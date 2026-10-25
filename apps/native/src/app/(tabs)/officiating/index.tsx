@@ -273,6 +273,7 @@ export default function OfficiatingScreen() {
             {i18n.t("refereeTab.error")}
           </Text>
           <Pressable
+            accessibilityRole="button"
             onPress={() => {
               void mutate();
             }}

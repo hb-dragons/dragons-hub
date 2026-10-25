@@ -11,6 +11,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useAiNotice } from "@/hooks/useAiNotice";
 import { resolveApiUrl, authClient } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
+import { TEXT_LINK_SLOP } from "@/lib/ui/a11y";
 import { buildAssistantTransportConfig } from "@/lib/assistant/transport";
 import { messageText, messageSegments } from "@/lib/assistant/messages";
 import type { UiMessageLike } from "@/lib/assistant/messages";
@@ -79,10 +80,10 @@ function MessageItem({ message, isStreaming, onRegenerate }: { message: UiMessag
       <AssistantMarkdown text={shown} />
       {!isStreaming && full.length > 0 ? (
         <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.xs }}>
-          <Pressable accessibilityRole="button" onPress={copy}>
+          <Pressable accessibilityRole="button" hitSlop={TEXT_LINK_SLOP} onPress={copy}>
             <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>{copied ? i18n.t("assistant.copied") : i18n.t("assistant.copy")}</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" onPress={onRegenerate}>
+          <Pressable accessibilityRole="button" hitSlop={TEXT_LINK_SLOP} onPress={onRegenerate}>
             <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>{i18n.t("assistant.regenerate")}</Text>
           </Pressable>
         </View>
@@ -243,6 +244,7 @@ export default function AssistantScreen() {
               </Text>
               <Pressable
                 accessibilityRole="button"
+                hitSlop={TEXT_LINK_SLOP}
                 onPress={() => resetChat({ setMessages, clearError })}
               >
                 <Text style={{ color: colors.mutedForeground, textDecorationLine: "underline" }}>

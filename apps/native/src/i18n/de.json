@@ -507,7 +507,39 @@
     "dragHandle": "Ziehgriff. Lange drücken und ziehen, um zu verschieben.",
     "pickedUpTask": "Aufgabe aufgenommen: %{title}",
     "droppedTaskInColumn": "Aufgabe in Spalte abgelegt: %{column}",
-    "dropCancelled": "Ablegen abgebrochen"
+    "dropCancelled": "Ablegen abgebrochen",
+    "match": {
+      "score": "%{home} %{homeScore} gegen %{guest} %{guestScore}",
+      "fixture": "%{home} gegen %{guest}",
+      "final": "Endstand",
+      "won": "gewonnen",
+      "lost": "verloren",
+      "cancelled": "abgesagt",
+      "forfeited": "kampflos gewertet",
+      "dayAt": "%{day} um %{time} Uhr"
+    },
+    "refereeSlot": {
+      "holder": "%{slot}: %{name}",
+      "remove": "%{name} als %{slot} entfernen"
+    },
+    "boardColumnPill": {
+      "one": "%{name}, 1 Aufgabe",
+      "other": "%{name}, %{count} Aufgaben"
+    },
+    "columnColor": {
+      "none": "Keine Farbe",
+      "gray": "Grau",
+      "green": "Grün",
+      "blue": "Blau",
+      "amber": "Bernstein",
+      "red": "Rot",
+      "violet": "Violett",
+      "pink": "Pink"
+    },
+    "standing": {
+      "row": "Platz %{position}, %{team}, %{played} Spiele, %{won} Siege, %{lost} Niederlagen, Korbdifferenz %{diff}, %{points} Punkte",
+      "withdrawn": "zurückgezogen"
+    }
   },
   "teamStaff": {
     "role": {

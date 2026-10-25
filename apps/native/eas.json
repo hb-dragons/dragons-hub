@@ -49,11 +49,17 @@
   },
   "submit": {
     "preview": {
-      "ios": {},
+      "ios": {
+        "appleTeamId": "Z28P2F9QQR",
+        "ascAppId": "6826908010"
+      },
       "android": {}
     },
     "production": {
-      "ios": {},
+      "ios": {
+        "appleTeamId": "Z28P2F9QQR",
+        "ascAppId": "6826908010"
+      },
       "android": {}
     }
   }

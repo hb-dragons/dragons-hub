@@ -51,8 +51,9 @@ Assumes `cd apps/native` unless stated otherwise.
     as `preview`, so it consumes a version code / build number.
 - EAS account: organization `hb-dragons` (transferred from the personal
   `eshamounskerto` account 2026-09-01, #239; projectId and updates URL
-  unchanged by the transfer). The Apple team still has the personal-account
-  problem, see `PRE-LAUNCH.md` § Account / ownership.
+  unchanged by the transfer). Apple: organization team `Z28P2F9QQR`
+  since 2026-10-25, iOS bundle id `de.hbdragons.club` (the personal team
+  kept `de.hbdragons.app`), see `PRE-LAUNCH.md` § Account / ownership.
 
 **Builds:** as of 2026-09-09 the newest binaries are iOS build 12 and
 Android version code 5 (both `preview`, SDK 57, commit `334d0b46`);
@@ -204,8 +205,9 @@ build:
   app whether or not anything changed. Version 1.0.0 builds 1 and 2
   expired this way. A quiet quarter means a rebuild, not an OTA.
 - **The build number must exceed every number already uploaded for that
-  `version`.** App Store Connect has consumed 1 and 2 at 1.0.0, so the
-  next upload needs ≥ 3. `autoIncrement` reads EAS's own remote
+  `version`.** The organization's App Store Connect record (2026-10-25)
+  has no uploads yet; the 1 and 2 consumed in April belong to the old
+  personal-team record. `autoIncrement` reads EAS's own remote
   counter, which tracks its builds and not App Store Connect's — it
   stood at 4 on 2026-08-25, so the next build gets 5. Check the number
   it picked rather than assuming the two agree (`eas build:version:get`,

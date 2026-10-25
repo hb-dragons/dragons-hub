@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -35,14 +35,40 @@ const { expo } = JSON.parse(readFileSync(APP_JSON, "utf8")) as {
       };
     };
     android?: {
+      adaptiveIcon?: { foregroundImage?: string; monochromeImage?: string };
       intentFilters?: {
         autoVerify?: boolean;
         data?: { scheme?: string; host?: string }[];
       }[];
     };
     locales?: Record<string, string>;
+    name?: string;
   };
 };
+
+/** The store listing title on both stores, decided 2026-09-09. */
+const STORE_NAME = "HB Dragons";
+
+describe("app.json identity", () => {
+  // The launcher label under the icon is `name`; a mismatch with the store
+  // title reads as a different app after install.
+  it("labels the app with its store name", () => {
+    expect(expo.name).toBe(STORE_NAME);
+  });
+});
+
+describe("app.json Android adaptive icon", () => {
+  // Android 13+ themed icons draw only this layer's alpha in the system tint;
+  // without it the launcher falls back to the full-colour crest on a themed
+  // home screen.
+  it("ships a monochrome layer next to the foreground", () => {
+    const icon = expo.android?.adaptiveIcon;
+    expect(icon?.monochromeImage).toBeDefined();
+    expect(icon?.monochromeImage).not.toBe(icon?.foregroundImage);
+    const file = path.resolve(path.dirname(APP_JSON), icon?.monochromeImage ?? "");
+    expect(existsSync(file)).toBe(true);
+  });
+});
 
 /**
  * The floor Expo SDK 57 supports, from `EXPO_SDK_MINIMAL_SUPPORTED_VERSIONS`

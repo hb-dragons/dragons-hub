@@ -12,6 +12,7 @@ import { useChecklistMutations } from "@/hooks/board/useChecklistMutations";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/hooks/useToast";
 import { i18n } from "@/lib/i18n";
+import { MIN_TAP_TARGET } from "@/lib/ui/a11y";
 import { haptics } from "@/lib/haptics";
 import { adminBoardApi } from "@/lib/api";
 import { singleLineInput } from "@/components/ui/inputStyles";
@@ -69,6 +70,7 @@ function ChecklistRow({
         alignItems: "center",
         gap: spacing.sm,
         paddingVertical: spacing.xs,
+        minHeight: MIN_TAP_TARGET,
       }}
     >
       <Animated.View

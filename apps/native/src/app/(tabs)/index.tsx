@@ -14,6 +14,7 @@ import { authClient, useGateUser } from "@/lib/auth-client";
 import { publicApi } from "@/lib/api";
 import { STANDINGS_SHORTCUT_ROUTE } from "@/lib/nav/tabs";
 import { i18n } from "@/lib/i18n";
+import { TEXT_LINK_SLOP } from "@/lib/ui/a11y";
 import { kickoffCountdownDays } from "@/lib/format/kickoff";
 import { resolveFetchState } from "@/lib/ui/fetch-state";
 import { ErrorState } from "@/components/ErrorState";
@@ -140,6 +141,7 @@ export default function HomeScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={i18n.t("assistant.open")}
+          hitSlop={TEXT_LINK_SLOP}
           onPress={() => router.push("/assistant")}
           style={{ marginTop: spacing.md }}
         >
