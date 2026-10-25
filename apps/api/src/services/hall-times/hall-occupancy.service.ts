@@ -2,7 +2,6 @@ import { and, asc, eq, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core";
 import { leagues, matches, teamEntries, teams, venueHallTimes, venues } from "@dragons/db/schema";
 import {
-  BOOKING_DEFAULTS,
   clubDayAnchor,
   coverageFor,
   plusDaysInClubZone,
@@ -11,34 +10,24 @@ import {
 import type { HallOccupancyDay, HallOccupancyGame } from "@dragons/shared";
 import type { HallOccupancyQuery } from "@dragons/contracts";
 import { getDb } from "../../config/database";
-import { readIntSetting, readSettings } from "../settings/app-settings.reader";
+import { getBookingSettings } from "../admin/settings.service";
 import { getActiveSeason } from "../admin/season.service";
 import { loadHallTimesByDay } from "./hall-time.service";
 import { gameEnd, programmeWindow, type BufferConfig } from "./hall-occupancy";
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
-const SETTING_KEYS = {
-  bufferBefore: "venue_booking_buffer_before",
-  bufferAfter: "venue_booking_buffer_after",
-  gameDuration: "venue_booking_game_duration",
-} as const;
-
 /**
- * The programme-window settings every hall-occupancy read applies. The keys
- * keep their `venue_booking_` prefix from the stored-booking era; the admin
- * settings route writes the same keys.
+ * The programme-window settings every hall-occupancy read applies: the admin
+ * settings' booking keys (named from the stored-booking era), read through the
+ * one key table in settings.service.
  */
 export async function getBufferConfig(): Promise<BufferConfig> {
-  const settings = await readSettings([
-    SETTING_KEYS.bufferBefore,
-    SETTING_KEYS.bufferAfter,
-    SETTING_KEYS.gameDuration,
-  ]);
+  const settings = await getBookingSettings();
   return {
-    bufferBeforeMinutes: readIntSetting(settings, SETTING_KEYS.bufferBefore, BOOKING_DEFAULTS.bufferBefore),
-    bufferAfterMinutes: readIntSetting(settings, SETTING_KEYS.bufferAfter, BOOKING_DEFAULTS.bufferAfter),
-    defaultGameDurationMinutes: readIntSetting(settings, SETTING_KEYS.gameDuration, BOOKING_DEFAULTS.gameDuration),
+    bufferBeforeMinutes: settings.bufferBefore,
+    bufferAfterMinutes: settings.bufferAfter,
+    defaultGameDurationMinutes: settings.gameDuration,
   };
 }
 
