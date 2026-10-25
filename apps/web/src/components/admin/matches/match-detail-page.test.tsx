@@ -43,14 +43,6 @@ import { MatchDetailPage } from "./match-detail-page";
 
 const messages = {
   common: { back: "Back", loading: "Loading" },
-  bookings: {
-    status: {
-      pending: "Pending",
-      requested: "Requested",
-      confirmed: "Confirmed",
-      cancelled: "Cancelled",
-    },
-  },
   errors: {
     title: "Something went wrong",
     description: "An unexpected error occurred.",
@@ -81,13 +73,16 @@ const messages = {
       homeGame: "Home game",
       awayGame: "Away game",
       groups: {
-        booked: "With a hall booking",
-        unbooked: "Without a hall booking",
+        fits: "Fits a held hall time",
+        notHeld: "No hall time held",
         away: "Away",
       },
-      noBooking: "no booking",
+      hallTime: "Hall time {start} – {end}",
       awayVenue: "Hall: opponent",
-      needsReconfirmation: "Needs re-confirmation",
+      currentVenue: "current hall",
+      noHalls: "None of our halls has a hall time.",
+      game: "{start} – {end} {home} – {guest}",
+      noFit: "Game does not fit",
       suggestedKickoff: "Suggested kickoff: {time}",
       loading: "Searching for dates…",
       flags: {
@@ -222,17 +217,19 @@ describe("MatchDetailPage alternative-date finder", () => {
         {
           date: "2026-08-15",
           weekday: "saturday",
-          group: "booked",
-          bookings: [
+          group: "fits",
+          halls: [
             {
-              id: 1,
-              effectiveStartTime: "10:00:00",
-              effectiveEndTime: "16:00:00",
-              status: "confirmed",
-              needsReconfirmation: false,
+              venueId: 1,
+              venueName: "Drachenhalle",
+              isCurrentVenue: true,
+              hallTime: { kind: "open", startTime: "10:00", endTime: "20:00", note: null },
+              games: [],
+              existing: null,
+              fits: true,
+              suggestedKickoffTime: "17:00:00",
             },
           ],
-          suggestedKickoffTime: "17:00:00",
           flags: [],
         },
       ],
@@ -264,7 +261,7 @@ describe("MatchDetailPage alternative-date finder", () => {
 
     expect(mocks.alternativeDates).toHaveBeenCalledWith(1, undefined);
     expect(
-      screen.getByRole("heading", { name: "With a hall booking", hidden: true }),
+      screen.getByRole("heading", { name: "Fits a held hall time", hidden: true }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Suggested kickoff/)).toBeInTheDocument();
   });

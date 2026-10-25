@@ -299,15 +299,13 @@
       "homeGame": "Home game",
       "awayGame": "Away game",
       "groups": {
-        "booked": "With a hall booking",
-        "unbooked": "Without a hall booking",
-        "away": "Away",
-        "hallTimeOpen": "Hall time held",
-        "closed": "Hall closed"
+        "fits": "Fits a held hall time",
+        "heldNoFit": "Hall time held, game does not fit",
+        "notHeld": "No hall time held",
+        "closed": "Every hall closed",
+        "away": "Away"
       },
-      "noBooking": "no booking",
       "awayVenue": "Hall: opponent",
-      "needsReconfirmation": "Needs re-confirmation",
       "suggestedKickoff": "Suggested kickoff: {time}",
       "loading": "Searching for dates",
       "flags": {
@@ -322,7 +320,10 @@
       "copyFailed": "Copying was not possible.",
       "hallTime": "Hall time {start} – {end}",
       "hallClosed": "Hall closed{note, select, none {} other {: {note}}}",
-      "noHallTime": "no hall time"
+      "currentVenue": "current hall",
+      "noHalls": "None of our halls has a hall time.",
+      "game": "{start} – {end} {home} – {guest}",
+      "noFit": "Game does not fit"
     },
     "score": {
       "title": "Score",

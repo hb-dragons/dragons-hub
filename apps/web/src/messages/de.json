@@ -299,15 +299,13 @@
       "homeGame": "Heimspiel",
       "awayGame": "Auswärtsspiel",
       "groups": {
-        "booked": "Mit Hallenbuchung",
-        "unbooked": "Ohne Hallenbuchung",
-        "away": "Auswärts",
-        "hallTimeOpen": "Hallenzeit vorhanden",
-        "closed": "Halle geschlossen"
+        "fits": "Passt in eine Hallenzeit",
+        "heldNoFit": "Hallenzeit vorhanden, Spiel passt nicht",
+        "notHeld": "Keine Hallenzeit vorhanden",
+        "closed": "Alle Hallen geschlossen",
+        "away": "Auswärts"
       },
-      "noBooking": "keine Buchung",
       "awayVenue": "Halle: Gegner",
-      "needsReconfirmation": "Rückbestätigung nötig",
       "suggestedKickoff": "Vorschlag: {time} Uhr",
       "loading": "Termine werden gesucht",
       "flags": {
@@ -322,7 +320,10 @@
       "copyFailed": "Kopieren war nicht möglich.",
       "hallTime": "Hallenzeit {start} – {end}",
       "hallClosed": "Halle geschlossen{note, select, none {} other {: {note}}}",
-      "noHallTime": "keine Hallenzeit"
+      "currentVenue": "aktuelle Halle",
+      "noHalls": "Keine unserer Hallen hat eine Hallenzeit.",
+      "game": "{start} – {end} {home} – {guest}",
+      "noFit": "Spiel passt nicht"
     },
     "score": {
       "title": "Ergebnis",

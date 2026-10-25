@@ -135,15 +135,6 @@ const messages = {
       none: "No hall time",
     },
   },
-  // The alternative-date finder still names its candidate bookings by status.
-  bookings: {
-    status: {
-      pending: "Pending",
-      requested: "Requested",
-      confirmed: "Confirmed",
-      cancelled: "Cancelled",
-    },
-  },
   matchDetail: {
     overrideActive: "Override active",
     discard: "Discard",
@@ -198,13 +189,16 @@ const messages = {
       homeGame: "Home game",
       awayGame: "Away game",
       groups: {
-        booked: "With a hall booking",
-        unbooked: "Without a hall booking",
+        fits: "Fits a held hall time",
+        notHeld: "No hall time held",
         away: "Away",
       },
-      noBooking: "no booking",
+      hallTime: "Hall time {start} – {end}",
       awayVenue: "Hall: opponent",
-      needsReconfirmation: "Needs re-confirmation",
+      currentVenue: "current hall",
+      noHalls: "None of our halls has a hall time.",
+      game: "{start} – {end} {home} – {guest}",
+      noFit: "Game does not fit",
       suggestedKickoff: "Suggested kickoff: {time}",
       loading: "Searching for dates…",
       empty: "No free weekend day in this range.",
@@ -513,17 +507,19 @@ describe("MatchEditSheet alternative-date finder", () => {
         {
           date: "2026-08-15",
           weekday: "saturday",
-          group: "booked",
-          bookings: [
+          group: "fits",
+          halls: [
             {
-              id: 1,
-              effectiveStartTime: "10:00:00",
-              effectiveEndTime: "16:00:00",
-              status: "confirmed",
-              needsReconfirmation: false,
+              venueId: 1,
+              venueName: "Drachenhalle",
+              isCurrentVenue: true,
+              hallTime: { kind: "open", startTime: "10:00", endTime: "20:00", note: null },
+              games: [],
+              existing: null,
+              fits: true,
+              suggestedKickoffTime: "17:00:00",
             },
           ],
-          suggestedKickoffTime: "17:00:00",
           flags: [],
         },
       ],
@@ -582,15 +578,15 @@ describe("MatchEditSheet alternative-date finder", () => {
     expect(screen.queryByText("Alternative dates")).not.toBeInTheDocument();
   });
 
-  it("shows the hall booking behind a candidate inside the sheet", async () => {
+  it("shows the halls behind a candidate inside the sheet", async () => {
     await openFinder();
 
     expect(
-      screen.getByRole("heading", { name: "With a hall booking", hidden: true }),
+      screen.getByRole("heading", { name: "Fits a held hall time", hidden: true }),
     ).toBeInTheDocument();
-    // The window itself is asserted where the provider pins the club zone, as
-    // production does; this sheet renders in UTC.
-    expect(screen.getByText(/Confirmed/, { selector: "span" })).toBeInTheDocument();
+    // The times themselves are asserted where the provider pins the club zone,
+    // as production does; this sheet renders in UTC.
+    expect(screen.getByText("Drachenhalle")).toBeInTheDocument();
     expect(screen.getByText(/Suggested kickoff/)).toBeInTheDocument();
   });
 
@@ -646,9 +642,8 @@ describe("MatchEditSheet alternative-date finder", () => {
         {
           date: "2026-08-15",
           weekday: "saturday",
-          group: "unbooked",
-          bookings: [],
-          suggestedKickoffTime: null,
+          group: "notHeld",
+          halls: [],
           flags: [],
         },
       ],
@@ -656,7 +651,7 @@ describe("MatchEditSheet alternative-date finder", () => {
     await openFinder();
 
     await act(async () => {
-      fireEvent.click(candidateRow(/no booking/)!);
+      fireEvent.click(candidateRow(/None of our halls/)!);
     });
 
     expect(
@@ -702,25 +697,26 @@ describe("MatchEditSheet alternative-date finder", () => {
         {
           date: "2026-08-15",
           weekday: "saturday",
-          group: "booked",
-          bookings: [
+          group: "fits",
+          halls: [
             {
-              id: 1,
-              effectiveStartTime: "10:00:00",
-              effectiveEndTime: "16:00:00",
-              status: "confirmed",
-              needsReconfirmation: false,
+              venueId: 1,
+              venueName: "Drachenhalle",
+              isCurrentVenue: true,
+              hallTime: { kind: "open", startTime: "10:00", endTime: "20:00", note: null },
+              games: [],
+              existing: null,
+              fits: true,
+              suggestedKickoffTime: "17:00:00",
             },
           ],
-          suggestedKickoffTime: "17:00:00",
           flags: [{ type: "outsideRoundWindow" }],
         },
         {
           date: "2026-08-09",
           weekday: "sunday",
-          group: "unbooked",
-          bookings: [],
-          suggestedKickoffTime: null,
+          group: "notHeld",
+          halls: [],
           flags: [],
         },
       ],

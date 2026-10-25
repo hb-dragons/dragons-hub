@@ -1,5 +1,6 @@
-import type { BookingStatus, DiffStatus } from "./constants";
-import type { HallCoverageInfo, HallTimeCoverage, HallTimeWindow } from "./hall-times";
+import type { DiffStatus } from "./constants";
+import type { HallCoverageInfo, HallTimeWindow } from "./hall-times";
+import type { HallOccupancyGame } from "./hall-occupancy";
 import type { ClubWeekendDay } from "./kickoff";
 interface RefereeSlotReferee {
   id: number;
@@ -202,33 +203,39 @@ export interface DateRange {
 
 /**
  * Which pile a candidate belongs in, and therefore what the panel shows for it.
- * A home game splits into the days the club's hall is already booked and the
- * days it is not; an away game has one pile, because the hall is the other
- * club's problem.
+ * A home game day is judged by the best of our halls that day:
+ *
+ * - `fits`: the game fits into a hall time the club holds;
+ * - `heldNoFit`: a hall time is held somewhere, but the game does not fit in
+ *   it — the hall time would have to grow or games would have to move;
+ * - `notHeld`: no hall time is held — our halls have no row or are closed, in
+ *   any mix;
+ * - `closed`: every one of our halls is closed that day.
+ *
+ * An away game has one pile, because the hall is the other club's problem.
  */
-export type AlternativeDateGroup =
-  | "booked"
-  | "hallTimeOpen"
-  | "unbooked"
-  | "closed"
-  | "away";
-
-/** The hall time the club holds at the game's venue on a candidate day. */
-export type AlternativeDateHallTime = HallTimeWindow;
+export type AlternativeDateGroup = "fits" | "heldNoFit" | "notHeld" | "closed" | "away";
 
 /**
- * One of the club's hall bookings at the game's current venue on a candidate
- * day. The effective window is the one actually agreed: an override time wins
- * over the calculated one, per end, exactly as the booking screens show it.
+ * One of our halls on a candidate day: its hall time, the home games already
+ * played there (without the game being moved), and whether the moved game
+ * fits in next to them.
  */
-export interface AlternativeDateBooking {
-  id: number;
-  effectiveStartTime: string;
-  effectiveEndTime: string;
-  status: BookingStatus;
-  needsReconfirmation: boolean;
-  /** How the booking's window sits in the day's hall time. */
-  hallTimeCoverage: HallTimeCoverage;
+export interface AlternativeDateHall {
+  venueId: number;
+  venueName: string;
+  /** The hall the game is played in today. */
+  isCurrentVenue: boolean;
+  /** The hall time the club holds that day, or null when it holds none. */
+  hallTime: HallTimeWindow | null;
+  /** Live home games already there that day, in kickoff order. */
+  games: HallOccupancyGame[];
+  /** How the hall time covers the games already there; null when there are none. */
+  existing: HallCoverageInfo | null;
+  /** Whether the moved game can be placed inside the hall time next to those games. */
+  fits: boolean;
+  /** `HH:mm:ss`, rounded up to the quarter hour; null when the game does not fit. */
+  suggestedKickoffTime: string | null;
 }
 
 /**
@@ -261,22 +268,10 @@ export interface AlternativeDateCandidate {
   weekday: ClubWeekendDay;
   group: AlternativeDateGroup;
   /**
-   * The club's bookings at the game's current venue that day. Empty for an away
-   * game and for a day in the `unbooked` group.
+   * Every one of our halls that day: the game's current hall first (when it
+   * is one of ours), then by name. Empty for an away game.
    */
-  bookings: AlternativeDateBooking[];
-  /**
-   * `HH:mm:ss` directly after the last booked game — its kickoff plus that team
-   * entry's game duration plus the buffer after. Null whenever nothing is
-   * booked: a hall time says when the hall is ours, not when a game could
-   * start inside it, so the finder derives nothing from it (ADR-0011).
-   */
-  suggestedKickoffTime: string | null;
-  /**
-   * The hall time the club holds at the game's current venue that day, or null
-   * when it holds none. Always null for an away game.
-   */
-  hallTime: AlternativeDateHallTime | null;
+  halls: AlternativeDateHall[];
   /** Empty when nothing about the day needs saying — the common case. */
   flags: AlternativeDateFlag[];
 }
@@ -297,6 +292,6 @@ export interface AlternativeDatesResponse {
    * whatever the client left out. The date pickers show this back.
    */
   range: DateRange;
-  /** Ranked server-side: unflagged days before flagged, chronological within. */
+  /** Ranked server-side: by group, then unflagged before flagged, then chronological. */
   candidates: AlternativeDateCandidate[];
 }
