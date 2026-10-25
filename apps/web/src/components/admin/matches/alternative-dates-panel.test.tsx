@@ -35,6 +35,10 @@ const messages = {
     description: "An unexpected error occurred.",
     tryAgain: "Try again",
   },
+  hallOccupancy: {
+    gapEarly: "{minutes} min early",
+    gapLate: "{minutes} min late",
+  },
   hallTimes: {
     coverage: {
       covered: "Hall time covered",
@@ -424,7 +428,8 @@ describe("AlternativeDatesPanel", () => {
     expect(halls[1]).toHaveTextContent("Arena am Park");
     expect(halls[1]).not.toHaveTextContent("current hall");
     expect(halls[1]).toHaveTextContent("No hall time");
-    expect(halls[1]).toHaveTextContent("Game does not fit");
+    // No hall time already says why; "does not fit" is for an open hall.
+    expect(halls[1]).not.toHaveTextContent("Game does not fit");
   });
 
   it("names a hall without a row in German as Keine Hallenzeit", async () => {
@@ -447,7 +452,7 @@ describe("AlternativeDatesPanel", () => {
               hall({
                 ...fits("2026-03-14", "saturday").halls[0],
                 hallTime: tight,
-                existing: { hallTime: tight, coverage: "partial", gapBeforeMinutes: 0, gapAfterMinutes: 85 },
+                existing: { hallTime: tight, coverage: "partial", gapBeforeMinutes: 30, gapAfterMinutes: 85 },
                 fits: false,
                 suggestedKickoffTime: null,
               }),
@@ -461,6 +466,9 @@ describe("AlternativeDatesPanel", () => {
     await settle();
 
     expect(screen.getByText("Hall time partial")).toBeInTheDocument();
+    expect(screen.getByText("30 min early")).toBeInTheDocument();
+    expect(screen.getByText("85 min late")).toBeInTheDocument();
+    expect(screen.getByText("Game does not fit")).toBeInTheDocument();
     expect(screen.queryByText(/Suggested kickoff/)).not.toBeInTheDocument();
   });
 
@@ -648,5 +656,33 @@ describe("AlternativeDatesPanel", () => {
     await settle();
 
     expect(screen.getByText("Hall closed: Osterferien")).toBeInTheDocument();
+    expect(screen.queryByText("Game does not fit")).not.toBeInTheDocument();
+  });
+
+  it("names the existing shortfall's gap in German like the Hallenbelegung", async () => {
+    const tight = { kind: "open", startTime: "10:00", endTime: "12:00", note: null } as const;
+    mocks.alternativeDates.mockResolvedValue(
+      response({
+        candidates: [
+          {
+            ...notHeld("2026-03-14", "saturday"),
+            group: "heldNoFit",
+            halls: [
+              hall({
+                hallTime: tight,
+                existing: { hallTime: tight, coverage: "partial", gapBeforeMinutes: 30, gapAfterMinutes: 45 },
+              }),
+            ],
+          },
+        ],
+      }),
+    );
+
+    renderWithCatalog("de");
+    await settle();
+
+    const shown = screen.getByTestId("alternative-date-hall");
+    expect(shown).toHaveTextContent("30 Min. zu früh");
+    expect(shown).toHaveTextContent("45 Min. zu spät");
   });
 });

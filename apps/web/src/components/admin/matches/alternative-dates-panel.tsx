@@ -349,6 +349,8 @@ function CandidateDetails({ candidate }: { candidate: AlternativeDateCandidate }
  */
 function HallDetails({ hall, date }: { hall: AlternativeDateHall; date: string }) {
   const t = useTranslations("matchDetail.alternativeDates");
+  // The gap wording is the Hallenbelegung's, so both pages say it alike.
+  const tOccupancy = useTranslations("hallOccupancy");
   const format = useFormatter();
   const time = (value: string) => format.dateTime(clubTimeAnchor(value, date), "matchTime");
   const shortfall =
@@ -357,7 +359,7 @@ function HallDetails({ hall, date }: { hall: AlternativeDateHall; date: string }
       : null;
 
   return (
-    <span data-testid="alternative-date-hall" className="block space-y-0.5 border-l-2 border-border pl-2 text-xs">
+    <span data-testid="alternative-date-hall" className="bg-surface-low block space-y-0.5 rounded-md px-2 py-1.5 text-xs">
       <span className="flex flex-wrap items-center gap-2">
         <span className="font-medium">{hall.venueName}</span>
         {hall.isCurrentVenue && (
@@ -369,6 +371,16 @@ function HallDetails({ hall, date }: { hall: AlternativeDateHall; date: string }
           <HallTimeCoverageBadge coverage="none" className="text-[10px]" />
         )}
         {shortfall && <HallTimeCoverageBadge coverage={shortfall} className="text-[10px]" />}
+        {shortfall && hall.existing && hall.existing.gapBeforeMinutes > 0 && (
+          <span className="text-heat">
+            {tOccupancy("gapEarly", { minutes: hall.existing.gapBeforeMinutes })}
+          </span>
+        )}
+        {shortfall && hall.existing && hall.existing.gapAfterMinutes > 0 && (
+          <span className="text-heat">
+            {tOccupancy("gapLate", { minutes: hall.existing.gapAfterMinutes })}
+          </span>
+        )}
       </span>
       {hall.hallTime?.kind === "open" && hall.hallTime.startTime && hall.hallTime.endTime && (
         <span className="block">
@@ -395,7 +407,10 @@ function HallDetails({ hall, date }: { hall: AlternativeDateHall; date: string }
           {t("suggestedKickoff", { time: time(hall.suggestedKickoffTime) })}
         </span>
       ) : (
-        <span className="text-muted-foreground block">{t("noFit")}</span>
+        // A hall with no hall time or a closed one already says why above.
+        hall.hallTime?.kind === "open" && (
+          <span className="text-muted-foreground block">{t("noFit")}</span>
+        )
       )}
     </span>
   );
