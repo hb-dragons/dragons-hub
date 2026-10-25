@@ -104,7 +104,8 @@ Suggested kickoff: the first kickoff on the day that fits, trying in order the
 slot right after the existing programme (today's rule: latest end plus
 `bufferAfter`), then the slot before the first game, then gaps between games.
 With no games there, the hall time's start plus `bufferBefore`. Kickoffs are
-rounded up to the next quarter hour.
+rounded to the quarter hour: up after a game or the hall start, down before the
+first game.
 
 Ranking of a candidate day stays tiered, using the best hall that day:
 

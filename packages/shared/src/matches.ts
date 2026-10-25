@@ -234,7 +234,7 @@ export interface AlternativeDateHall {
   existing: HallCoverageInfo | null;
   /** Whether the moved game can be placed inside the hall time next to those games. */
   fits: boolean;
-  /** `HH:mm:ss`, rounded up to the quarter hour; null when the game does not fit. */
+  /** `HH:mm:ss`, rounded to the quarter hour (up after a game or hall start, down before the first game); null when the game does not fit. */
   suggestedKickoffTime: string | null;
 }
 
