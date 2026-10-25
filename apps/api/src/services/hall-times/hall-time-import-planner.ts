@@ -1,34 +1,9 @@
-import { coverageFor } from "@dragons/shared";
-import type {
-  HallTimeCoverage,
-  HallTimeImportBookingChange,
-  HallTimeInput,
-  HallTimeRow,
-  HallTimeShortfall,
-} from "@dragons/shared";
-
-/** A day without a hall time reads as `uncovered` here, as it did before `none` existed. */
-function importCoverage(
-  window: { start: string; end: string },
-  hallTime: Parameters<typeof coverageFor>[1],
-): HallTimeCoverage {
-  const status = coverageFor(window, hallTime).status;
-  return status === "none" ? "uncovered" : status;
-}
-
-/** A booking at the venue inside the span, with the window the club would ask for. */
-export interface PlannerBooking {
-  id: number;
-  date: string;
-  effectiveStartTime: string;
-  effectiveEndTime: string;
-}
+import type { HallTimeInput, HallTimeRow } from "@dragons/shared";
 
 export interface ImportPlanInput {
   /** Stored rows of the venue inside the sheet span. */
   existing: readonly HallTimeRow[];
   rows: readonly HallTimeInput[];
-  bookings: readonly PlannerBooking[];
 }
 
 export interface ImportPlan {
@@ -41,10 +16,6 @@ export interface ImportPlan {
   deleteIds: number[];
   /** Rows the apply inserts, all with source `anlage_t`. */
   inserts: HallTimeInput[];
-  /** Every booking whose coverage the import changes. */
-  bookings: HallTimeImportBookingChange[];
-  /** The subset of `bookings` that moves out of `covered`: one event each. */
-  losses: (HallTimeImportBookingChange & { after: HallTimeShortfall })[];
 }
 
 function sameEntry(a: HallTimeInput, b: HallTimeInput): boolean {
@@ -80,18 +51,12 @@ export function planHallTimeImport(input: ImportPlanInput): ImportPlan {
     unchanged: 0,
     deleteIds: [],
     inserts: [],
-    bookings: [],
-    losses: [],
   };
-
-  // After the import, the day → row map is the sheet plus surviving manual rows.
-  const afterByDate = new Map<string, HallTimeInput>();
 
   for (const existing of input.existing) {
     const incoming = incomingByDate.get(existing.date);
     if (!incoming) {
       if (existing.source === "manual") {
-        afterByDate.set(existing.date, existing);
         plan.unchanged++;
       } else {
         plan.removed.push(existing);
@@ -101,32 +66,17 @@ export function planHallTimeImport(input: ImportPlanInput): ImportPlan {
     }
     if (sameEntry(existing, incoming) && existing.source === "anlage_t") {
       plan.unchanged++;
-      afterByDate.set(existing.date, existing);
       continue;
     }
     plan.changed.push({ before: existing, after: incoming });
     plan.deleteIds.push(existing.id);
     plan.inserts.push(incoming);
-    afterByDate.set(existing.date, incoming);
   }
 
   for (const row of [...input.rows].sort((a, b) => a.date.localeCompare(b.date))) {
     if (existingByDate.has(row.date)) continue;
     plan.added.push(row);
     plan.inserts.push(row);
-    afterByDate.set(row.date, row);
-  }
-
-  for (const booking of [...input.bookings].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)) {
-    const window = { start: booking.effectiveStartTime, end: booking.effectiveEndTime };
-    const before = importCoverage(window, existingByDate.get(booking.date) ?? null);
-    const after = importCoverage(window, afterByDate.get(booking.date) ?? null);
-    if (before === after) continue;
-    const change = { bookingId: booking.id, date: booking.date, before, after };
-    plan.bookings.push(change);
-    if (before === "covered" && after !== "covered") {
-      plan.losses.push({ ...change, after });
-    }
   }
 
   return plan;

@@ -417,7 +417,7 @@ Event types are defined in `packages/shared/src/domain-events.ts`. Events are pu
 - `booking.created` — Venue booking created
 - `booking.status.changed` — Booking status or times updated
 - `booking.needs_reconfirmation` — Booking flagged for reconfirmation
-- `booking.hall_time.missing` — Booking window outside the hall time the club holds that day (or no hall time, or hall closed): a rental request is still owed to the city. Emitted once per transition out of `covered`, by sync reconcile and by an Anlage T import
+- `booking.hall_time.missing` — Booking window outside the hall time the club holds that day (or no hall time, or hall closed): a rental request is still owed to the city. Emitted once per transition out of `covered` by sync reconcile (the Anlage T import no longer emits it)
 
 ### Override Events
 
@@ -672,8 +672,8 @@ nested under their task.
 | GET | `/admin/venues` | List venues |
 | GET | `/admin/venues/search` | Search venues by name. Query: `q` |
 | GET | `/admin/venues/:id/hall-times` | Hall times the club holds at a venue. Query: `from`, `to` |
-| POST | `/admin/venues/:id/hall-times/import/preview` | Diff Anlage T rows against stored hall times; lists bookings whose coverage changes; writes nothing (`venue:update`) |
-| POST | `/admin/venues/:id/hall-times/import` | Apply Anlage T rows: replace sheet rows inside the sheet span, emit `booking.hall_time.missing` (`venue:update`) |
+| POST | `/admin/venues/:id/hall-times/import/preview` | Diff Anlage T rows against stored hall times (added, changed, removed, unchanged); writes nothing (`venue:update`) |
+| POST | `/admin/venues/:id/hall-times/import` | Apply Anlage T rows: replace sheet rows inside the sheet span; judges no bookings and emits no event (`venue:update`) |
 | PUT | `/admin/venues/:id/hall-times/:date` | Create or replace one day's hall time by hand (`venue:update`) |
 | DELETE | `/admin/venues/:id/hall-times/:date` | Remove one day's hall time (`venue:update`) |
 

@@ -70,7 +70,6 @@ const preview: HallTimeImportPreview = {
   changed: [],
   removed: [],
   unchanged: 1,
-  bookings: [{ bookingId: 11, date: "2026-09-19", before: "uncovered", after: "covered" }],
 };
 
 function renderDialog(onImported = vi.fn()) {
@@ -108,7 +107,7 @@ describe("HallTimeImportDialog", () => {
 
   it("previews against the picked venue and applies, reporting the venue back", async () => {
     mocks.previewHallTimeImport.mockResolvedValue(preview);
-    mocks.importHallTimes.mockResolvedValue({ ...preview, eventsEmitted: 2 });
+    mocks.importHallTimes.mockResolvedValue(preview);
     const { onImported } = renderDialog();
     await pickFile(anlageT("Gymnasium Goetheschule"));
 
@@ -124,13 +123,13 @@ describe("HallTimeImportDialog", () => {
     });
     expect(screen.getByText(de.hallTimes.import.added)).toBeInTheDocument();
     expect(screen.getByText(/1 Tag unverändert/)).toBeInTheDocument();
-    expect(screen.getByText(de.hallTimes.import.bookings)).toBeInTheDocument();
+    expect(screen.queryByText(/Betroffene Buchungen/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: de.hallTimes.import.apply }));
     await waitFor(() => expect(onImported).toHaveBeenCalledWith(7));
     expect(mocks.importHallTimes).toHaveBeenCalledWith(7, { rows: expect.any(Array) });
     expect(mocks.toastSuccess).toHaveBeenCalledWith(de.hallTimes.import.imported);
-    expect(mocks.toastInfo).toHaveBeenCalledWith("2 Buchungen ohne Hallenzeit gemeldet");
+    expect(mocks.toastInfo).not.toHaveBeenCalled();
   });
 
   it("leaves the venue empty and the preview disabled when no venue matches the hall name", async () => {
@@ -142,7 +141,7 @@ describe("HallTimeImportDialog", () => {
   });
 
   it("says so when the preview finds nothing to change", async () => {
-    mocks.previewHallTimeImport.mockResolvedValue({ ...preview, added: [], bookings: [], unchanged: 3 });
+    mocks.previewHallTimeImport.mockResolvedValue({ ...preview, added: [], unchanged: 3 });
     renderDialog();
     await pickFile(anlageT("Friedrich-Ebert-Schule"));
 

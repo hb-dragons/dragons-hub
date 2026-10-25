@@ -28,7 +28,6 @@ import { Input } from "@dragons/ui/components/input";
 import { Label } from "@dragons/ui/components/label";
 import { Combobox, type ComboboxOption } from "@dragons/ui/components/combobox";
 import { Separator } from "@dragons/ui/components/separator";
-import { HallTimeCoverageBadge } from "./hall-time-coverage-badge";
 
 interface HallTimeImportDialogProps {
   open: boolean;
@@ -150,9 +149,8 @@ export function HallTimeImportDialog({ open, onOpenChange, venues, onImported }:
     if (!body || venueId === null) return;
     setApplying(true);
     try {
-      const applied = await api.venues.importHallTimes(venueId, body);
+      await api.venues.importHallTimes(venueId, body);
       toast.success(t("import.imported"));
-      if (applied.eventsEmitted > 0) toast.info(t("import.applied", { count: applied.eventsEmitted }));
       onImported(venueId);
       onOpenChange(false);
     } catch {
@@ -238,21 +236,6 @@ export function HallTimeImportDialog({ open, onOpenChange, venues, onImported }:
               />
               <PreviewList title={t("import.removed")} items={preview.removed} day={day} closedLabel={closedLabel} />
               <p className="text-muted-foreground text-xs">{t("import.unchanged", { count: preview.unchanged })}</p>
-              {preview.bookings.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">{t("import.bookings")}</p>
-                  <ul className="space-y-1 text-sm">
-                    {preview.bookings.map((b) => (
-                      <li key={b.bookingId} className="flex items-center gap-2">
-                        <span className="tabular-nums">{day(b.date)}</span>
-                        <HallTimeCoverageBadge coverage={b.before} className="text-[10px]" />
-                        <span aria-hidden="true">→</span>
-                        <HallTimeCoverageBadge coverage={b.after} className="text-[10px]" />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
           )}
         </div>

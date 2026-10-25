@@ -1940,10 +1940,8 @@
       "changed": "Geändert",
       "removed": "Entfernt",
       "unchanged": "{count, plural, one {# Tag unverändert} other {# Tage unverändert}}",
-      "bookings": "Betroffene Buchungen",
       "noChanges": "Keine Änderungen gegenüber den gespeicherten Hallenzeiten.",
       "apply": "Importieren",
-      "applied": "{count, plural, one {# Buchung} other {# Buchungen}} ohne Hallenzeit gemeldet",
       "imported": "Hallenzeiten importiert",
       "parseFailed": "Die Datei konnte nicht gelesen werden.",
       "failed": "Import fehlgeschlagen."

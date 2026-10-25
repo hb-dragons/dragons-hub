@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import { Hono } from "hono";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { AppEnv } from "../../types";
-import type { HallTimeImportPreview, HallTimeImportResult, HallTimeRow } from "@dragons/shared";
+import type { HallTimeImportPreview, HallTimeRow } from "@dragons/shared";
 
 // --- Mocks (hoisted before imports) ---
 //
@@ -139,13 +139,6 @@ function post(path: string, body: unknown) {
   });
 }
 
-async function hallTimeEvents() {
-  return ctx.db
-    .select({ entityId: domainEvents.entityId, payload: domainEvents.payload })
-    .from(domainEvents)
-    .where(eq(domainEvents.type, "booking.hall_time.missing"));
-}
-
 // --- Tests ---
 
 describe("PUT + GET + DELETE /venues/:id/hall-times", () => {
@@ -251,28 +244,18 @@ describe("POST /venues/:id/hall-times/import/preview", () => {
     expect(stored).toHaveLength(5);
   });
 
-  it("reports the bookings whose coverage the import would change", async () => {
+  it("answers with exactly span, added, changed, removed and unchanged, even with bookings on the span", async () => {
     const venueId = await seedVenue();
-    const loses = await seedBooking(venueId, "2026-09-12", { start: "17:00:00", end: "21:00:00" });
-    const gains = await seedBooking(venueId, "2026-09-19", { start: "17:00:00", end: "21:00:00" });
-    const same = await seedBooking(venueId, "2026-09-26", { start: "17:00:00", end: "21:00:00" });
+    await seedBooking(venueId, "2026-09-12", { start: "17:00:00", end: "21:00:00" });
     await ctx.db.insert(venueHallTimes).values([
       { venueId, date: "2026-09-12", kind: "open", startTime: "10:00", endTime: "22:00", source: "anlage_t" },
     ]);
 
     const res = await post(`/venues/${venueId}/hall-times/import/preview`, {
-      rows: [
-        open("2026-09-12", "10:00", "19:00"),
-        open("2026-09-19", "16:00", "22:00"),
-        open("2026-09-26", "10:00", "12:00"),
-      ],
+      rows: [open("2026-09-12", "10:00", "19:00")],
     });
-    const preview = (await res.json()) as HallTimeImportPreview;
-    expect(preview.bookings).toEqual([
-      { bookingId: loses, date: "2026-09-12", before: "covered", after: "partial" },
-      { bookingId: gains, date: "2026-09-19", before: "uncovered", after: "covered" },
-    ]);
-    expect(preview.bookings.map((b) => b.bookingId)).not.toContain(same);
+    const preview = (await res.json()) as Record<string, unknown>;
+    expect(Object.keys(preview).sort()).toEqual(["added", "changed", "removed", "span", "unchanged"]);
   });
 
   it("answers 404 for an unknown venue and 400 for a malformed body", async () => {
@@ -298,11 +281,10 @@ describe("POST /venues/:id/hall-times/import", () => {
       rows: [open("2026-09-12", "12:00", "16:00"), closed("2026-10-03", "Tag der Dt. Einheit")],
     });
     expect(res.status).toBe(200);
-    const result = (await res.json()) as HallTimeImportResult;
+    const result = (await res.json()) as HallTimeImportPreview;
     expect(result.added.map((r) => r.date)).toEqual(["2026-10-03"]);
     expect(result.changed.map((c) => c.after.date)).toEqual(["2026-09-12"]);
     expect(result.removed.map((r) => r.date)).toEqual(["2026-09-13"]);
-    expect(result.eventsEmitted).toBe(0);
 
     const stored = await ctx.db
       .select({ date: venueHallTimes.date, kind: venueHallTimes.kind, startTime: venueHallTimes.startTime, source: venueHallTimes.source })
@@ -322,86 +304,22 @@ describe("POST /venues/:id/hall-times/import", () => {
     expect(other).toEqual([{ date: "2026-09-19" }]);
   });
 
-  it("emits booking.hall_time.missing once per booking that loses coverage, and nothing on a repeat import", async () => {
+  it("writes rows and emits no domain event, whatever the bookings on the span", async () => {
     const venueId = await seedVenue();
-    const loses = await seedBooking(venueId, "2026-09-12", { start: "17:00:00", end: "21:00:00" });
-    await seedBooking(venueId, "2026-09-19", { start: "17:00:00", end: "21:00:00" }); // uncovered before and after
-    await seedBooking(venueId, "2026-09-26", { start: "17:00:00", end: "21:00:00" }); // gains coverage
+    await seedBooking(venueId, "2026-09-12", { start: "17:00:00", end: "21:00:00" });
     await ctx.db.insert(venueHallTimes).values([
       { venueId, date: "2026-09-12", kind: "open", startTime: "10:00", endTime: "22:00", source: "anlage_t" },
     ]);
+    const before = await ctx.db.select().from(domainEvents);
 
-    const body = {
-      rows: [closed("2026-09-12", "Ferien"), open("2026-09-19", "10:00", "12:00"), open("2026-09-26", "16:00", "22:00")],
-    };
-    const first = (await (await post(`/venues/${venueId}/hall-times/import`, body)).json()) as HallTimeImportResult;
-    expect(first.eventsEmitted).toBe(1);
-
-    const events = await hallTimeEvents();
-    expect(events).toHaveLength(1);
-    expect(events[0]!.entityId).toBe(loses);
-    expect(events[0]!.payload).toMatchObject({
-      bookingId: loses,
-      venueId,
-      venueName: "Gymnasium Goetheschule",
-      date: "2026-09-12",
-      startTime: "17:00:00",
-      endTime: "21:00:00",
-      coverage: "closed",
-      hallTime: { kind: "closed", note: "Ferien" },
+    const res = await post(`/venues/${venueId}/hall-times/import`, {
+      rows: [closed("2026-09-12", "Ferien"), open("2026-09-19", "10:00", "12:00")],
     });
+    const result = (await res.json()) as Record<string, unknown>;
 
-    const second = (await (await post(`/venues/${venueId}/hall-times/import`, body)).json()) as HallTimeImportResult;
-    expect(second.eventsEmitted).toBe(0);
-    expect(second.unchanged).toBe(3);
-    expect(await hallTimeEvents()).toHaveLength(1);
-  });
-
-  it("ignores a cancelled booking: it asks the city for nothing", async () => {
-    const venueId = await seedVenue();
-    await ctx.db
-      .insert(venueBookings)
-      .values({
-        venueId,
-        date: "2026-09-12",
-        calculatedStartTime: "17:00:00",
-        calculatedEndTime: "21:00:00",
-        status: "cancelled",
-      });
-    await ctx.db.insert(venueHallTimes).values([
-      { venueId, date: "2026-09-12", kind: "open", startTime: "10:00", endTime: "22:00", source: "anlage_t" },
-    ]);
-
-    const result = (await (
-      await post(`/venues/${venueId}/hall-times/import`, { rows: [closed("2026-09-12", "Ferien")] })
-    ).json()) as HallTimeImportResult;
-
-    expect(result.bookings).toEqual([]);
-    expect(result.eventsEmitted).toBe(0);
-    expect(await hallTimeEvents()).toHaveLength(0);
-  });
-
-  it("judges coverage by the booking's override window when one is set", async () => {
-    const venueId = await seedVenue();
-    await seedBooking(venueId, "2026-09-12", {
-      start: "17:00:00",
-      end: "21:00:00",
-      overrideStart: "12:00:00",
-      overrideEnd: "14:00:00",
-    });
-    await ctx.db.insert(venueHallTimes).values([
-      { venueId, date: "2026-09-12", kind: "open", startTime: "10:00", endTime: "22:00", source: "anlage_t" },
-    ]);
-
-    const result = (await (
-      await post(`/venues/${venueId}/hall-times/import`, { rows: [open("2026-09-12", "16:00", "22:00")] })
-    ).json()) as HallTimeImportResult;
-    expect(result.bookings[0]).toMatchObject({ before: "covered", after: "uncovered" });
-    expect(result.eventsEmitted).toBe(1);
-    const [row] = await ctx.db
-      .select({ startTime: venueHallTimes.startTime })
-      .from(venueHallTimes)
-      .where(and(eq(venueHallTimes.venueId, venueId), eq(venueHallTimes.date, "2026-09-12")));
-    expect(row?.startTime).toBe("16:00:00");
+    expect(Object.keys(result).sort()).toEqual(["added", "changed", "removed", "span", "unchanged"]);
+    const stored = await ctx.db.select().from(venueHallTimes).where(eq(venueHallTimes.venueId, venueId));
+    expect(stored.map((r) => r.date).sort()).toEqual(["2026-09-12", "2026-09-19"]);
+    expect(await ctx.db.select().from(domainEvents)).toHaveLength(before.length);
   });
 });

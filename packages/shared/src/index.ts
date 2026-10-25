@@ -287,7 +287,6 @@ export type {
   HallTimeWindow,
   BookingHallTime,
   HallCoverageInfo,
-  HallTimeImportBookingChange,
   HallTimeImportPreview,
   HallTimeImportResult,
 } from "./hall-times";

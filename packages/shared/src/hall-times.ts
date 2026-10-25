@@ -59,22 +59,13 @@ export interface BookingHallTime extends HallTimeWindow {
   gapAfterMinutes: number;
 }
 
-export interface HallTimeImportBookingChange {
-  bookingId: number;
-  date: string;
-  before: HallTimeCoverage;
-  after: HallTimeCoverage;
-}
-
 export interface HallTimeImportPreview {
   span: { from: string; to: string };
   added: HallTimeInput[];
   changed: { before: HallTimeRow; after: HallTimeInput }[];
   removed: HallTimeRow[];
   unchanged: number;
-  bookings: HallTimeImportBookingChange[];
 }
 
-export interface HallTimeImportResult extends HallTimeImportPreview {
-  eventsEmitted: number;
-}
+/** Applying an import reports the same diff the preview showed. */
+export type HallTimeImportResult = HallTimeImportPreview;

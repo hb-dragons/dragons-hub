@@ -30,7 +30,6 @@ describe("planHallTimeImport", () => {
         stored({ id: 5, date: "2026-09-26", source: "manual" }), // manual, sheet wins
       ],
       rows: [open("2026-09-12", "12:00", "16:00"), open("2026-09-19"), open("2026-09-26", "09:00", "11:00"), open("2026-10-03")],
-      bookings: [],
     });
 
     expect(plan.span).toEqual({ from: "2026-09-12", to: "2026-10-03" });
@@ -43,40 +42,16 @@ describe("planHallTimeImport", () => {
     expect(plan.unchanged).toBe(2);
     expect(plan.deleteIds).toEqual([1, 2, 5]);
     expect(plan.inserts.map((r) => r.date)).toEqual(["2026-09-12", "2026-09-26", "2026-10-03"]);
-  });
-
-  it("reports coverage changes and singles out the losses", () => {
-    const window = { effectiveStartTime: "11:00:00", effectiveEndTime: "13:00:00" };
-    const plan = planHallTimeImport({
-      existing: [stored({ id: 1, date: "2026-09-12" }), stored({ id: 2, date: "2026-09-19" })],
-      rows: [
-        { date: "2026-09-12", kind: "closed", startTime: null, endTime: null, note: "Ferien" },
-        open("2026-09-19"),
-        open("2026-09-26"),
-      ],
-      bookings: [
-        { id: 10, date: "2026-09-12", ...window }, // covered -> closed
-        { id: 11, date: "2026-09-19", ...window }, // covered -> covered
-        { id: 12, date: "2026-09-26", ...window }, // uncovered -> covered
-      ],
-    });
-
-    expect(plan.bookings).toEqual([
-      { bookingId: 10, date: "2026-09-12", before: "covered", after: "closed" },
-      { bookingId: 12, date: "2026-09-26", before: "uncovered", after: "covered" },
-    ]);
-    expect(plan.losses.map((l) => l.bookingId)).toEqual([10]);
+    expect(Object.keys(plan).sort()).toEqual(["added", "changed", "deleteIds", "inserts", "removed", "span", "unchanged"]);
   });
 
   it("counts a surviving manual row as unchanged and keeps it in the after-picture", () => {
     const plan = planHallTimeImport({
       existing: [stored({ id: 4, date: "2026-09-05", source: "manual", startTime: "09:00", endTime: "12:00" })],
       rows: [open("2026-09-01"), open("2026-09-30")],
-      bookings: [{ id: 1, date: "2026-09-05", effectiveStartTime: "09:30:00", effectiveEndTime: "11:00:00" }],
     });
 
     expect(plan.unchanged).toBe(1);
     expect(plan.deleteIds).toEqual([]);
-    expect(plan.bookings).toEqual([]);
   });
 });

@@ -1940,10 +1940,8 @@
       "changed": "Changed",
       "removed": "Removed",
       "unchanged": "{count, plural, one {# day unchanged} other {# days unchanged}}",
-      "bookings": "Affected bookings",
       "noChanges": "No changes against the stored hall times.",
       "apply": "Import",
-      "applied": "{count, plural, one {# booking} other {# bookings}} reported without hall time",
       "imported": "Hall times imported",
       "parseFailed": "The file could not be read.",
       "failed": "Import failed."
