@@ -6,7 +6,6 @@
   "src/app/[locale]/auth/[path]/page.tsx",
   "src/components/admin/app-sidebar.tsx",
   "src/components/admin/board/column-settings-dialog.tsx",
-  "src/components/admin/bookings/reconcile-dialog.tsx",
   "src/components/admin/dashboard/dashboard-view.tsx",
   "src/components/admin/matches/match-change-history.tsx",
   "src/components/admin/matches/match-detail-page.tsx",

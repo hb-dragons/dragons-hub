@@ -43,18 +43,21 @@ import { MatchDetailPage } from "./match-detail-page";
 
 const messages = {
   common: { back: "Back", loading: "Loading" },
-  bookings: {
-    status: {
-      pending: "Pending",
-      requested: "Requested",
-      confirmed: "Confirmed",
-      cancelled: "Cancelled",
-    },
-  },
   errors: {
     title: "Something went wrong",
     description: "An unexpected error occurred.",
     tryAgain: "Try again",
+  },
+  hallTimes: {
+    title: "Hall times",
+    closedNote: "Hall closed{note, select, none {} other {: {note}}}",
+    coverage: {
+      covered: "Hall time covered",
+      partial: "Hall time partial",
+      uncovered: "Outside hall time",
+      closed: "Hall closed",
+      none: "No hall time",
+    },
   },
   matchDetail: {
     alternativeDates: {
@@ -70,13 +73,16 @@ const messages = {
       homeGame: "Home game",
       awayGame: "Away game",
       groups: {
-        booked: "With a hall booking",
-        unbooked: "Without a hall booking",
+        fits: "Fits a held hall time",
+        notHeld: "No hall time held",
         away: "Away",
       },
-      noBooking: "no booking",
+      hallTime: "Hall time {start} – {end}",
       awayVenue: "Hall: opponent",
-      needsReconfirmation: "Needs re-confirmation",
+      currentVenue: "current hall",
+      noHalls: "None of our halls has a hall time.",
+      game: "{start} – {end} {home} – {guest}",
+      noFit: "Game does not fit",
       suggestedKickoff: "Suggested kickoff: {time}",
       loading: "Searching for dates…",
       flags: {
@@ -107,7 +113,11 @@ const messages = {
     score: { title: "Score", final: "Final", halftime: "Halftime" },
     status: { confirmed: "Confirmed", forfeited: "Forfeited", cancelled: "Cancelled" },
     referees: { title: "Referees", open: "Open" },
-    booking: { title: "Booking", needsReconfirmation: "Needs reconfirmation" },
+    hallCoverage: {
+      title: "Hall time",
+      window: "Window needed: {start} – {end}",
+      games: "{count, plural, one {# game} other {# games}} that day",
+    },
   },
 };
 
@@ -132,7 +142,7 @@ const detail = {
     isCancelled: false,
     overrides: [],
     refereeSlots: [],
-    booking: null,
+    hallCoverage: null,
   },
   diffs: [],
 };
@@ -207,17 +217,19 @@ describe("MatchDetailPage alternative-date finder", () => {
         {
           date: "2026-08-15",
           weekday: "saturday",
-          group: "booked",
-          bookings: [
+          group: "fits",
+          halls: [
             {
-              id: 1,
-              effectiveStartTime: "10:00:00",
-              effectiveEndTime: "16:00:00",
-              status: "confirmed",
-              needsReconfirmation: false,
+              venueId: 1,
+              venueName: "Drachenhalle",
+              isCurrentVenue: true,
+              hallTime: { kind: "open", startTime: "10:00", endTime: "20:00", note: null },
+              games: [],
+              existing: null,
+              fits: true,
+              suggestedKickoffTime: "17:00:00",
             },
           ],
-          suggestedKickoffTime: "17:00:00",
           flags: [],
         },
       ],
@@ -249,7 +261,7 @@ describe("MatchDetailPage alternative-date finder", () => {
 
     expect(mocks.alternativeDates).toHaveBeenCalledWith(1, undefined);
     expect(
-      screen.getByRole("heading", { name: "With a hall booking", hidden: true }),
+      screen.getByRole("heading", { name: "Fits a held hall time", hidden: true }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Suggested kickoff/)).toBeInTheDocument();
   });
@@ -291,5 +303,73 @@ describe("MatchDetailPage alternative-date finder", () => {
     expect(mocks.editSheet).toHaveBeenLastCalledWith(
       expect.objectContaining({ open: true, prefill: null }),
     );
+  });
+});
+
+function renderWithCoverage(hallCoverage: unknown) {
+  return render(
+    <NextIntlClientProvider locale="en" messages={messages}>
+      <MatchDetailPage
+        matchId={1}
+        initialDetail={{ ...detail, match: { ...detail.match, hallCoverage } } as never}
+        initialHistory={{ entries: [], total: 0 } as never}
+      />
+    </NextIntlClientProvider>,
+  );
+}
+
+describe("MatchDetailPage hall coverage", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("shows the hall time, the window the games need and the game count", () => {
+    renderWithCoverage({
+      hallTime: { kind: "open", startTime: "08:00", endTime: "17:00", note: null },
+      coverage: "partial",
+      gapBeforeMinutes: 0,
+      gapAfterMinutes: 30,
+      windowStart: "09:00:00",
+      windowEnd: "17:30:00",
+      gameCount: 2,
+    });
+    expect(screen.getByText("Hall time partial")).toHaveAttribute("data-coverage", "partial");
+    expect(screen.getByText("Hall times: 08:00 – 17:00")).toBeInTheDocument();
+    expect(
+      screen.getByText("Window needed: 09:00 – 17:30 · 2 games that day"),
+    ).toBeInTheDocument();
+  });
+
+  it("names the closure on a closed day", () => {
+    renderWithCoverage({
+      hallTime: { kind: "closed", startTime: null, endTime: null, note: "Ferien" },
+      coverage: "closed",
+      gapBeforeMinutes: 0,
+      gapAfterMinutes: 0,
+      windowStart: "09:00:00",
+      windowEnd: "12:30:00",
+      gameCount: 1,
+    });
+    expect(screen.getByText("Hall closed")).toHaveAttribute("data-coverage", "closed");
+    expect(screen.getByText("Hall closed: Ferien")).toBeInTheDocument();
+  });
+
+  it("flags a day with no hall time at all", () => {
+    renderWithCoverage({
+      hallTime: null,
+      coverage: "none",
+      gapBeforeMinutes: 0,
+      gapAfterMinutes: 0,
+      windowStart: "09:00:00",
+      windowEnd: "12:30:00",
+      gameCount: 1,
+    });
+    expect(screen.getByText("No hall time")).toHaveAttribute("data-coverage", "none");
+  });
+
+  it("shows no hall card for a game without coverage", () => {
+    renderWithCoverage(null);
+    expect(screen.queryByText("Hall time partial")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Window needed/)).not.toBeInTheDocument();
   });
 });

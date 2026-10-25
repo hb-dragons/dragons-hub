@@ -5,7 +5,7 @@ import type { EventType } from "./domain-events";
  *
  * A deliberate subset of `EVENT_TYPES`: muting is offered only for events
  * addressed to a *person* (their task assignments and comments). Club-wide
- * match, referee, booking and sync events are not the user's to silence, so
+ * match, referee and sync events are not the user's to silence, so
  * they are absent here and rejected by `notificationPreferencesBodySchema`.
  *
  * `satisfies readonly EventType[]` is the load-bearing part — it stops this

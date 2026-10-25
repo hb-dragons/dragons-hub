@@ -14,7 +14,7 @@ export interface TeamBadgeProps {
 }
 
 /**
- * The one team badge. Matches, bookings and reconcile all render through this
+ * The one team badge. Matches and hall occupancy both render through this
  * so a given team is the same colour wherever it appears, in either theme.
  */
 export function TeamBadge({ name, badgeColor, className }: TeamBadgeProps) {

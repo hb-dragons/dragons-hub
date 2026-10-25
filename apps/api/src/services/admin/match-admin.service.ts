@@ -22,7 +22,7 @@ const NOT_NULL_STATUS_FIELDS = new Set<string>(["isForfeited", "isCancelled"]);
 import type { MatchDetailResponse, EventType } from "@dragons/shared";
 import { EVENT_TYPES } from "@dragons/shared";
 import type { MatchUpdateData, TransactionClient } from "./match-query.service";
-import { buildDetailResponse, loadRemoteSnapshot } from "./match-query.service";
+import { buildDetailResponse, loadRemoteSnapshot, withHallCoverage } from "./match-query.service";
 import { publishDomainEvent } from "../events/event-publisher";
 import { logger } from "../../config/logger";
 
@@ -89,7 +89,7 @@ export async function updateMatchLocal(
   data: MatchUpdateData,
   changedBy: string,
 ): Promise<MatchDetailResponse | null> {
-  return await getDb().transaction(async (tx) => {
+  const detail = await getDb().transaction(async (tx) => {
     const [locked] = await tx
       .select()
       .from(matches)
@@ -310,6 +310,7 @@ export async function updateMatchLocal(
     // Re-query within transaction for full response
     return buildDetailResponse(tx, id);
   });
+  return withHallCoverage(detail);
 }
 
 export async function releaseOverride(
@@ -317,7 +318,7 @@ export async function releaseOverride(
   fieldName: string,
   changedBy: string,
 ): Promise<MatchDetailResponse | null> {
-  return await getDb().transaction(async (tx) => {
+  const detail = await getDb().transaction(async (tx) => {
     const [locked] = await tx
       .select()
       .from(matches)
@@ -495,4 +496,5 @@ export async function releaseOverride(
     // Re-query within transaction for full response
     return buildDetailResponse(tx, matchId);
   });
+  return withHallCoverage(detail);
 }

@@ -53,7 +53,7 @@ function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
     publicComment: null,
     hasLocalChanges: false,
     overriddenFields: [],
-    booking: null,
+    hallCoverage: null,
     ...overrides,
   };
 }

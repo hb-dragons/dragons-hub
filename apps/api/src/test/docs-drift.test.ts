@@ -194,7 +194,9 @@ describe("AGENTS.md sync pipeline", () => {
     // would make the two tests below vacuously pass.
     expect(stages.length).toBeGreaterThan(10);
     expect(stages).toContain("syncLeagues");
-    expect(stages).toContain("reconcileAfterSync");
+    expect(stages).toContain("confirmIntentsFromSync");
+    // Stored venue bookings are gone (ADR-0012): no stage reconciles them.
+    expect(stages).not.toContain("reconcileAfterSync");
   });
 
   it("names every stage fullSync calls", () => {

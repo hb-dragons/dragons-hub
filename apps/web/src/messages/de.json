@@ -16,7 +16,7 @@
     "venues": "Hallen",
     "users": "Benutzer",
     "board": "Board",
-    "bookings": "Buchungen",
+    "bookings": "Hallenbelegung",
     "menu": "Menü",
     "groupLeague": "Liga",
     "groupOperations": "Betrieb",
@@ -56,8 +56,7 @@
     "quickLinks": {
       "teams": "Teams",
       "teamsDesc": "{count, plural, one {# Team} other {# Teams}} verfolgt",
-      "bookings": "Buchungen",
-      "bookingsDesc": "{count, plural, one {# ausstehend} other {# ausstehend}}",
+      "bookings": "Hallenbelegung",
       "sync": "Sync-Status",
       "syncHealthy": "Fehlerfrei",
       "syncFailed": "Aktion nötig",
@@ -258,8 +257,7 @@
       "anschreiber": "Anschreiber",
       "zeitnehmer": "Zeitnehmer",
       "shotclock": "Shotclock",
-      "comment": "Kommentar",
-      "booking": "Buchung"
+      "comment": "Kommentar"
     },
     "status": {
       "label": "Status",
@@ -300,13 +298,13 @@
       "homeGame": "Heimspiel",
       "awayGame": "Auswärtsspiel",
       "groups": {
-        "booked": "Mit Hallenbuchung",
-        "unbooked": "Ohne Hallenbuchung",
+        "fits": "Passt in eine Hallenzeit",
+        "heldNoFit": "Hallenzeit vorhanden, Spiel passt nicht",
+        "notHeld": "Keine Hallenzeit vorhanden",
+        "closed": "Alle Hallen geschlossen",
         "away": "Auswärts"
       },
-      "noBooking": "keine Buchung",
       "awayVenue": "Halle: Gegner",
-      "needsReconfirmation": "Rückbestätigung nötig",
       "suggestedKickoff": "Vorschlag: {time} Uhr",
       "loading": "Termine werden gesucht",
       "flags": {
@@ -318,7 +316,13 @@
       "copy": "Als Text kopieren",
       "copyHeader": "Mögliche Ausweichtermine für {home} – {guest} ({league}, Spieltag {matchDay}):",
       "copied": "Ausweichtermine kopiert.",
-      "copyFailed": "Kopieren war nicht möglich."
+      "copyFailed": "Kopieren war nicht möglich.",
+      "hallTime": "Hallenzeit {start} – {end}",
+      "hallClosed": "Halle geschlossen{note, select, none {} other {: {note}}}",
+      "currentVenue": "aktuelle Halle",
+      "noHalls": "Keine unserer Hallen hat eine Hallenzeit.",
+      "game": "{start} – {end} {home} – {guest}",
+      "noFit": "Spiel passt nicht"
     },
     "score": {
       "title": "Ergebnis",
@@ -381,9 +385,10 @@
       "overrideReleaseFailed": "Override-Freigabe fehlgeschlagen",
       "loadFailed": "Spiel konnte nicht geladen werden"
     },
-    "booking": {
-      "title": "Hallenbuchung",
-      "needsReconfirmation": "Bestätigung erforderlich"
+    "hallCoverage": {
+      "title": "Hallenzeit",
+      "window": "Benötigtes Fenster: {start} – {end}",
+      "games": "{count, plural, one {# Spiel} other {# Spiele}} an diesem Tag"
     },
     "diff": {
       "diverged": "Abweichend",
@@ -613,8 +618,10 @@
       "street": "Straße",
       "postalCode": "PLZ",
       "city": "Stadt",
-      "map": "Karte"
-    }
+      "map": "Karte",
+      "hallTimes": "Hallenzeiten"
+    },
+    "hallTimes": "Hallenzeiten"
   },
   "teams": {
     "title": "Teams",
@@ -881,8 +888,6 @@
       "comments": "Kommentare",
       "addComment": "Kommentar hinzufügen",
       "linkedMatch": "Verknüpftes Spiel",
-      "linkedBooking": "Verknüpfte Buchung",
-      "venueBooking": "Hallenbuchung",
       "linkedMatches": "Verknüpfte Spiele",
       "source": "Quelle",
       "titlePlaceholder": "Unbenannte Aufgabe",
@@ -904,81 +909,6 @@
       "moved": "Aufgabe verschoben"
     },
     "moreActions": "Board-Aktionen"
-  },
-  "bookings": {
-    "title": "Hallenbuchungen",
-    "description": "Buchungsstatus für Heimspiele verwalten",
-    "empty": "Keine Hallenbuchungen gefunden",
-    "status": {
-      "pending": "Ausstehend",
-      "requested": "Angefragt",
-      "confirmed": "Bestätigt",
-      "cancelled": "Storniert"
-    },
-    "needsReconfirmation": "Erneute Bestätigung erforderlich — Spielzeiten haben sich seit der Bestätigung geändert",
-    "columns": {
-      "date": "Datum",
-      "venue": "Halle",
-      "timeWindow": "Zeitfenster",
-      "matches": "Spiele",
-      "status": "Status"
-    },
-    "create": {
-      "title": "Neue Buchung",
-      "venue": "Halle",
-      "venuePlaceholder": "Halle auswählen...",
-      "date": "Datum",
-      "startTime": "Startzeit",
-      "endTime": "Endzeit",
-      "notes": "Notizen",
-      "notesPlaceholder": "Optionale Notizen...",
-      "submit": "Buchung erstellen"
-    },
-    "override": {
-      "label": "Zeitfenster überschreiben",
-      "reason": "Grund"
-    },
-    "toast": {
-      "updated": "Buchung aktualisiert",
-      "statusChanged": "Status aktualisiert",
-      "deleted": "Buchung gelöscht",
-      "created": "Buchung erstellt",
-      "reconciled": "Buchungen synchronisiert"
-    },
-    "reconcile": {
-      "button": "Aus Spielplan synchronisieren",
-      "title": "Buchungen synchronisieren",
-      "description": "Aktuelle Buchungen mit dem Spielplan vergleichen und Änderungen anwenden.",
-      "noChanges": "Alles aktuell. Keine Änderungen notwendig.",
-      "apply": "Änderungen anwenden",
-      "toCreate": "Neue Buchungen",
-      "toUpdate": "Aktualisierte Buchungen",
-      "toRemove": "Zu entfernende Buchungen",
-      "timeWindow": "Zeitfenster",
-      "matchesAdded": "Spiele hinzugefügt",
-      "matchesRemoved": "Spiele entfernt",
-      "reasonCancelled": "Alle Spiele ausgefallen oder abgesagt",
-      "reasonNoMatches": "Keine verknüpften Spiele mehr",
-      "forfeited": "Ausgefallen",
-      "cancelled": "Abgesagt"
-    },
-    "detail": {
-      "times": "Zeitfenster",
-      "startTime": "Start",
-      "endTime": "Ende",
-      "calculated": "Berechnet",
-      "reasonPlaceholder": "Grund für Überschreibung...",
-      "linkedMatches": "Verknüpfte Spiele",
-      "opponent": "vs. {guest}",
-      "notes": "Notizen",
-      "notesPlaceholder": "Notizen hinzufügen...",
-      "delete": "Buchung löschen",
-      "deleteConfirmTitle": "Buchung löschen?",
-      "deleteConfirmDescription": "Diese Buchung und alle Spielverknüpfungen werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
-      "discardTitle": "Änderungen verwerfen?",
-      "discardDescription": "Du hast ungespeicherte Änderungen. Möchtest du sie wirklich verwerfen?",
-      "discard": "Verwerfen"
-    }
   },
   "settings": {
     "title": "Einstellungen",
@@ -1013,12 +943,11 @@
       }
     },
     "booking": {
-      "title": "Hallenbuchungs-Einstellungen",
-      "description": "Standardwerte für die Berechnung der Hallenbuchungszeiten konfigurieren",
+      "title": "Hallenbelegung: Zeitfenster",
+      "description": "Vorlauf vor dem ersten und Nachlauf nach dem letzten Spiel sowie die Standard-Spieldauer, aus denen das Zeitfenster eines Heimspieltags berechnet wird",
       "bufferBefore": "Vorlauf vor erstem Spiel (min)",
       "bufferAfter": "Nachlauf nach letztem Spiel (min)",
-      "gameDuration": "Standard-Spieldauer (min)",
-      "dueDaysBefore": "Buchungsfrist (Tage vorher)"
+      "gameDuration": "Standard-Spieldauer (min)"
     },
     "theme": {
       "title": "Design",
@@ -1873,5 +1802,96 @@
     "deleteBlocked": "Person konnte nicht gelöscht werden — sie ist noch einem Team zugeordnet.",
     "saveFailed": "Person konnte nicht gespeichert werden.",
     "deleteFailed": "Person konnte nicht gelöscht werden."
+  },
+  "hallTimes": {
+    "title": "Hallenzeiten",
+    "description": "Wann der Verein die Halle laut Mietantrag hält.",
+    "coverage": {
+      "covered": "Hallenzeit gedeckt",
+      "partial": "Hallenzeit teilweise",
+      "uncovered": "Außerhalb der Hallenzeit",
+      "closed": "Halle geschlossen",
+      "none": "Keine Hallenzeit"
+    },
+    "columns": {
+      "date": "Datum",
+      "window": "Hallenzeit",
+      "note": "Hinweis",
+      "source": "Quelle"
+    },
+    "kind": {
+      "open": "Hallenzeit",
+      "closed": "Geschlossen"
+    },
+    "source": {
+      "anlage_t": "Anlage T",
+      "manual": "Manuell"
+    },
+    "empty": "Keine Hallenzeiten für diese Halle.",
+    "gap": "{before, plural, =0 {} other {{before} Min. vor Beginn}}{both, select, yes { und } other {}}{after, plural, =0 {} other {{after} Min. nach Ende}} nicht gedeckt",
+    "noHallTime": "Für diesen Tag hält der Verein keine Hallenzeit – Mietantrag an die Stadt nötig.",
+    "closedNote": "Halle geschlossen{note, select, none {} other {: {note}}}",
+    "edit": {
+      "title": "Hallenzeit bearbeiten",
+      "add": "Tag eintragen",
+      "date": "Datum",
+      "kind": "Art",
+      "startTime": "Von",
+      "endTime": "Bis",
+      "note": "Hinweis",
+      "save": "Speichern",
+      "delete": "Löschen",
+      "deleteConfirmTitle": "Hallenzeit löschen?",
+      "deleteConfirmDescription": "Der Eintrag für diesen Tag wird entfernt.",
+      "saved": "Hallenzeit gespeichert",
+      "deleted": "Hallenzeit gelöscht"
+    },
+    "import": {
+      "button": "Anlage T importieren",
+      "title": "Anlage T importieren",
+      "description": "Die Excel-Datei der Stadt (Anlage T zum Mietantrag) einlesen. Die Hallenzeiten im Zeitraum der Datei werden ersetzt.",
+      "file": "Datei",
+      "venue": "Halle",
+      "venuePlaceholder": "Halle wählen…",
+      "parsed": "{count, plural, one {# Tag} other {# Tage}} gelesen aus „{hallName}“{updatedOn, select, none {} other {, Stand {updatedOn}}}",
+      "warnings": "Hinweise beim Einlesen",
+      "preview": "Vorschau",
+      "added": "Neu",
+      "changed": "Geändert",
+      "removed": "Entfernt",
+      "unchanged": "{count, plural, one {# Tag unverändert} other {# Tage unverändert}}",
+      "noChanges": "Keine Änderungen gegenüber den gespeicherten Hallenzeiten.",
+      "apply": "Importieren",
+      "imported": "Hallenzeiten importiert",
+      "parseFailed": "Die Datei konnte nicht gelesen werden.",
+      "failed": "Import fehlgeschlagen."
+    }
+  },
+  "hallOccupancy": {
+    "title": "Hallenbelegung",
+    "description": "Heimspieltage je Halle mit Abgleich gegen die Hallenzeiten",
+    "empty": "Keine Heimspieltage gefunden",
+    "columns": {
+      "date": "Datum",
+      "hall": "Halle",
+      "games": "Spiele",
+      "window": "Hallenbedarf",
+      "hallTime": "Hallenzeit",
+      "coverage": "Abdeckung"
+    },
+    "filters": {
+      "hall": "Halle",
+      "allHalls": "Alle Hallen",
+      "coverage": "Abdeckung",
+      "allCoverages": "Alle",
+      "from": "Von",
+      "to": "Bis"
+    },
+    "versus": "gegen {guest}",
+    "noHallTime": "Keine Hallenzeit",
+    "closed": "Geschlossen",
+    "closedWithNote": "Geschlossen: {note}",
+    "gapEarly": "{minutes} Min. zu früh",
+    "gapLate": "{minutes} Min. zu spät"
   }
 }

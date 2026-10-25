@@ -50,6 +50,7 @@ export const SWR_KEYS = {
   standings: (seasonId?: number) =>
     seasonId === undefined ? "/admin/standings" : `/admin/standings?seasonId=${seasonId}`,
   venues: "/admin/venues",
+  venueHallTimes: (venueId: number) => `/admin/venues/${venueId}/hall-times`,
   settingsClub: "/admin/settings/club",
   settingsLeagues: "/admin/settings/leagues",
   users: "admin-users",
@@ -69,7 +70,20 @@ export const SWR_KEYS = {
       : `/admin/boards/${boardId}/tasks`;
   },
   taskDetail: (id: number) => `/admin/tasks/${id}`,
-  bookings: "/admin/bookings",
+  hallOccupancy: (q: {
+    dateFrom?: string;
+    dateTo?: string;
+    venueId?: number;
+    coverage?: string;
+  }) => {
+    const qs = new URLSearchParams();
+    if (q.dateFrom) qs.set("dateFrom", q.dateFrom);
+    if (q.dateTo) qs.set("dateTo", q.dateTo);
+    if (q.venueId !== undefined) qs.set("venueId", String(q.venueId));
+    if (q.coverage) qs.set("coverage", q.coverage);
+    const suffix = qs.toString();
+    return suffix ? `/admin/hall-occupancy?${suffix}` : "/admin/hall-occupancy";
+  },
   settingsBooking: "/admin/settings/booking",
   notifications: (limit?: number, offset?: number) =>
     `/admin/notifications?limit=${limit ?? 20}&offset=${offset ?? 0}`,

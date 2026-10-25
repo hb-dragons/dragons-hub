@@ -15,7 +15,6 @@ export interface DefaultNotification {
 
 const ADMIN_EVENT_PREFIXES = [
   "match.",
-  "booking.",
   "override.",
   "referee.",
 ] as const;
@@ -68,7 +67,7 @@ const TASK_RECIPIENT_FIELDS: Partial<Record<EventType, string>> = {
  * Determine the default set of notifications to emit for a domain event,
  * based on role-based rules rather than user-created watch rules.
  *
- * Admins receive all match.*, booking.*, override.*, referee.* events on
+ * Admins receive all match.*, override.*, referee.* events on
  * in-app. Referees receive referee.assigned / unassigned / reassigned on
  * in-app for their own refereeId. For reassigned events, both old and new
  * referee are notified.

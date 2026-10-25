@@ -3,14 +3,6 @@
 export const TASK_PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 export type TaskPriority = (typeof TASK_PRIORITIES)[number];
 
-export const BOOKING_STATUSES = [
-  "pending",
-  "requested",
-  "confirmed",
-  "cancelled",
-] as const;
-export type BookingStatus = (typeof BOOKING_STATUSES)[number];
-
 // State of one referee slot (SR1/SR2) on a federation fixture. Derived during
 // sync by `deriveSrStatus`, and set to "assigned"/"open" by the assignment
 // service — those are the only writers, so `refereeGames.sr{1,2}Status` carries

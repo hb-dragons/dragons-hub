@@ -37,18 +37,6 @@ export {
 } from "./match";
 
 export {
-  bookingIdParamSchema,
-  bookingListQuerySchema,
-  bookingUpdateBodySchema,
-  bookingStatusBodySchema,
-  bookingCreateBodySchema,
-  type BookingListQuery,
-  type BookingCreateBody,
-  type BookingUpdateBody,
-  type BookingStatusBody,
-} from "./booking";
-
-export {
   channelConfigIdParamSchema,
   channelConfigListQuerySchema,
   createChannelConfigSchema,
@@ -171,8 +159,19 @@ export { meStaffUpdateBodySchema, type MeStaffUpdateBody } from "./me";
 
 export {
   venueSearchQuerySchema,
+  venueIdParamSchema,
+  hallTimeDateParamSchema,
+  hallTimeListQuerySchema,
+  hallTimeInputSchema,
+  hallTimeUpsertBodySchema,
+  hallTimeImportBodySchema,
   type VenueSearchQuery,
+  type HallTimeListQuery,
+  type HallTimeUpsertBody,
+  type HallTimeImportBody,
 } from "./venue";
+
+export { hallOccupancyQuerySchema, type HallOccupancyQuery } from "./hall-occupancy";
 
 export {
   taskBoardIdParamSchema,

@@ -69,19 +69,20 @@ const ENUM_COLUMNS: readonly EnumColumn[] = [
   { table: "sync_run_entries", column: "entity_type", constant: "ENTITY_TYPES" },
   { table: "sync_run_entries", column: "action", constant: "ENTRY_ACTIONS" },
   { table: "tasks", column: "priority", constant: "TASK_PRIORITIES" },
-  { table: "venue_bookings", column: "status", constant: "BOOKING_STATUSES" },
+  { table: "venue_hall_times", column: "kind", constant: "HALL_TIME_KINDS" },
+  { table: "venue_hall_times", column: "source", constant: "HALL_TIME_SOURCES" },
   {
     table: "domain_events",
     column: "type",
     constant: "STORED_EVENT_TYPE_VALUES",
-    note: "the stored vocabulary, wider than the publishable EVENT_TYPE_VALUES: publishSystemEvent writes admin.test_push (#154)",
+    note: "the stored vocabulary, wider than the publishable EVENT_TYPE_VALUES: publishSystemEvent writes admin.test_push (#154), and rows of the retired booking events stay readable (ADR-0012)",
   },
   { table: "domain_events", column: "urgency", constant: "EVENT_URGENCIES" },
   {
     table: "domain_events",
     column: "entity_type",
     constant: "STORED_EVENT_ENTITY_TYPES",
-    note: "likewise wider than EVENT_ENTITY_TYPES: a system event is about an account, so it stores 'user'",
+    note: "likewise wider than EVENT_ENTITY_TYPES: a system event is about an account, so it stores 'user'; retired booking events stored 'booking'",
   },
   {
     table: "domain_events",
@@ -127,6 +128,7 @@ const ENUM_COLUMNS: readonly EnumColumn[] = [
  * skip list.
  */
 const NOT_PERSISTED: Readonly<Record<string, string>> = {
+  HALL_TIME_COVERAGES: "derived at read time from a window and a hall time; never written to the database",
   SURFACE_GROUP_ORDER: "navigation shell ordering; never written to the database",
   COLOR_PRESET_KEYS: "team colour presets are stored as the resolved hex values, not the key",
   EVENT_ENTITY_TYPES:
@@ -135,6 +137,10 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = {
     "a component of STORED_EVENT_TYPE_VALUES, which is what guards the column; kept separate so the manual trigger and watch rules cannot name admin.test_push",
   SYSTEM_EVENT_ENTITY_TYPES:
     "likewise a component of STORED_EVENT_ENTITY_TYPES rather than a column's governing array in its own right",
+  RETIRED_EVENT_TYPES:
+    "a component of STORED_EVENT_TYPE_VALUES; kept separate so the manual trigger and new watch-rule entries cannot name a retired booking event",
+  RETIRED_EVENT_ENTITY_TYPES:
+    "a component of STORED_EVENT_ENTITY_TYPES rather than a column's governing array in its own right",
   KAMPFGERICHT_ROLES:
     "the three matches columns (anschreiber/zeitnehmer/shotclock) are the roles; the array names them for the Einsatz response and stores nothing (#313)",
 };

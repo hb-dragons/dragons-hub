@@ -37,7 +37,6 @@ export { socialEndpoints } from "./social";
 
 export { settingsEndpoints } from "./settings";
 
-export { bookingEndpoints } from "./booking";
 
 export { teamEndpoints } from "./team";
 
@@ -56,6 +55,7 @@ export { eventEndpoints } from "./event";
 export type { TriggerEventBody } from "@dragons/contracts";
 
 export { venueEndpoints } from "./venue";
+export { hallOccupancyEndpoints } from "./hall-occupancy";
 
 export { scoreboardEndpoints } from "./scoreboard";
 

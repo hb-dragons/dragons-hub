@@ -90,7 +90,7 @@ function makeMatch(): MatchDetail {
     publicComment: null,
     hasLocalChanges: false,
     overriddenFields: [],
-    booking: null,
+    hallCoverage: null,
     homeHalftimeScore: null,
     guestHalftimeScore: null,
     periodFormat: null,
@@ -125,12 +125,14 @@ const messages = {
     saveChanges: "Save Changes",
   },
   matches: { title: "Matches" },
-  bookings: {
-    status: {
-      pending: "Pending",
-      requested: "Requested",
-      confirmed: "Confirmed",
-      cancelled: "Cancelled",
+  hallTimes: {
+    title: "Hall times",
+    coverage: {
+      covered: "Hall time covered",
+      partial: "Hall time partial",
+      uncovered: "Outside hall time",
+      closed: "Hall closed",
+      none: "No hall time",
     },
   },
   matchDetail: {
@@ -187,13 +189,16 @@ const messages = {
       homeGame: "Home game",
       awayGame: "Away game",
       groups: {
-        booked: "With a hall booking",
-        unbooked: "Without a hall booking",
+        fits: "Fits a held hall time",
+        notHeld: "No hall time held",
         away: "Away",
       },
-      noBooking: "no booking",
+      hallTime: "Hall time {start} – {end}",
       awayVenue: "Hall: opponent",
-      needsReconfirmation: "Needs re-confirmation",
+      currentVenue: "current hall",
+      noHalls: "None of our halls has a hall time.",
+      game: "{start} – {end} {home} – {guest}",
+      noFit: "Game does not fit",
       suggestedKickoff: "Suggested kickoff: {time}",
       loading: "Searching for dates…",
       empty: "No free weekend day in this range.",
@@ -204,7 +209,11 @@ const messages = {
       copied: "Alternative dates copied.",
       copyFailed: "Copying was not possible.",
     },
-    booking: { title: "Booking", needsReconfirmation: "Needs reconfirmation" },
+    hallCoverage: {
+      title: "Hall time",
+      window: "Window needed: {start} – {end}",
+      games: "{count, plural, one {# game} other {# games}} that day",
+    },
     notes: {
       title: "Notes",
       internal: "Internal",
@@ -335,6 +344,47 @@ describe("MatchEditSheet venue override", () => {
   });
 });
 
+describe("MatchEditSheet hall coverage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    mocks.listTeams.mockResolvedValue([]);
+    mocks.searchVenues.mockResolvedValue({ venues: [] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  it("shows the day's coverage, hall time and window instead of a booking status", async () => {
+    const match = {
+      ...makeMatch(),
+      hallCoverage: {
+        hallTime: { kind: "open", startTime: "08:00", endTime: "17:00", note: null },
+        coverage: "partial",
+        gapBeforeMinutes: 0,
+        gapAfterMinutes: 30,
+        windowStart: "09:00:00",
+        windowEnd: "17:30:00",
+        gameCount: 2,
+      },
+    };
+    mocks.getMatch.mockResolvedValue({ match, diffs: [] });
+    await renderSheet();
+
+    expect(screen.getByText("Hall time partial")).toHaveAttribute("data-coverage", "partial");
+    expect(screen.getByText("08:00 – 17:00")).toBeInTheDocument();
+    expect(screen.getByText("Window needed: 09:00 – 17:30")).toBeInTheDocument();
+  });
+
+  it("shows no hall section for a game without coverage", async () => {
+    mocks.getMatch.mockResolvedValue({ match: makeMatch(), diffs: [] });
+    await renderSheet();
+
+    expect(screen.queryByText(/Window needed/)).not.toBeInTheDocument();
+  });
+});
+
 /**
  * Every FieldLabel in the sheet used to be a bare <label> with no htmlFor, so
  * a screen reader announced the controls unnamed and clicking a label did
@@ -457,17 +507,19 @@ describe("MatchEditSheet alternative-date finder", () => {
         {
           date: "2026-08-15",
           weekday: "saturday",
-          group: "booked",
-          bookings: [
+          group: "fits",
+          halls: [
             {
-              id: 1,
-              effectiveStartTime: "10:00:00",
-              effectiveEndTime: "16:00:00",
-              status: "confirmed",
-              needsReconfirmation: false,
+              venueId: 1,
+              venueName: "Drachenhalle",
+              isCurrentVenue: true,
+              hallTime: { kind: "open", startTime: "10:00", endTime: "20:00", note: null },
+              games: [],
+              existing: null,
+              fits: true,
+              suggestedKickoffTime: "17:00:00",
             },
           ],
-          suggestedKickoffTime: "17:00:00",
           flags: [],
         },
       ],
@@ -526,15 +578,15 @@ describe("MatchEditSheet alternative-date finder", () => {
     expect(screen.queryByText("Alternative dates")).not.toBeInTheDocument();
   });
 
-  it("shows the hall booking behind a candidate inside the sheet", async () => {
+  it("shows the halls behind a candidate inside the sheet", async () => {
     await openFinder();
 
     expect(
-      screen.getByRole("heading", { name: "With a hall booking", hidden: true }),
+      screen.getByRole("heading", { name: "Fits a held hall time", hidden: true }),
     ).toBeInTheDocument();
-    // The window itself is asserted where the provider pins the club zone, as
-    // production does; this sheet renders in UTC.
-    expect(screen.getByText(/Confirmed/, { selector: "span" })).toBeInTheDocument();
+    // The times themselves are asserted where the provider pins the club zone,
+    // as production does; this sheet renders in UTC.
+    expect(screen.getByText("Drachenhalle")).toBeInTheDocument();
     expect(screen.getByText(/Suggested kickoff/)).toBeInTheDocument();
   });
 
@@ -590,9 +642,8 @@ describe("MatchEditSheet alternative-date finder", () => {
         {
           date: "2026-08-15",
           weekday: "saturday",
-          group: "unbooked",
-          bookings: [],
-          suggestedKickoffTime: null,
+          group: "notHeld",
+          halls: [],
           flags: [],
         },
       ],
@@ -600,7 +651,7 @@ describe("MatchEditSheet alternative-date finder", () => {
     await openFinder();
 
     await act(async () => {
-      fireEvent.click(candidateRow(/no booking/)!);
+      fireEvent.click(candidateRow(/None of our halls/)!);
     });
 
     expect(
@@ -646,25 +697,26 @@ describe("MatchEditSheet alternative-date finder", () => {
         {
           date: "2026-08-15",
           weekday: "saturday",
-          group: "booked",
-          bookings: [
+          group: "fits",
+          halls: [
             {
-              id: 1,
-              effectiveStartTime: "10:00:00",
-              effectiveEndTime: "16:00:00",
-              status: "confirmed",
-              needsReconfirmation: false,
+              venueId: 1,
+              venueName: "Drachenhalle",
+              isCurrentVenue: true,
+              hallTime: { kind: "open", startTime: "10:00", endTime: "20:00", note: null },
+              games: [],
+              existing: null,
+              fits: true,
+              suggestedKickoffTime: "17:00:00",
             },
           ],
-          suggestedKickoffTime: "17:00:00",
           flags: [{ type: "outsideRoundWindow" }],
         },
         {
           date: "2026-08-09",
           weekday: "sunday",
-          group: "unbooked",
-          bookings: [],
-          suggestedKickoffTime: null,
+          group: "notHeld",
+          halls: [],
           flags: [],
         },
       ],

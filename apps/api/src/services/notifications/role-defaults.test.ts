@@ -10,8 +10,6 @@ describe("getDefaultNotificationsForEvent", () => {
       "match.cancelled",
       "match.schedule.changed",
       "match.created",
-      "booking.created",
-      "booking.status.changed",
       "override.applied",
       "referee.assigned",
       "referee.unassigned",
@@ -23,6 +21,10 @@ describe("getDefaultNotificationsForEvent", () => {
       );
       expect(adminInApp).toHaveLength(1);
       expect(adminInApp[0]).toEqual({ audience: "admin", channel: "in_app" });
+    });
+
+    it("admin receives no default for a retired booking event", () => {
+      expect(getDefaultNotificationsForEvent("booking.created", {}, "sync")).toEqual([]);
     });
 
     it("admin does not receive unrelated events", () => {
@@ -216,8 +218,8 @@ describe("getDefaultNotificationsForEvent", () => {
       expect(newChannels).toEqual(["in_app", "push"]);
     });
 
-    it("does NOT emit push for non-eligible event (e.g., booking.created)", () => {
-      const out = getDefaultNotificationsForEvent("booking.created", {}, "test");
+    it("does NOT emit push for non-eligible event (e.g., match.created)", () => {
+      const out = getDefaultNotificationsForEvent("match.created", {}, "test");
       const pushEntries = out.filter((n) => n.channel === "push");
       expect(pushEntries).toEqual([]);
     });
