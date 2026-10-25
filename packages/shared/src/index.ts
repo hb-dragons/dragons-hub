@@ -34,6 +34,7 @@ export type {
   OverrideInfo,
   MatchListItem,
   GamePlanMatchItem,
+  MatchHallCoverage,
   GamePlanGhostItem,
   GamePlanItem,
   MatchDetail,

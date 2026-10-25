@@ -36,7 +36,6 @@ import type { GamePlanGhostItem, GamePlanItem } from "./types"
 import { MatchEditSheet } from "./match-edit-sheet"
 import { TeamBadge } from "@/components/admin/shared/team-badge"
 import { HallTimeCoverageBadge } from "@/components/admin/hall-times/hall-time-coverage-badge"
-import { hallTimeCoverage } from "@dragons/shared"
 
 function OverrideDot({ match, field }: { match: GamePlanItem; field: string }) {
   const t = useTranslations("matchDetail")
@@ -104,7 +103,6 @@ function unlessGhost(match: GamePlanItem, value: string | null): string {
 
 function getColumns(
   t: ReturnType<typeof useTranslations<"matches">>,
-  tBookings: ReturnType<typeof useTranslations<"bookings">>,
   format: ReturnType<typeof useFormatter>,
   dateLocale: string,
 ): ColumnDef<GamePlanItem, unknown>[] {
@@ -121,12 +119,12 @@ function getColumns(
           {row.original.kind === "ghost" && (
             <GhostBadge ghost={row.original} dateLocale={dateLocale} />
           )}
-          {/* The booking column is hidden by default; a hall the club does not hold that day must still show. */}
+          {/* A hall the club does not fully hold that day must show on the plan. */}
           {row.original.kind === "match" &&
-            row.original.booking &&
-            hallTimeCoverage(row.original.booking.hallTime) !== "covered" && (
+            row.original.hallCoverage &&
+            row.original.hallCoverage.coverage !== "covered" && (
               <HallTimeCoverageBadge
-                coverage={hallTimeCoverage(row.original.booking.hallTime)}
+                coverage={row.original.hallCoverage.coverage}
                 className="ml-2 text-[10px]"
               />
             )}
@@ -264,35 +262,6 @@ function getColumns(
       meta: { label: t("columns.comment") },
     },
     {
-      id: "booking",
-      accessorFn: (row) => row.booking?.status ?? null,
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title={t("columns.booking")} />
-      ),
-      cell: ({ row }) => {
-        const booking = row.original.booking;
-        if (!booking || row.original.kind === "ghost") return null;
-        return (
-          <Badge
-            variant={
-              booking.status === "confirmed"
-                ? "success"
-                : booking.status === "requested"
-                  ? "default"
-                  : booking.status === "cancelled"
-                    ? "destructive"
-                    : "secondary"
-            }
-          >
-            {booking.needsReconfirmation ? "\u26A0 " : ""}
-            {tBookings(`status.${booking.status}`)}
-          </Badge>
-        );
-      },
-      enableSorting: false,
-      meta: { label: t("columns.booking") },
-    },
-    {
       id: "status",
       accessorFn: (row) => {
         if (row.isForfeited) return "forfeited"
@@ -344,7 +313,6 @@ const matchGlobalFilterFn: FilterFn<GamePlanItem> = (
 
 export function MatchListTable() {
   const t = useTranslations("matches")
-  const tBookings = useTranslations("bookings")
   const format = useFormatter()
   const dateLocale = resolveDateLocale(useLocale())
   const { mutate } = useSWRConfig()
@@ -354,8 +322,8 @@ export function MatchListTable() {
   const matchesQ = queries.matches(seasonId)
   const { data: response } = useSWR(matchesQ.key, matchesQ.fetcher)
   const columns = useMemo(
-    () => getColumns(t, tBookings, format, dateLocale),
-    [t, tBookings, format, dateLocale],
+    () => getColumns(t, format, dateLocale),
+    [t, format, dateLocale],
   )
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null)
 
@@ -404,7 +372,7 @@ export function MatchListTable() {
         onRowClick={handleRowClick}
         rowClassName={getRowClassName}
         globalFilterFn={matchGlobalFilterFn}
-        initialColumnVisibility={{ score: false, publicComment: false, status: false, booking: false }}
+        initialColumnVisibility={{ score: false, publicComment: false, status: false }}
         initialColumnFilters={[{ id: "status", value: ["active", "cancelled"] }]}
         emptyState={
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">

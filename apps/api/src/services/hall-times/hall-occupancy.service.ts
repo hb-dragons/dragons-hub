@@ -190,7 +190,10 @@ export async function loadHomeGameDays(scope: GameScope): Promise<HallOccupancyD
 export async function listHallOccupancy(query: HallOccupancyQuery): Promise<HallOccupancyDay[]> {
   const from = query.dateFrom ?? todayInClubZone();
   const seasonEnd = query.dateTo ? null : (await getActiveSeason())?.endDate ?? null;
-  const to = query.dateTo ?? seasonEnd ?? plusDaysInClubZone(365, clubDayAnchor(from));
+  // A season that is already over would invert the range, so it counts as no end.
+  const to =
+    query.dateTo ??
+    (seasonEnd && seasonEnd >= from ? seasonEnd : plusDaysInClubZone(365, clubDayAnchor(from)));
 
   const days = await loadHomeGameDays({
     from,

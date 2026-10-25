@@ -258,8 +258,7 @@
       "anschreiber": "Scorer",
       "zeitnehmer": "Timekeeper",
       "shotclock": "Shot Clock",
-      "comment": "Comment",
-      "booking": "Booking"
+      "comment": "Comment"
     },
     "status": {
       "label": "Status",
@@ -386,9 +385,10 @@
       "overrideReleaseFailed": "Failed to release override",
       "loadFailed": "Failed to load match"
     },
-    "booking": {
-      "title": "Venue Booking",
-      "needsReconfirmation": "Needs reconfirmation"
+    "hallCoverage": {
+      "title": "Hall time",
+      "window": "Window needed: {start} – {end}",
+      "games": "{count, plural, one {# game} other {# games}} that day"
     },
     "diff": {
       "diverged": "Diverged",
@@ -1888,7 +1888,7 @@
     "coverage": {
       "covered": "Hall time covered",
       "partial": "Hall time partial",
-      "uncovered": "No hall time",
+      "uncovered": "Outside hall time",
       "closed": "Hall closed",
       "none": "No hall time"
     },

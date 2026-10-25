@@ -62,8 +62,9 @@ const messages = {
     coverage: {
       covered: "Hall time covered",
       partial: "Hall time partial",
-      uncovered: "No hall time",
+      uncovered: "Outside hall time",
       closed: "Hall closed",
+      none: "No hall time",
     },
   },
   matchDetail: {
@@ -117,7 +118,11 @@ const messages = {
     score: { title: "Score", final: "Final", halftime: "Halftime" },
     status: { confirmed: "Confirmed", forfeited: "Forfeited", cancelled: "Cancelled" },
     referees: { title: "Referees", open: "Open" },
-    booking: { title: "Booking", needsReconfirmation: "Needs reconfirmation" },
+    hallCoverage: {
+      title: "Hall time",
+      window: "Window needed: {start} – {end}",
+      games: "{count, plural, one {# game} other {# games}} that day",
+    },
   },
 };
 
@@ -142,7 +147,7 @@ const detail = {
     isCancelled: false,
     overrides: [],
     refereeSlots: [],
-    booking: null,
+    hallCoverage: null,
   },
   diffs: [],
 };
@@ -304,32 +309,70 @@ describe("MatchDetailPage alternative-date finder", () => {
   });
 });
 
-describe("MatchDetailPage booking hall-time coverage", () => {
-  it("shows the booking's coverage next to its status", () => {
-    render(
-      <NextIntlClientProvider locale="en" messages={messages}>
-        <MatchDetailPage
-          matchId={1}
-          initialDetail={
-            {
-              ...detail,
-              match: {
-                ...detail.match,
-                booking: {
-                  id: 3,
-                  status: "pending",
-                  needsReconfirmation: false,
-                  hallTime: { kind: "closed", startTime: null, endTime: null, note: "Ferien", coverage: "closed", gapBeforeMinutes: 0, gapAfterMinutes: 0 },
-                },
-              },
-            } as never
-          }
-          initialHistory={{ entries: [], total: 0 } as never}
-        />
-      </NextIntlClientProvider>,
-    );
-    expect(screen.getByText("Pending")).toBeInTheDocument();
+function renderWithCoverage(hallCoverage: unknown) {
+  return render(
+    <NextIntlClientProvider locale="en" messages={messages}>
+      <MatchDetailPage
+        matchId={1}
+        initialDetail={{ ...detail, match: { ...detail.match, hallCoverage } } as never}
+        initialHistory={{ entries: [], total: 0 } as never}
+      />
+    </NextIntlClientProvider>,
+  );
+}
+
+describe("MatchDetailPage hall coverage", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("shows the hall time, the window the games need and the game count", () => {
+    renderWithCoverage({
+      hallTime: { kind: "open", startTime: "08:00", endTime: "17:00", note: null },
+      coverage: "partial",
+      gapBeforeMinutes: 0,
+      gapAfterMinutes: 30,
+      windowStart: "09:00:00",
+      windowEnd: "17:30:00",
+      gameCount: 2,
+    });
+    expect(screen.getByText("Hall time partial")).toHaveAttribute("data-coverage", "partial");
+    expect(screen.getByText("Hall times: 08:00 – 17:00")).toBeInTheDocument();
+    expect(
+      screen.getByText("Window needed: 09:00 – 17:30 · 2 games that day"),
+    ).toBeInTheDocument();
+  });
+
+  it("names the closure on a closed day", () => {
+    renderWithCoverage({
+      hallTime: { kind: "closed", startTime: null, endTime: null, note: "Ferien" },
+      coverage: "closed",
+      gapBeforeMinutes: 0,
+      gapAfterMinutes: 0,
+      windowStart: "09:00:00",
+      windowEnd: "12:30:00",
+      gameCount: 1,
+    });
     expect(screen.getByText("Hall closed")).toHaveAttribute("data-coverage", "closed");
     expect(screen.getByText("Hall closed: Ferien")).toBeInTheDocument();
+  });
+
+  it("flags a day with no hall time at all", () => {
+    renderWithCoverage({
+      hallTime: null,
+      coverage: "none",
+      gapBeforeMinutes: 0,
+      gapAfterMinutes: 0,
+      windowStart: "09:00:00",
+      windowEnd: "12:30:00",
+      gameCount: 1,
+    });
+    expect(screen.getByText("No hall time")).toHaveAttribute("data-coverage", "none");
+  });
+
+  it("shows no hall card for a game without coverage", () => {
+    renderWithCoverage(null);
+    expect(screen.queryByText("Hall time partial")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Window needed/)).not.toBeInTheDocument();
   });
 });

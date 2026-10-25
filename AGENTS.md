@@ -580,8 +580,8 @@ now picked per season through the endpoints below.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/matches` | List own club matches (with booking info); `includeGhosts=true` adds the game plan's ghost entries (`kind: "ghost"` with the date override's reason and author name, not counted in `total`) |
-| GET | `/admin/matches/:id` | Match detail with remote/local diffs (includes booking info) |
+| GET | `/admin/matches` | List own club matches (with hall coverage); `includeGhosts=true` adds the game plan's ghost entries (`kind: "ghost"` with the date override's reason and author name, not counted in `total`) |
+| GET | `/admin/matches/:id` | Match detail with remote/local diffs (includes hall coverage) |
 | GET | `/admin/matches/:id/history` | Match change history (remote + local track) |
 | GET | `/admin/matches/:id/alternative-dates` | Weekend days in a range on which neither squad plays |
 | PATCH | `/admin/matches/:id` | Update match local fields |

@@ -90,7 +90,7 @@ function makeMatch(): MatchDetail {
     publicComment: null,
     hasLocalChanges: false,
     overriddenFields: [],
-    booking: null,
+    hallCoverage: null,
     homeHalftimeScore: null,
     guestHalftimeScore: null,
     periodFormat: null,
@@ -125,6 +125,16 @@ const messages = {
     saveChanges: "Save Changes",
   },
   matches: { title: "Matches" },
+  hallTimes: {
+    title: "Hall times",
+    coverage: {
+      covered: "Hall time covered",
+      partial: "Hall time partial",
+      uncovered: "Outside hall time",
+      closed: "Hall closed",
+      none: "No hall time",
+    },
+  },
   bookings: {
     status: {
       pending: "Pending",
@@ -204,7 +214,11 @@ const messages = {
       copied: "Alternative dates copied.",
       copyFailed: "Copying was not possible.",
     },
-    booking: { title: "Booking", needsReconfirmation: "Needs reconfirmation" },
+    hallCoverage: {
+      title: "Hall time",
+      window: "Window needed: {start} – {end}",
+      games: "{count, plural, one {# game} other {# games}} that day",
+    },
     notes: {
       title: "Notes",
       internal: "Internal",
@@ -332,6 +346,48 @@ describe("MatchEditSheet venue override", () => {
     });
     const body = mocks.updateMatch.mock.calls[0]?.[1] as Record<string, unknown>;
     expect(body).not.toHaveProperty("venueId");
+  });
+});
+
+describe("MatchEditSheet hall coverage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    mocks.listTeams.mockResolvedValue([]);
+    mocks.searchVenues.mockResolvedValue({ venues: [] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  it("shows the day's coverage, hall time and window instead of a booking status", async () => {
+    const match = {
+      ...makeMatch(),
+      hallCoverage: {
+        hallTime: { kind: "open", startTime: "08:00", endTime: "17:00", note: null },
+        coverage: "partial",
+        gapBeforeMinutes: 0,
+        gapAfterMinutes: 30,
+        windowStart: "09:00:00",
+        windowEnd: "17:30:00",
+        gameCount: 2,
+      },
+    };
+    mocks.getMatch.mockResolvedValue({ match, diffs: [] });
+    await renderSheet();
+
+    expect(screen.getByText("Hall time partial")).toHaveAttribute("data-coverage", "partial");
+    expect(screen.getByText("08:00 – 17:00")).toBeInTheDocument();
+    expect(screen.getByText("Window needed: 09:00 – 17:30")).toBeInTheDocument();
+    expect(screen.queryByText("Pending")).not.toBeInTheDocument();
+  });
+
+  it("shows no hall section for a game without coverage", async () => {
+    mocks.getMatch.mockResolvedValue({ match: makeMatch(), diffs: [] });
+    await renderSheet();
+
+    expect(screen.queryByText(/Window needed/)).not.toBeInTheDocument();
   });
 });
 

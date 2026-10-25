@@ -258,8 +258,7 @@
       "anschreiber": "Anschreiber",
       "zeitnehmer": "Zeitnehmer",
       "shotclock": "Shotclock",
-      "comment": "Kommentar",
-      "booking": "Buchung"
+      "comment": "Kommentar"
     },
     "status": {
       "label": "Status",
@@ -386,9 +385,10 @@
       "overrideReleaseFailed": "Override-Freigabe fehlgeschlagen",
       "loadFailed": "Spiel konnte nicht geladen werden"
     },
-    "booking": {
-      "title": "Hallenbuchung",
-      "needsReconfirmation": "Bestätigung erforderlich"
+    "hallCoverage": {
+      "title": "Hallenzeit",
+      "window": "Benötigtes Fenster: {start} – {end}",
+      "games": "{count, plural, one {# Spiel} other {# Spiele}} an diesem Tag"
     },
     "diff": {
       "diverged": "Abweichend",
@@ -1888,7 +1888,7 @@
     "coverage": {
       "covered": "Hallenzeit gedeckt",
       "partial": "Hallenzeit teilweise",
-      "uncovered": "Keine Hallenzeit",
+      "uncovered": "Außerhalb der Hallenzeit",
       "closed": "Halle geschlossen",
       "none": "Keine Hallenzeit"
     },

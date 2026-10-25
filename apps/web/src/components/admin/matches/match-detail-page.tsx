@@ -28,7 +28,6 @@ import { MatchEditSheet } from "./match-edit-sheet";
 import type { MatchPrefill } from "./match-edit-sheet";
 import { AlternativeDatesPanel } from "./alternative-dates-panel";
 import { HallTimeCoverageBadge } from "@/components/admin/hall-times/hall-time-coverage-badge";
-import { hallTimeCoverage } from "@dragons/shared";
 import { MatchDivergenceTable } from "./match-divergence-table";
 import { MatchChangeHistory } from "./match-change-history";
 import { formatMatchTime, formatScore, formatPeriodScores } from "./utils";
@@ -271,44 +270,37 @@ export function MatchDetailPage({
         </Card>
       )}
 
-      {/* Booking */}
-      {match.booking && (
+      {/* Hall coverage */}
+      {match.hallCoverage && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{t("matchDetail.booking.title")}</CardTitle>
+            <CardTitle className="text-base">{t("matchDetail.hallCoverage.title")}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-1">
             <div className="flex items-center gap-2">
-              <Badge
-                variant={
-                  match.booking.status === "confirmed"
-                    ? "success"
-                    : match.booking.status === "requested"
-                      ? "default"
-                      : match.booking.status === "cancelled"
-                        ? "destructive"
-                        : "secondary"
-                }
-              >
-                {t(`bookings.status.${match.booking.status}`)}
-              </Badge>
-              {match.booking.needsReconfirmation && (
-                <Badge variant="outline" className="border-heat/50 text-heat">
-                  {t("matchDetail.booking.needsReconfirmation")}
-                </Badge>
-              )}
-              <HallTimeCoverageBadge coverage={hallTimeCoverage(match.booking.hallTime)} />
+              <HallTimeCoverageBadge coverage={match.hallCoverage.coverage} />
             </div>
-            {match.booking.hallTime?.kind === "open" && match.booking.hallTime.startTime && match.booking.hallTime.endTime && (
-              <p className="text-muted-foreground mt-2 text-sm tabular-nums">
-                {t("hallTimes.title")}: {match.booking.hallTime.startTime} – {match.booking.hallTime.endTime}
+            {match.hallCoverage.hallTime?.kind === "open" &&
+              match.hallCoverage.hallTime.startTime &&
+              match.hallCoverage.hallTime.endTime && (
+                <p className="text-muted-foreground text-sm tabular-nums">
+                  {t("hallTimes.title")}: {match.hallCoverage.hallTime.startTime} –{" "}
+                  {match.hallCoverage.hallTime.endTime}
+                </p>
+              )}
+            {match.hallCoverage.hallTime?.kind === "closed" && (
+              <p className="text-muted-foreground text-sm">
+                {t("hallTimes.closedNote", { note: match.hallCoverage.hallTime.note ?? "none" })}
               </p>
             )}
-            {match.booking.hallTime?.kind === "closed" && (
-              <p className="text-muted-foreground mt-2 text-sm">
-                {t("hallTimes.closedNote", { note: match.booking.hallTime.note ?? "none" })}
-              </p>
-            )}
+            <p className="text-muted-foreground text-sm tabular-nums">
+              {t("matchDetail.hallCoverage.window", {
+                start: match.hallCoverage.windowStart.slice(0, 5),
+                end: match.hallCoverage.windowEnd.slice(0, 5),
+              })}
+              {" · "}
+              {t("matchDetail.hallCoverage.games", { count: match.hallCoverage.gameCount })}
+            </p>
           </CardContent>
         </Card>
       )}

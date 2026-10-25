@@ -351,6 +351,20 @@ describe("listHallOccupancy", () => {
     expect(days.map((d) => d.date)).toEqual(["2026-03-10"]);
   });
 
+  it("falls back to 365 days when the season end lies before the start date", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2025-08-10T12:00:00Z"));
+    await ctx.client.query("UPDATE seasons SET end_date = '2025-06-30' WHERE id = $1", [seasonId]);
+    invalidateActiveSeasonCache();
+    const v = await seedBase();
+    await hallTime(v, "2025-09-06", "08:00:00", "17:00:00");
+    await match({ venue_id: v, kickoff_date: "2025-09-06" });
+
+    const days = await listHallOccupancy({});
+
+    expect(days.map((d) => d.date)).toEqual(["2025-09-06"]);
+  });
+
   it("falls back to 365 days when there is no active season", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2025-03-10T12:00:00Z"));

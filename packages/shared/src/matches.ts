@@ -1,5 +1,5 @@
 import type { BookingStatus, DiffStatus } from "./constants";
-import type { BookingHallTime, HallTimeCoverage, HallTimeWindow } from "./hall-times";
+import type { HallCoverageInfo, HallTimeCoverage, HallTimeWindow } from "./hall-times";
 import type { ClubWeekendDay } from "./kickoff";
 interface RefereeSlotReferee {
   id: number;
@@ -96,13 +96,16 @@ export interface MatchListItem {
   publicComment: string | null;
   hasLocalChanges: boolean;
   overriddenFields: string[];
-  booking: {
-    id: number;
-    status: BookingStatus;
-    needsReconfirmation: boolean;
-    /** The day's hall time and how the booking's window sits in it; null when the club holds none. */
-    hallTime: BookingHallTime | null;
-  } | null;
+  /** The day's hall time against the window its games need; null for away games and games not at one of our halls. */
+  hallCoverage: MatchHallCoverage | null;
+}
+
+/** Hall coverage of the day a game sits on, with the window and game count behind it. */
+export interface MatchHallCoverage extends HallCoverageInfo {
+  windowStart: string;
+  windowEnd: string;
+  /** Live home games at that hall that day, this one included. */
+  gameCount: number;
 }
 
 /** A real game on the admin game plan. */
