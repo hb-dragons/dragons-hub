@@ -1,10 +1,20 @@
 import { coverageFor } from "@dragons/shared";
 import type {
+  HallTimeCoverage,
   HallTimeImportBookingChange,
   HallTimeInput,
   HallTimeRow,
   HallTimeShortfall,
 } from "@dragons/shared";
+
+/** A day without a hall time reads as `uncovered` here, as it did before `none` existed. */
+function importCoverage(
+  window: { start: string; end: string },
+  hallTime: Parameters<typeof coverageFor>[1],
+): HallTimeCoverage {
+  const status = coverageFor(window, hallTime).status;
+  return status === "none" ? "uncovered" : status;
+}
 
 /** A booking at the venue inside the span, with the window the club would ask for. */
 export interface PlannerBooking {
@@ -109,8 +119,8 @@ export function planHallTimeImport(input: ImportPlanInput): ImportPlan {
 
   for (const booking of [...input.bookings].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)) {
     const window = { start: booking.effectiveStartTime, end: booking.effectiveEndTime };
-    const before = coverageFor(window, existingByDate.get(booking.date) ?? null).status;
-    const after = coverageFor(window, afterByDate.get(booking.date) ?? null).status;
+    const before = importCoverage(window, existingByDate.get(booking.date) ?? null);
+    const after = importCoverage(window, afterByDate.get(booking.date) ?? null);
     if (before === after) continue;
     const change = { bookingId: booking.id, date: booking.date, before, after };
     plan.bookings.push(change);

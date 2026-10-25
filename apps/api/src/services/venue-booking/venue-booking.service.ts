@@ -20,7 +20,7 @@ import type {
   ReconcileResult,
 } from "@dragons/shared";
 import { EVENT_TYPES, coverageFor } from "@dragons/shared";
-import type { HallTimeShortfall } from "@dragons/shared";
+import type { HallTimeCoverage, HallTimeShortfall } from "@dragons/shared";
 import { publishDomainEvent } from "../events/event-publisher";
 import { emitHallTimeMissing, loadHallTimesByDay } from "../hall-times/hall-time.service";
 
@@ -355,10 +355,15 @@ export async function reconcileBookingsForMatches(
   const rewindowed = plan.updates.filter((u) => u.windowChanged);
   const hallTimes = await loadHallTimesByDay([...plan.creates, ...rewindowed]);
   const hallTimeFor = (venueId: number, date: string) => hallTimes.get(`${venueId}:${date}`) ?? null;
+  // Events keep their pre-"none" vocabulary: a day without any hall time is still "uncovered" there.
+  const eventCoverage = (start: string, end: string, venueId: number, date: string): HallTimeCoverage => {
+    const status = coverageFor({ start, end }, hallTimeFor(venueId, date)).status;
+    return status === "none" ? "uncovered" : status;
+  };
   const uncoveredCreates = plan.creates
     .map((c) => ({
       create: c,
-      coverage: coverageFor({ start: c.calculatedStartTime, end: c.calculatedEndTime }, hallTimeFor(c.venueId, c.date)).status,
+      coverage: eventCoverage(c.calculatedStartTime, c.calculatedEndTime, c.venueId, c.date),
     }))
     .filter((x): x is typeof x & { coverage: HallTimeShortfall } => x.coverage !== "covered");
   const lostCoverage = rewindowed
@@ -370,7 +375,7 @@ export async function reconcileBookingsForMatches(
         hallTime,
       ).status;
       const after = { start: b.overrideStartTime ?? u.newStartTime, end: b.overrideEndTime ?? u.newEndTime };
-      return { update: u, window: after, coverage: coverageFor(after, hallTime).status, before };
+      return { update: u, window: after, coverage: eventCoverage(after.start, after.end, u.venueId, u.date), before };
     })
     .filter(
       (x): x is typeof x & { coverage: HallTimeShortfall } =>

@@ -24,11 +24,14 @@ export interface HallTimeRow extends HallTimeInput {
   updatedAt: string;
 }
 
+export const HALL_TIME_COVERAGES = ["covered", "partial", "uncovered", "closed", "none"] as const;
+
 /**
- * How a booking's window sits against the hall time of its day. `uncovered`
- * is also the answer when no hall time exists at all.
+ * How a window sits against the hall time of its day. `uncovered` means a
+ * hall time exists but the window misses it; `none` means the day has no
+ * hall time at all.
  */
-export type HallTimeCoverage = "covered" | "partial" | "uncovered" | "closed";
+export type HallTimeCoverage = (typeof HALL_TIME_COVERAGES)[number];
 
 /** A coverage that still owes the city a request: everything but `covered`. */
 export type HallTimeShortfall = Exclude<HallTimeCoverage, "covered">;
@@ -41,7 +44,15 @@ export interface HallTimeWindow {
   note: string | null;
 }
 
-/** The hall-time side of a booking, attached at read time. */
+/** The hall-time side of a window, attached at read time. */
+export interface HallCoverageInfo {
+  hallTime: HallTimeWindow | null;
+  coverage: HallTimeCoverage;
+  gapBeforeMinutes: number;
+  gapAfterMinutes: number;
+}
+
+/** @deprecated Replaced by HallCoverageInfo; removed in Task 8. */
 export interface BookingHallTime extends HallTimeWindow {
   coverage: HallTimeCoverage;
   gapBeforeMinutes: number;

@@ -854,7 +854,7 @@ describe("GET /matches/:id/alternative-dates — hall bookings", () => {
         effectiveEndTime: "16:30:00",
         status: "confirmed",
         needsReconfirmation: true,
-        hallTimeCoverage: "uncovered",
+        hallTimeCoverage: "none",
       },
     ]);
   });

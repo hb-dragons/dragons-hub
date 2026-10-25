@@ -1889,7 +1889,8 @@
       "covered": "Hall time covered",
       "partial": "Hall time partial",
       "uncovered": "No hall time",
-      "closed": "Hall closed"
+      "closed": "Hall closed",
+      "none": "No hall time"
     },
     "columns": {
       "date": "Date",

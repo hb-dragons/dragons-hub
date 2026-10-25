@@ -276,7 +276,7 @@ export type {
 } from "./broadcast";
 
 // Hall times (Hallenzeiten): types, Anlage T parser, coverage
-export { HALL_TIME_KINDS, HALL_TIME_SOURCES } from "./hall-times";
+export { HALL_TIME_KINDS, HALL_TIME_SOURCES, HALL_TIME_COVERAGES } from "./hall-times";
 export type {
   HallTimeKind,
   HallTimeSource,
@@ -286,6 +286,7 @@ export type {
   HallTimeShortfall,
   HallTimeWindow,
   BookingHallTime,
+  HallCoverageInfo,
   HallTimeImportBookingChange,
   HallTimeImportPreview,
   HallTimeImportResult,
@@ -294,3 +295,4 @@ export { parseAnlageT } from "./hall-times/anlage-t";
 export type { AnlageTParseResult } from "./hall-times/anlage-t";
 export { coverageFor, hallTimeCoverage } from "./hall-times/coverage";
 export type { CoverageResult } from "./hall-times/coverage";
+export type { HallOccupancyGame, HallOccupancyDay } from "./hall-occupancy";

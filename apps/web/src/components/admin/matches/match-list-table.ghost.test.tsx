@@ -224,13 +224,13 @@ describe("MatchListTable hall-time coverage", () => {
 
   it("shows no coverage badge on a ghost entry", () => {
     renderTable([ghost]);
-    expect(screen.queryByText(de.hallTimes.coverage.uncovered)).not.toBeInTheDocument();
+    expect(screen.queryByText(de.hallTimes.coverage.none)).not.toBeInTheDocument();
   });
 
   it("flags a home game whose booking has no hall time", () => {
     renderTable([{ ...real, booking: { ...real.booking!, hallTime: null } }]);
-    const badge = screen.getByText(de.hallTimes.coverage.uncovered);
-    expect(badge).toHaveAttribute("data-coverage", "uncovered");
+    const badge = screen.getByText(de.hallTimes.coverage.none);
+    expect(badge).toHaveAttribute("data-coverage", "none");
     expect(badge.closest("tr")).toHaveTextContent("Rivals");
   });
 

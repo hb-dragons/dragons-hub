@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { HALL_TIME_COVERAGES } from "../hall-times";
 import { coverageFor, hallTimeCoverage } from "./coverage";
 
 const open = (startTime: string, endTime: string) =>
@@ -16,7 +17,7 @@ describe("coverageFor", () => {
     ["entirely before the hall time", open("18:00", "22:00"), "uncovered", 0, 0],
     ["entirely after the hall time", open("08:00", "12:00"), "uncovered", 0, 0],
     ["closed day", closed, "closed", 0, 0],
-    ["no hall time", null, "uncovered", 0, 0],
+    ["no hall time", null, "none", 0, 0],
   ] as const)("%s", (_label, hallTime, status, before, after) => {
     expect(coverageFor(window, hallTime)).toEqual({
       status,
@@ -33,9 +34,15 @@ describe("coverageFor", () => {
 });
 
 describe("hallTimeCoverage", () => {
-  it("reads a missing hall time as uncovered", () => {
-    expect(hallTimeCoverage(null)).toBe("uncovered");
-    expect(hallTimeCoverage(undefined)).toBe("uncovered");
+  it("reads a missing hall time as none", () => {
+    expect(hallTimeCoverage(null)).toBe("none");
+    expect(hallTimeCoverage(undefined)).toBe("none");
     expect(hallTimeCoverage({ coverage: "partial" })).toBe("partial");
+  });
+});
+
+describe("HALL_TIME_COVERAGES", () => {
+  it("lists the five coverages in order", () => {
+    expect([...HALL_TIME_COVERAGES]).toEqual(["covered", "partial", "uncovered", "closed", "none"]);
   });
 });

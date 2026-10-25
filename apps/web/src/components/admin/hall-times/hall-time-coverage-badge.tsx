@@ -10,6 +10,7 @@ const VARIANT: Record<HallTimeCoverage, "success" | "outline" | "destructive" | 
   partial: "outline",
   uncovered: "destructive",
   closed: "secondary",
+  none: "secondary",
 };
 
 /**

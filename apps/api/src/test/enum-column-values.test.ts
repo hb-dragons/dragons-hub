@@ -129,6 +129,7 @@ const ENUM_COLUMNS: readonly EnumColumn[] = [
  * skip list.
  */
 const NOT_PERSISTED: Readonly<Record<string, string>> = {
+  HALL_TIME_COVERAGES: "derived at read time from a window and a hall time; never written to the database",
   SURFACE_GROUP_ORDER: "navigation shell ordering; never written to the database",
   COLOR_PRESET_KEYS: "team colour presets are stored as the resolved hex values, not the key",
   EVENT_ENTITY_TYPES:

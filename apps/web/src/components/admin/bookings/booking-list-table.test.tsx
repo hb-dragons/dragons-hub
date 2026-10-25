@@ -105,6 +105,7 @@ const messages = {
       covered: "Hallenzeit gedeckt",
       partial: "Hallenzeit teilweise",
       uncovered: "Keine Hallenzeit",
+      none: "Keine Hallenzeit",
       closed: "Halle geschlossen",
     },
   },
@@ -168,14 +169,14 @@ describe("BookingListTable time windows", () => {
 });
 
 describe("BookingListTable hall-time coverage", () => {
-  it("shows each booking's coverage, reading a missing hall time as uncovered", () => {
+  it("shows each booking's coverage, reading a missing hall time as none", () => {
     renderTable();
     const partial = screen.getByText("Hallenzeit teilweise");
     expect(partial).toHaveAttribute("data-coverage", "partial");
     expect(partial.closest("tr")).toHaveTextContent("Sporthalle Nord");
-    const uncovered = screen.getByText("Keine Hallenzeit");
-    expect(uncovered).toHaveAttribute("data-coverage", "uncovered");
-    expect(uncovered.closest("tr")).toHaveTextContent("Sporthalle Süd");
+    const none = screen.getByText("Keine Hallenzeit");
+    expect(none).toHaveAttribute("data-coverage", "none");
+    expect(none.closest("tr")).toHaveTextContent("Sporthalle Süd");
   });
 
   it("offers a coverage filter next to the status filter", () => {

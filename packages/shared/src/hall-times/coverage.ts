@@ -25,7 +25,7 @@ export function coverageFor(
   hallTime: Pick<HallTimeInput, "kind" | "startTime" | "endTime"> | null,
 ): CoverageResult {
   const none = { gapBeforeMinutes: 0, gapAfterMinutes: 0 };
-  if (!hallTime) return { status: "uncovered", ...none };
+  if (!hallTime) return { status: "none", ...none };
   if (hallTime.kind === "closed" || !hallTime.startTime || !hallTime.endTime) {
     return { status: "closed", ...none };
   }
@@ -44,5 +44,5 @@ export function coverageFor(
 export function hallTimeCoverage(
   hallTime: { coverage: HallTimeCoverage } | null | undefined,
 ): HallTimeCoverage {
-  return hallTime?.coverage ?? "uncovered";
+  return hallTime?.coverage ?? "none";
 }
