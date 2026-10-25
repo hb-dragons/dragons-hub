@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Dragons",
+    "name": "HB Dragons",
     "slug": "dragons",
     "scheme": "dragons",
     "version": "1.0.0",
@@ -17,7 +17,7 @@
         "applinks:app.hbdragons.de"
       ],
       "infoPlist": {
-        "NSFaceIDUsageDescription": "Use Face ID to unlock the Dragons app",
+        "NSFaceIDUsageDescription": "Use Face ID to unlock the HB Dragons app",
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleAllowMixedLocalizations": true
       },
@@ -69,6 +69,7 @@
       "package": "de.hbdragons.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/adaptive-icon-mono.png",
         "backgroundColor": "#004b23"
       },
       "intentFilters": [
