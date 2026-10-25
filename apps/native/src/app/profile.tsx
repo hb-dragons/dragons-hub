@@ -67,6 +67,7 @@ export default function ProfileScreen() {
             {i18n.t("auth.staffSignInHint")}
           </Text>
           <Pressable
+            accessibilityRole="button"
             onPress={() => router.push("/(auth)/sign-in")}
             style={{
               backgroundColor: colors.primary,
@@ -240,6 +241,7 @@ export default function ProfileScreen() {
 
         {/* Sign Out */}
         <Pressable
+          accessibilityRole="button"
           onPress={() => { void handleSignOut(); }}
           style={{
             backgroundColor: colors.destructive + "1A",

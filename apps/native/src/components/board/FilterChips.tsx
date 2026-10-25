@@ -27,6 +27,21 @@ interface Props {
 
 const CHIP_HEIGHT = 44;
 
+/**
+ * The chip's nested clear button as a custom action on the chip itself:
+ * the chip is one accessible element, and VoiceOver cannot focus a button
+ * nested inside another, so without this the clear is touch-only.
+ */
+function clearActionProps(onClear: (() => void) | undefined) {
+  if (!onClear) return {};
+  return {
+    accessibilityActions: [{ name: "clear", label: i18n.t("common.clear") }],
+    onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => {
+      if (event.nativeEvent.actionName === "clear") onClear();
+    },
+  };
+}
+
 export function FilterChips({
   filters,
   onToggleMine,
@@ -84,6 +99,7 @@ export function FilterChips({
 
       <Pressable
         {...filterPillA11y(i18n.t("board.filters.assignees"), assigneeActive)}
+        {...clearActionProps(assigneeActive ? onClearAssignees : undefined)}
         onPress={onPressAssignees}
         style={chipStyle(assigneeActive)}
       >
@@ -135,7 +151,14 @@ export function FilterChips({
       </Pressable>
 
       <Pressable
-        {...filterPillA11y(i18n.t("board.filters.priority"), filters.priority != null)}
+        {...filterPillA11y(
+          // The chip shows the picked priority in place of its name; say both.
+          filters.priority
+            ? `${i18n.t("board.filters.priority")}: ${i18n.t(`board.priority.${filters.priority}`)}`
+            : i18n.t("board.filters.priority"),
+          filters.priority != null,
+        )}
+        {...clearActionProps(filters.priority != null ? onClearPriority : undefined)}
         onPress={onPressPriority}
         style={chipStyle(filters.priority != null)}
       >

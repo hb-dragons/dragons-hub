@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { filterPillA11y } from "@/lib/ui/a11y";
+import { MIN_TAP_TARGET, filterPillA11y, pagerTabA11y, tapTargetSlop } from "@/lib/ui/a11y";
 import { resolveInPackage } from "../../../test/source-tree";
 
 describe("filterPillA11y", () => {
@@ -39,5 +39,43 @@ describe("filter pill components", () => {
     const source = readFileSync(resolveInPackage(file), "utf8");
     expect(source).toContain("filterPillA11y(");
     expect(source).not.toContain("accessibilityState=");
+  });
+});
+
+describe("pagerTabA11y", () => {
+  it("announces the column on screen as a selected tab", () => {
+    expect(pagerTabA11y("To do, 3 tasks", true)).toEqual({
+      accessibilityRole: "tab",
+      accessibilityLabel: "To do, 3 tasks",
+      accessibilityState: { selected: true },
+    });
+  });
+
+  it("carries selected: false for the other columns", () => {
+    expect(pagerTabA11y("Done", false).accessibilityState).toEqual({ selected: false });
+  });
+
+  it("is what the board's column pills use", () => {
+    const source = readFileSync(resolveInPackage("src/components/board/BoardHeader.tsx"), "utf8");
+    expect(source).toContain("pagerTabA11y(");
+  });
+});
+
+describe("tapTargetSlop", () => {
+  it("grows a small square evenly to the minimum on both axes", () => {
+    expect(tapTargetSlop(32)).toEqual({ top: 6, bottom: 6, left: 6, right: 6 });
+  });
+
+  it("grows each axis on its own", () => {
+    expect(tapTargetSlop(44, 18)).toEqual({ top: 13, bottom: 13, left: 0, right: 0 });
+  });
+
+  it("rounds up, so an odd gap never leaves the target a point short", () => {
+    const slop = tapTargetSlop(19);
+    expect(19 + slop.left + slop.right).toBeGreaterThanOrEqual(MIN_TAP_TARGET);
+  });
+
+  it("adds nothing to a control already at or above the minimum", () => {
+    expect(tapTargetSlop(60, 48)).toEqual({ top: 0, bottom: 0, left: 0, right: 0 });
   });
 });

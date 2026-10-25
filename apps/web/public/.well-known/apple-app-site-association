@@ -2,7 +2,7 @@
   "applinks": {
     "details": [
       {
-        "appIDs": ["2ZDTV3KLV2.de.hbdragons.app"],
+        "appIDs": ["Z28P2F9QQR.de.hbdragons.club"],
         "components": [
           { "/": "/en/*", "exclude": true, "comment": "English pages have no native route; Safari handles them" },
           { "/": "/admin/*", "exclude": true, "comment": "session-gated web surface" },

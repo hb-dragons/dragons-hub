@@ -15,6 +15,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { fontFamilies } from "@/theme/typography";
 import { authClient } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
+import { TEXT_LINK_SLOP } from "@/lib/ui/a11y";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Icon } from "@/components/ui/Icon";
 import { LEGAL_LINKS } from "@/lib/legal/links";
@@ -171,6 +172,11 @@ export default function SignInScreen() {
         <Pressable
           onPress={() => { void handleSignIn(); }}
           disabled={!canSubmit}
+          accessibilityRole="button"
+          // The spinner that replaces the text while signing in reads as
+          // nothing, so the label is explicit.
+          accessibilityLabel={i18n.t("auth.signIn")}
+          accessibilityState={{ busy: loading }}
           style={({ pressed }) => [
             {
               backgroundColor: colors.primary,
@@ -218,13 +224,21 @@ export default function SignInScreen() {
             marginTop: spacing.lg,
           }}
         >
-          <Pressable accessibilityRole="link" onPress={() => openExternal(LEGAL_LINKS.privacy)}>
+          <Pressable
+            accessibilityRole="link"
+            hitSlop={TEXT_LINK_SLOP}
+            onPress={() => openExternal(LEGAL_LINKS.privacy)}
+          >
             <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
               {i18n.t("legal.privacy")}
             </Text>
           </Pressable>
           <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>·</Text>
-          <Pressable accessibilityRole="link" onPress={() => openExternal(LEGAL_LINKS.imprint)}>
+          <Pressable
+            accessibilityRole="link"
+            hitSlop={TEXT_LINK_SLOP}
+            onPress={() => openExternal(LEGAL_LINKS.imprint)}
+          >
             <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
               {i18n.t("legal.imprint")}
             </Text>

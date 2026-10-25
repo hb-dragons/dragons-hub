@@ -3,6 +3,7 @@ import { Platform, Pressable, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { tapTargetSlop } from "@/lib/ui/a11y";
 import {
   clampComposerHeight,
   composerButtonState,
@@ -11,6 +12,9 @@ import {
 } from "@/lib/assistant/composer";
 import { ComposerSurface } from "./ComposerSurface";
 import { Icon } from "@/components/ui/Icon";
+
+/** Drawn diameter of the send/stop button; `tapTargetSlop` grows its tap area. */
+const SEND_BUTTON_SIZE = 36;
 
 export function ChatComposer({
   value,
@@ -104,9 +108,10 @@ export function ChatComposer({
             accessibilityState={{ disabled: state === "disabled" }}
             disabled={state === "disabled"}
             onPress={handlePress}
+            hitSlop={tapTargetSlop(SEND_BUTTON_SIZE)}
             style={{
-              width: 36,
-              height: 36,
+              width: SEND_BUTTON_SIZE,
+              height: SEND_BUTTON_SIZE,
               borderRadius: radius.pill,
               backgroundColor: fill,
               alignItems: "center",

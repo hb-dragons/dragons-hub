@@ -19,6 +19,7 @@ import {
   type EinsatzTeam,
 } from "@/lib/referee/einsatz";
 import { i18n } from "@/lib/i18n";
+import { TEXT_LINK_SLOP } from "@/lib/ui/a11y";
 import { kickoffCompact } from "@/lib/format/kickoff";
 import { fontFamilies } from "@/theme/typography";
 
@@ -104,6 +105,7 @@ function ContactRow({ contact }: { contact: EinsatzContact }) {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`${i18n.t("refereeGame.call")}: ${name}`}
+            hitSlop={TEXT_LINK_SLOP}
             onPress={() => openExternal(phone.url)}
           >
             <Text style={[textStyles.body, { color: colors.primary }]}>{phone.label}</Text>
@@ -113,6 +115,7 @@ function ContactRow({ contact }: { contact: EinsatzContact }) {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`${i18n.t("refereeGame.mail")}: ${name}`}
+            hitSlop={TEXT_LINK_SLOP}
             onPress={() => openExternal(email.url)}
           >
             <Text style={[textStyles.body, { color: colors.primary }]}>{email.label}</Text>
@@ -282,6 +285,7 @@ export default function RefereeGameDetailScreen() {
             </Text>
             {!isNotFound ? (
               <Pressable
+                accessibilityRole="button"
                 onPress={() => {
                   void mutate();
                 }}

@@ -39,6 +39,7 @@ export default function TodayScreen() {
           {items.map((item) => (
             <Pressable
               key={`${item.providerId}:${item.id}`}
+              accessibilityRole="button"
               onPress={() => router.push(item.route)}
             >
               <Card>

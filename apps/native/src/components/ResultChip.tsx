@@ -3,6 +3,7 @@ import type { MatchListItem } from "@dragons/shared";
 import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
+import { matchA11yLabel } from "../lib/ui/match-a11y";
 import { fontFamilies } from "../theme/typography";
 
 interface ResultChipProps {
@@ -154,6 +155,18 @@ export function ResultChip({ match, onPress }: ResultChipProps) {
     return (
       <Pressable
         onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={matchA11yLabel({
+          homeName: match.homeIsOwnClub ? ownName : opponentLabel,
+          guestName: match.homeIsOwnClub ? opponentLabel : ownName,
+          homeScore: match.homeScore,
+          guestScore: match.guestScore,
+          kickoffDate: match.kickoffDate,
+          kickoffTime: match.kickoffTime,
+          isCancelled: match.isCancelled,
+          isForfeited: match.isForfeited,
+          ownSide: match.homeIsOwnClub ? "home" : "guest",
+        })}
         style={({ pressed }) => (pressed ? { opacity: 0.85 } : undefined)}
       >
         {content}

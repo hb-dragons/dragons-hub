@@ -6,9 +6,11 @@ interface CardProps {
   children: ReactNode;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
+  /** Spoken label for a pressable card whose text alone does not say enough. */
+  accessibilityLabel?: string;
 }
 
-export function Card({ children, onPress, style }: CardProps) {
+export function Card({ children, onPress, style, accessibilityLabel }: CardProps) {
   const { colors, radius, spacing } = useTheme();
 
   const cardStyle: ViewStyle = {
@@ -20,6 +22,8 @@ export function Card({ children, onPress, style }: CardProps) {
   if (onPress) {
     return (
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
         onPress={onPress}
         style={({ pressed }) => [
           cardStyle,
