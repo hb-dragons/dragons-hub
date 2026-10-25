@@ -23,7 +23,6 @@ export type EventUrgency = (typeof EVENT_URGENCIES)[number];
  */
 export const EVENT_ENTITY_TYPES = [
   "match",
-  "booking",
   "referee",
   "task",
 ] as const;
@@ -53,12 +52,6 @@ export const EVENT_TYPES = {
   // Referee slot events
   REFEREE_SLOTS_NEEDED: "referee.slots.needed",
   REFEREE_SLOTS_REMINDER: "referee.slots.reminder",
-
-  // Booking events
-  BOOKING_CREATED: "booking.created",
-  BOOKING_STATUS_CHANGED: "booking.status.changed",
-  BOOKING_NEEDS_RECONFIRMATION: "booking.needs_reconfirmation",
-  BOOKING_HALL_TIME_MISSING: "booking.hall_time.missing",
 
   // Override events
   OVERRIDE_CONFLICT: "override.conflict",
@@ -109,9 +102,31 @@ export type SystemEventType = (typeof SYSTEM_EVENT_TYPES)[number];
 export const SYSTEM_EVENT_ENTITY_TYPES = ["user"] as const;
 export type SystemEventEntityType = (typeof SYSTEM_EVENT_ENTITY_TYPES)[number];
 
+// ── Retired event constants ──────────────────────────────────────────────────
+
 /**
- * What a persisted `domain_events` row can actually hold, domain and system
- * events together — the type of the columns and of anything that reads them
+ * Types nothing publishes any more but `domain_events` rows and watch rules
+ * may still carry. The booking events went with the stored venue bookings
+ * (ADR-0012). They stay readable — the event listing filters to them and the
+ * event browser renders them generically — and are never publishable: they
+ * are absent from `EVENT_TYPES`, so the manual trigger and new watch-rule
+ * entries refuse them.
+ */
+export const RETIRED_EVENT_TYPES = [
+  "booking.created",
+  "booking.status.changed",
+  "booking.needs_reconfirmation",
+  "booking.hall_time.missing",
+] as const;
+export type RetiredEventType = (typeof RETIRED_EVENT_TYPES)[number];
+
+/** Entity types only retired events use. */
+export const RETIRED_EVENT_ENTITY_TYPES = ["booking"] as const;
+export type RetiredEventEntityType = (typeof RETIRED_EVENT_ENTITY_TYPES)[number];
+
+/**
+ * What a persisted `domain_events` row can actually hold, domain, system and
+ * retired events together — the type of the columns and of anything that reads them
  * back out, such as the admin event listing.
  *
  * Kept separate from `EventType` / `EventEntityType` on purpose. Those two are
@@ -119,17 +134,22 @@ export type SystemEventEntityType = (typeof SYSTEM_EVENT_ENTITY_TYPES)[number];
  * against; these two are the *readable* one. Collapsing them would let an admin
  * trigger `admin.test_push` by hand, which is the thing the split prevents.
  */
-export type StoredEventType = EventType | SystemEventType;
-export type StoredEventEntityType = EventEntityType | SystemEventEntityType;
+export type StoredEventType = EventType | SystemEventType | RetiredEventType;
+export type StoredEventEntityType =
+  | EventEntityType
+  | SystemEventEntityType
+  | RetiredEventEntityType;
 
 /** Runtime counterparts, for filters that must accept any stored value. */
 export const STORED_EVENT_TYPE_VALUES = [
   ...EVENT_TYPE_VALUES,
   ...SYSTEM_EVENT_TYPES,
+  ...RETIRED_EVENT_TYPES,
 ] as readonly StoredEventType[];
 export const STORED_EVENT_ENTITY_TYPES = [
   ...EVENT_ENTITY_TYPES,
   ...SYSTEM_EVENT_ENTITY_TYPES,
+  ...RETIRED_EVENT_ENTITY_TYPES,
 ] as readonly StoredEventEntityType[];
 
 // ── Payload types ────────────────────────────────────────────────────────────

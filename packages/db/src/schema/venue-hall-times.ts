@@ -19,9 +19,8 @@ import { venues } from "./venues";
  * Hall times (Hallenzeiten): one row per venue and club-zone day, the time
  * window the club holds the hall per its Mietantrag ("Anlage T") or the
  * landlord's closure note for that day. A day the club asked for nothing has
- * no row. Distinct from `venue_bookings`, which are derived from home games
- * and say "we have games here that day"; coverage of a booking by a hall time
- * is computed at read time, never stored.
+ * no row. Whether a home game day is covered by its hall time is computed at
+ * read time (hall occupancy), never stored.
  */
 export const venueHallTimes = pgTable(
   "venue_hall_times",

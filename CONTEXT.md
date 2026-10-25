@@ -128,9 +128,13 @@ _Avoid_: home hall, location, Spielfeld
 One day on which the club holds a hall per its rental application to the city (the "Anlage T zum Mietantrag"): the time window it asked for, or the city's closure note for that day. Imported from the sheet per hall, editable by hand. Says when the hall is ours, not what is played in it.
 _Avoid_: rental slot, availability, opening hours
 
-**Hall booking (Hallenbuchung)**:
-The club's record that it needs one of its halls on one day for one or more home games, with the time window those games span. Exists only where a home game is already scheduled. Covered when that window sits inside the day's hall time; otherwise a rental request is still owed.
-_Avoid_: venue slot, reservation
+**Home game day (Heimspieltag)**:
+One of our halls on one day with at least one live home game in it. Its programme window — first kickoff minus the buffer before to the last game's end plus the buffer after — and its coverage by the day's hall time are derived from the games and the hall time whenever it is read, never stored. Covered when the window sits inside the hall time; otherwise a rental request is still owed.
+_Avoid_: Hallenbuchung, hall booking, venue slot, reservation
+
+**Hall occupancy (Hallenbelegung)**:
+The list of home game days across our halls, each with its games, programme window and coverage. A read over games and hall times, not a record anyone keeps.
+_Avoid_: bookings list, Hallenbuchungen
 
 **Rescheduling (Spielverlegung)**:
 Moving a game to another kickoff. Agreed between the two clubs and entered on the federation's side; the Hub learns of it through the sync, or earlier through an override when the club knows before the federation has recorded it.

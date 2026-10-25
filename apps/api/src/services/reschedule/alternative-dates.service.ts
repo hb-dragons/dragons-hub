@@ -299,7 +299,7 @@ async function loadCoachCollisions(
 
 /**
  * Which season's team entries the game belongs to. The league carries it
- * (`matches.leagueId` -> `leagues.seasonRefId`, as the booking reads do); a game
+ * (`matches.leagueId` -> `leagues.seasonRefId`, as the hall-occupancy reads do); a game
  * with no league falls back to the club's active season, so a friendly still
  * finds the people on the moving team entry. A round window has no such
  * fallback — without a league there is no round to compare against at all.

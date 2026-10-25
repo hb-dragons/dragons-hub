@@ -2,6 +2,7 @@ import { and, asc, eq, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core";
 import { leagues, matches, teamEntries, teams, venueHallTimes, venues } from "@dragons/db/schema";
 import {
+  BOOKING_DEFAULTS,
   clubDayAnchor,
   coverageFor,
   plusDaysInClubZone,
@@ -23,6 +24,11 @@ const SETTING_KEYS = {
   gameDuration: "venue_booking_game_duration",
 } as const;
 
+/**
+ * The programme-window settings every hall-occupancy read applies. The keys
+ * keep their `venue_booking_` prefix from the stored-booking era; the admin
+ * settings route writes the same keys.
+ */
 export async function getBufferConfig(): Promise<BufferConfig> {
   const settings = await readSettings([
     SETTING_KEYS.bufferBefore,
@@ -30,9 +36,9 @@ export async function getBufferConfig(): Promise<BufferConfig> {
     SETTING_KEYS.gameDuration,
   ]);
   return {
-    bufferBeforeMinutes: readIntSetting(settings, SETTING_KEYS.bufferBefore, 60),
-    bufferAfterMinutes: readIntSetting(settings, SETTING_KEYS.bufferAfter, 60),
-    defaultGameDurationMinutes: readIntSetting(settings, SETTING_KEYS.gameDuration, 90),
+    bufferBeforeMinutes: readIntSetting(settings, SETTING_KEYS.bufferBefore, BOOKING_DEFAULTS.bufferBefore),
+    bufferAfterMinutes: readIntSetting(settings, SETTING_KEYS.bufferAfter, BOOKING_DEFAULTS.bufferAfter),
+    defaultGameDurationMinutes: readIntSetting(settings, SETTING_KEYS.gameDuration, BOOKING_DEFAULTS.gameDuration),
   };
 }
 

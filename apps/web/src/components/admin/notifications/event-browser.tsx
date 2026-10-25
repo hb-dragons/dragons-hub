@@ -315,7 +315,7 @@ export function EventBrowser() {
                     onValueChange={(v) =>
                       setTriggerForm((f) => ({
                         ...f,
-                        entityType: v as "match" | "booking" | "referee",
+                        entityType: v as TriggerEventForm["entityType"],
                       }))
                     }
                   >
@@ -324,7 +324,6 @@ export function EventBrowser() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="match">{t("entityTypes.match")}</SelectItem>
-                      <SelectItem value="booking">{t("entityTypes.booking")}</SelectItem>
                       <SelectItem value="referee">{t("entityTypes.referee")}</SelectItem>
                     </SelectContent>
                   </Select>
@@ -452,6 +451,7 @@ export function EventBrowser() {
               <SelectContent>
                 <SelectItem value={ALL}>{t("allFilter")}</SelectItem>
                 <SelectItem value="match">{t("entityTypes.match")}</SelectItem>
+                {/* `booking` only for rows of the retired booking events (ADR-0012). */}
                 <SelectItem value="booking">{t("entityTypes.booking")}</SelectItem>
                 <SelectItem value="referee">{t("entityTypes.referee")}</SelectItem>
                 {/* `task` was missing, so task events — the most frequent kind

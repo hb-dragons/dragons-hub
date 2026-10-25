@@ -1,18 +1,13 @@
 import { and, eq, gte, inArray, lte, or } from "drizzle-orm";
 import { venueHallTimes, venues } from "@dragons/db/schema";
-import { EVENT_TYPES, coverageFor } from "@dragons/shared";
 import type {
-  BookingHallTime,
   HallTimeImportPreview,
   HallTimeImportResult,
   HallTimeRow,
-  HallTimeShortfall,
-  HallTimeWindow,
 } from "@dragons/shared";
 import type { HallTimeImportBody, HallTimeUpsertBody } from "@dragons/contracts";
 import { getDb } from "../../config/database";
 import { logger } from "../../config/logger";
-import { publishDomainEvent } from "../events/event-publisher";
 import type { TransactionClient } from "../events/event-publisher";
 import { planHallTimeImport, type ImportPlan } from "./hall-time-import-planner";
 
@@ -92,7 +87,7 @@ async function loadSpan(
 
 /**
  * Hall times for a set of (venue, day) pairs, keyed `${venueId}:${date}`.
- * One query however many bookings ask; a pair with no row is simply absent.
+ * One query however many days ask; a pair with no row is simply absent.
  */
 export async function loadHallTimesByDay(
   pairs: readonly { venueId: number; date: string }[],
@@ -110,42 +105,6 @@ export async function loadHallTimesByDay(
       ),
     );
   return new Map(rows.map((r) => [`${r.venueId}:${r.date}`, toRow(r)]));
-}
-
-/** The booking-side view of one hall time, or null when the club holds none that day. */
-function bookingHallTime(
-  window: { start: string; end: string },
-  hallTime: HallTimeRow | null | undefined,
-): BookingHallTime | null {
-  if (!hallTime) return null;
-  const coverage = coverageFor(window, hallTime);
-  return {
-    kind: hallTime.kind,
-    startTime: hallTime.startTime,
-    endTime: hallTime.endTime,
-    note: hallTime.note,
-    coverage: coverage.status,
-    gapBeforeMinutes: coverage.gapBeforeMinutes,
-    gapAfterMinutes: coverage.gapAfterMinutes,
-  };
-}
-
-/**
- * Attach `hallTime` to booking-shaped items in one query. Every booking read
- * that reaches a client goes through here, so the coverage a list shows and
- * the one a detail shows can never disagree.
- */
-export async function attachHallTimes<
-  T extends { venueId: number; date: string; effectiveStartTime: string; effectiveEndTime: string },
->(items: T[]): Promise<(T & { hallTime: BookingHallTime | null })[]> {
-  const byDay = await loadHallTimesByDay(items);
-  return items.map((item) => ({
-    ...item,
-    hallTime: bookingHallTime(
-      { start: item.effectiveStartTime, end: item.effectiveEndTime },
-      byDay.get(`${item.venueId}:${item.date}`),
-    ),
-  }));
 }
 
 // ── Manual edits ─────────────────────────────────────────────────────────────
@@ -216,7 +175,7 @@ export async function previewHallTimeImport(
 /**
  * Apply an Anlage T: plan and replace inside one transaction, so the rows the
  * plan decided to delete are the rows that still exist when it does. The
- * import records what the club holds and judges nothing about bookings.
+ * import records what the club holds and judges no home game day.
  */
 export async function applyHallTimeImport(
   venueId: number,
@@ -250,57 +209,4 @@ export async function applyHallTimeImport(
     "Hall time import applied",
   );
   return toPreview(p);
-}
-
-// ── Event ────────────────────────────────────────────────────────────────────
-
-export interface HallTimeMissingEvent {
-  bookingId: number;
-  venueId: number;
-  venueName: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  coverage: HallTimeShortfall;
-  hallTime: HallTimeWindow | null;
-}
-
-/**
- * One booking whose window the club's hall time does not cover: a rental
- * request still has to go to the city. Published inside the caller's
- * transaction so the outbox only sees it once the change that caused it is
- * committed.
- */
-export async function emitHallTimeMissing(
-  tx: TransactionClient | undefined,
-  e: HallTimeMissingEvent,
-): Promise<void> {
-  await publishDomainEvent(
-    {
-      type: EVENT_TYPES.BOOKING_HALL_TIME_MISSING,
-      source: "reconciliation",
-      entityType: "booking",
-      entityId: e.bookingId,
-      entityName: `${e.venueName} - ${e.date}`,
-      deepLinkPath: `/admin/bookings/${e.bookingId}`,
-      payload: {
-        bookingId: e.bookingId,
-        venueId: e.venueId,
-        venueName: e.venueName,
-        date: e.date,
-        startTime: e.startTime,
-        endTime: e.endTime,
-        coverage: e.coverage,
-        hallTime: e.hallTime
-          ? {
-              kind: e.hallTime.kind,
-              startTime: e.hallTime.startTime,
-              endTime: e.hallTime.endTime,
-              note: e.hallTime.note,
-            }
-          : null,
-      },
-    },
-    tx,
-  );
 }

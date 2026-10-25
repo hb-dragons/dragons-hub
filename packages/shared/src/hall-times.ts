@@ -52,13 +52,6 @@ export interface HallCoverageInfo {
   gapAfterMinutes: number;
 }
 
-/** @deprecated Replaced by HallCoverageInfo; removed in Task 8. */
-export interface BookingHallTime extends HallTimeWindow {
-  coverage: HallTimeCoverage;
-  gapBeforeMinutes: number;
-  gapAfterMinutes: number;
-}
-
 export interface HallTimeImportPreview {
   span: { from: string; to: string };
   added: HallTimeInput[];

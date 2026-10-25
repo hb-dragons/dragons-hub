@@ -8,7 +8,7 @@ import {
   type TestDbContext,
 } from "./setup-test-db";
 import { seedActiveSeason } from "./seed-season";
-import { leagues, venueBookings, venues } from "@dragons/db/schema";
+import { leagues, venueHallTimes, venues } from "@dragons/db/schema";
 
 let ctx: TestDbContext;
 
@@ -146,16 +146,18 @@ describe("resetTestDb", () => {
       .insert(venues)
       .values({ apiId: 7, name: "Sporthalle" })
       .returning();
-    await ctx.db.insert(venueBookings).values({
+    await ctx.db.insert(venueHallTimes).values({
       venueId: venue!.id,
       date: "2026-01-01",
-      calculatedStartTime: "18:00:00",
-      calculatedEndTime: "20:00:00",
+      kind: "open",
+      startTime: "18:00:00",
+      endTime: "20:00:00",
+      source: "manual",
     });
 
     await resetTestDb(ctx);
 
-    expect(await ctx.db.select().from(venueBookings)).toEqual([]);
+    expect(await ctx.db.select().from(venueHallTimes)).toEqual([]);
     expect(await ctx.db.select().from(venues)).toEqual([]);
   });
 
@@ -166,11 +168,13 @@ describe("resetTestDb", () => {
     expect(role.rows[0]!.session_replication_role).toBe("origin");
 
     await expect(
-      ctx.db.insert(venueBookings).values({
+      ctx.db.insert(venueHallTimes).values({
         venueId: 12345,
         date: "2026-01-01",
-        calculatedStartTime: "18:00:00",
-        calculatedEndTime: "20:00:00",
+        kind: "open",
+        startTime: "18:00:00",
+        endTime: "20:00:00",
+        source: "manual",
       }),
     ).rejects.toThrow();
   });

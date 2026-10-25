@@ -39,7 +39,7 @@ vi.mock("../../config/auth", () => ({
 
 import { venueRoutes } from "./venue.routes";
 import { errorHandler } from "../../middleware/error";
-import { domainEvents, venueBookings, venueHallTimes, venues } from "@dragons/db/schema";
+import { domainEvents, venueHallTimes, venues } from "@dragons/db/schema";
 import {
   setupTestDb,
   resetTestDb,
@@ -79,25 +79,6 @@ async function seedVenue(name = "Gymnasium Goetheschule"): Promise<number> {
     .insert(venues)
     .values({ apiId: 4711 + Math.floor(Math.random() * 100000), name })
     .returning({ id: venues.id });
-  return row!.id;
-}
-
-async function seedBooking(
-  venueId: number,
-  date: string,
-  window: { start: string; end: string; overrideStart?: string; overrideEnd?: string },
-): Promise<number> {
-  const [row] = await ctx.db
-    .insert(venueBookings)
-    .values({
-      venueId,
-      date,
-      calculatedStartTime: window.start,
-      calculatedEndTime: window.end,
-      overrideStartTime: window.overrideStart ?? null,
-      overrideEndTime: window.overrideEnd ?? null,
-    })
-    .returning({ id: venueBookings.id });
   return row!.id;
 }
 
@@ -244,9 +225,8 @@ describe("POST /venues/:id/hall-times/import/preview", () => {
     expect(stored).toHaveLength(5);
   });
 
-  it("answers with exactly span, added, changed, removed and unchanged, even with bookings on the span", async () => {
+  it("answers with exactly span, added, changed, removed and unchanged", async () => {
     const venueId = await seedVenue();
-    await seedBooking(venueId, "2026-09-12", { start: "17:00:00", end: "21:00:00" });
     await ctx.db.insert(venueHallTimes).values([
       { venueId, date: "2026-09-12", kind: "open", startTime: "10:00", endTime: "22:00", source: "anlage_t" },
     ]);
@@ -304,9 +284,8 @@ describe("POST /venues/:id/hall-times/import", () => {
     expect(other).toEqual([{ date: "2026-09-19" }]);
   });
 
-  it("writes rows and emits no domain event, whatever the bookings on the span", async () => {
+  it("writes rows and emits no domain event", async () => {
     const venueId = await seedVenue();
-    await seedBooking(venueId, "2026-09-12", { start: "17:00:00", end: "21:00:00" });
     await ctx.db.insert(venueHallTimes).values([
       { venueId, date: "2026-09-12", kind: "open", startTime: "10:00", endTime: "22:00", source: "anlage_t" },
     ]);

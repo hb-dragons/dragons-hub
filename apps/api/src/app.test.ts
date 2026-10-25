@@ -140,7 +140,7 @@ describe("sub-router middleware isolation (Hono /admin leak)", () => {
     }
   });
 
-  it("admin/bookings list only checks booking:view, not foreign perms", async () => {
+  it("admin/hall-occupancy only checks booking:view, not foreign perms", async () => {
     mockGetSession.mockResolvedValue({
       user: { id: "u1", role: "venueManager" },
       session: { id: "s1" },
@@ -151,7 +151,7 @@ describe("sub-router middleware isolation (Hono /admin leak)", () => {
       return { success: false };
     });
 
-    const response = await app.request("/admin/bookings");
+    const response = await app.request("/admin/hall-occupancy");
 
     expect(response.status).not.toBe(403);
 

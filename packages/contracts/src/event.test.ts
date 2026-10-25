@@ -42,6 +42,13 @@ describe("eventListQuerySchema", () => {
     });
   });
 
+  it("accepts a retired type and entity type as filters", () => {
+    expect(eventListQuerySchema.parse({ type: "booking.created", entityType: "booking" })).toEqual({
+      type: "booking.created",
+      entityType: "booking",
+    });
+  });
+
   it("accepts valid status enum values", () => {
     for (const status of ["pending", "sent", "failed", "read"] as const) {
       expect(eventListQuerySchema.parse({ status })).toMatchObject({ status });
@@ -122,7 +129,7 @@ describe("triggerEventSchema", () => {
   });
 
   it("accepts all valid entityType values", () => {
-    for (const entityType of ["match", "booking", "referee"] as const) {
+    for (const entityType of ["match", "referee", "task"] as const) {
       const result = triggerEventSchema.parse({ ...validBody, entityType });
       expect(result).toMatchObject({ entityType });
     }
@@ -153,6 +160,11 @@ describe("triggerEventSchema", () => {
   it("rejects missing type", () => {
     const { type: _type, ...rest } = validBody;
     expect(() => triggerEventSchema.parse(rest)).toThrow();
+  });
+
+  it("rejects the retired booking type and entity type", () => {
+    expect(() => triggerEventSchema.parse({ ...validBody, type: "booking.created" })).toThrow();
+    expect(() => triggerEventSchema.parse({ ...validBody, entityType: "booking" })).toThrow();
   });
 
   it("rejects invalid entityType", () => {

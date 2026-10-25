@@ -174,19 +174,17 @@ describe("setClubConfig", () => {
 });
 
 describe("getBookingSettings", () => {
-  it("returns the stored settings when all four exist", async () => {
+  it("returns the stored settings when all three exist", async () => {
     await setBookingSettings({
       bufferBefore: 45,
       bufferAfter: 30,
       gameDuration: 120,
-      dueDaysBefore: 14,
     });
 
     expect(await getBookingSettings()).toEqual({
       bufferBefore: 45,
       bufferAfter: 30,
       gameDuration: 120,
-      dueDaysBefore: 14,
     });
   });
 
@@ -195,7 +193,6 @@ describe("getBookingSettings", () => {
       bufferBefore: 60,
       bufferAfter: 60,
       gameDuration: 90,
-      dueDaysBefore: 7,
     });
   });
 
@@ -207,7 +204,6 @@ describe("getBookingSettings", () => {
       bufferBefore: 45,
       bufferAfter: 60,
       gameDuration: 120,
-      dueDaysBefore: 7,
     });
   });
 
@@ -223,12 +219,11 @@ describe("getBookingSettings", () => {
     expect((await getBookingSettings()).bufferAfter).toBe(60);
   });
 
-  it("reads all four keys in a single query", async () => {
+  it("reads all three keys in a single query", async () => {
     await setBookingSettings({
       bufferBefore: 45,
       bufferAfter: 30,
       gameDuration: 120,
-      dueDaysBefore: 14,
     });
     trace.reset();
 
@@ -244,14 +239,12 @@ describe("setBookingSettings", () => {
       bufferBefore: 45,
       bufferAfter: 30,
       gameDuration: 120,
-      dueDaysBefore: 14,
     });
 
     expect(await readRaw("venue_booking_buffer_before")).toBe("45");
     expect(await readRaw("venue_booking_buffer_after")).toBe("30");
     expect(await readRaw("venue_booking_game_duration")).toBe("120");
-    expect(await readRaw("venue_booking_due_days_before")).toBe("14");
-    expect(await ctx.db.select().from(appSettings)).toHaveLength(4);
+    expect(await ctx.db.select().from(appSettings)).toHaveLength(3);
   });
 });
 

@@ -82,16 +82,6 @@ describe("classifyUrgency", () => {
     expect(classifyUrgency(EVENT_TYPES.MATCH_FORFEITED, {})).toBe("immediate");
   });
 
-  it("classifies booking.hall_time.missing as immediate", () => {
-    expect(classifyUrgency(EVENT_TYPES.BOOKING_HALL_TIME_MISSING, {})).toBe("immediate");
-  });
-
-  it("classifies booking.needs_reconfirmation as immediate", () => {
-    expect(
-      classifyUrgency(EVENT_TYPES.BOOKING_NEEDS_RECONFIRMATION, {}),
-    ).toBe("immediate");
-  });
-
   // --- Always routine events ---
 
   it("classifies match.created as routine", () => {
@@ -130,16 +120,6 @@ describe("classifyUrgency", () => {
 
   it("classifies referee.reassigned as routine", () => {
     expect(classifyUrgency(EVENT_TYPES.REFEREE_REASSIGNED, {})).toBe("routine");
-  });
-
-  it("classifies booking.created as routine", () => {
-    expect(classifyUrgency(EVENT_TYPES.BOOKING_CREATED, {})).toBe("routine");
-  });
-
-  it("classifies booking.status.changed as routine", () => {
-    expect(classifyUrgency(EVENT_TYPES.BOOKING_STATUS_CHANGED, {})).toBe(
-      "routine",
-    );
   });
 
   it("classifies override.applied as routine", () => {

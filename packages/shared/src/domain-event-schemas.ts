@@ -177,57 +177,6 @@ const refereeSlotsSchema = z.object({
   deepLink: z.string(),
 });
 
-// Booking payload schemas
-
-const bookingCreatedSchema = z.object({
-  venueName: z.string(),
-  date: z.string(),
-  startTime: z.string(),
-  endTime: z.string(),
-  matchCount: z.number(),
-});
-
-const bookingStatusChangedSchema = z.object({
-  venueName: z.string(),
-  date: z.string(),
-  oldStartTime: z.string().optional(),
-  oldEndTime: z.string().optional(),
-  newStartTime: z.string().optional(),
-  newEndTime: z.string().optional(),
-  oldStatus: z.string().optional(),
-  newStatus: z.string().optional(),
-  reason: z.string().optional(),
-});
-
-const bookingNeedsReconfirmationSchema = z.object({
-  venueName: z.string(),
-  date: z.string(),
-  reason: z.string(),
-});
-
-/**
- * A booking's window fell outside the hall time the club holds that day (or
- * onto a closed day, or a day with no hall time at all): a rental request
- * still has to go to the city. `hallTime` is the day's row, null when none.
- */
-const bookingHallTimeMissingSchema = z.object({
-  bookingId: z.number(),
-  venueId: z.number(),
-  venueName: z.string(),
-  date: z.string(),
-  startTime: z.string(),
-  endTime: z.string(),
-  coverage: z.enum(["partial", "uncovered", "closed"]),
-  hallTime: z
-    .object({
-      kind: z.enum(["open", "closed"]),
-      startTime: z.string().nullable(),
-      endTime: z.string().nullable(),
-      note: z.string().nullable(),
-    })
-    .nullable(),
-});
-
 // Override payload schemas
 
 const overrideValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
@@ -339,10 +288,6 @@ const eventPayloadSchemas = {
   [EVENT_TYPES.REFEREE_REASSIGNED]: refereeReassignedSchema,
   [EVENT_TYPES.REFEREE_SLOTS_NEEDED]: refereeSlotsSchema,
   [EVENT_TYPES.REFEREE_SLOTS_REMINDER]: refereeSlotsSchema,
-  [EVENT_TYPES.BOOKING_CREATED]: bookingCreatedSchema,
-  [EVENT_TYPES.BOOKING_STATUS_CHANGED]: bookingStatusChangedSchema,
-  [EVENT_TYPES.BOOKING_NEEDS_RECONFIRMATION]: bookingNeedsReconfirmationSchema,
-  [EVENT_TYPES.BOOKING_HALL_TIME_MISSING]: bookingHallTimeMissingSchema,
   [EVENT_TYPES.OVERRIDE_CONFLICT]: overrideConflictSchema,
   [EVENT_TYPES.OVERRIDE_APPLIED]: overrideAppliedSchema,
   [EVENT_TYPES.OVERRIDE_REVERTED]: overrideRevertedSchema,

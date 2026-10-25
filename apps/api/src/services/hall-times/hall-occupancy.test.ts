@@ -63,6 +63,28 @@ describe("programmeWindow", () => {
     ).toEqual({ start: "09:30:00", end: "15:15:00" });
   });
 
+  it("takes the latest end when games share a kickoff", () => {
+    expect(programmeWindow([g("16:00:00", 60), g("16:00:00", 120)], cfg)).toEqual({
+      start: "15:30:00",
+      end: "18:15:00",
+    });
+  });
+
+  it("keeps a zero team duration instead of falling back to the default", () => {
+    expect(programmeWindow([g("10:00:00", 0)], cfg)).toEqual({
+      start: "09:30:00",
+      end: "10:15:00",
+    });
+  });
+
+  it("handles zero buffers", () => {
+    const noBuffers = { ...cfg, bufferBeforeMinutes: 0, bufferAfterMinutes: 0 };
+    expect(programmeWindow([g("10:00:00")], noBuffers)).toEqual({
+      start: "10:00:00",
+      end: "11:30:00",
+    });
+  });
+
   it("clamps start to 00:00:00", () => {
     expect(programmeWindow([g("00:15:00")], cfg)).toEqual({
       start: "00:00:00",

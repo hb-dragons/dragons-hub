@@ -57,7 +57,6 @@
       "teams": "Teams",
       "teamsDesc": "{count, plural, one {# team} other {# teams}} tracked",
       "bookings": "Hall occupancy",
-      "bookingsDesc": "{count, plural, one {# pending} other {# pending}}",
       "sync": "Sync Status",
       "syncHealthy": "Healthy",
       "syncFailed": "Needs Attention",
@@ -889,8 +888,6 @@
       "comments": "Comments",
       "addComment": "Add comment",
       "linkedMatch": "Linked Match",
-      "linkedBooking": "Linked Booking",
-      "venueBooking": "Venue Booking",
       "linkedMatches": "Linked Matches",
       "source": "Source",
       "titlePlaceholder": "Untitled task",
@@ -950,8 +947,7 @@
       "description": "Configure default values for venue booking time calculations",
       "bufferBefore": "Buffer Before First Game (min)",
       "bufferAfter": "Buffer After Last Game (min)",
-      "gameDuration": "Default Game Duration (min)",
-      "dueDaysBefore": "Booking Due Days Before"
+      "gameDuration": "Default Game Duration (min)"
     },
     "theme": {
       "title": "Theme",

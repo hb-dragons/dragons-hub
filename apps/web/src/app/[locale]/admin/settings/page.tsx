@@ -22,7 +22,7 @@ export default async function SettingsPage() {
   const t = await getTranslations();
   let clubConfig: ClubConfigType | null = null;
   let leaguesResponse: TrackedLeaguesResponse | null = null;
-  let bookingConfig: { bufferBefore: number; bufferAfter: number; gameDuration: number; dueDaysBefore: number } | null = null;
+  let bookingConfig: { bufferBefore: number; bufferAfter: number; gameDuration: number } | null = null;
 
   const serverApi = await getServerApi();
   const sq = makeQueries(serverApi);

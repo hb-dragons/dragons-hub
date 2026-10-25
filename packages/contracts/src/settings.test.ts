@@ -34,43 +34,49 @@ describe("settingsClubConfigSchema", () => {
 
 describe("settingsBookingConfigSchema", () => {
   it("accepts valid booking config", () => {
-    const input = { bufferBefore: 60, bufferAfter: 30, gameDuration: 90, dueDaysBefore: 7 };
+    const input = { bufferBefore: 60, bufferAfter: 30, gameDuration: 90 };
     const result = settingsBookingConfigSchema.parse(input);
     expect(result).toEqual(input);
   });
 
-  it("accepts zero for buffer values and dueDaysBefore", () => {
-    const input = { bufferBefore: 0, bufferAfter: 0, gameDuration: 90, dueDaysBefore: 0 };
+  it("accepts zero for buffer values", () => {
+    const input = { bufferBefore: 0, bufferAfter: 0, gameDuration: 90 };
     expect(settingsBookingConfigSchema.parse(input)).toEqual(input);
   });
 
   it("rejects negative bufferBefore", () => {
     expect(() =>
-      settingsBookingConfigSchema.parse({ bufferBefore: -1, bufferAfter: 0, gameDuration: 90, dueDaysBefore: 0 }),
+      settingsBookingConfigSchema.parse({ bufferBefore: -1, bufferAfter: 0, gameDuration: 90 }),
     ).toThrow();
   });
 
   it("rejects negative bufferAfter", () => {
     expect(() =>
-      settingsBookingConfigSchema.parse({ bufferBefore: 0, bufferAfter: -1, gameDuration: 90, dueDaysBefore: 0 }),
+      settingsBookingConfigSchema.parse({ bufferBefore: 0, bufferAfter: -1, gameDuration: 90 }),
     ).toThrow();
   });
 
   it("rejects zero gameDuration", () => {
     expect(() =>
-      settingsBookingConfigSchema.parse({ bufferBefore: 0, bufferAfter: 0, gameDuration: 0, dueDaysBefore: 0 }),
+      settingsBookingConfigSchema.parse({ bufferBefore: 0, bufferAfter: 0, gameDuration: 0 }),
     ).toThrow();
   });
 
   it("rejects negative gameDuration", () => {
     expect(() =>
-      settingsBookingConfigSchema.parse({ bufferBefore: 0, bufferAfter: 0, gameDuration: -5, dueDaysBefore: 0 }),
+      settingsBookingConfigSchema.parse({ bufferBefore: 0, bufferAfter: 0, gameDuration: -5 }),
     ).toThrow();
   });
 
   it("rejects non-integer bufferBefore", () => {
     expect(() =>
-      settingsBookingConfigSchema.parse({ bufferBefore: 60.5, bufferAfter: 0, gameDuration: 90, dueDaysBefore: 0 }),
+      settingsBookingConfigSchema.parse({ bufferBefore: 60.5, bufferAfter: 0, gameDuration: 90 }),
+    ).toThrow();
+  });
+
+  it("rejects the retired dueDaysBefore field", () => {
+    expect(() =>
+      settingsBookingConfigSchema.parse({ bufferBefore: 0, bufferAfter: 0, gameDuration: 90, dueDaysBefore: 7 }),
     ).toThrow();
   });
 

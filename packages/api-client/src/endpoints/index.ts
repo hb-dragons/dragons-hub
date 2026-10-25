@@ -37,7 +37,6 @@ export { socialEndpoints } from "./social";
 
 export { settingsEndpoints } from "./settings";
 
-export { bookingEndpoints } from "./booking";
 
 export { teamEndpoints } from "./team";
 

@@ -44,7 +44,6 @@ describe("settings request bodies satisfy @dragons/contracts schemas", () => {
       bufferBefore: 60,
       bufferAfter: 60,
       gameDuration: 90,
-      dueDaysBefore: 7,
     });
     const parsed = settingsBookingConfigSchema.safeParse(calls[0]!.body);
     expect(

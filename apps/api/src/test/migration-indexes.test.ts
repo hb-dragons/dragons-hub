@@ -98,12 +98,6 @@ describe("foreign keys to matches.id", () => {
     return result.rows[0]?.confdeltype;
   }
 
-  it("cascades the booking↔match link, which cannot exist without the match", async () => {
-    expect(
-      await deleteRule("venue_booking_matches", "venue_booking_matches_match_id_matches_id_fk"),
-    ).toBe("c");
-  });
-
   it("unlinks referee_games rather than destroying the officiating record", async () => {
     expect(await deleteRule("referee_games", "referee_games_match_id_matches_id_fk")).toBe("n");
   });

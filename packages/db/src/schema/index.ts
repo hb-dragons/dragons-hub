@@ -14,8 +14,6 @@ export * from "./referee-assignment-rules";
 export * from "./versions";
 export * from "./sync-runs";
 export * from "./auth";
-export * from "./venue-bookings";
-export * from "./venue-booking-matches";
 export * from "./venue-hall-times";
 export * from "./boards";
 export * from "./tasks";

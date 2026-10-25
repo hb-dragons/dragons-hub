@@ -88,7 +88,7 @@ venueRoutes.post(
   validator("json", hallTimeImportBodySchema, validationHook),
   describeRoute({
     description:
-      "Diff the rows of an Anlage T sheet against the stored hall times and report the bookings whose coverage would change; writes nothing",
+      "Diff the rows of an Anlage T sheet against the stored hall times; writes nothing",
     tags: ["Venues"],
     responses: { 200: { description: "Preview" }, 404: { description: "Venue not found" } },
   }),
@@ -108,7 +108,7 @@ venueRoutes.post(
   validator("json", hallTimeImportBodySchema, validationHook),
   describeRoute({
     description:
-      "Apply an Anlage T sheet: replace the venue's sheet rows inside the sheet's date span and emit booking.hall_time.missing for bookings that lose coverage",
+      "Apply an Anlage T sheet: replace the venue's sheet rows inside the sheet's date span",
     tags: ["Venues"],
     responses: { 200: { description: "Import result" }, 404: { description: "Venue not found" } },
   }),

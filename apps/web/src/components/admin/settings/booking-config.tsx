@@ -28,7 +28,6 @@ export function BookingConfig() {
   const [bufferBefore, setBufferBefore] = useState(() => settings?.bufferBefore?.toString() ?? "");
   const [bufferAfter, setBufferAfter] = useState(() => settings?.bufferAfter?.toString() ?? "");
   const [gameDuration, setGameDuration] = useState(() => settings?.gameDuration?.toString() ?? "");
-  const [dueDays, setDueDays] = useState(() => settings?.dueDaysBefore?.toString() ?? "");
   const [saving, setSaving] = useState(false);
   const [initialized, setInitialized] = useState(() => !!settings);
 
@@ -37,7 +36,6 @@ export function BookingConfig() {
       setBufferBefore(settings.bufferBefore.toString());
       setBufferAfter(settings.bufferAfter.toString());
       setGameDuration(settings.gameDuration.toString());
-      setDueDays(settings.dueDaysBefore.toString());
       setInitialized(true);
     }
   }, [settings, initialized]);
@@ -47,8 +45,7 @@ export function BookingConfig() {
     settings &&
     (bufferBefore !== settings.bufferBefore.toString() ||
       bufferAfter !== settings.bufferAfter.toString() ||
-      gameDuration !== settings.gameDuration.toString() ||
-      dueDays !== settings.dueDaysBefore.toString());
+      gameDuration !== settings.gameDuration.toString());
 
   async function handleSave() {
     setSaving(true);
@@ -57,7 +54,6 @@ export function BookingConfig() {
         bufferBefore: parseInt(bufferBefore, 10),
         bufferAfter: parseInt(bufferAfter, 10),
         gameDuration: parseInt(gameDuration, 10),
-        dueDaysBefore: parseInt(dueDays, 10),
       });
       await mutate(SWR_KEYS.settingsBooking, result, { revalidate: false });
       toast.success(t("common.saved"));
@@ -110,18 +106,6 @@ export function BookingConfig() {
               min={1}
               value={gameDuration}
               onChange={(e) => setGameDuration(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="due-days">
-              {t("settings.booking.dueDaysBefore")}
-            </Label>
-            <Input
-              id="due-days"
-              type="number"
-              min={0}
-              value={dueDays}
-              onChange={(e) => setDueDays(e.target.value)}
             />
           </div>
           <Button

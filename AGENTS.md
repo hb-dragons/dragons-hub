@@ -42,10 +42,7 @@ League (1) ──── (N) Match
            └──── (N) Team (via season)
 
 Venue (1) ──── (N) Match
-     (1) ──── (N) VenueBooking
      (1) ──── (N) VenueHallTime (unique: venueId + date)
-
-VenueBooking (N) ──── (N) Match (via VenueBookingMatch join table)
 
 Match (1) ──── (N) MatchReferee
           ├──── (N) MatchRemoteVersion (version history)
@@ -98,7 +95,7 @@ Match (0..1) ──── (N) BroadcastConfig (PK deviceId — one row per score
 
 ### Database Tables
 
-49 tables, all exported from `packages/db/src/schema/index.ts`. The list below is
+47 tables, all exported from `packages/db/src/schema/index.ts`. The list below is
 verified against those exports by `apps/api/src/test/docs-drift.test.ts` in both
 directions — adding a `pgTable` without a row here fails the build.
 
@@ -130,9 +127,7 @@ tables (`user`, `session`, `account`, `verification`) use text ids,
 | `matchLocalVersions` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), versionNumber, changedBy, snapshot JSONB |
 | `matchChanges` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), track (remote/local), fieldName, oldValue, newValue |
 | `matchOverrides` | `packages/db/src/schema/match-overrides.ts` | matchId FK (cascade), fieldName, reason, changedBy — unique(matchId, fieldName) |
-| `venueBookings` | `packages/db/src/schema/venue-bookings.ts` | venueId FK, date, calculatedStartTime/EndTime, overrideStartTime/EndTime, status, needsReconfirmation, confirmedBy |
-| `venueHallTimes` | `packages/db/src/schema/venue-hall-times.ts` | venueId FK, date (unique with venueId), kind (open/closed), startTime/endTime, note, source (anlage_t/manual) — the hall time the club holds per its Mietantrag; bookings are judged against it at read time |
-| `venueBookingMatches` | `packages/db/src/schema/venue-booking-matches.ts` | venueBookingId FK (cascade), matchId FK — unique(venueBookingId, matchId) |
+| `venueHallTimes` | `packages/db/src/schema/venue-hall-times.ts` | venueId FK, date (unique with venueId), kind (open/closed), startTime/endTime, note, source (anlage_t/manual) — the hall time the club holds per its Mietantrag; hall occupancy judges home game days against it at read time |
 | `boards` | `packages/db/src/schema/boards.ts` | name, description, createdBy |
 | `boardColumns` | `packages/db/src/schema/boards.ts` | boardId FK (cascade), name, position, color, isDoneColumn |
 | `tasks` | `packages/db/src/schema/tasks.ts` | boardId FK (cascade), columnId FK, title, description, priority, dueDate, position, createdBy |
@@ -301,12 +296,6 @@ Step 5.25: confirmIntentsFromSync()
   - Check pending refereeAssignmentIntents (confirmedBySyncAt IS NULL)
   - If referee now assigned in matchReferees, set confirmedBySyncAt
 
-Step 5.5: reconcileAfterSync()
-  - services/venue-booking/venue-booking.service.ts
-  - Recomputes venue bookings from the freshly synced matches
-  - Wrapped in its own try/catch: a failure is collected into the error list,
-    it does not fail the run
-
 Step 6: Finalize
   - Close SyncLogger (flush remaining entries; dropped entries become errors)
   - Update syncRuns record with counts, summary JSONB and status
@@ -412,13 +401,6 @@ Event types are defined in `packages/shared/src/domain-events.ts`. Events are pu
 - `referee.slots.needed` — Match has open slots requiring assignment
 - `referee.slots.reminder` — Reminders for open referee slots
 
-### Booking Events
-
-- `booking.created` — Venue booking created
-- `booking.status.changed` — Booking status or times updated
-- `booking.needs_reconfirmation` — Booking flagged for reconfirmation
-- `booking.hall_time.missing` — Booking window outside the hall time the club holds that day (or no hall time, or hall closed): a rental request is still owed to the city. Emitted once per transition out of `covered` by sync reconcile (the Anlage T import no longer emits it)
-
 ### Override Events
 
 - `override.applied` — Local field override applied
@@ -439,8 +421,20 @@ Event types are defined in `packages/shared/src/domain-events.ts`. Events are pu
 ### Entity types
 
 `EVENT_ENTITY_TYPES` in the same file is the closed set of entities an event can
-be raised against: `match`, `booking`, `referee`, `task`. The manual-trigger
+be raised against: `match`, `referee`, `task`. The manual-trigger
 request contract derives its enum from that array — do not restate the literals.
+
+### Retired events
+
+`RETIRED_EVENT_TYPES` (`booking.created`, `booking.status.changed`,
+`booking.needs_reconfirmation`, `booking.hall_time.missing`) and
+`RETIRED_EVENT_ENTITY_TYPES` (`booking`) went with the stored venue bookings
+(ADR-0012). Nothing publishes them; they are folded into
+`STORED_EVENT_TYPE_VALUES` / `STORED_EVENT_ENTITY_TYPES` so old
+`domain_events` rows stay listable and filterable, and the event browser and
+notification renderer show them generically. They are not in `EVENT_TYPES`, so
+the manual trigger refuses them and a watch rule cannot add one; a rule that
+already lists one keeps it (it never fires) until edited.
 
 ## API Endpoints
 
@@ -548,8 +542,8 @@ League tracking lives under `/admin/settings/leagues`. There is no
 |--------|------|-------------|
 | GET | `/admin/settings/club` | Get current club config (clubId, clubName) or null |
 | PUT | `/admin/settings/club` | Set club config `{ clubId, clubName }` |
-| GET | `/admin/settings/booking` | Get booking configuration |
-| PUT | `/admin/settings/booking` | Set booking configuration |
+| GET | `/admin/settings/booking` | Get the programme-window settings (buffer before, buffer after, default game duration) |
+| PUT | `/admin/settings/booking` | Set the programme-window settings `{ bufferBefore, bufferAfter, gameDuration }` |
 | GET | `/admin/settings/referee-reminders` | Get referee reminder day offsets |
 | PUT | `/admin/settings/referee-reminders` | Set referee reminder day offsets |
 | GET | `/admin/settings/leagues` | Tracked leagues for the active season, with tracking status |
@@ -594,19 +588,6 @@ Match list and detail responses carry `hallCoverage` (the day's hall time agains
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/qa/chat` | Members-only club Q&A assistant (AI SDK UI message stream); auth-gated (`requireAuth`), rate-limited, gated by `CHATBOT_ENABLED`. Returns 503 when `CHATBOT_ENABLED=false`. |
-
-### Admin - Bookings
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/admin/bookings` | List all bookings |
-| GET | `/admin/bookings/:id` | Booking detail |
-| POST | `/admin/bookings` | Create a booking manually |
-| PATCH | `/admin/bookings/:id` | Update booking |
-| PATCH | `/admin/bookings/:id/status` | Quick status change |
-| DELETE | `/admin/bookings/:id` | Delete a booking |
-| GET | `/admin/bookings/reconcile/preview` | Preview the booking changes a reconcile would make |
-| POST | `/admin/bookings/reconcile` | Apply booking reconciliation from matches |
 
 ### Admin - Boards
 
@@ -878,7 +859,7 @@ the app hides the "Meine Kontaktdaten" section on.
 
 Route files: `apps/api/src/routes/health.routes.ts`, `apps/api/src/routes/qa.routes.ts`, `apps/api/src/routes/device.routes.ts`, `apps/api/src/routes/admin/*.routes.ts`, `apps/api/src/routes/api/*.routes.ts`, `apps/api/src/routes/public/*.routes.ts`, `apps/api/src/routes/referee/*.routes.ts`. Mount table: `apps/api/src/routes/index.ts`; app-level routes: `apps/api/src/app.ts`.
 Request schemas: `packages/contracts/src/<group>.ts` (never redeclared in the route).
-Service layer: `apps/api/src/services/admin/*.service.ts`, `apps/api/src/services/referee/`, `apps/api/src/services/venue-booking/`, `apps/api/src/services/reschedule/`, `apps/api/src/services/notifications/`, `apps/api/src/services/social/`
+Service layer: `apps/api/src/services/admin/*.service.ts`, `apps/api/src/services/referee/`, `apps/api/src/services/hall-times/`, `apps/api/src/services/reschedule/`, `apps/api/src/services/notifications/`, `apps/api/src/services/social/`
 
 ## Access Control (RBAC)
 
@@ -1018,7 +999,7 @@ new top-level one.
 
 Every web data call goes through the shared typed client built from `@dragons/api-client`'s `createApi`. There is one entry point per render context:
 
-- **Client components and hooks** import `api` from `@/lib/api` and call it by namespace, e.g. `api.bookings.list()`. The namespaces come from `createApi`, which wraps the exported `browserClient`.
+- **Client components and hooks** import `api` from `@/lib/api` and call it by namespace, e.g. `api.hallOccupancy.list()`. The namespaces come from `createApi`, which wraps the exported `browserClient`.
 - **Server components** call `const api = await getServerApi()` from `@/lib/api.server`. Each call builds a per-request client that forwards the incoming cookies, so server-side reads stay authenticated.
 - **SWR client-side reads** use `apiFetcher` from `@/lib/swr`, which wraps the same shared `browserClient.get`. Point a `useSWR` key at an endpoint and `apiFetcher` resolves it through the typed client.
 

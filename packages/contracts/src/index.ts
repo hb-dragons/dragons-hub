@@ -37,18 +37,6 @@ export {
 } from "./match";
 
 export {
-  bookingIdParamSchema,
-  bookingListQuerySchema,
-  bookingUpdateBodySchema,
-  bookingStatusBodySchema,
-  bookingCreateBodySchema,
-  type BookingListQuery,
-  type BookingCreateBody,
-  type BookingUpdateBody,
-  type BookingStatusBody,
-} from "./booking";
-
-export {
   channelConfigIdParamSchema,
   channelConfigListQuerySchema,
   createChannelConfigSchema,

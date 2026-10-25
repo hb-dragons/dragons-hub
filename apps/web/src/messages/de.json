@@ -57,7 +57,6 @@
       "teams": "Teams",
       "teamsDesc": "{count, plural, one {# Team} other {# Teams}} verfolgt",
       "bookings": "Hallenbelegung",
-      "bookingsDesc": "{count, plural, one {# ausstehend} other {# ausstehend}}",
       "sync": "Sync-Status",
       "syncHealthy": "Fehlerfrei",
       "syncFailed": "Aktion nötig",
@@ -889,8 +888,6 @@
       "comments": "Kommentare",
       "addComment": "Kommentar hinzufügen",
       "linkedMatch": "Verknüpftes Spiel",
-      "linkedBooking": "Verknüpfte Buchung",
-      "venueBooking": "Hallenbuchung",
       "linkedMatches": "Verknüpfte Spiele",
       "source": "Quelle",
       "titlePlaceholder": "Unbenannte Aufgabe",
@@ -950,8 +947,7 @@
       "description": "Standardwerte für die Berechnung der Hallenbuchungszeiten konfigurieren",
       "bufferBefore": "Vorlauf vor erstem Spiel (min)",
       "bufferAfter": "Nachlauf nach letztem Spiel (min)",
-      "gameDuration": "Standard-Spieldauer (min)",
-      "dueDaysBefore": "Buchungsfrist (Tage vorher)"
+      "gameDuration": "Standard-Spieldauer (min)"
     },
     "theme": {
       "title": "Design",
