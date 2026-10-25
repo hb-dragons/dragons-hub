@@ -1,7 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAnlageT } from "./anlage-t";
 import goetheschule from "./fixtures/anlage-t-goetheschule.json";
 import fes from "./fixtures/anlage-t-fes.json";
+
+// Kiritimati (UTC+14) on purpose: a parsed day must be the sheet's day, not
+// one shifted by the runtime zone.
+beforeEach(() => {
+  vi.stubEnv("TZ", "Pacific/Kiritimati");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 function rowFor(result: ReturnType<typeof parseAnlageT>, date: string) {
   return result.rows.find((r) => r.date === date);

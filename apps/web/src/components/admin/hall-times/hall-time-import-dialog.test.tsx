@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import * as XLSX from "xlsx";
@@ -89,9 +89,15 @@ async function pickFile(file: File) {
   await screen.findByTestId("import-parsed");
 }
 
+beforeEach(() => {
+  // Non-Berlin runtime zone on purpose: dates and times must be the club's, not the runtime's.
+  vi.stubEnv("TZ", "Pacific/Honolulu");
+});
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe("HallTimeImportDialog", () => {

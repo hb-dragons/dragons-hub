@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import de from "@/messages/de.json";
@@ -47,7 +47,15 @@ vi.mock("@/lib/navigation", () => ({
 
 import { HallOccupancyTable } from "./hall-occupancy-table";
 
-afterEach(cleanup);
+beforeEach(() => {
+  // Non-Berlin runtime zone on purpose: dates and times must be the club's, not the runtime's.
+  vi.stubEnv("TZ", "Pacific/Honolulu");
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+});
 
 describe("HallOccupancyTable accessibility", () => {
   // The repo has no axe runner; this asserts the structure axe would check:

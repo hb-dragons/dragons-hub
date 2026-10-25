@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { HallOccupancyDay } from "@dragons/shared";
@@ -89,8 +89,14 @@ beforeAll(() => {
   Element.prototype.scrollIntoView = () => {};
 });
 
+beforeEach(() => {
+  // Non-Berlin runtime zone on purpose: dates and times must be the club's, not the runtime's.
+  vi.stubEnv("TZ", "Pacific/Honolulu");
+});
+
 afterEach(() => {
   cleanup();
+  vi.unstubAllEnvs();
   mocks.days = [];
   mocks.keys = [];
   mocks.error = undefined;

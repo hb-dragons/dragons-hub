@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { Sheet } from "@dragons/ui/components/sheet";
@@ -51,9 +51,15 @@ function renderSheet(canEdit = true) {
   );
 }
 
+beforeEach(() => {
+  // Non-Berlin runtime zone on purpose: dates and times must be the club's, not the runtime's.
+  vi.stubEnv("TZ", "Pacific/Honolulu");
+});
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
   mocks.swr = { data: undefined, error: undefined, isLoading: false };
 });
 
