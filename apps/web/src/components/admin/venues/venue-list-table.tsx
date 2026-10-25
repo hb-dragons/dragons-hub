@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useTranslations } from "next-intl"
+import { useSearchParams } from "next/navigation"
 import useSWR, { useSWRConfig } from "swr"
 import { queries } from "@/lib/swr-queries"
 import { SWR_KEYS } from "@/lib/swr-keys"
@@ -154,8 +155,22 @@ export function VenueListTable() {
   const { mutate: mutateKey } = useSWRConfig()
   const { data: session } = authClient.useSession()
   const canEdit = can(session?.user ?? null, "venue", "update")
-  const [selectedVenue, setSelectedVenue] = useState<VenueListItem | null>(null)
-  const columns = useMemo(() => getColumns(t, setSelectedVenue), [t])
+  const [pickedVenue, setPickedVenue] = useState<VenueListItem | null>(null)
+  // `?hallTimes=<venueId>` deep-links to a venue's Hallenzeiten panel (the
+  // Hallenbelegung list links here). Closing the panel marks the param handled
+  // so it does not reopen on the next render.
+  const hallTimesParam = useSearchParams()?.get("hallTimes") ?? null
+  const [dismissedParam, setDismissedParam] = useState<string | null>(null)
+  const paramVenue =
+    hallTimesParam !== null && hallTimesParam !== dismissedParam
+      ? (venueList ?? []).find((v) => String(v.id) === hallTimesParam) ?? null
+      : null
+  const selectedVenue = pickedVenue ?? paramVenue
+  const setSelectedVenue = (venue: VenueListItem | null) => {
+    setPickedVenue(venue)
+    if (venue === null) setDismissedParam(hallTimesParam)
+  }
+  const columns = useMemo(() => getColumns(t, setPickedVenue), [t])
   const [showImport, setShowImport] = useState(false)
 
   // A failed request is not "no venues found" — never collapse the two.
@@ -219,7 +234,9 @@ export function VenueListTable() {
       venues={allItems}
       onImported={(venueId) => {
         void mutateKey(SWR_KEYS.venueHallTimes(venueId))
-        void mutateKey(SWR_KEYS.bookings)
+        void mutateKey(
+          (key) => typeof key === "string" && key.startsWith("/admin/hall-occupancy"),
+        )
       }}
     />
     </div>

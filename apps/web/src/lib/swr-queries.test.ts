@@ -38,7 +38,7 @@ function mockApi() {
       getLeagues: rec("settings.getLeagues"),
       getBooking: rec("settings.getBooking"),
     },
-    bookings: { list: rec("bookings.list") },
+    hallOccupancy: { list: rec("hallOccupancy.list") },
     notificationTest: { recentTestPush: rec("notificationTest.recentTestPush") },
     notifications: { list: rec("notifications.list") },
     events: { list: rec("events.list"), failed: rec("events.failed") },
@@ -387,13 +387,21 @@ describe("makeQueries", () => {
     expect(calls[0]).toEqual({ method: "settings.getBooking", args: [] });
   });
 
-  // --- bookings ---
-  it("bookings: key + dispatch to bookings.list()", async () => {
+  // --- hall occupancy ---
+  it("hallOccupancy: key carries the filters + dispatch to hallOccupancy.list(query)", async () => {
     const { api, calls } = mockApi();
-    const q = makeQueries(api).bookings();
-    expect(q.key).toBe(SWR_KEYS.bookings);
+    const q = makeQueries(api).hallOccupancy({ venueId: 8, coverage: "partial" });
+    expect(q.key).toBe("/admin/hall-occupancy?venueId=8&coverage=partial");
     await q.fetcher();
-    expect(calls[0]).toEqual({ method: "bookings.list", args: [] });
+    expect(calls[0]).toEqual({
+      method: "hallOccupancy.list",
+      args: [{ venueId: 8, coverage: "partial" }],
+    });
+  });
+
+  it("hallOccupancy: no filters gives the bare key", () => {
+    const { api } = mockApi();
+    expect(makeQueries(api).hallOccupancy().key).toBe("/admin/hall-occupancy");
   });
 
   // --- notification test ---

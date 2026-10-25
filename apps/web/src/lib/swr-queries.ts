@@ -30,6 +30,8 @@ function normReferees(opts: {
   };
 }
 
+type HallOccupancyQuery = NonNullable<Parameters<Api["hallOccupancy"]["list"]>[0]>;
+
 export function makeQueries(api: Api) {
   return {
     // sync
@@ -151,8 +153,11 @@ export function makeQueries(api: Api) {
       key: SWR_KEYS.settingsBooking,
       fetcher: () => api.settings.getBooking(),
     }),
-    // bookings
-    bookings: () => ({ key: SWR_KEYS.bookings, fetcher: () => api.bookings.list() }),
+    // hall occupancy
+    hallOccupancy: (query: HallOccupancyQuery = {}) => ({
+      key: SWR_KEYS.hallOccupancy(query),
+      fetcher: () => api.hallOccupancy.list(query),
+    }),
     // notifications / events
     testPushRecent: () => ({
       key: SWR_KEYS.testPushRecent,

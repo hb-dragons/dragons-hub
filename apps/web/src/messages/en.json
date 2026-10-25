@@ -16,7 +16,7 @@
     "venues": "Venues",
     "users": "Users",
     "board": "Board",
-    "bookings": "Bookings",
+    "bookings": "Hall occupancy",
     "menu": "Menu",
     "groupLeague": "League",
     "groupOperations": "Operations",
@@ -56,7 +56,7 @@
     "quickLinks": {
       "teams": "Teams",
       "teamsDesc": "{count, plural, one {# team} other {# teams}} tracked",
-      "bookings": "Bookings",
+      "bookings": "Hall occupancy",
       "bookingsDesc": "{count, plural, one {# pending} other {# pending}}",
       "sync": "Sync Status",
       "syncHealthy": "Healthy",
@@ -912,82 +912,6 @@
       "moved": "Task moved"
     },
     "moreActions": "Board actions"
-  },
-  "bookings": {
-    "title": "Venue Bookings",
-    "description": "Track venue booking status for home games",
-    "empty": "No venue bookings found",
-    "status": {
-      "pending": "Pending",
-      "requested": "Requested",
-      "confirmed": "Confirmed",
-      "cancelled": "Cancelled"
-    },
-    "needsReconfirmation": "Needs re-confirmation — match times have changed since this was confirmed",
-    "columns": {
-      "date": "Date",
-      "venue": "Venue",
-      "timeWindow": "Time Window",
-      "matches": "Matches",
-      "status": "Status",
-      "hallTime": "Hall time"
-    },
-    "create": {
-      "title": "New Booking",
-      "venue": "Venue",
-      "venuePlaceholder": "Select venue...",
-      "date": "Date",
-      "startTime": "Start Time",
-      "endTime": "End Time",
-      "notes": "Notes",
-      "notesPlaceholder": "Optional notes...",
-      "submit": "Create Booking"
-    },
-    "override": {
-      "label": "Override Time",
-      "reason": "Reason"
-    },
-    "toast": {
-      "updated": "Booking updated",
-      "statusChanged": "Status updated",
-      "deleted": "Booking deleted",
-      "created": "Booking created",
-      "reconciled": "Bookings synchronized"
-    },
-    "reconcile": {
-      "button": "Sync from Matches",
-      "title": "Synchronize Bookings",
-      "description": "Compare current bookings with match schedule and apply changes.",
-      "noChanges": "Everything is up to date. No changes needed.",
-      "apply": "Apply Changes",
-      "toCreate": "New Bookings",
-      "toUpdate": "Updated Bookings",
-      "toRemove": "Bookings to Remove",
-      "timeWindow": "Time Window",
-      "matchesAdded": "Matches added",
-      "matchesRemoved": "Matches removed",
-      "reasonCancelled": "All matches forfeited or cancelled",
-      "reasonNoMatches": "No linked matches remaining",
-      "forfeited": "Forfeited",
-      "cancelled": "Cancelled"
-    },
-    "detail": {
-      "times": "Time Window",
-      "startTime": "Start",
-      "endTime": "End",
-      "calculated": "Calculated",
-      "reasonPlaceholder": "Reason for override...",
-      "linkedMatches": "Linked Matches",
-      "opponent": "vs {guest}",
-      "notes": "Notes",
-      "notesPlaceholder": "Add notes...",
-      "delete": "Delete Booking",
-      "deleteConfirmTitle": "Delete Booking?",
-      "deleteConfirmDescription": "This will permanently delete this booking and its match links. This action cannot be undone.",
-      "discardTitle": "Discard changes?",
-      "discardDescription": "You have unsaved changes. Are you sure you want to discard them?",
-      "discard": "Discard"
-    }
   },
   "settings": {
     "title": "Settings",
@@ -1946,5 +1870,30 @@
       "parseFailed": "The file could not be read.",
       "failed": "Import failed."
     }
+  },
+  "hallOccupancy": {
+    "title": "Hall occupancy",
+    "description": "Home game days per hall, checked against the hall times",
+    "empty": "No home game days found",
+    "columns": {
+      "date": "Date",
+      "hall": "Hall",
+      "games": "Games",
+      "window": "Hall needed",
+      "hallTime": "Hall time",
+      "coverage": "Coverage"
+    },
+    "filters": {
+      "hall": "Hall",
+      "allHalls": "All halls",
+      "coverage": "Coverage",
+      "allCoverages": "All"
+    },
+    "versus": "vs {guest}",
+    "noHallTime": "No hall time",
+    "closed": "Closed",
+    "closedWithNote": "Closed: {note}",
+    "gapEarly": "{minutes} min early",
+    "gapLate": "{minutes} min late"
   }
 }
