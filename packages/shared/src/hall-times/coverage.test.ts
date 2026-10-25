@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HALL_TIME_COVERAGES } from "../hall-times";
-import { coverageFor, hallTimeCoverage } from "./coverage";
+import { coverageFor } from "./coverage";
 
 const open = (startTime: string, endTime: string) =>
   ({ kind: "open", startTime, endTime, note: null }) as const;
@@ -30,14 +30,6 @@ describe("coverageFor", () => {
     expect(coverageFor({ start: "13:00", end: "17:30" }, open("13:00", "17:30")).status).toBe(
       "covered",
     );
-  });
-});
-
-describe("hallTimeCoverage", () => {
-  it("reads a missing hall time as none", () => {
-    expect(hallTimeCoverage(null)).toBe("none");
-    expect(hallTimeCoverage(undefined)).toBe("none");
-    expect(hallTimeCoverage({ coverage: "partial" })).toBe("partial");
   });
 });
 

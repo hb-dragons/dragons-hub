@@ -62,7 +62,6 @@ export const hallTimeImportBodySchema = z
     path: ["rows"],
   });
 
-export type HallTimeDateParam = z.infer<typeof hallTimeDateParamSchema>;
 export type HallTimeListQuery = z.infer<typeof hallTimeListQuerySchema>;
 export type HallTimeUpsertBody = z.infer<typeof hallTimeUpsertBodySchema>;
 export type HallTimeImportBody = z.infer<typeof hallTimeImportBodySchema>;

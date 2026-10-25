@@ -18,7 +18,7 @@ import { venues } from "./venues";
 /**
  * Hall times (Hallenzeiten): one row per venue and club-zone day, the time
  * window the club holds the hall per its Mietantrag ("Anlage T") or the
- * landlord's closure note for that day. A day the club asked for nothing has
+ * city's closure note for that day. A day the club asked for nothing has
  * no row. Whether a home game day is covered by its hall time is computed at
  * read time (hall occupancy), never stored.
  */
@@ -54,6 +54,3 @@ export const venueHallTimes = pgTable(
     ),
   }),
 );
-
-export type VenueHallTime = typeof venueHallTimes.$inferSelect;
-export type NewVenueHallTime = typeof venueHallTimes.$inferInsert;

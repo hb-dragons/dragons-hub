@@ -33,9 +33,6 @@ export const HALL_TIME_COVERAGES = ["covered", "partial", "uncovered", "closed",
  */
 export type HallTimeCoverage = (typeof HALL_TIME_COVERAGES)[number];
 
-/** A coverage that still owes the city a request: everything but `covered`. */
-export type HallTimeShortfall = Exclude<HallTimeCoverage, "covered">;
-
 /** The four facts a hall time carries wherever it is shown or published. */
 export interface HallTimeWindow {
   kind: HallTimeKind;

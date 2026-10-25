@@ -166,7 +166,6 @@ export {
   hallTimeUpsertBodySchema,
   hallTimeImportBodySchema,
   type VenueSearchQuery,
-  type HallTimeDateParam,
   type HallTimeListQuery,
   type HallTimeUpsertBody,
   type HallTimeImportBody,

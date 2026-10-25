@@ -14,7 +14,7 @@ import { timeToMinutes } from "./coverage";
  * blocks, each `Tag | Datum | von | - | bis`. A day is one of:
  * - `von` and `bis` filled → the club holds the hall in that window (`open`)
  * - text other than `-` written across the separator column and no times →
- *   the landlord's closure note for that day (`closed`); a note that runs over consecutive rows
+ *   the city's closure note for that day (`closed`); a note that runs over consecutive rows
  *   ("Sommerferien**" over "02.07.-12.08.**") is joined onto each of them
  * - `-` or blank → the club asked for nothing; no row
  */

@@ -269,7 +269,6 @@ export type {
   HallTimeInput,
   HallTimeRow,
   HallTimeCoverage,
-  HallTimeShortfall,
   HallTimeWindow,
   HallCoverageInfo,
   HallTimeImportPreview,
@@ -277,6 +276,6 @@ export type {
 } from "./hall-times";
 export { parseAnlageT } from "./hall-times/anlage-t";
 export type { AnlageTParseResult } from "./hall-times/anlage-t";
-export { coverageFor, hallTimeCoverage, timeToMinutes } from "./hall-times/coverage";
+export { coverageFor, timeToMinutes } from "./hall-times/coverage";
 export type { CoverageResult } from "./hall-times/coverage";
 export type { HallOccupancyGame, HallOccupancyDay } from "./hall-occupancy";
