@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "695848613875",
+    "project_id": "hb-dragons",
+    "storage_bucket": "hb-dragons.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:695848613875:android:17b5813b2add57d1d1c486",
+        "android_client_info": {
+          "package_name": "de.hbdragons.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFb1t55oAKxMDyr3-BZVt2rBB0wA7_KLA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

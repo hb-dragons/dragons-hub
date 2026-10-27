@@ -1,0 +1,13 @@
+# Read by gitleaks-action in CI (`secret-scan` job). Default rules stay on;
+# the allowlist below names files whose matches are known not to be secrets.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public client config, not credentials"
+paths = [
+  # Firebase client config for the Android app. Its `AIza...` key ships inside
+  # every APK and only identifies the Firebase project; access is gated by the
+  # project's API restrictions, not by keeping the key out of the repo.
+  '''apps/native/google-services\.json''',
+]
