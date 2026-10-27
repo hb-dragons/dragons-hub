@@ -35,6 +35,8 @@ const { expo } = JSON.parse(readFileSync(APP_JSON, "utf8")) as {
       };
     };
     android?: {
+      package?: string;
+      googleServicesFile?: string;
       adaptiveIcon?: { foregroundImage?: string; monochromeImage?: string };
       intentFilters?: {
         autoVerify?: boolean;
@@ -54,6 +56,21 @@ describe("app.json identity", () => {
   // title reads as a different app after install.
   it("labels the app with its store name", () => {
     expect(expo.name).toBe(STORE_NAME);
+  });
+});
+
+describe("app.json Android push", () => {
+  // Without the Firebase client config the FCM token request fails, which
+  // `lib/push/registration.ts` only logs, so Android push dies silently.
+  it("ships the Firebase config for the Android package", () => {
+    const android = expo.android;
+    const file = path.resolve(path.dirname(APP_JSON), android?.googleServicesFile ?? "");
+    expect(existsSync(file)).toBe(true);
+    const config = JSON.parse(readFileSync(file, "utf8")) as {
+      client: { client_info: { android_client_info: { package_name: string } } }[];
+    };
+    const packages = config.client.map((c) => c.client_info.android_client_info.package_name);
+    expect(packages).toContain(android?.package);
   });
 });
 

@@ -62,11 +62,14 @@ Remaining, still-open:
       item used to bundle in is a universal-links concern, not a push
       one — it now has its own section below.)
 - [ ] Verify APNs / FCM credentials exist for the production EAS profile
-      (`eas credentials`). Known on 2026-08-25: there is no
-      `google-services.json` and no FCM V1 key has been uploaded, so
-      Android push is not wired at all. A build without it still runs —
-      `lib/push/registration.ts` catches the token failure and logs a
-      warning — but no Android device will ever register.
+      (`eas credentials`). APNs key under team `Z28P2F9QQR`: done
+      2026-10-25. `google-services.json` (Firebase project `hb-dragons`,
+      club account) is committed and wired as
+      `android.googleServicesFile` since 2026-10-27; it is client config,
+      not a secret. Still open: upload the FCM V1 service-account key
+      (`eas credentials -p android`) and receive a test push on an
+      Android build. Without the file `lib/push/registration.ts` catches
+      the token failure and only logs it, so no Android device registers.
 
 ### iOS universal links — entitlement landed (#217), not yet active
 
