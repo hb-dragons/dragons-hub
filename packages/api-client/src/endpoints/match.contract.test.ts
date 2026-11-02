@@ -70,7 +70,7 @@ describe("match request bodies satisfy @dragons/contracts schemas", () => {
       venueCity: null, venueNameOverride: null,
       isConfirmed: false, isForfeited: false, isCancelled: false,
       anschreiber: null, zeitnehmer: null, shotclock: null, publicComment: null,
-      hasLocalChanges: true, overriddenFields: [], booking: null,
+      hasLocalChanges: true, overriddenFields: [], hallCoverage: null,
       kind: "ghost",
       kickoffDate: "2026-03-14",
       kickoffTime: "18:00:00",

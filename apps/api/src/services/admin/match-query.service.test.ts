@@ -53,8 +53,7 @@ import {
   seasons,
   teams,
   teamEntries,
-  venueBookingMatches,
-  venueBookings,
+  venueHallTimes,
   venues,
 } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
@@ -158,6 +157,17 @@ async function seedLeague(name: string): Promise<number> {
     })
     .returning({ id: leagues.id });
   return row!.id;
+}
+
+async function seedHallTime(
+  venueId: number,
+  date: string,
+  startTime = "08:00:00",
+  endTime = "17:00:00",
+): Promise<void> {
+  await ctx.db
+    .insert(venueHallTimes)
+    .values({ venueId, date, kind: "open", startTime, endTime, source: "manual" });
 }
 
 async function seedVenue(name: string): Promise<number> {
@@ -469,43 +479,66 @@ describe("getOwnClubMatches — ordering and pagination", () => {
 describe("getOwnClubMatches — row decoration", () => {
   beforeEach(seedTeams);
 
-  it("attaches each match's own overrides and booking, not another match's", async () => {
+  it("attaches each match's own overrides and hall coverage, not another match's", async () => {
     const venueId = await seedVenue("Sporthalle Nord");
-    const withExtras = await seedMatch({ venueId, kickoffDate: "2026-03-20" });
+    const withExtras = await seedMatch({ venueId, kickoffDate: "2026-03-20", kickoffTime: "10:00:00" });
+    const sameDay = await seedMatch({ venueId, kickoffDate: "2026-03-20", kickoffTime: "13:00:00" });
     const plain = await seedMatch({ kickoffDate: "2026-03-21" });
+    await seedHallTime(venueId, "2026-03-20", "08:00:00", "17:00:00");
 
     await ctx.db.insert(matchOverrides).values([
       { matchId: withExtras, fieldName: "kickoffDate", reason: "Weather", changedBy: "admin" },
       { matchId: withExtras, fieldName: "homeScore", reason: "Correction", changedBy: "scorer" },
     ]);
-    const [booking] = await ctx.db
-      .insert(venueBookings)
-      .values({
-        venueId,
-        date: "2026-03-20",
-        calculatedStartTime: "18:00:00",
-        calculatedEndTime: "21:00:00",
-        status: "confirmed",
-        needsReconfirmation: true,
-      })
-      .returning({ id: venueBookings.id });
-    await ctx.db
-      .insert(venueBookingMatches)
-      .values({ venueBookingId: booking!.id, matchId: withExtras });
 
     const items = (await getOwnClubMatches(listParams)).items;
     const decorated = items.find((m) => m.id === withExtras)!;
     const bare = items.find((m) => m.id === plain)!;
 
     expect(decorated.overriddenFields.sort()).toEqual(["homeScore", "kickoffDate"]);
-    expect(decorated.booking).toEqual({
-      id: booking!.id,
-      status: "confirmed",
-      needsReconfirmation: true,
+    expect(decorated.hallCoverage).toMatchObject({
+      coverage: "covered",
+      gameCount: 2,
+      hallTime: { kind: "open", startTime: "08:00", endTime: "17:00" },
     });
+    expect(items.find((m) => m.id === sameDay)!.hallCoverage).toEqual(decorated.hallCoverage);
     expect(decorated.venueName).toBe("Sporthalle Nord");
     expect(bare.overriddenFields).toEqual([]);
-    expect(bare.booking).toBeNull();
+    expect(bare.hallCoverage).toBeNull();
+  });
+
+  it("gives away games and games at a venue without hall times no hall coverage", async () => {
+    const ourHall = await seedVenue("Sporthalle Nord");
+    const elsewhere = await seedVenue("Fremde Halle");
+    await seedHallTime(ourHall, "2026-03-20");
+    const away = await seedMatch({
+      home: FOREIGN_X,
+      guest: OWN_A,
+      venueId: ourHall,
+      kickoffDate: "2026-03-20",
+    });
+    const noHallTimes = await seedMatch({ venueId: elsewhere, kickoffDate: "2026-03-20" });
+
+    const items = (await getOwnClubMatches(listParams)).items;
+
+    expect(items.find((m) => m.id === away)!.hallCoverage).toBeNull();
+    expect(items.find((m) => m.id === noHallTimes)!.hallCoverage).toBeNull();
+  });
+
+  it("reports a home game on a day without hall time as none, with its window", async () => {
+    const venueId = await seedVenue("Sporthalle Nord");
+    await seedHallTime(venueId, "2026-04-04");
+    const matchId = await seedMatch({ venueId, kickoffDate: "2026-03-20", kickoffTime: "10:00:00" });
+
+    const item = (await getOwnClubMatches(listParams)).items.find((m) => m.id === matchId)!;
+
+    expect(item.hallCoverage).toMatchObject({
+      coverage: "none",
+      hallTime: null,
+      windowStart: "09:00:00",
+      windowEnd: "12:30:00",
+      gameCount: 1,
+    });
   });
 
   it("reports hasLocalChanges from currentLocalVersion", async () => {
@@ -579,7 +612,7 @@ describe("row mappers", () => {
       venueCity: "Musterstadt",
       hasLocalChanges: true,
       overriddenFields: ["kickoffDate"],
-      booking: null,
+      hallCoverage: null,
     });
   });
 
@@ -787,24 +820,14 @@ describe("loadRemoteSnapshot", () => {
 describe("getMatchDetail", () => {
   beforeEach(seedTeams);
 
-  it("returns the addressed match with its overrides, booking and slot array", async () => {
+  it("returns the addressed match with its overrides, hall coverage and slot array", async () => {
     const venueId = await seedVenue("Sporthalle Nord");
     const matchId = await seedMatch({ venueId });
     await seedMatch();
     await ctx.db
       .insert(matchOverrides)
       .values({ matchId, fieldName: "kickoffTime", reason: "Hall clash", changedBy: "admin" });
-    const [booking] = await ctx.db
-      .insert(venueBookings)
-      .values({
-        venueId,
-        date: "2026-03-20",
-        calculatedStartTime: "18:00:00",
-        calculatedEndTime: "21:00:00",
-        status: "pending",
-      })
-      .returning({ id: venueBookings.id });
-    await ctx.db.insert(venueBookingMatches).values({ venueBookingId: booking!.id, matchId });
+    await seedHallTime(venueId, "2026-03-20", "19:00:00", "22:00:00");
 
     const result = await getMatchDetail(matchId);
 
@@ -815,10 +838,11 @@ describe("getMatchDetail", () => {
       reason: "Hall clash",
       changedBy: "admin",
     });
-    expect(result!.match.booking).toEqual({
-      id: booking!.id,
-      status: "pending",
-      needsReconfirmation: false,
+    expect(result!.match.hallCoverage).toMatchObject({
+      coverage: "partial",
+      gameCount: 1,
+      gapBeforeMinutes: 30,
+      hallTime: { kind: "open", startTime: "19:00", endTime: "22:00" },
     });
     expect(result!.match.refereeSlots!.map((s) => s.slotNumber)).toEqual([1, 2, 3]);
     // The overridden field surfaces in the diff tail (computeDiffs runs for real).

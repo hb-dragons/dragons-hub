@@ -733,14 +733,14 @@ describe("renderEventMessage (registry)", () => {
     expect(result.title).toContain("Schiedsrichter");
   });
 
-  it("routes booking events to the booking renderer", () => {
+  it("falls back to a generic rendering for a retired booking event", () => {
     const result = renderEventMessage(
-      EVENT_TYPES.BOOKING_CREATED,
+      "booking.created",
       { venueName: "Halle", date: "2026-04-01", startTime: "18:00", endTime: "20:00", matchCount: 1 },
       "Halle",
       "de",
     );
-    expect(result.title).toContain("Hallenbuchung");
+    expect(result).toEqual({ title: "Ereignis: booking.created", body: "Halle" });
   });
 
   it("routes override events to the override renderer", () => {

@@ -4,8 +4,8 @@ import type { AppEnv } from "../../types";
 import type {
   AlternativeDateCandidate,
   AlternativeDateFlag,
+  AlternativeDateHall,
   AlternativeDatesResponse,
-  BookingStatus,
 } from "@dragons/shared";
 
 // --- Mocks (hoisted before imports) ---
@@ -56,8 +56,7 @@ import {
   staffPeople,
   matches,
   venues,
-  venueBookings,
-  venueBookingMatches,
+  venueHallTimes,
 } from "@dragons/db/schema";
 import {
   setupTestDb,
@@ -324,38 +323,6 @@ async function seedBookingConfig(): Promise<void> {
   ]);
 }
 
-async function seedBooking(seed: {
-  venueId: number;
-  date: string;
-  calculatedStartTime?: string;
-  calculatedEndTime?: string;
-  overrideStartTime?: string | null;
-  overrideEndTime?: string | null;
-  status?: BookingStatus;
-  needsReconfirmation?: boolean;
-  matchIds?: number[];
-}): Promise<number> {
-  const [row] = await ctx.db
-    .insert(venueBookings)
-    .values({
-      venueId: seed.venueId,
-      date: seed.date,
-      calculatedStartTime: seed.calculatedStartTime ?? "11:30:00",
-      calculatedEndTime: seed.calculatedEndTime ?? "16:00:00",
-      overrideStartTime: seed.overrideStartTime ?? null,
-      overrideEndTime: seed.overrideEndTime ?? null,
-      status: seed.status ?? "pending",
-      needsReconfirmation: seed.needsReconfirmation ?? false,
-    })
-    .returning({ id: venueBookings.id });
-  for (const matchId of seed.matchIds ?? []) {
-    await ctx.db
-      .insert(venueBookingMatches)
-      .values({ venueBookingId: row!.id, matchId });
-  }
-  return row!.id;
-}
-
 /**
  * The standard fixture plus a hall: our home game is played at "Drachenhalle",
  * and our second team is the one whose games fill it on other weekends.
@@ -391,7 +358,7 @@ async function seedHomeFixtureWithVenue(): Promise<{
   return { matchId, leagueId, seasonId, venueId };
 }
 
-/** A game of our second team in the hall — what a booking is made of. */
+/** A game of our second team in the hall — the programme the moved game has to fit next to. */
 async function seedHallGame(seed: {
   venueId: number;
   leagueId: number;
@@ -429,13 +396,13 @@ async function candidateOn(
   return found!;
 }
 
-/** A day nothing is booked on: what most candidates look like. */
-function unbooked(
+/** A home day with none of our halls to offer: what most candidates look like. */
+function notHeld(
   date: string,
   weekday: AlternativeDateCandidate["weekday"],
   flags: AlternativeDateFlag[] = [],
 ): AlternativeDateCandidate {
-  return { date, weekday, group: "unbooked", bookings: [], suggestedKickoffTime: null, flags };
+  return { date, weekday, group: "notHeld", halls: [], flags };
 }
 
 async function flagsOn(
@@ -461,14 +428,14 @@ describe("GET /matches/:id/alternative-dates", () => {
     const body = (await res.json()) as AlternativeDatesResponse;
     expect(body.range).toEqual({ from: "2026-03-01", to: "2026-03-28" });
     expect(body.candidates).toEqual([
-      unbooked("2026-03-01", "sunday"),
-      unbooked("2026-03-07", "saturday"),
-      unbooked("2026-03-08", "sunday"),
-      unbooked("2026-03-14", "saturday"),
-      unbooked("2026-03-15", "sunday"),
-      unbooked("2026-03-21", "saturday"),
-      unbooked("2026-03-22", "sunday"),
-      unbooked("2026-03-28", "saturday"),
+      notHeld("2026-03-01", "sunday"),
+      notHeld("2026-03-07", "saturday"),
+      notHeld("2026-03-08", "sunday"),
+      notHeld("2026-03-14", "saturday"),
+      notHeld("2026-03-15", "sunday"),
+      notHeld("2026-03-21", "saturday"),
+      notHeld("2026-03-22", "sunday"),
+      notHeld("2026-03-28", "saturday"),
     ]);
   });
 
@@ -584,7 +551,7 @@ describe("GET /matches/:id/alternative-dates", () => {
     // 2026-03-01 is itself a Sunday, so the collapsed range still yields it —
     // outside the round window of the only fixture the league has.
     expect(body.candidates).toEqual([
-      unbooked("2026-03-01", "sunday", [{ type: "outsideRoundWindow" }]),
+      notHeld("2026-03-01", "sunday", [{ type: "outsideRoundWindow" }]),
     ]);
   });
 
@@ -627,7 +594,7 @@ describe("GET /matches/:id/alternative-dates", () => {
 
     expect(body.range).toEqual({ from: "2026-02-14", to: "2026-02-14" });
     expect(body.candidates).toEqual([
-      unbooked("2026-02-14", "saturday", [{ type: "outsideRoundWindow" }]),
+      notHeld("2026-02-14", "saturday", [{ type: "outsideRoundWindow" }]),
     ]);
   });
 
@@ -679,7 +646,7 @@ describe("GET /matches/:id/alternative-dates", () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as AlternativeDatesResponse;
-    expect(body.candidates).toEqual([unbooked("2026-03-01", "sunday")]);
+    expect(body.candidates).toEqual([notHeld("2026-03-01", "sunday")]);
   });
 
   it("flags a day on which a shared staff person's other team entry plays", async () => {
@@ -814,233 +781,248 @@ describe("GET /matches/:id/alternative-dates", () => {
   });
 });
 
-describe("GET /matches/:id/alternative-dates — hall bookings", () => {
-  it("lists the booking at the game's own venue, override times winning", async () => {
-    const { matchId, leagueId, venueId } = await seedHomeFixtureWithVenue();
+describe("GET /matches/:id/alternative-dates — our halls", () => {
+  async function seedHallTime(seed: {
+    venueId: number;
+    date: string;
+    kind?: "open" | "closed";
+    startTime?: string;
+    endTime?: string;
+    note?: string;
+  }): Promise<void> {
+    await ctx.db.insert(venueHallTimes).values({
+      venueId: seed.venueId,
+      date: seed.date,
+      kind: seed.kind ?? "open",
+      startTime: seed.kind === "closed" ? null : (seed.startTime ?? "10:00:00"),
+      endTime: seed.kind === "closed" ? null : (seed.endTime ?? "20:00:00"),
+      note: seed.note ?? null,
+      source: "anlage_t",
+    });
+  }
+
+  /**
+   * The home fixture's hall "Drachenhalle" (A, the game's own) plus a second
+   * hall of ours, B. B is named to sort before A, so A coming first proves the
+   * current venue leads rather than the alphabet. Each hall holds a hall time
+   * on a weekday outside every candidate list, which is what makes it one of
+   * ours without saying anything about a candidate day.
+   */
+  async function seedTwoHalls(): Promise<{
+    matchId: number;
+    leagueId: number;
+    seasonId: number;
+    hallA: number;
+    hallB: number;
+  }> {
+    const fixture = await seedHomeFixtureWithVenue();
+    const hallB = await seedVenue("Arena am Park");
+    await seedHallTime({ venueId: fixture.venueId, date: "2026-03-03" });
+    await seedHallTime({ venueId: hallB, date: "2026-03-03" });
+    return { ...fixture, hallA: fixture.venueId, hallB };
+  }
+
+  function hall(candidate: AlternativeDateCandidate, venueId: number): AlternativeDateHall {
+    const found = candidate.halls.find((h) => h.venueId === venueId);
+    expect(found, `no hall ${venueId} on ${candidate.date}`).toBeDefined();
+    return found!;
+  }
+
+  it("offers both halls, the game's own first, and fits the game after the one already there", async () => {
+    const { matchId, leagueId, hallA, hallB } = await seedTwoHalls();
+    await seedHallTime({ venueId: hallA, date: "2026-03-14", startTime: "10:00:00", endTime: "18:00:00" });
     const hallGame = await seedHallGame({
-      venueId,
+      venueId: hallA,
       leagueId,
       kickoffDate: "2026-03-14",
-      kickoffTime: "12:00:00",
-    });
-    const bookingId = await seedBooking({
-      venueId,
-      date: "2026-03-14",
-      calculatedStartTime: "11:00:00",
-      calculatedEndTime: "15:00:00",
-      overrideStartTime: "10:30:00",
-      overrideEndTime: "16:30:00",
-      status: "confirmed",
-      needsReconfirmation: true,
-      matchIds: [hallGame],
+      kickoffTime: "11:00:00",
     });
 
     const candidate = await candidateOn(matchId, "2026-03-14");
 
-    expect(candidate.group).toBe("booked");
-    expect(candidate.bookings).toEqual([
+    expect(candidate.group).toBe("fits");
+    const hallTimeA = { kind: "open", startTime: "10:00", endTime: "18:00", note: null };
+    expect(candidate.halls).toEqual([
       {
-        id: bookingId,
-        effectiveStartTime: "10:30:00",
-        effectiveEndTime: "16:30:00",
-        status: "confirmed",
-        needsReconfirmation: true,
+        venueId: hallA,
+        venueName: "Drachenhalle",
+        isCurrentVenue: true,
+        hallTime: hallTimeA,
+        games: [
+          {
+            matchId: hallGame,
+            kickoffTime: "11:00:00",
+            // 11:00 + the configured default of 100 minutes.
+            endTime: "12:40:00",
+            homeTeam: `Squad ${OWN_SECOND_SQUAD}`,
+            homeTeamCustomName: null,
+            homeBadgeColor: null,
+            guestTeam: `Squad ${THIRD_SQUAD}`,
+            leagueName: "Kreisliga Nord",
+          },
+        ],
+        // 10:30 (kickoff - 30 before) to 13:25 (end + 45 after): inside the hall time.
+        existing: { hallTime: hallTimeA, coverage: "covered", gapBeforeMinutes: 0, gapAfterMinutes: 0 },
+        fits: true,
+        // 12:40 + 45 after = 13:25, rounded up to the quarter hour.
+        suggestedKickoffTime: "13:30:00",
+      },
+      {
+        venueId: hallB,
+        venueName: "Arena am Park",
+        isCurrentVenue: false,
+        hallTime: null,
+        games: [],
+        existing: null,
+        fits: false,
+        suggestedKickoffTime: null,
       },
     ]);
   });
 
-  it("shows the calculated window when the booking carries no override", async () => {
-    const { matchId, venueId } = await seedHomeFixtureWithVenue();
-    await seedBooking({
-      venueId,
-      date: "2026-03-14",
-      calculatedStartTime: "09:15:00",
-      calculatedEndTime: "13:45:00",
-    });
+  it("fits the game into the other hall when its own is full", async () => {
+    const { matchId, leagueId, hallA, hallB } = await seedTwoHalls();
+    await seedHallTime({ venueId: hallA, date: "2026-03-14", startTime: "10:00:00", endTime: "13:00:00" });
+    await seedHallTime({ venueId: hallB, date: "2026-03-14", startTime: "12:10:00", endTime: "20:00:00" });
+    await seedHallGame({ venueId: hallA, leagueId, kickoffDate: "2026-03-14", kickoffTime: "11:00:00" });
 
     const candidate = await candidateOn(matchId, "2026-03-14");
 
-    expect(candidate.bookings[0]).toMatchObject({
-      effectiveStartTime: "09:15:00",
-      effectiveEndTime: "13:45:00",
-      status: "pending",
-      needsReconfirmation: false,
-    });
+    expect(candidate.group).toBe("fits");
+    expect(hall(candidate, hallA)).toMatchObject({ fits: false, suggestedKickoffTime: null });
+    // An empty hall: its start plus the 30 minutes before, rounded up.
+    expect(hall(candidate, hallB)).toMatchObject({ fits: true, suggestedKickoffTime: "12:45:00" });
   });
 
-  it("takes each end of the window on its own when only one is overridden", async () => {
-    const { matchId, venueId } = await seedHomeFixtureWithVenue();
-    await seedBooking({
-      venueId,
-      date: "2026-03-14",
-      calculatedStartTime: "11:00:00",
-      calculatedEndTime: "15:00:00",
-      overrideEndTime: "17:00:00",
-    });
+  it("puts a day whose held hall time is too short into heldNoFit", async () => {
+    const { matchId, hallA, hallB } = await seedTwoHalls();
+    await seedHallTime({ venueId: hallA, date: "2026-03-14", startTime: "10:00:00", endTime: "12:00:00" });
 
     const candidate = await candidateOn(matchId, "2026-03-14");
 
-    expect(candidate.bookings[0]).toMatchObject({
-      effectiveStartTime: "11:00:00",
-      effectiveEndTime: "17:00:00",
+    expect(candidate.group).toBe("heldNoFit");
+    expect(hall(candidate, hallA)).toMatchObject({ fits: false, hallTime: { kind: "open" } });
+    expect(hall(candidate, hallB).hallTime).toBeNull();
+  });
+
+  it("puts a day with one hall closed and the other without a row into notHeld", async () => {
+    const { matchId, hallA } = await seedTwoHalls();
+    await seedHallTime({ venueId: hallA, date: "2026-03-14", kind: "closed", note: "Osterferien" });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    expect(candidate.group).toBe("notHeld");
+    expect(hall(candidate, hallA).hallTime).toEqual({
+      kind: "closed",
+      startTime: null,
+      endTime: null,
+      note: "Osterferien",
     });
   });
 
-  it("treats a home game without a venue as unbooked", async () => {
-    const { matchId, venueId } = await seedHomeFixtureWithVenue();
-    await ctx.db
-      .update(matches)
-      .set({ venueId: null })
-      .where(eq(matches.id, matchId));
-    await seedBooking({ venueId, date: "2026-03-14" });
+  it("puts a day on which every hall is closed into closed", async () => {
+    const { matchId, hallA, hallB } = await seedTwoHalls();
+    await seedHallTime({ venueId: hallA, date: "2026-03-14", kind: "closed" });
+    await seedHallTime({ venueId: hallB, date: "2026-03-14", kind: "closed" });
 
-    const body = (await (await get(matchId)).json()) as AlternativeDatesResponse;
-
-    expect(body.isHomeGame).toBe(true);
-    expect(body.candidates.every((c) => c.group === "unbooked")).toBe(true);
+    expect((await candidateOn(matchId, "2026-03-14")).group).toBe("closed");
   });
 
-  it("suggests a kickoff after the last booked game, using that entry's duration", async () => {
-    const { matchId, leagueId, seasonId, venueId } = await seedHomeFixtureWithVenue();
+  it("never holds a closed hall, and shows its games with the closed coverage", async () => {
+    const { matchId, leagueId, hallA } = await seedTwoHalls();
+    await seedHallTime({ venueId: hallA, date: "2026-03-14", kind: "closed" });
+    await seedHallGame({ venueId: hallA, leagueId, kickoffDate: "2026-03-14", kickoffTime: "11:00:00" });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    expect(candidate.group).toBe("notHeld");
+    expect(hall(candidate, hallA)).toMatchObject({
+      fits: false,
+      existing: { coverage: "closed" },
+    });
+    expect(hall(candidate, hallA).games).toHaveLength(1);
+  });
+
+  it("leaves the game being moved out of its own hall's games", async () => {
+    const { matchId, hallA } = await seedTwoHalls();
+    await ctx.db.update(matches).set({ kickoffTime: "11:00:00" }).where(eq(matches.id, matchId));
+    await seedHallTime({ venueId: hallA, date: "2026-03-07", startTime: "10:00:00", endTime: "20:00:00" });
+
+    const candidate = await candidateOn(matchId, "2026-03-07");
+
+    const own = hall(candidate, hallA);
+    expect(own.games).toEqual([]);
+    expect(own.existing).toBeNull();
+    // An empty hall again: 10:00 + 30 before.
+    expect(own).toMatchObject({ fits: true, suggestedKickoffTime: "10:30:00" });
+  });
+
+  it("sizes the moved game by its own team entry's duration", async () => {
+    const { matchId, leagueId, seasonId, hallA } = await seedTwoHalls();
+    await seedTeamEntry(seasonId, OWN_SQUAD, { estimatedGameDuration: 60 });
+    await seedHallTime({ venueId: hallA, date: "2026-03-14", startTime: "10:00:00", endTime: "15:30:00" });
+    await seedHallGame({ venueId: hallA, leagueId, kickoffDate: "2026-03-14", kickoffTime: "11:00:00" });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    // 13:30 + 60 + 45 after = 15:15, inside 15:30; the default 100 would not be.
+    expect(hall(candidate, hallA)).toMatchObject({ fits: true, suggestedKickoffTime: "13:30:00" });
+  });
+
+  it("sizes the games already there by their own team entries", async () => {
+    const { matchId, leagueId, seasonId, hallA } = await seedTwoHalls();
     await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, { estimatedGameDuration: 80 });
-    const early = await seedHallGame({
-      venueId,
-      leagueId,
-      kickoffDate: "2026-03-14",
-      kickoffTime: "10:00:00",
-    });
-    const late = await seedHallGame({
-      venueId,
-      leagueId,
-      kickoffDate: "2026-03-14",
-      kickoffTime: "12:00:00",
-    });
-    await seedBooking({ venueId, date: "2026-03-14", matchIds: [early, late] });
+    await seedHallTime({ venueId: hallA, date: "2026-03-14", startTime: "10:00:00", endTime: "20:00:00" });
+    await seedHallGame({ venueId: hallA, leagueId, kickoffDate: "2026-03-14", kickoffTime: "11:00:00" });
 
     const candidate = await candidateOn(matchId, "2026-03-14");
 
-    // 12:00 + 80 minutes of game + 45 minutes of buffer.
-    expect(candidate.suggestedKickoffTime).toBe("14:05:00");
+    // 11:00 + 80 = 12:20, + 45 after = 13:05, rounded up to 13:15.
+    expect(hall(candidate, hallA).games[0]?.endTime).toBe("12:20:00");
+    expect(hall(candidate, hallA).suggestedKickoffTime).toBe("13:15:00");
   });
 
-  it("falls back to the configured default duration when the team entry has none", async () => {
-    const { matchId, leagueId, seasonId, venueId } = await seedHomeFixtureWithVenue();
-    await seedTeamEntry(seasonId, OWN_SECOND_SQUAD);
-    const hallGame = await seedHallGame({
-      venueId,
+  it("ignores a cancelled game in the hall", async () => {
+    const { matchId, leagueId, hallA } = await seedTwoHalls();
+    await seedHallTime({ venueId: hallA, date: "2026-03-14", startTime: "10:00:00", endTime: "20:00:00" });
+    await seedHallGame({
+      venueId: hallA,
       leagueId,
       kickoffDate: "2026-03-14",
-      kickoffTime: "12:00:00",
-    });
-    await seedBooking({ venueId, date: "2026-03-14", matchIds: [hallGame] });
-
-    const candidate = await candidateOn(matchId, "2026-03-14");
-
-    // 12:00 + 100 minutes of default duration + 45 minutes of buffer.
-    expect(candidate.suggestedKickoffTime).toBe("14:25:00");
-  });
-
-  it("waits for the game that runs longest, not for the one that starts last", async () => {
-    const { matchId, leagueId, seasonId, venueId } = await seedHomeFixtureWithVenue();
-    await seedTeamEntry(seasonId, OWN_THIRD_SQUAD, { estimatedGameDuration: 240 });
-    await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, { estimatedGameDuration: 80 });
-    const long = await seedHallGame({
-      venueId,
-      leagueId,
-      kickoffDate: "2026-03-14",
-      kickoffTime: "10:00:00",
-      homeTeamApiId: OWN_THIRD_SQUAD,
-    });
-    const late = await seedHallGame({
-      venueId,
-      leagueId,
-      kickoffDate: "2026-03-14",
-      kickoffTime: "12:00:00",
-    });
-    await seedBooking({ venueId, date: "2026-03-14", matchIds: [long, late] });
-
-    const candidate = await candidateOn(matchId, "2026-03-14");
-
-    // The 10:00 game runs to 14:00, past the 12:00 one's 13:20; the hall is
-    // busy until the last basket either way.
-    expect(candidate.suggestedKickoffTime).toBe("14:45:00");
-  });
-
-  it("suggests nothing when the booked programme runs past midnight", async () => {
-    const { matchId, leagueId, seasonId, venueId } = await seedHomeFixtureWithVenue();
-    await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, { estimatedGameDuration: 200 });
-    const lateGame = await seedHallGame({
-      venueId,
-      leagueId,
-      kickoffDate: "2026-03-14",
-      kickoffTime: "22:00:00",
-    });
-    await seedBooking({ venueId, date: "2026-03-14", matchIds: [lateGame] });
-
-    const candidate = await candidateOn(matchId, "2026-03-14");
-
-    expect(candidate.group).toBe("booked");
-    expect(candidate.suggestedKickoffTime).toBeNull();
-  });
-
-  it("ignores a cancelled game of the booking when suggesting a kickoff", async () => {
-    const { matchId, leagueId, seasonId, venueId } = await seedHomeFixtureWithVenue();
-    await seedTeamEntry(seasonId, OWN_SECOND_SQUAD, { estimatedGameDuration: 80 });
-    const played = await seedHallGame({
-      venueId,
-      leagueId,
-      kickoffDate: "2026-03-14",
-      kickoffTime: "12:00:00",
-    });
-    const dead = await seedHallGame({
-      venueId,
-      leagueId,
-      kickoffDate: "2026-03-14",
-      kickoffTime: "15:00:00",
+      kickoffTime: "11:00:00",
       isCancelled: true,
     });
-    await seedBooking({ venueId, date: "2026-03-14", matchIds: [played, dead] });
 
     const candidate = await candidateOn(matchId, "2026-03-14");
 
-    expect(candidate.suggestedKickoffTime).toBe("14:05:00");
+    expect(hall(candidate, hallA).games).toEqual([]);
   });
 
-  it("suggests no kickoff for a booking nothing is linked to", async () => {
-    const { matchId, venueId } = await seedHomeFixtureWithVenue();
-    await seedBooking({ venueId, date: "2026-03-14" });
+  it("offers our halls by name, none marked current, for a home game without a venue", async () => {
+    const { matchId, hallA, hallB } = await seedTwoHalls();
+    await ctx.db.update(matches).set({ venueId: null }).where(eq(matches.id, matchId));
 
     const candidate = await candidateOn(matchId, "2026-03-14");
 
-    expect(candidate.group).toBe("booked");
-    expect(candidate.suggestedKickoffTime).toBeNull();
-  });
-
-  it("says a day is unbooked and suggests nothing for it", async () => {
-    const { matchId, venueId } = await seedHomeFixtureWithVenue();
-    await seedBooking({ venueId, date: "2026-03-14" });
-
-    const candidate = await candidateOn(matchId, "2026-03-15");
-
-    expect(candidate.group).toBe("unbooked");
-    expect(candidate.bookings).toEqual([]);
-    expect(candidate.suggestedKickoffTime).toBeNull();
-  });
-
-  it("does not show a booking of another hall", async () => {
-    const { matchId, venueId } = await seedHomeFixtureWithVenue();
-    const otherVenueId = await seedVenue("Turnhalle am Wald");
-    await seedBooking({ venueId: otherVenueId, date: "2026-03-14" });
-    await seedBooking({ venueId, date: "2026-03-21" });
-
-    const body = (await (await get(matchId)).json()) as AlternativeDatesResponse;
-
-    expect(body.candidates.filter((c) => c.group === "booked").map((c) => c.date)).toEqual([
-      "2026-03-21",
+    expect(candidate.halls.map((h) => [h.venueId, h.isCurrentVenue])).toEqual([
+      [hallB, false],
+      [hallA, false],
     ]);
   });
 
-  it("returns away candidates as dates alone, whatever the hall is booked for", async () => {
+  it("offers only our halls when the game's own venue is not one of them", async () => {
+    // The fixture's own hall holds no hall time anywhere, so it is not ours.
+    const { matchId } = await seedHomeFixtureWithVenue();
+    const ours = await seedVenue("Turnhalle am Wald");
+    await seedHallTime({ venueId: ours, date: "2026-03-03" });
+
+    const candidate = await candidateOn(matchId, "2026-03-14");
+
+    expect(candidate.halls.map((h) => h.venueId)).toEqual([ours]);
+    expect(candidate.halls[0]?.isCurrentVenue).toBe(false);
+  });
+
+  it("returns away candidates with no halls, whatever our halls hold", async () => {
     await seedSquad(OWN_SQUAD, true);
     await seedSquad(OPPONENT_SQUAD, false);
     await seedSquad(THIRD_SQUAD, false);
@@ -1048,6 +1030,7 @@ describe("GET /matches/:id/alternative-dates — hall bookings", () => {
     const { leagueId } = await seedSeasonAndLeague();
     const venueId = await seedVenue("Halle des Gegners");
     await seedBookingConfig();
+    await seedHallTime({ venueId, date: "2026-03-14" });
     const matchId = await seedMatch({
       homeTeamApiId: OPPONENT_SQUAD,
       guestTeamApiId: OWN_SQUAD,
@@ -1061,14 +1044,12 @@ describe("GET /matches/:id/alternative-dates — hall bookings", () => {
       kickoffDate: "2026-03-28",
       leagueId,
     });
-    await seedBooking({ venueId, date: "2026-03-14" });
 
     const body = (await (await get(matchId)).json()) as AlternativeDatesResponse;
 
     expect(body.isHomeGame).toBe(false);
     expect(body.candidates.every((c) => c.group === "away")).toBe(true);
-    expect(body.candidates.every((c) => c.bookings.length === 0)).toBe(true);
-    expect(body.candidates.every((c) => c.suggestedKickoffTime === null)).toBe(true);
+    expect(body.candidates.every((c) => c.halls.length === 0)).toBe(true);
     // 2026-03-01 lies before the round (all fixtures share a match day), so it
     // carries the round flag and closes the list; the rest reads like a calendar.
     expect(body.candidates.map((c) => c.date)).toEqual([
@@ -1083,35 +1064,27 @@ describe("GET /matches/:id/alternative-dates — hall bookings", () => {
     ]);
   });
 
-  it("ranks booked days before unbooked ones, chronologically inside each group", async () => {
-    const { matchId, venueId } = await seedHomeFixtureWithVenue();
-    await seedBooking({ venueId, date: "2026-03-21" });
-    await seedBooking({ venueId, date: "2026-03-14" });
+  it("ranks fits, then heldNoFit, then notHeld, then closed, unflagged before flagged inside each", async () => {
+    const { matchId, hallA, hallB } = await seedTwoHalls();
+    // 03-07 and 03-08 are the round's own weekend; 03-01 is flagged (before the round).
+    await seedHallTime({ venueId: hallB, date: "2026-03-28" }); // fits
+    await seedHallTime({ venueId: hallA, date: "2026-03-01" }); // fits, flagged
+    await seedHallTime({ venueId: hallA, date: "2026-03-22", startTime: "10:00:00", endTime: "11:00:00" }); // heldNoFit
+    await seedHallTime({ venueId: hallA, date: "2026-03-15", kind: "closed" }); // notHeld
+    await seedHallTime({ venueId: hallA, date: "2026-03-08", kind: "closed" }); // closed
+    await seedHallTime({ venueId: hallB, date: "2026-03-08", kind: "closed" });
 
     const dates = await candidateDates(matchId);
 
-    // Booked days lead; inside the unbooked group 2026-03-01 is flagged (before
-    // the round) and therefore closes the list.
     expect(dates).toEqual([
+      "2026-03-28", // fits
+      "2026-03-01", // fits, flagged
+      "2026-03-22", // heldNoFit
+      "2026-03-07", // notHeld
       "2026-03-14",
-      "2026-03-21",
-      "2026-03-07",
-      "2026-03-08",
       "2026-03-15",
-      "2026-03-22",
-      "2026-03-28",
-      "2026-03-01",
+      "2026-03-21",
+      "2026-03-08", // closed
     ]);
-  });
-
-  it("ignores a booking outside the range", async () => {
-    const { matchId, venueId } = await seedHomeFixtureWithVenue();
-    await seedBooking({ venueId, date: "2026-03-21" });
-
-    const body = (await (
-      await get(matchId, "?from=2026-03-07&to=2026-03-15")
-    ).json()) as AlternativeDatesResponse;
-
-    expect(body.candidates.every((c) => c.group === "unbooked")).toBe(true);
   });
 });

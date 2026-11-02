@@ -618,6 +618,20 @@ describe("updateMatchLocal", () => {
     expect(result).toBeNull();
   });
 
+  it("returns the edited game's hall coverage after the transaction commits", async () => {
+    const { venueId } = await seedBasicData();
+    const matchId = await insertMatch({ venue_id: venueId, kickoff_time: "18:00:00" });
+    await ctx.client.query(
+      `INSERT INTO venue_hall_times (venue_id, date, kind, start_time, end_time, source)
+       VALUES ($1, '2025-03-15', 'open', '08:00', '22:00', 'manual')`,
+      [venueId],
+    );
+
+    const result = await updateMatchLocal(matchId, { anschreiber: "Anna" }, "admin@test.com");
+
+    expect(result!.match.hallCoverage).toMatchObject({ coverage: "covered", gameCount: 1 });
+  });
+
   it("updates override fields and creates version + override row", async () => {
     await seedBasicData();
     const matchId = await insertMatch();

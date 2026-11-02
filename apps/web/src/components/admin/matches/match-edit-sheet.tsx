@@ -13,6 +13,7 @@ import {
   SheetDescription,
 } from "@dragons/ui/components/sheet";
 import { Badge } from "@dragons/ui/components/badge";
+import { HallTimeCoverageBadge } from "@/components/admin/hall-times/hall-time-coverage-badge";
 import { Button } from "@dragons/ui/components/button";
 import {
   Select,
@@ -50,7 +51,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@dragons/ui/components/popover";
-import { AlertTriangle, CalendarSearch, Loader2, RotateCcw, Save, X, Users } from "lucide-react";
+import { CalendarSearch, Loader2, RotateCcw, Save, X, Users } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
 import { can, clubDayAnchor, teamDisplayName } from "@dragons/shared";
@@ -984,35 +985,31 @@ export function MatchEditSheet({
                 </div>
               </section>
 
-              {/* Booking */}
-              {match.booking && (
+              {/* Hall coverage */}
+              {match.hallCoverage && (
                 <>
                   <Separator />
                   <section className="space-y-3">
                     <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                      {t("matchDetail.booking.title")}
+                      {t("matchDetail.hallCoverage.title")}
                     </h3>
                     <div className="flex items-center gap-2">
-                      <Badge
-                        variant={
-                          match.booking.status === "confirmed"
-                            ? "success"
-                            : match.booking.status === "requested"
-                              ? "default"
-                              : match.booking.status === "cancelled"
-                                ? "destructive"
-                                : "secondary"
-                        }
-                      >
-                        {t(`bookings.status.${match.booking.status}`)}
-                      </Badge>
-                      {match.booking.needsReconfirmation && (
-                        <span className="text-heat inline-flex items-center gap-1 text-xs">
-                          <AlertTriangle className="h-3 w-3" />
-                          {t("matchDetail.booking.needsReconfirmation")}
-                        </span>
-                      )}
+                      <HallTimeCoverageBadge coverage={match.hallCoverage.coverage} />
+                      {match.hallCoverage.hallTime?.kind === "open" &&
+                        match.hallCoverage.hallTime.startTime &&
+                        match.hallCoverage.hallTime.endTime && (
+                          <span className="text-muted-foreground text-xs tabular-nums">
+                            {match.hallCoverage.hallTime.startTime} –{" "}
+                            {match.hallCoverage.hallTime.endTime}
+                          </span>
+                        )}
                     </div>
+                    <p className="text-muted-foreground text-xs tabular-nums">
+                      {t("matchDetail.hallCoverage.window", {
+                        start: match.hallCoverage.windowStart.slice(0, 5),
+                        end: match.hallCoverage.windowEnd.slice(0, 5),
+                      })}
+                    </p>
                   </section>
                 </>
               )}

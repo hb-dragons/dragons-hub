@@ -102,11 +102,6 @@ vi.mock("./data-fetcher", () => ({
   extractRefereeAssignments: (...args: unknown[]) => mockExtractAssignments(...args),
 }));
 
-const mockReconcileAfterSync = vi.fn();
-vi.mock("../venue-booking/venue-booking.service", () => ({
-  reconcileAfterSync: (...args: unknown[]) => mockReconcileAfterSync(...args),
-}));
-
 import { fullSync } from "./index";
 import { syncRuns } from "@dragons/db/schema";
 import {
@@ -214,7 +209,6 @@ beforeEach(async () => {
   mockRemoveAssignments.mockResolvedValue({ removed: 0, skipped: false, reason: null, errors: [] });
   mockConfirmIntents.mockResolvedValue(0);
 
-  mockReconcileAfterSync.mockResolvedValue(undefined);
 });
 
 describe("fullSync", () => {
@@ -293,10 +287,11 @@ describe("fullSync", () => {
       // The run row disappears mid-sync (e.g. an admin purge), so the completion
       // UPDATE legitimately matches nothing.
       let deletedId: number | undefined;
-      mockReconcileAfterSync.mockImplementation(async () => {
+      mockConfirmIntents.mockImplementation(async () => {
         const [row] = await syncRunRows();
         deletedId = row!.id;
         await ctx.db.delete(syncRuns).where(eq(syncRuns.id, row!.id));
+        return 0;
       });
 
       await fullSync("manual");
@@ -584,34 +579,6 @@ describe("fullSync", () => {
       expect(result.referees.rolesUpdated).toBe(2);
       expect(result.referees.rolesSkipped).toBe(1);
       expect(result.referees.assignmentsCreated).toBe(5);
-    });
-
-    it("calls venue booking reconciliation after sync steps", async () => {
-      await fullSync("manual");
-
-      expect(mockReconcileAfterSync).toHaveBeenCalled();
-    });
-
-    it("collects error when venue booking reconciliation fails", async () => {
-      mockReconcileAfterSync.mockRejectedValue(new Error("Booking DB error"));
-
-      const result = await fullSync("manual");
-
-      expect(result.status).toBe("completed");
-      expect(result.totalErrors).toContain(
-        "Venue booking reconciliation failed: Booking DB error",
-      );
-    });
-
-    it("handles non-Error venue booking reconciliation failure", async () => {
-      mockReconcileAfterSync.mockRejectedValue("string error");
-
-      const result = await fullSync("manual");
-
-      expect(result.status).toBe("completed");
-      expect(result.totalErrors).toContain(
-        "Venue booking reconciliation failed: Unknown error",
-      );
     });
   });
 });

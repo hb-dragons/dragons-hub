@@ -7,8 +7,6 @@ import {
   venues,
   matchOverrides,
   matchRemoteVersions,
-  venueBookingMatches,
-  venueBookings,
   matchReferees,
   referees,
   refereeRoles,
@@ -31,7 +29,9 @@ import type {
   MatchChangeHistoryItem,
   RefereeSlotInfo,
   PublicMatchDetail,
+  MatchHallCoverage,
 } from "@dragons/shared";
+import { loadHomeGameDays } from "../hall-times/hall-occupancy.service";
 
 export type TransactionClient = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
@@ -270,7 +270,7 @@ export function rowToListItem(
     publicComment: row.publicComment,
     hasLocalChanges: row.currentLocalVersion > 0,
     overriddenFields,
-    booking: null,
+    hallCoverage: null,
   };
 }
 
@@ -342,6 +342,9 @@ export async function getPublicMatchDetail(id: number): Promise<PublicMatchDetai
 /**
  * Shared tail pattern for building a MatchDetailResponse from a match ID.
  * Used by both updateMatchLocal and releaseOverride after their mutations.
+ * Hall coverage stays null: it reads through its own connection, which would
+ * wait on the open transaction these callers pass in. Callers outside a
+ * transaction attach it with `withHallCoverage`.
  */
 export async function buildDetailResponse(
   client: Database | TransactionClient,
@@ -361,21 +364,6 @@ export async function buildDetailResponse(
     createdAt: o.createdAt.toISOString(),
   }));
   const remoteSnapshot = await loadRemoteSnapshot(client, matchId, row.currentRemoteVersion);
-
-  const [bookingLink] = await client
-    .select({
-      bookingId: venueBookings.id,
-      bookingStatus: venueBookings.status,
-      needsReconfirmation: venueBookings.needsReconfirmation,
-    })
-    .from(venueBookingMatches)
-    .innerJoin(venueBookings, eq(venueBookings.id, venueBookingMatches.venueBookingId))
-    .where(eq(venueBookingMatches.matchId, matchId))
-    .limit(1);
-
-  const booking = bookingLink
-    ? { id: bookingLink.bookingId, status: bookingLink.bookingStatus, needsReconfirmation: bookingLink.needsReconfirmation }
-    : null;
 
   // Load referee assignments for this match
   const refAssignments = await client
@@ -459,7 +447,7 @@ export async function buildDetailResponse(
   });
 
   return {
-    match: { ...rowToDetail(row, overriddenFields, overrides), booking, refereeSlots },
+    match: { ...rowToDetail(row, overriddenFields, overrides), refereeSlots },
     diffs: computeDiffs(row, overriddenFields, remoteSnapshot),
   };
 }
@@ -594,30 +582,11 @@ export async function getOwnClubMatches(params: MatchListParams) {
     overridesByMatch.set(o.matchId, existing);
   }
 
-  const bookingLinks = matchIds.length > 0
-    ? await getDb()
-        .select({
-          matchId: venueBookingMatches.matchId,
-          bookingId: venueBookings.id,
-          bookingStatus: venueBookings.status,
-          needsReconfirmation: venueBookings.needsReconfirmation,
-        })
-        .from(venueBookingMatches)
-        .innerJoin(venueBookings, eq(venueBookings.id, venueBookingMatches.venueBookingId))
-        .where(inArray(venueBookingMatches.matchId, matchIds))
-    : [];
-
-  const bookingByMatch = new Map(
-    bookingLinks.map((b) => [b.matchId, {
-      id: b.bookingId,
-      status: b.bookingStatus,
-      needsReconfirmation: b.needsReconfirmation,
-    }]),
-  );
+  const coverageByMatch = await hallCoverageByMatch(matchIds);
 
   const items: MatchListItem[] = rows.map((row) => ({
     ...rowToListItem(row, overridesByMatch.get(row.id) ?? []),
-    booking: bookingByMatch.get(row.id) ?? null,
+    hallCoverage: coverageByMatch.get(row.id) ?? null,
   }));
 
   return { items, total, limit, offset, hasMore: offset + items.length < total };
@@ -705,13 +674,13 @@ async function getGhostEntries(
       effectiveKickoffTime: row.kickoffTime,
       overrideReason: o.reason?.trim() || null,
       overrideAuthorName: o.authorName?.trim() || null,
-      // A ghost is a marker, not the game: no score, crew or booking on it.
+      // A ghost is a marker, not the game: no score, crew or hall coverage on it.
       homeScore: null,
       guestScore: null,
       anschreiber: null,
       zeitnehmer: null,
       shotclock: null,
-      booking: null,
+      hallCoverage: null,
     };
   });
 }
@@ -740,8 +709,18 @@ export async function getGamePlan(params: MatchListParams) {
   return { ...list, items };
 }
 
+/** Fill in the detail's hall coverage; call it once no transaction is open. */
+export async function withHallCoverage(
+  detail: MatchDetailResponse | null,
+): Promise<MatchDetailResponse | null> {
+  if (!detail) return null;
+  const { id } = detail.match;
+  const hallCoverage = (await hallCoverageByMatch([id])).get(id) ?? null;
+  return { ...detail, match: { ...detail.match, hallCoverage } };
+}
+
 export async function getMatchDetail(id: number): Promise<MatchDetailResponse | null> {
-  return buildDetailResponse(getDb(), id);
+  return withHallCoverage(await buildDetailResponse(getDb(), id));
 }
 
 // ── Match change history ───────────────────────────────────────────────────
@@ -778,4 +757,30 @@ export async function getMatchChangeHistory(
     })),
     total: totalRow!.count,
   };
+}
+
+/**
+ * Hall coverage per match: the hall time of the day a live home game at one of
+ * our halls sits on, against the window all that day's games need. One
+ * occupancy query for the whole batch; away games, cancelled games and games
+ * elsewhere have no entry.
+ */
+async function hallCoverageByMatch(matchIds: number[]): Promise<Map<number, MatchHallCoverage>> {
+  const asked = new Set(matchIds);
+  const byMatch = new Map<number, MatchHallCoverage>();
+  for (const day of await loadHomeGameDays({ matchIds })) {
+    for (const game of day.games) {
+      if (!asked.has(game.matchId)) continue;
+      byMatch.set(game.matchId, {
+        hallTime: day.hallTime,
+        coverage: day.coverage,
+        gapBeforeMinutes: day.gapBeforeMinutes,
+        gapAfterMinutes: day.gapAfterMinutes,
+        windowStart: day.windowStart,
+        windowEnd: day.windowEnd,
+        gameCount: day.games.length,
+      });
+    }
+  }
+  return byMatch;
 }

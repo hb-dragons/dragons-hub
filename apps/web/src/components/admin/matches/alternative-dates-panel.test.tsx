@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { NextIntlClientProvider } from "next-intl";
 import type {
   AlternativeDateCandidate,
+  AlternativeDateHall,
   AlternativeDatesResponse,
   ClubWeekendDay,
 } from "@dragons/shared";
@@ -29,18 +30,23 @@ import { AlternativeDatesPanel } from "./alternative-dates-panel";
 
 const messages = {
   common: { back: "Back", loading: "Loading" },
-  bookings: {
-    status: {
-      pending: "Pending",
-      requested: "Requested",
-      confirmed: "Confirmed",
-      cancelled: "Cancelled",
-    },
-  },
   errors: {
     title: "Something went wrong",
     description: "An unexpected error occurred.",
     tryAgain: "Try again",
+  },
+  hallOccupancy: {
+    gapEarly: "{minutes} min early",
+    gapLate: "{minutes} min late",
+  },
+  hallTimes: {
+    coverage: {
+      covered: "Hall time covered",
+      partial: "Hall time partial",
+      uncovered: "Outside hall time",
+      closed: "Hall closed",
+      none: "No hall time",
+    },
   },
   matchDetail: {
     alternativeDates: {
@@ -56,13 +62,19 @@ const messages = {
       homeGame: "Home game",
       awayGame: "Away game",
       groups: {
-        booked: "With a hall booking",
-        unbooked: "Without a hall booking",
+        fits: "Fits a held hall time",
+        heldNoFit: "Hall time held, game does not fit",
+        notHeld: "No hall time held",
+        closed: "Every hall closed",
         away: "Away",
       },
-      noBooking: "no booking",
+      hallTime: "Hall time {start} – {end}",
+      hallClosed: "Hall closed{note, select, none {} other {: {note}}}",
       awayVenue: "Hall: opponent",
-      needsReconfirmation: "Needs re-confirmation",
+      currentVenue: "current hall",
+      noHalls: "None of our halls has a hall time.",
+      game: "{start} – {end} {home} – {guest}",
+      noFit: "Game does not fit",
       suggestedKickoff: "Suggested kickoff: {time}",
       loading: "Searching for dates…",
       flags: {
@@ -87,11 +99,30 @@ const formats = {
   },
 } as const;
 
-function unbooked(date: string, weekday: ClubWeekendDay): AlternativeDateCandidate {
-  return { date, weekday, group: "unbooked", bookings: [], suggestedKickoffTime: null, flags: [] };
+/** One of our halls on a day, empty and without a hall time unless told otherwise. */
+function hall(over: Partial<AlternativeDateHall> = {}): AlternativeDateHall {
+  return {
+    venueId: 1,
+    venueName: "Drachenhalle",
+    isCurrentVenue: true,
+    hallTime: null,
+    games: [],
+    existing: null,
+    fits: false,
+    suggestedKickoffTime: null,
+    ...over,
+  };
 }
 
-function booked(
+/** A home day with no hall time held at our one hall. */
+function notHeld(date: string, weekday: ClubWeekendDay): AlternativeDateCandidate {
+  return { date, weekday, group: "notHeld", halls: [hall()], flags: [] };
+}
+
+const OPEN_10_TO_18 = { kind: "open", startTime: "10:00", endTime: "18:00", note: null } as const;
+
+/** A home day the game fits into at our hall, after one game already there. */
+function fits(
   date: string,
   weekday: ClubWeekendDay,
   over: Partial<AlternativeDateCandidate> = {},
@@ -99,17 +130,27 @@ function booked(
   return {
     date,
     weekday,
-    group: "booked",
-    bookings: [
-      {
-        id: 1,
-        effectiveStartTime: "10:30:00",
-        effectiveEndTime: "16:30:00",
-        status: "confirmed",
-        needsReconfirmation: false,
-      },
+    group: "fits",
+    halls: [
+      hall({
+        hallTime: OPEN_10_TO_18,
+        games: [
+          {
+            matchId: 11,
+            kickoffTime: "11:00:00",
+            endTime: "12:40:00",
+            homeTeam: "Dragons 2",
+            homeTeamCustomName: "Damen 1",
+            homeBadgeColor: null,
+            guestTeam: "Wolves",
+            leagueName: "Kreisliga",
+          },
+        ],
+        existing: { hallTime: OPEN_10_TO_18, coverage: "covered", gapBeforeMinutes: 0, gapAfterMinutes: 0 },
+        fits: true,
+        suggestedKickoffTime: "13:30:00",
+      }),
     ],
-    suggestedKickoffTime: "17:00:00",
     flags: [],
     ...over,
   };
@@ -120,7 +161,7 @@ function response(over: Partial<AlternativeDatesResponse> = {}): AlternativeDate
     isHomeGame: true,
     caveats: ["opponentGamesOutsideTrackedLeagues"],
     range: { from: "2026-03-01", to: "2026-03-28" },
-    candidates: [unbooked("2026-03-14", "saturday"), unbooked("2026-03-15", "sunday")],
+    candidates: [notHeld("2026-03-14", "saturday"), notHeld("2026-03-15", "sunday")],
     ...over,
   };
 }
@@ -128,9 +169,9 @@ function response(over: Partial<AlternativeDatesResponse> = {}): AlternativeDate
 /** The two flags on two days, for the locale checks below. */
 const flagged = response({
   candidates: [
-    { ...unbooked("2026-03-14", "saturday"), flags: [{ type: "outsideRoundWindow" }] },
+    { ...notHeld("2026-03-14", "saturday"), flags: [{ type: "outsideRoundWindow" }] },
     {
-      ...unbooked("2026-03-15", "sunday"),
+      ...notHeld("2026-03-15", "sunday"),
       flags: [{ type: "coachCollision", teamEntryName: "Damen 1" }],
     },
   ],
@@ -333,10 +374,16 @@ describe("AlternativeDatesPanel", () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  it("heads each group and shows the booking window, status and kickoff", async () => {
+  it("heads each home group in the order of the ranking tiers", async () => {
     mocks.alternativeDates.mockResolvedValue(
       response({
-        candidates: [booked("2026-03-14", "saturday"), unbooked("2026-03-15", "sunday")],
+        // Arrives in the wrong order on purpose: the headings follow the tiers.
+        candidates: [
+          { ...notHeld("2026-03-21", "saturday"), group: "closed" },
+          notHeld("2026-03-15", "sunday"),
+          { ...notHeld("2026-03-22", "sunday"), group: "heldNoFit" },
+          fits("2026-03-14", "saturday"),
+        ],
       }),
     );
 
@@ -344,30 +391,22 @@ describe("AlternativeDatesPanel", () => {
     await settle();
 
     const headings = screen.getAllByRole("heading", { level: 4 }).map((h) => h.textContent);
-    expect(headings).toEqual(["With a hall booking", "Without a hall booking"]);
-
-    const items = screen.getAllByRole("listitem");
-    // 12-hour clock: the panel renders in the viewer's locale, and this one is
-    // English.
-    expect(items[0]).toHaveTextContent("10:30 AM – 04:30 PM");
-    expect(items[0]).toHaveTextContent("Confirmed");
-    expect(items[0]).toHaveTextContent("Suggested kickoff: 05:00 PM");
-    expect(items[0]).not.toHaveTextContent("Needs re-confirmation");
+    expect(headings).toEqual([
+      "Fits a held hall time",
+      "Hall time held, game does not fit",
+      "No hall time held",
+      "Every hall closed",
+    ]);
   });
 
-  it("marks a booking that has to be reconfirmed", async () => {
+  it("shows each hall with its hall time, its games and the suggested kickoff", async () => {
     mocks.alternativeDates.mockResolvedValue(
       response({
         candidates: [
-          booked("2026-03-14", "saturday", {
-            bookings: [
-              {
-                id: 1,
-                effectiveStartTime: "10:30:00",
-                effectiveEndTime: "16:30:00",
-                status: "confirmed",
-                needsReconfirmation: true,
-              },
+          fits("2026-03-14", "saturday", {
+            halls: [
+              ...fits("2026-03-14", "saturday").halls,
+              hall({ venueId: 2, venueName: "Arena am Park", isCurrentVenue: false }),
             ],
           }),
         ],
@@ -377,17 +416,71 @@ describe("AlternativeDatesPanel", () => {
     renderPanel();
     await settle();
 
-    expect(screen.getByText("Needs re-confirmation")).toBeInTheDocument();
+    const halls = screen.getAllByTestId("alternative-date-hall");
+    expect(halls).toHaveLength(2);
+    // 12-hour clock: the panel renders in the viewer's locale, and this one is
+    // English.
+    expect(halls[0]).toHaveTextContent("Drachenhalle");
+    expect(halls[0]).toHaveTextContent("current hall");
+    expect(halls[0]).toHaveTextContent("Hall time 10:00 AM – 06:00 PM");
+    expect(halls[0]).toHaveTextContent("11:00 AM – 12:40 PM Damen 1 – Wolves");
+    expect(halls[0]).toHaveTextContent("Suggested kickoff: 01:30 PM");
+    expect(halls[1]).toHaveTextContent("Arena am Park");
+    expect(halls[1]).not.toHaveTextContent("current hall");
+    expect(halls[1]).toHaveTextContent("No hall time");
+    // No hall time already says why; "does not fit" is for an open hall.
+    expect(halls[1]).not.toHaveTextContent("Game does not fit");
   });
 
-  it("says a day has no booking and suggests no kickoff for it", async () => {
-    mocks.alternativeDates.mockResolvedValue(response());
+  it("names a hall without a row in German as Keine Hallenzeit", async () => {
+    mocks.alternativeDates.mockResolvedValue(response({ candidates: [notHeld("2026-03-14", "saturday")] }));
+
+    renderWithCatalog("de");
+    await settle();
+
+    expect(screen.getByTestId("alternative-date-hall")).toHaveTextContent("Keine Hallenzeit");
+  });
+
+  it("badges a hall whose games already stick out of its hall time", async () => {
+    const tight = { kind: "open", startTime: "10:00", endTime: "12:00", note: null } as const;
+    mocks.alternativeDates.mockResolvedValue(
+      response({
+        candidates: [
+          fits("2026-03-14", "saturday", {
+            group: "heldNoFit",
+            halls: [
+              hall({
+                ...fits("2026-03-14", "saturday").halls[0],
+                hallTime: tight,
+                existing: { hallTime: tight, coverage: "partial", gapBeforeMinutes: 30, gapAfterMinutes: 85 },
+                fits: false,
+                suggestedKickoffTime: null,
+              }),
+            ],
+          }),
+        ],
+      }),
+    );
 
     renderPanel();
     await settle();
 
-    expect(screen.getAllByText("no booking")).toHaveLength(2);
+    expect(screen.getByText("Hall time partial")).toBeInTheDocument();
+    expect(screen.getByText("30 min early")).toBeInTheDocument();
+    expect(screen.getByText("85 min late")).toBeInTheDocument();
+    expect(screen.getByText("Game does not fit")).toBeInTheDocument();
     expect(screen.queryByText(/Suggested kickoff/)).not.toBeInTheDocument();
+  });
+
+  it("says so when the club has no hall at all", async () => {
+    mocks.alternativeDates.mockResolvedValue(
+      response({ candidates: [{ ...notHeld("2026-03-14", "saturday"), halls: [] }] }),
+    );
+
+    renderPanel();
+    await settle();
+
+    expect(screen.getByText("None of our halls has a hall time.")).toBeInTheDocument();
   });
 
   it("leaves the hall to the other club on an away game", async () => {
@@ -395,14 +488,7 @@ describe("AlternativeDatesPanel", () => {
       response({
         isHomeGame: false,
         candidates: [
-          {
-            date: "2026-03-14",
-            weekday: "saturday",
-            group: "away",
-            bookings: [],
-            suggestedKickoffTime: null,
-            flags: [],
-          },
+          { date: "2026-03-14", weekday: "saturday", group: "away", halls: [], flags: [] },
         ],
       }),
     );
@@ -412,7 +498,8 @@ describe("AlternativeDatesPanel", () => {
 
     expect(screen.getByRole("heading", { level: 4, name: "Away" })).toBeInTheDocument();
     expect(screen.getByText("Hall: opponent")).toBeInTheDocument();
-    expect(screen.queryByText("no booking")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("alternative-date-hall")).not.toBeInTheDocument();
+    expect(screen.queryByText("None of our halls has a hall time.")).not.toBeInTheDocument();
   });
 
   it("re-queries with the range the staff member picked", async () => {
@@ -437,7 +524,7 @@ describe("AlternativeDatesPanel", () => {
 
   it("hands the picked day and its suggested kickoff to the sheet", async () => {
     mocks.alternativeDates.mockResolvedValue(
-      response({ candidates: [booked("2026-03-14", "saturday")] }),
+      response({ candidates: [fits("2026-03-14", "saturday")] }),
     );
     const { onPrefill } = renderPanel();
     await settle();
@@ -446,12 +533,36 @@ describe("AlternativeDatesPanel", () => {
       fireEvent.click(screen.getByRole("button", { name: /14\.03\.2026/ }));
     });
 
-    expect(onPrefill).toHaveBeenCalledWith("2026-03-14", "17:00:00");
+    expect(onPrefill).toHaveBeenCalledWith("2026-03-14", "13:30:00");
+  });
+
+  it("hands over the kickoff of the first hall the game fits into", async () => {
+    mocks.alternativeDates.mockResolvedValue(
+      response({
+        candidates: [
+          fits("2026-03-14", "saturday", {
+            halls: [
+              hall(),
+              hall({ venueId: 2, isCurrentVenue: false, fits: true, suggestedKickoffTime: "15:00:00" }),
+              hall({ venueId: 3, isCurrentVenue: false, fits: true, suggestedKickoffTime: "10:30:00" }),
+            ],
+          }),
+        ],
+      }),
+    );
+    const { onPrefill } = renderPanel();
+    await settle();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /14\.03\.2026/ }));
+    });
+
+    expect(onPrefill).toHaveBeenCalledWith("2026-03-14", "15:00:00");
   });
 
   it("hands over a day with no kickoff to suggest as just that day", async () => {
     mocks.alternativeDates.mockResolvedValue(
-      response({ candidates: [unbooked("2026-03-14", "saturday")] }),
+      response({ candidates: [notHeld("2026-03-14", "saturday")] }),
     );
     const { onPrefill } = renderPanel();
     await settle();
@@ -479,7 +590,7 @@ describe("AlternativeDatesPanel", () => {
       // Sunday first and in another pile than the Saturday, so a copy that
       // followed the headings on screen would come out the other way round.
       response({
-        candidates: [unbooked("2026-03-15", "sunday"), booked("2026-03-14", "saturday")],
+        candidates: [notHeld("2026-03-15", "sunday"), fits("2026-03-14", "saturday")],
       }),
     );
 
@@ -525,5 +636,53 @@ describe("AlternativeDatesPanel", () => {
     await settle();
 
     expect(screen.queryByRole("button", { name: "Copy as text" })).not.toBeInTheDocument();
+  });
+
+  it("lists a closed hall with the city's note", async () => {
+    mocks.alternativeDates.mockResolvedValue(
+      response({
+        candidates: [
+          {
+            ...notHeld("2026-03-15", "sunday"),
+            group: "closed",
+            halls: [
+              hall({ hallTime: { kind: "closed", startTime: null, endTime: null, note: "Osterferien" } }),
+            ],
+          },
+        ],
+      }),
+    );
+    renderPanel();
+    await settle();
+
+    expect(screen.getByText("Hall closed: Osterferien")).toBeInTheDocument();
+    expect(screen.queryByText("Game does not fit")).not.toBeInTheDocument();
+  });
+
+  it("names the existing shortfall's gap in German like the Hallenbelegung", async () => {
+    const tight = { kind: "open", startTime: "10:00", endTime: "12:00", note: null } as const;
+    mocks.alternativeDates.mockResolvedValue(
+      response({
+        candidates: [
+          {
+            ...notHeld("2026-03-14", "saturday"),
+            group: "heldNoFit",
+            halls: [
+              hall({
+                hallTime: tight,
+                existing: { hallTime: tight, coverage: "partial", gapBeforeMinutes: 30, gapAfterMinutes: 45 },
+              }),
+            ],
+          },
+        ],
+      }),
+    );
+
+    renderWithCatalog("de");
+    await settle();
+
+    const shown = screen.getByTestId("alternative-date-hall");
+    expect(shown).toHaveTextContent("30 Min. zu früh");
+    expect(shown).toHaveTextContent("45 Min. zu spät");
   });
 });

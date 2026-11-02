@@ -5,8 +5,8 @@ import { inArray } from "drizzle-orm";
 /**
  * Shared reader for the `app_settings` key/value table.
  *
- * Both the admin settings service and the venue-booking service used to read
- * their keys with their own copy of "select one row per key, then parseInt with
+ * The admin settings service and the hall-occupancy service once read their
+ * keys with their own copy of "select one row per key, then parseInt with
  * a fallback". The admin copy issued one round trip per key; this one fetches
  * the whole set in a single `inArray` query and both callers parse it the same
  * way.

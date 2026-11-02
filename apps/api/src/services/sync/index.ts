@@ -18,7 +18,6 @@ import {
 } from "./referees.sync";
 import { createSyncLogger } from "./sync-logger";
 import { fetchAllSyncData, extractRefereeAssignments } from "./data-fetcher";
-import { reconcileAfterSync } from "../venue-booking/venue-booking.service";
 import { logger } from "../../config/logger";
 import { publishDomainEvent } from "../events/event-publisher";
 import { EVENT_TYPES } from "@dragons/shared";
@@ -200,17 +199,6 @@ export async function fullSync(
     const confirmedIntents = await confirmIntentsFromSync();
     if (confirmedIntents > 0) {
       await logStep(`Confirmed ${confirmedIntents} referee assignment intents`);
-    }
-
-    // Step 5.5: Reconcile venue bookings
-    await logStep("Reconciling venue bookings...");
-    try {
-      await reconcileAfterSync();
-      await logStep("Venue bookings reconciled");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      allErrors.push(`Venue booking reconciliation failed: ${message}`);
-      log.error({ err: error }, "Venue booking reconciliation failed");
     }
 
     // Step 6: Finalize

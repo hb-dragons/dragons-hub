@@ -11,7 +11,6 @@ import {
 } from "../../services/admin/match-admin.service";
 import { requirePermission } from "../../middleware/rbac";
 import { validationHook } from "../../middleware/validation";
-import { reconcileMatch } from "../../services/venue-booking/venue-booking.service";
 import { findAlternativeDates } from "../../services/reschedule/alternative-dates.service";
 import {
   adminMatchListQuerySchema,
@@ -141,13 +140,6 @@ matchRoutes.patch(
     if (!result) {
       return c.json({ error: "Match not found", code: "NOT_FOUND" }, 404);
     }
-
-    reconcileMatch(id).catch((err) => {
-      const log = c.get("logger");
-      if (log) {
-        log.error({ err, matchId: id }, "Venue booking reconciliation failed after match update");
-      }
-    });
 
     return c.json(result);
   },

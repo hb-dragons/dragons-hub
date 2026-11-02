@@ -17,7 +17,6 @@ const BOOKING_KEYS = {
   bufferBefore: "venue_booking_buffer_before",
   bufferAfter: "venue_booking_buffer_after",
   gameDuration: "venue_booking_game_duration",
-  dueDaysBefore: "venue_booking_due_days_before",
 } as const;
 
 export async function getSetting(key: string): Promise<string | null> {
@@ -58,11 +57,6 @@ export async function getBookingSettings(): Promise<BookingSettings> {
     bufferBefore: readIntSetting(values, BOOKING_KEYS.bufferBefore, BOOKING_DEFAULTS.bufferBefore),
     bufferAfter: readIntSetting(values, BOOKING_KEYS.bufferAfter, BOOKING_DEFAULTS.bufferAfter),
     gameDuration: readIntSetting(values, BOOKING_KEYS.gameDuration, BOOKING_DEFAULTS.gameDuration),
-    dueDaysBefore: readIntSetting(
-      values,
-      BOOKING_KEYS.dueDaysBefore,
-      BOOKING_DEFAULTS.dueDaysBefore,
-    ),
   };
 }
 
@@ -70,7 +64,6 @@ export async function setBookingSettings(settings: BookingSettings): Promise<voi
   await upsertSetting(BOOKING_KEYS.bufferBefore, String(settings.bufferBefore));
   await upsertSetting(BOOKING_KEYS.bufferAfter, String(settings.bufferAfter));
   await upsertSetting(BOOKING_KEYS.gameDuration, String(settings.gameDuration));
-  await upsertSetting(BOOKING_KEYS.dueDaysBefore, String(settings.dueDaysBefore));
 }
 
 export async function getRefereeReminderDays(): Promise<number[]> {

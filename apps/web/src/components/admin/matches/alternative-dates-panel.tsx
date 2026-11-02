@@ -19,11 +19,13 @@ import type {
   AlternativeDateCandidate,
   AlternativeDateFlag,
   AlternativeDateGroup,
+  AlternativeDateHall,
   AlternativeDatesResponse,
   DateRange,
 } from "@dragons/shared";
 import { api } from "@/lib/api";
 import { ErrorState } from "@/components/ui/error-state";
+import { HallTimeCoverageBadge } from "@/components/admin/hall-times/hall-time-coverage-badge";
 import { LoadingState } from "@/components/ui/loading-state";
 
 /**
@@ -51,8 +53,9 @@ interface AlternativeDatesPanelProps {
   leagueName: string | null;
   matchDay: number;
   /**
-   * Fills the picked day — and its suggested kickoff, where the finder found
-   * one — into the sheet's override fields, then returns to the form. Null
+   * Fills the picked day — and the suggested kickoff of the first hall the
+   * game fits into, where there is one — into the sheet's override fields,
+   * then returns to the form. Null
    * when the staff member may not update the match: the list stays theirs to
    * read and to copy, only the form it would write into is not.
    */
@@ -254,14 +257,14 @@ export function AlternativeDatesPanel({
                       <button
                         type="button"
                         // Without this the accessible name is the whole row —
-                        // flags, hall window, status and suggestion read out
-                        // before the day the button is actually about.
+                        // flags, halls, games and suggestions read out before
+                        // the day the button is actually about.
                         aria-label={formatKickoffDayShort(
                           candidate.date,
                           resolveDateLocale(locale),
                         )}
                         onClick={() =>
-                          onPrefill(candidate.date, candidate.suggestedKickoffTime)
+                          onPrefill(candidate.date, prefillKickoff(candidate))
                         }
                         className={cn(
                           ROW_CLASS,
@@ -292,13 +295,22 @@ export function AlternativeDatesPanel({
 const ROW_CLASS = "space-y-1 rounded-md bg-surface-low px-3 py-2 text-sm";
 
 /**
+ * The kickoff a picked day fills in: the first hall the game fits into, in the
+ * server's order — the game's own hall first. The override sets no venue, so
+ * a kickoff from another hall is a starting point the staff member settles
+ * with the federation along with the hall.
+ */
+function prefillKickoff(candidate: AlternativeDateCandidate): string | null {
+  return candidate.halls.find((h) => h.fits)?.suggestedKickoffTime ?? null;
+}
+
+/**
  * One candidate day as it reads on screen, without the element around it: the
  * same lines whether the row is a button that prefills the form or the plain
  * block a staff member without match update sees.
  */
 function CandidateDetails({ candidate }: { candidate: AlternativeDateCandidate }) {
   const t = useTranslations("matchDetail.alternativeDates");
-  const tStatus = useTranslations("bookings.status");
   const format = useFormatter();
 
   return (
@@ -316,48 +328,102 @@ function CandidateDetails({ candidate }: { candidate: AlternativeDateCandidate }
           );
         })}
       </span>
-      {candidate.group === "away" && (
+      {candidate.group === "away" ? (
         <span className="text-muted-foreground block text-xs">{t("awayVenue")}</span>
-      )}
-      {candidate.group === "unbooked" && (
-        <span className="text-muted-foreground block text-xs">{t("noBooking")}</span>
-      )}
-      {candidate.bookings.map((booking) => (
-        <span key={booking.id} className="text-muted-foreground block text-xs">
-          {format.dateTime(
-            clubTimeAnchor(booking.effectiveStartTime, candidate.date),
-            "matchTime",
-          )}{" "}
-          –{" "}
-          {format.dateTime(
-            clubTimeAnchor(booking.effectiveEndTime, candidate.date),
-            "matchTime",
-          )}{" "}
-          · {tStatus(booking.status)}
-          {booking.needsReconfirmation && (
-            <>
-              {" · "}
-              <span className="text-heat">{t("needsReconfirmation")}</span>
-            </>
-          )}
-        </span>
-      ))}
-      {candidate.suggestedKickoffTime && (
-        <span className="block text-xs font-medium">
-          {t("suggestedKickoff", {
-            time: format.dateTime(
-              clubTimeAnchor(candidate.suggestedKickoffTime, candidate.date),
-              "matchTime",
-            ),
-          })}
-        </span>
+      ) : candidate.halls.length === 0 ? (
+        <span className="text-muted-foreground block text-xs">{t("noHalls")}</span>
+      ) : (
+        candidate.halls.map((hall) => (
+          <HallDetails key={hall.venueId} hall={hall} date={candidate.date} />
+        ))
       )}
     </>
   );
 }
 
+/**
+ * One of our halls on a candidate day: the hall time, the games already
+ * there, and where the moved game would go. A coverage badge appears only
+ * when those games already stick out of the hall time, the shortfall the
+ * staff member should see before adding to it.
+ */
+function HallDetails({ hall, date }: { hall: AlternativeDateHall; date: string }) {
+  const t = useTranslations("matchDetail.alternativeDates");
+  // The gap wording is the Hallenbelegung's, so both pages say it alike.
+  const tOccupancy = useTranslations("hallOccupancy");
+  const format = useFormatter();
+  const time = (value: string) => format.dateTime(clubTimeAnchor(value, date), "matchTime");
+  const shortfall =
+    hall.existing?.coverage === "partial" || hall.existing?.coverage === "uncovered"
+      ? hall.existing.coverage
+      : null;
+
+  return (
+    <span data-testid="alternative-date-hall" className="bg-surface-low block space-y-0.5 rounded-md px-2 py-1.5 text-xs">
+      <span className="flex flex-wrap items-center gap-2">
+        <span className="font-medium">{hall.venueName}</span>
+        {hall.isCurrentVenue && (
+          <Badge variant="outline" className="text-[10px]">
+            {t("currentVenue")}
+          </Badge>
+        )}
+        {hall.hallTime === null && (
+          <HallTimeCoverageBadge coverage="none" className="text-[10px]" />
+        )}
+        {shortfall && <HallTimeCoverageBadge coverage={shortfall} className="text-[10px]" />}
+        {shortfall && hall.existing && hall.existing.gapBeforeMinutes > 0 && (
+          <span className="text-heat">
+            {tOccupancy("gapEarly", { minutes: hall.existing.gapBeforeMinutes })}
+          </span>
+        )}
+        {shortfall && hall.existing && hall.existing.gapAfterMinutes > 0 && (
+          <span className="text-heat">
+            {tOccupancy("gapLate", { minutes: hall.existing.gapAfterMinutes })}
+          </span>
+        )}
+      </span>
+      {hall.hallTime?.kind === "open" && hall.hallTime.startTime && hall.hallTime.endTime && (
+        <span className="block">
+          {t("hallTime", { start: time(hall.hallTime.startTime), end: time(hall.hallTime.endTime) })}
+        </span>
+      )}
+      {hall.hallTime?.kind === "closed" && (
+        <span className="text-muted-foreground block">
+          {t("hallClosed", { note: hall.hallTime.note ?? "none" })}
+        </span>
+      )}
+      {hall.games.map((game) => (
+        <span key={game.matchId} className="text-muted-foreground block">
+          {t("game", {
+            start: time(game.kickoffTime),
+            end: time(game.endTime),
+            home: game.homeTeamCustomName ?? game.homeTeam,
+            guest: game.guestTeam,
+          })}
+        </span>
+      ))}
+      {hall.fits && hall.suggestedKickoffTime ? (
+        <span className="block font-medium">
+          {t("suggestedKickoff", { time: time(hall.suggestedKickoffTime) })}
+        </span>
+      ) : (
+        // A hall with no hall time or a closed one already says why above.
+        hall.hallTime?.kind === "open" && (
+          <span className="text-muted-foreground block">{t("noFit")}</span>
+        )
+      )}
+    </span>
+  );
+}
+
 /** The order the piles are shown in; a pile with no day in it is not shown. */
-const GROUP_ORDER: AlternativeDateGroup[] = ["booked", "unbooked", "away"];
+const GROUP_ORDER: AlternativeDateGroup[] = [
+  "fits",
+  "heldNoFit",
+  "notHeld",
+  "closed",
+  "away",
+];
 
 /**
  * The candidates split into their piles, each keeping the order the server

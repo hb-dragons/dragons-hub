@@ -56,7 +56,7 @@ settingsRoutes.get(
   "/settings/booking",
   requirePermission("settings", "view"),
   describeRoute({
-    description: "Get booking configuration",
+    description: "Get the programme-window settings (buffers, default game duration)",
     tags: ["Settings"],
     responses: { 200: { description: "Success" } },
   }),
@@ -72,7 +72,7 @@ settingsRoutes.put(
   requirePermission("settings", "update"),
   validator("json", settingsBookingConfigSchema, validationHook),
   describeRoute({
-    description: "Set booking configuration",
+    description: "Set the programme-window settings (buffers, default game duration)",
     tags: ["Settings"],
     responses: { 200: { description: "Success" } },
   }),

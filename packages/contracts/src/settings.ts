@@ -9,7 +9,6 @@ export const settingsBookingConfigSchema = z.strictObject({
   bufferBefore: z.number().int().min(0),
   bufferAfter: z.number().int().min(0),
   gameDuration: z.number().int().positive(),
-  dueDaysBefore: z.number().int().min(0),
 });
 
 export const settingsRefereeReminderSchema = z.strictObject({

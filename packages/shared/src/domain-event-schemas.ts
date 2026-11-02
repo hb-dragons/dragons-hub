@@ -177,34 +177,6 @@ const refereeSlotsSchema = z.object({
   deepLink: z.string(),
 });
 
-// Booking payload schemas
-
-const bookingCreatedSchema = z.object({
-  venueName: z.string(),
-  date: z.string(),
-  startTime: z.string(),
-  endTime: z.string(),
-  matchCount: z.number(),
-});
-
-const bookingStatusChangedSchema = z.object({
-  venueName: z.string(),
-  date: z.string(),
-  oldStartTime: z.string().optional(),
-  oldEndTime: z.string().optional(),
-  newStartTime: z.string().optional(),
-  newEndTime: z.string().optional(),
-  oldStatus: z.string().optional(),
-  newStatus: z.string().optional(),
-  reason: z.string().optional(),
-});
-
-const bookingNeedsReconfirmationSchema = z.object({
-  venueName: z.string(),
-  date: z.string(),
-  reason: z.string(),
-});
-
 // Override payload schemas
 
 const overrideValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
@@ -316,9 +288,6 @@ const eventPayloadSchemas = {
   [EVENT_TYPES.REFEREE_REASSIGNED]: refereeReassignedSchema,
   [EVENT_TYPES.REFEREE_SLOTS_NEEDED]: refereeSlotsSchema,
   [EVENT_TYPES.REFEREE_SLOTS_REMINDER]: refereeSlotsSchema,
-  [EVENT_TYPES.BOOKING_CREATED]: bookingCreatedSchema,
-  [EVENT_TYPES.BOOKING_STATUS_CHANGED]: bookingStatusChangedSchema,
-  [EVENT_TYPES.BOOKING_NEEDS_RECONFIRMATION]: bookingNeedsReconfirmationSchema,
   [EVENT_TYPES.OVERRIDE_CONFLICT]: overrideConflictSchema,
   [EVENT_TYPES.OVERRIDE_APPLIED]: overrideAppliedSchema,
   [EVENT_TYPES.OVERRIDE_REVERTED]: overrideRevertedSchema,

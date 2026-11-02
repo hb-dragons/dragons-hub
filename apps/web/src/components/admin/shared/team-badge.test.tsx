@@ -17,7 +17,7 @@ describe("<TeamBadge>", () => {
   afterEach(cleanup);
 
   it("renders one team the same way on every surface", () => {
-    // Matches, bookings and reconcile all render through this component. The
+    // Matches and hall occupancy both render through this component. The
     // bug this replaces was bookings dropping badgeColor, which silently
     // reassigned the team a hash-derived colour on that screen only.
     const inMatches = classesFor("Dragons U18", "violet");

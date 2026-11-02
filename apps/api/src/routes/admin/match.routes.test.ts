@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
   getMatchChangeHistory: vi.fn(),
   updateMatchLocal: vi.fn(),
   releaseOverride: vi.fn(),
-  reconcileMatch: vi.fn(),
   getActiveSeasonId: vi.fn(),
 }));
 
@@ -20,10 +19,6 @@ vi.mock("../../services/admin/match-admin.service", () => ({
   getMatchChangeHistory: mocks.getMatchChangeHistory,
   updateMatchLocal: mocks.updateMatchLocal,
   releaseOverride: mocks.releaseOverride,
-}));
-
-vi.mock("../../services/venue-booking/venue-booking.service", () => ({
-  reconcileMatch: mocks.reconcileMatch,
 }));
 
 vi.mock("../../services/admin/season.service", () => ({
@@ -63,7 +58,6 @@ function json(response: Response) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.reconcileMatch.mockResolvedValue(undefined);
   mocks.getActiveSeasonId.mockResolvedValue(3);
 });
 
@@ -344,57 +338,6 @@ describe("PATCH /matches/:id", () => {
       { homeScore: 85, homeQ1: 20 },
       "user-123",
     );
-  });
-
-  it("fires venue booking reconciliation after successful update", async () => {
-    mocks.updateMatchLocal.mockResolvedValue({
-      match: { id: 1, kickoffDate: "2025-04-01" },
-      diffs: [],
-    });
-
-    await app.request("/matches/1", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kickoffDate: "2025-04-01" }),
-    });
-
-    // Flush microtasks so the dynamic import promise chain resolves
-    await vi.dynamicImportSettled();
-
-    expect(mocks.reconcileMatch).toHaveBeenCalledWith(1);
-  });
-
-  it("does not fire booking reconciliation when match not found", async () => {
-    mocks.updateMatchLocal.mockResolvedValue(null);
-
-    await app.request("/matches/999", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ anschreiber: "Max" }),
-    });
-
-    await vi.dynamicImportSettled();
-
-    expect(mocks.reconcileMatch).not.toHaveBeenCalled();
-  });
-
-  it("logs booking reconciliation errors without affecting response", async () => {
-    mocks.updateMatchLocal.mockResolvedValue({
-      match: { id: 1, kickoffDate: "2025-04-01" },
-      diffs: [],
-    });
-    mocks.reconcileMatch.mockRejectedValue(new Error("DB down"));
-
-    const res = await app.request("/matches/1", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kickoffDate: "2025-04-01" }),
-    });
-
-    // Should still return success despite booking failure
-    expect(res.status).toBe(200);
-
-    await vi.dynamicImportSettled();
   });
 });
 

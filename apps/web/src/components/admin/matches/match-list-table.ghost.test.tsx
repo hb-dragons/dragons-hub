@@ -54,7 +54,15 @@ const real: GamePlanMatchItem = {
   anschreiber: "Anna Schreiber", zeitnehmer: "Zeno Zeit", shotclock: "Shot Clock",
   publicComment: null,
   hasLocalChanges: true, overriddenFields: ["kickoffDate", "kickoffTime"],
-  booking: { id: 3, status: "confirmed", needsReconfirmation: false },
+  hallCoverage: {
+    hallTime: { kind: "open", startTime: "10:00", endTime: "22:00", note: null },
+    coverage: "covered",
+    gapBeforeMinutes: 0,
+    gapAfterMinutes: 0,
+    windowStart: "15:00:00",
+    windowEnd: "18:30:00",
+    gameCount: 1,
+  },
 };
 
 const ghost: GamePlanGhostItem = {
@@ -71,7 +79,7 @@ const ghost: GamePlanGhostItem = {
   anschreiber: null,
   zeitnehmer: null,
   shotclock: null,
-  booking: null,
+  hallCoverage: null,
   overriddenFields: [],
 };
 
@@ -208,5 +216,45 @@ describe("MatchListTable ghost entries", () => {
 
     // The row itself is the one clickable element.
     expect(within(ghostRow()).queryAllByRole("button")).toEqual([]);
+  });
+});
+
+describe("MatchListTable hall-time coverage", () => {
+  const withCoverage = (patch: Partial<NonNullable<typeof real.hallCoverage>>) => ({
+    ...real,
+    hallCoverage: { ...real.hallCoverage!, ...patch },
+  });
+
+  it("shows no coverage badge on a covered game", () => {
+    renderTable([real]);
+    expect(screen.queryByText(de.hallTimes.coverage.covered)).not.toBeInTheDocument();
+  });
+
+  it("shows no coverage badge on a ghost entry", () => {
+    renderTable([ghost]);
+    expect(screen.queryByText(de.hallTimes.coverage.none)).not.toBeInTheDocument();
+  });
+
+  it("shows no coverage badge on a game without hall coverage", () => {
+    renderTable([{ ...real, hallCoverage: null }]);
+    expect(screen.queryByText(de.hallTimes.coverage.none)).not.toBeInTheDocument();
+  });
+
+  it("flags a home game on a day with no hall time", () => {
+    renderTable([withCoverage({ hallTime: null, coverage: "none" })]);
+    const badge = screen.getByText(de.hallTimes.coverage.none);
+    expect(badge).toHaveAttribute("data-coverage", "none");
+    expect(badge.closest("tr")).toHaveTextContent("Rivals");
+  });
+
+  it("flags a partly covered game in English too", () => {
+    renderTable([withCoverage({ coverage: "partial", gapAfterMinutes: 60 })], "en");
+    expect(screen.getByText(en.hallTimes.coverage.partial)).toBeInTheDocument();
+  });
+
+  it("labels a window outside the hall time differently from no hall time", () => {
+    renderTable([withCoverage({ coverage: "uncovered" })], "en");
+    expect(screen.getByText("Outside hall time")).toHaveAttribute("data-coverage", "uncovered");
+    expect(en.hallTimes.coverage.uncovered).not.toBe(en.hallTimes.coverage.none);
   });
 });

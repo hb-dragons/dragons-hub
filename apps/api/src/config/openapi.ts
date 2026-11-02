@@ -21,7 +21,7 @@ export const openApiSpec: GenerateSpecOptions["documentation"] = {
     { name: "Standings", description: "League standings" },
     { name: "Boards", description: "Kanban board management" },
     { name: "Tasks", description: "Task management within boards" },
-    { name: "Bookings", description: "Venue booking management" },
+    { name: "Hall occupancy", description: "Home games against the hall times the club holds" },
     { name: "Notifications", description: "User notifications" },
     { name: "Devices", description: "Push notification device registration" },
     { name: "Public", description: "Public endpoints (no auth required)" },

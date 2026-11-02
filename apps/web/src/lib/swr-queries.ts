@@ -30,6 +30,8 @@ function normReferees(opts: {
   };
 }
 
+type HallOccupancyQuery = NonNullable<Parameters<Api["hallOccupancy"]["list"]>[0]>;
+
 export function makeQueries(api: Api) {
   return {
     // sync
@@ -90,6 +92,10 @@ export function makeQueries(api: Api) {
       fetcher: () => api.standings.list(seasonId === undefined ? {} : { seasonId }),
     }),
     venues: () => ({ key: SWR_KEYS.venues, fetcher: () => api.venues.list() }),
+    venueHallTimes: (venueId: number) => ({
+      key: SWR_KEYS.venueHallTimes(venueId),
+      fetcher: () => api.venues.hallTimes(venueId),
+    }),
     // referee-admin
     refereesPaginated: (opts: Parameters<typeof normReferees>[0] = {}) => {
       const norm = normReferees(opts);
@@ -147,8 +153,11 @@ export function makeQueries(api: Api) {
       key: SWR_KEYS.settingsBooking,
       fetcher: () => api.settings.getBooking(),
     }),
-    // bookings
-    bookings: () => ({ key: SWR_KEYS.bookings, fetcher: () => api.bookings.list() }),
+    // hall occupancy
+    hallOccupancy: (query: HallOccupancyQuery = {}) => ({
+      key: SWR_KEYS.hallOccupancy(query),
+      fetcher: () => api.hallOccupancy.list(query),
+    }),
     // notifications / events
     testPushRecent: () => ({
       key: SWR_KEYS.testPushRecent,

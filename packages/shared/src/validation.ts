@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-  BOOKING_STATUSES,
   TASK_PRIORITIES,
   DATE_REGEX,
   TIME_REGEX,
@@ -13,8 +12,6 @@ export const dateSchema = z
 export const timeSchema = z
   .string()
   .regex(TIME_REGEX, "Must be HH:MM or HH:MM:SS");
-
-export const bookingStatusSchema = z.enum(BOOKING_STATUSES);
 
 export const taskPrioritySchema = z.enum(TASK_PRIORITIES);
 

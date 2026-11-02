@@ -153,6 +153,35 @@ describe("EventBrowser type filter", () => {
       await screen.findByRole("option", { name: "admin.test_push" }),
     ).toBeInTheDocument();
   });
+  // Retired with the stored venue bookings (ADR-0012): nothing publishes these
+  // any more, but their rows stay in domain_events and must stay reachable.
+  it("offers the retired booking event types", async () => {
+    renderBrowser();
+    fireEvent.keyDown(typeFilter(), { key: "Enter", code: "Enter" });
+
+    expect(
+      await screen.findByRole("option", { name: "booking.created" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders a stored row of a retired booking event", () => {
+    renderBrowser(
+      [
+        {
+          ...baseEvent,
+          type: "booking.created",
+          entityType: "booking",
+          entityName: "Sporthalle Am Park - 2026-03-01",
+          deepLinkPath: "/admin/bookings/7",
+        },
+      ],
+      1,
+    );
+
+    expect(screen.getByText("booking.created")).toBeInTheDocument();
+    expect(screen.getByText("Sporthalle Am Park - 2026-03-01")).toBeInTheDocument();
+    expect(screen.getByText(enMessages.domainEvents.entityTypes.booking)).toBeInTheDocument();
+  });
 });
 
 describe("EventBrowser i18n and a11y", () => {
