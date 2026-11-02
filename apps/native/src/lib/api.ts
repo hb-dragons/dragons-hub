@@ -22,8 +22,10 @@ const handleUnauthorized = createOnceGuard(performSignOut);
 export const apiClient = new ApiClient({
   baseUrl,
   auth: {
-    getHeaders() {
-      const cookie = authClient.getCookie();
+    // better-auth 1.7 made the Expo client's getCookie async (it reads from
+    // SecureStore); ApiClient awaits getHeaders, so awaiting here is free.
+    async getHeaders() {
+      const cookie = await authClient.getCookie();
       if (cookie) {
         return { Cookie: cookie };
       }

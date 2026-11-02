@@ -19,21 +19,17 @@ overrides:
   react-native: 0.86.3
   expo-glass-effect: 57.0.4
   expo-constants: 57.0.22
-  # Capped at 1.6.23: better-auth 1.6.24 regressed the client-plugin generics, so
-  # any plugin declaring `getActions` stops being assignable to
-  # `BetterAuthClientPlugin`. One bad plugin collapses inference for the whole
-  # array, so native's `expoClient()` + `adminClient()` lose their `getCookie` and
-  # `admin` actions and apps/native no longer typechecks. Bisected 1.6.23 ok ->
-  # 1.6.24 broken; 1.6.25 and 1.7.0-rc.2 still broken. Ours: issue #138, upstream:
-  # better-auth/better-auth#10515 (open, no fix released).
-  # The documented upstream workaround (`as BetterAuthClientPlugin`) does not suit
-  # us: it erases the asserted plugin's own actions, and we call `getCookie()` in
-  # apps/native/src/lib/api.ts and src/app/assistant.tsx.
-  # These pin every copy, including the one `@daveyplate/better-auth-ui` pulls in,
-  # so the four workspaces depending on better-auth stay coherent. Lift once
-  # upstream ships a fix — that also unblocks workspace-wide `pnpm update -r`.
-  better-auth: 1.6.23
-  '@better-auth/expo': 1.6.23
+  # Pinned exactly, so every copy (including the one `@daveyplate/better-auth-ui`
+  # pulls in) matches the version the four workspaces declare. Raised from
+  # 1.6.23 to 1.7.15 on 2026-11-02 for GHSA-965c-763c-88jm (critical),
+  # GHSA-r4xp-prcw-77qf and GHSA-q84f-53jg-9ppm. The 1.6.23 cap (issue #138,
+  # client-plugin inference collapse from 1.6.24) is gone: upstream closed
+  # better-auth/better-auth#10515 and native typechecks on 1.7.15. 1.7 also made
+  # SecondaryStorage require `getAndDelete` + `increment` (apps/api
+  # config/auth.ts) and the Expo client's `getCookie()` async. Move all six
+  # package.json pins and these two lines together.
+  better-auth: 1.7.15
+  '@better-auth/expo': 1.7.15
   replace>minimatch: 3.1.5
   '@prisma/dev>hono': '>=4.12.18'
   '@prisma/dev>@hono/node-server': '>=1.19.13'
@@ -113,6 +109,12 @@ overrides:
   # zod GHSA-mrhx-c7xc-m3w5: the declared ranges were raised to ^4.6.7;
   # this reaches the copy @better-auth/core resolves on its own.
   zod: '>=4.6.6 <5'
+  # Floors raised 2026-11-02, same rule. node-forge via @expo/cli and
+  # @expo/code-signing-certificates (GHSA-7wch-p9px-956x, -jc66-7q78-782g,
+  # -8hrf-8g6f-7xwp, -hqq3-7jhf-c5jx, -5x38-2vff-x55p); decode-uri-component
+  # GHSA-qr28-fpjm-wq7f. better-auth above was raised in the same pass.
+  node-forge: '>=1.4.1 <2'
+  decode-uri-component: '>=0.5.1 <0.6'
   '@esbuild-kit/core-utils>esbuild': '>=0.25.0'
   '@instantdb/core>uuid': '>=11.1.1'
 auditConfig:

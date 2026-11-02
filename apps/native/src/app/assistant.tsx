@@ -128,10 +128,10 @@ export default function AssistantScreen() {
     () =>
       new DefaultChatTransport({
         api: buildAssistantTransportConfig({ apiUrl: resolveApiUrl(), cookie: null }).api,
-        headers: () =>
+        headers: async () =>
           buildAssistantTransportConfig({
             apiUrl: resolveApiUrl(),
-            cookie: authClient.getCookie() ?? null,
+            cookie: (await authClient.getCookie()) ?? null,
           }).headers,
         body: () =>
           buildAssistantTransportConfig({
