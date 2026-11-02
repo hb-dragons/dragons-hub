@@ -91,6 +91,36 @@ export const auth = betterAuth({
         logger.warn({ err, key }, "Session cache delete failed; entry will expire via TTL");
       }
     },
+    // Consumes single-use verification tokens. GETDEL keeps the read and the
+    // delete atomic, so one token cannot be redeemed twice by racing requests.
+    // A failure reports a miss: the token reads as invalid and the user asks
+    // for a new one, which beats throwing out of the verify route.
+    async getAndDelete(key) {
+      try {
+        return await getRedis().getdel(`${SECONDARY_STORAGE_PREFIX}${key}`);
+      } catch (err) {
+        logger.warn({ err, key }, "Verification cache consume failed; treating as a miss");
+        return null;
+      }
+    },
+    // better-auth's rate limiter counts requests through this whenever a
+    // secondaryStorage is configured. SET NX EX creates the counter with its
+    // window TTL only when absent, so later increments never extend the
+    // window; MULTI runs both against one key in one round trip. A Redis
+    // failure fails open (count 0 = allowed), matching the cache-read
+    // degradation above: a cache outage must not lock everyone out of sign-in.
+    async increment(key, ttl) {
+      const k = `${SECONDARY_STORAGE_PREFIX}${key}`;
+      try {
+        const results = await getRedis().multi().set(k, "0", "EX", ttl, "NX").incr(k).exec();
+        const [err, count] = results?.[1] ?? [new Error("MULTI aborted"), null];
+        if (err) throw err;
+        return Number(count);
+      } catch (err) {
+        logger.warn({ err, key }, "Rate-limit counter increment failed; allowing request");
+        return 0;
+      }
+    },
   },
   rateLimit: {
     enabled: true,

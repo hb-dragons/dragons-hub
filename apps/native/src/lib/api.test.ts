@@ -120,3 +120,30 @@ describe("api.ts 401 handling", () => {
     expect(authClient.signOut).not.toHaveBeenCalled();
   });
 });
+
+describe("api.ts auth headers", () => {
+  function getGetHeaders(): () => Promise<Record<string, string>> {
+    const ctorCall = vi.mocked(ApiClient).mock.calls[0];
+    if (!ctorCall) throw new Error("ApiClient was not constructed");
+    return (ctorCall[0] as { auth: { getHeaders: () => Promise<Record<string, string>> } }).auth
+      .getHeaders;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // better-auth 1.7's Expo client resolves getCookie asynchronously. Without
+  // the await, the header would carry a Promise and every authed call 401s.
+  it("sends the cookie the async getCookie resolves to", async () => {
+    vi.mocked(authClient.getCookie).mockResolvedValue("dragons.session_token=abc" as never);
+    await loadApiUnderTest();
+    await expect(getGetHeaders()()).resolves.toEqual({ Cookie: "dragons.session_token=abc" });
+  });
+
+  it("sends no Cookie header when signed out", async () => {
+    vi.mocked(authClient.getCookie).mockResolvedValue("" as never);
+    await loadApiUnderTest();
+    await expect(getGetHeaders()()).resolves.toEqual({});
+  });
+});

@@ -27,6 +27,10 @@ const redisMocks = vi.hoisted(() => ({
   get: vi.fn(),
   set: vi.fn(),
   del: vi.fn(),
+  getdel: vi.fn(),
+  multiSet: vi.fn(),
+  multiIncr: vi.fn(),
+  exec: vi.fn(),
 }));
 
 vi.mock("./redis", () => ({
@@ -34,6 +38,21 @@ vi.mock("./redis", () => ({
     get: (...a: unknown[]) => redisMocks.get(...a),
     set: (...a: unknown[]) => redisMocks.set(...a),
     del: (...a: unknown[]) => redisMocks.del(...a),
+    getdel: (...a: unknown[]) => redisMocks.getdel(...a),
+    multi: () => {
+      const chain = {
+        set: (...a: unknown[]) => {
+          redisMocks.multiSet(...a);
+          return chain;
+        },
+        incr: (...a: unknown[]) => {
+          redisMocks.multiIncr(...a);
+          return chain;
+        },
+        exec: () => redisMocks.exec(),
+      };
+      return chain;
+    },
   }),
 }));
 
@@ -295,6 +314,8 @@ describe("auth config", () => {
       get(key: string): Promise<unknown>;
       set(key: string, value: string, ttl?: number): Promise<void>;
       delete(key: string): Promise<void>;
+      getAndDelete(key: string): Promise<unknown>;
+      increment(key: string, ttl: number): Promise<number>;
     };
 
     async function getStorage(): Promise<Storage> {
@@ -309,6 +330,28 @@ describe("auth config", () => {
       redisMocks.get.mockReset();
       redisMocks.set.mockReset();
       redisMocks.del.mockReset();
+      redisMocks.getdel.mockReset();
+      redisMocks.multiSet.mockReset();
+      redisMocks.multiIncr.mockReset();
+      redisMocks.exec.mockReset();
+    });
+
+    it("getAndDelete consumes the prefixed key atomically via GETDEL", async () => {
+      redisMocks.getdel.mockResolvedValue("token");
+      const storage = await getStorage();
+      await expect(storage.getAndDelete("verification:x")).resolves.toBe("token");
+      expect(redisMocks.getdel).toHaveBeenCalledWith("ba:verification:x");
+    });
+
+    it("increment seeds the window TTL only on creation, then increments", async () => {
+      redisMocks.exec.mockResolvedValue([
+        [null, "OK"],
+        [null, 3],
+      ]);
+      const storage = await getStorage();
+      await expect(storage.increment("rl:ip", 60)).resolves.toBe(3);
+      expect(redisMocks.multiSet).toHaveBeenCalledWith("ba:rl:ip", "0", "EX", 60, "NX");
+      expect(redisMocks.multiIncr).toHaveBeenCalledWith("ba:rl:ip");
     });
 
     it("get prefixes the key", async () => {
@@ -363,6 +406,33 @@ describe("auth config", () => {
         const storage = await getStorage();
 
         await expect(storage.set("k", "v", 60)).resolves.toBeUndefined();
+        expect(logMocks.warn).toHaveBeenCalled();
+      });
+
+      it("getAndDelete degrades to a miss instead of throwing", async () => {
+        redisMocks.getdel.mockRejectedValue(new Error("redis down"));
+        const storage = await getStorage();
+
+        await expect(storage.getAndDelete("verification:x")).resolves.toBeNull();
+        expect(logMocks.warn).toHaveBeenCalled();
+      });
+
+      it("increment fails open when the INCR step errors", async () => {
+        redisMocks.exec.mockResolvedValue([
+          [null, null],
+          [new Error("WRONGTYPE"), null],
+        ]);
+        const storage = await getStorage();
+
+        await expect(storage.increment("rl:ip", 60)).resolves.toBe(0);
+        expect(logMocks.warn).toHaveBeenCalled();
+      });
+
+      it("increment fails open when the transaction is aborted", async () => {
+        redisMocks.exec.mockResolvedValue(null);
+        const storage = await getStorage();
+
+        await expect(storage.increment("rl:ip", 60)).resolves.toBe(0);
         expect(logMocks.warn).toHaveBeenCalled();
       });
 
