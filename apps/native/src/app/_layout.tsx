@@ -18,6 +18,7 @@ import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { LocaleProvider } from "@/hooks/useLocale";
 import { useBiometricLock } from "@/hooks/useBiometricLock";
 import { authClient } from "@/lib/auth-client";
+import { sessionGateSettled } from "@/lib/auth/session-gate";
 import { fontAssets } from "@/theme/typography";
 import { i18n } from "@/lib/i18n";
 import { colors as themeColors } from "@/theme/colors";
@@ -174,13 +175,19 @@ export default function RootLayout() {
   const { isLocked, isReady: biometricReady, authenticate } = useBiometricLock();
   const { isPending: sessionPending } = authClient.useSession();
   const [authFailed, setAuthFailed] = useState(false);
+  // Latched: a signed-out foreground refetch reports pending again, and
+  // gating on the live flag unmounted the navigator (see session-gate.ts).
+  const [sessionSettled, setSessionSettled] = useState(false);
+  const nextSessionSettled = sessionGateSettled(sessionSettled, sessionPending);
+  if (nextSessionSettled !== sessionSettled) setSessionSettled(nextSessionSettled);
 
   useEffect(() => installGlobalErrorHandler(), []);
 
   // Gating: the authed tree must only render once every independent guard has
   // settled. Three async sources feed this decision:
   //   1. `fontsLoaded`     — expo-font has loaded custom faces.
-  //   2. `!sessionPending` — better-auth has restored (or not) the session.
+  //   2. `sessionSettled`  — better-auth has restored (or not) the session
+  //                          once; later refetches do not re-close the gate.
   //   3. `biometricReady`  — SecureStore has been read so `isLocked` is
   //                          definitive; before this flag is true, `isLocked`
   //                          defaults to `false` and would let the authed tree
@@ -189,7 +196,7 @@ export default function RootLayout() {
   // Once all three are ready, we either show the Unlock screen (when locked
   // and auth has failed) or render the app. Splash stays up until the first
   // definitive decision is made.
-  const isGateReady = fontsLoaded && !sessionPending && biometricReady;
+  const isGateReady = fontsLoaded && nextSessionSettled && biometricReady;
 
   useEffect(() => {
     if (!isGateReady) return;
