@@ -272,6 +272,7 @@
     "close": "Schließen"
   },
   "common": {
+    "appName": "HB Dragons",
     "home": "Heim",
     "away": "Auswärts",
     "details": "Details",

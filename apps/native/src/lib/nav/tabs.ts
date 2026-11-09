@@ -77,7 +77,7 @@ export function tabBarAppearance(opts: {
 
 export const TAB_CONFIG: Record<TabId, TabConfig> = {
   home: {
-    name: "index",
+    name: "(home)",
     labelKey: "tabs.home",
     sf: { default: "basketball", selected: "basketball.fill" },
     md: "sports_basketball",

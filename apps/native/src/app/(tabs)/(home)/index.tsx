@@ -5,7 +5,7 @@ import useSWR from "swr";
 import type { MatchListItem } from "@dragons/shared";
 import { needsStandingsShortcut } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
-import { Screen } from "@/components/Screen";
+import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { StatStrip } from "@/components/StatStrip";
 import { MatchCardFull } from "@/components/MatchCardFull";
 import { MatchCardCompact } from "@/components/MatchCardCompact";
@@ -19,7 +19,6 @@ import { kickoffCountdownDays } from "@/lib/format/kickoff";
 import { resolveFetchState } from "@/lib/ui/fetch-state";
 import { ErrorState } from "@/components/ErrorState";
 import { fontFamilies } from "@/theme/typography";
-import { Wordmark } from "@/components/brand/Wordmark";
 
 function getCountdown(kickoffDate: string): string {
   const days = kickoffCountdownDays(kickoffDate);
@@ -32,9 +31,6 @@ export default function HomeScreen() {
   const { colors, textStyles, spacing, radius } = useTheme();
   const router = useRouter();
   const { data: session } = authClient.useSession();
-
-  const initial = session?.user?.name?.trim().charAt(0).toUpperCase() ?? "";
-  const isSignedIn = Boolean(session);
 
   // Staff whose Officiating tab took the Standings slot have no tab to the
   // league tables; the stat strip below carries their way in. Everyone else
@@ -62,7 +58,7 @@ export default function HomeScreen() {
 
   if (state === "loading") {
     return (
-      <Screen>
+      <Screen edges={UNDER_NATIVE_HEADER}>
         <View
           style={{
             flex: 1,
@@ -82,7 +78,7 @@ export default function HomeScreen() {
   // pull-to-refresh stranded in the unreachable success branch below.
   if (state === "error" || !dashboard) {
     return (
-      <Screen onRefresh={() => mutate()}>
+      <Screen edges={UNDER_NATIVE_HEADER} onRefresh={() => mutate()}>
         <ErrorState
           message={i18n.t("common.loadFailed")}
           retryLabel={i18n.t("common.retry")}
@@ -97,45 +93,7 @@ export default function HomeScreen() {
   const { nextGame, recentResults, upcomingGames, clubStats } = dashboard;
 
   return (
-    <Screen onRefresh={() => mutate()}>
-      {/* Header: Wordmark + Profile / Sign-In affordance */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginTop: spacing.sm,
-        }}
-      >
-        <Wordmark width={120} />
-        <Pressable
-          onPress={() => router.push("/profile")}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={
-            isSignedIn ? i18n.t("profile.title") : i18n.t("auth.signIn")
-          }
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 18,
-            backgroundColor: isSignedIn ? colors.primary : colors.surfaceHigh,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Text
-            style={{
-              color: isSignedIn ? colors.primaryForeground : colors.mutedForeground,
-              fontSize: 16,
-              fontFamily: fontFamilies.bodySemiBold,
-            }}
-          >
-            {isSignedIn ? initial : "?"}
-          </Text>
-        </Pressable>
-      </View>
-
+    <Screen edges={UNDER_NATIVE_HEADER} onRefresh={() => mutate()}>
       {/* Entry point: Club assistant */}
       {process.env.EXPO_PUBLIC_CHATBOT_ENABLED === "true" && session?.user ? (
         <Pressable

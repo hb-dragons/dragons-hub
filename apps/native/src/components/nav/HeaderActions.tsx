@@ -36,10 +36,10 @@ interface Props<K extends string> {
  * so on Android the bar items are hosted views instead, which is what the whole
  * app did before #224.
  */
-const BAR_DRAWS_ITEMS = Platform.OS === "ios";
+export const BAR_DRAWS_ITEMS = Platform.OS === "ios";
 
 /** Tap target for the fallback buttons; UIKit gives its bar items their own. */
-const FALLBACK_TAP_TARGET = 44;
+export const FALLBACK_TAP_TARGET = 44;
 
 /**
  * A screen's navigation-bar actions (#224).
