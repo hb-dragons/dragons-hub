@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import { RefreshControl, ScrollView, View, StyleSheet } from "react-native";
+import { RefreshControl, ScrollView, StyleSheet } from "react-native";
 import type { Edge } from "react-native-safe-area-context";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
@@ -60,8 +60,8 @@ export function Screen({
   // Bottom padding only where this component owns the scroll view; see
   // lib/ui/screen-padding.ts for why the non-scrolling wrapper gets none.
   const contentStyle = useMemo(
-    () => screenContentPadding({ scroll, spacing: { lg: spacing.lg, xl: spacing.xl } }),
-    [scroll, spacing.lg, spacing.xl],
+    () => screenContentPadding({ lg: spacing.lg, xl: spacing.xl }),
+    [spacing.lg, spacing.xl],
   );
 
   const refreshControl = useMemo(() => {
@@ -90,7 +90,13 @@ export function Screen({
           {children}
         </ScrollView>
       ) : (
-        <View style={[styles.scrollView, contentStyle]}>{children}</View>
+        // No view of our own between the container and the child. The native
+        // stack finds the scroll view it collapses the large title against by
+        // following each view's *first* subview down from the screen; a
+        // padded wrapper here broke that chain for every list screen, and the
+        // large title scrolled away with no small title replacing it. Lists
+        // carry their side padding in `contentContainerStyle` instead.
+        children
       )}
     </SafeAreaView>
   );

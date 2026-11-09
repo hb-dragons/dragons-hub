@@ -1,21 +1,17 @@
 /**
- * The padding `Screen` puts around its content.
+ * The padding a scrolling `Screen` puts around its content: it owns the scroll
+ * view, so it insets the sides and ends the content with breathing room.
  *
- * A scrolling `Screen` owns the scroll view, so it ends the content with
- * breathing room of its own. A non-scrolling one (`scroll={false}`) wraps
- * either a list that brings its own scroll view and end padding, or a
- * full-height centred state (spinner, error, not-found). Padding the wrapper's
- * bottom there does not add room, it clips: the list's cells vanish that many
- * points above the bottom edge. On iOS that strip hides under the translucent
- * tab bar; on Android the tab content ends at the bar's top edge, so the strip
- * is a blank band above an opaque bar.
+ * A non-scrolling `Screen` (`scroll={false}`) pads nothing, because it draws
+ * no view of its own between its safe-area container and its child — see
+ * `Screen`. That child is either a list, which brings its own scroll view and
+ * puts the side and end padding in its `contentContainerStyle`, or a
+ * full-height centred state (spinner, error, not-found) with padding of its
+ * own.
  */
-export function screenContentPadding(opts: {
-  scroll: boolean;
-  spacing: { lg: number; xl: number };
-}): { paddingHorizontal: number; paddingBottom?: number } {
-  const { scroll, spacing } = opts;
-  return scroll
-    ? { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl }
-    : { paddingHorizontal: spacing.lg };
+export function screenContentPadding(spacing: { lg: number; xl: number }): {
+  paddingHorizontal: number;
+  paddingBottom: number;
+} {
+  return { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl };
 }

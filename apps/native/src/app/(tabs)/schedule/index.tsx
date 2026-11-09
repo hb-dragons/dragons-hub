@@ -78,7 +78,10 @@ function MatchList({
   // The native tab bar clears itself (the inset behaviour below on iOS, the
   // padded tab content on Android); this is only the breathing room `Screen`
   // gives every scroll view.
-  const listContentStyle = useMemo(() => ({ paddingBottom: spacing.xl }), [spacing.xl]);
+  const listContentStyle = useMemo(
+    () => ({ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl }),
+    [spacing.lg, spacing.xl],
+  );
 
   return (
     <SectionList

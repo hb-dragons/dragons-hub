@@ -179,8 +179,8 @@ export default function TeamDetailScreen() {
   );
 
   const listContentStyle = useMemo(
-    () => ({ paddingBottom: spacing.xl }),
-    [spacing.xl],
+    () => ({ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl }),
+    [spacing.lg, spacing.xl],
   );
 
   // The standings row already carries the permanent api id the h2h route

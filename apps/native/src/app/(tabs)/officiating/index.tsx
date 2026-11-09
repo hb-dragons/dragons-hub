@@ -170,8 +170,8 @@ export default function OfficiatingScreen() {
   // The native tab bar clears itself; the bottom padding is only the breathing
   // room `Screen` gives every scroll view.
   const listContentStyle = useMemo(
-    () => ({ paddingTop: spacing.sm, paddingBottom: spacing.xl }),
-    [spacing.sm, spacing.xl],
+    () => ({ paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xl }),
+    [spacing.lg, spacing.sm, spacing.xl],
   );
 
   const {
