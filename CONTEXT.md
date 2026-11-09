@@ -12,6 +12,10 @@ _Avoid_: guest, anonymous user
 A signed-in person with a club role (admin, referee admin, team manager, coach, referee self-service). Gets the role-driven surfaces and club tooling.
 _Avoid_: member, signed-in user
 
+**Account**:
+A staff login, created and managed by the club, never by the person themselves. Separate from the referee and staff person records it links to; closing an account leaves those records in place.
+_Avoid_: profile, user (in prose)
+
 **Squad**:
 The federation-identified group of players behind a club team. Keeps its federation identity for life and ages up through age brackets across seasons (last season's U14 squad can be this season's U16 squad).
 _Avoid_: permanent team
