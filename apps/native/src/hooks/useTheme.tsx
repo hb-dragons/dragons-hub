@@ -2,8 +2,10 @@ import {
   createContext,
   useContext,
   useMemo,
+  useRef,
   type ReactNode,
 } from "react";
+import { useColorScheme } from "react-native";
 import { ThemeProvider as NavigationThemeProvider } from "expo-router";
 import { colors } from "@/theme/colors";
 import { textStyles } from "@/theme/typography";
@@ -16,11 +18,8 @@ import {
   type ResolvedTextStyles,
 } from "@/theme/bold-text";
 import type { ColorToken } from "@/theme/colors";
-import { useAppearanceMode, type Mode } from "./useAppearanceMode";
 import { useBoldText } from "./useBoldText";
 import { useLocaleSubscription } from "./useLocale";
-
-export type { Mode };
 
 type ResolvedColors = Record<ColorToken, string>;
 
@@ -35,14 +34,18 @@ interface ThemeContextValue {
   spacing: typeof spacing;
   radius: typeof radius;
   isDark: boolean;
-  mode: Mode;
-  setMode: (mode: Mode) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const { mode, setMode, scheme, loaded } = useAppearanceMode();
+  // The app follows the system appearance (#399); there is no in-app override.
+  // `useColorScheme` can report null for a moment (e.g. while iOS takes its
+  // background snapshots); keep the last known scheme rather than flash light.
+  const systemScheme = useColorScheme();
+  const lastKnownScheme = useRef<"light" | "dark">(systemScheme === "dark" ? "dark" : "light");
+  if (systemScheme === "light" || systemScheme === "dark") lastKnownScheme.current = systemScheme;
+  const scheme = lastKnownScheme.current;
   const boldText = useBoldText();
 
   const navTheme = useMemo(() => buildNavigationTheme(scheme), [scheme]);
@@ -56,13 +59,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       spacing,
       radius,
       isDark: scheme === "dark",
-      mode,
-      setMode,
     }),
-    [scheme, mode, setMode, boldText],
+    [scheme, boldText],
   );
-
-  if (!loaded) return null;
 
   return (
     <NavigationThemeProvider value={navTheme}>

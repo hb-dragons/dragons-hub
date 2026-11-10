@@ -47,6 +47,8 @@ export const APP_ROUTES: Record<string, (...params: string[]) => RouteHref> = {
   "/profile": () => "/profile",
   "/assistant": () => "/assistant",
   "/push-permission": () => "/push-permission",
+  // The app lock after a relock (#399). Presented by the root layout only.
+  "/lock": () => "/lock",
   // Profile's own stack (#398): the coach's contact data (#315) and the
   // notification settings, pushed inside the Profile sheet.
   "/profile/contact": () => "/profile/contact",

@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
-import { Alert, Platform, Pressable, Switch, Text, View } from "react-native";
+import { Alert, Linking, Platform, Pressable, Switch, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { isReferee, parseRoles, type RoleName } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { useLocale } from "@/hooks/useLocale";
+import { lockLabels } from "@/lib/auth/lock-method";
 import { useBiometricLock } from "@/hooks/useBiometricLock";
 import { authClient } from "@/lib/auth-client";
 import { performSignOut } from "@/lib/auth/sign-out";
@@ -15,7 +16,7 @@ import { Logo } from "@/components/brand/Logo";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { SettingsGroup, SettingsRow } from "@/components/settings/SettingsGroup";
 import { Segmented } from "@/components/ui/Segmented";
-import { i18n } from "@/lib/i18n";
+import { i18n, translate } from "@/lib/i18n";
 import {
   LEGAL_LINKS,
   appVersionLabel,
@@ -24,7 +25,7 @@ import {
 } from "@/lib/legal/links";
 import { readAppVersion } from "@/lib/legal/app-version";
 import { openExternal } from "@/lib/legal/open-external";
-import { LOCALE_SEGMENTS, THEME_SEGMENTS, segmentLabels } from "@/lib/ui/preference-segments";
+import { LOCALE_SEGMENTS, segmentLabels } from "@/lib/ui/preference-segments";
 
 const GROUP_TITLE_KEYS: Record<ProfileGroup["id"], string | null> = {
   signIn: null,
@@ -52,7 +53,7 @@ export default function ProfileScreen() {
   const { spacing } = useTheme();
   const { data: session } = authClient.useSession();
   const { isSupported } = useBiometricLock();
-  const groups = profileGroups({ user: session?.user ?? null, lockSupported: isSupported });
+  const groups = profileGroups({ user: session?.user ?? null, lockSupported: isSupported, os: Platform.OS });
 
   return (
     <Screen edges={UNDER_NATIVE_HEADER}>
@@ -90,10 +91,10 @@ function Row({ row, email }: { row: ProfileRow; email: string | undefined }) {
       );
     case "lock":
       return <LockRow />;
-    case "appearance":
-      return <AppearanceRow />;
     case "language":
       return <LanguageRow />;
+    case "languageSettings":
+      return <LanguageSettingsRow />;
     case "privacy":
       return <SettingsRow role="link" label={i18n.t("legal.privacy")} onPress={() => openExternal(LEGAL_LINKS.privacy)} />;
     case "imprint":
@@ -138,26 +139,34 @@ function Row({ row, email }: { row: ProfileRow; email: string | undefined }) {
   }
 }
 
+/** "Mit Face ID sperren": the toggle names the device's method (#399). */
 function LockRow() {
-  const { isEnabled, toggle } = useBiometricLock();
+  const { isEnabled, method, toggle } = useBiometricLock();
+  const label = lockLabels(method, translate).toggle;
   return (
     <SettingsRow
-      label={i18n.t("profile.biometricLock")}
-      accessory={<Switch value={isEnabled} onValueChange={() => void toggle()} />}
+      label={label}
+      accessory={<Switch accessibilityLabel={label} value={isEnabled} onValueChange={() => void toggle()} />}
     />
   );
 }
 
-function AppearanceRow() {
-  const { mode, setMode } = useTheme();
+/**
+ * iOS (#399): the language is set on the app's page in iOS Settings, which
+ * lists the languages `app.json` declares. The row shows the current one and
+ * opens that page.
+ */
+function LanguageSettingsRow() {
+  const { locale } = useLocale();
   return (
-    <SegmentRow label={i18n.t("profile.theme")}>
-      <Segmented
-        segments={segmentLabels(THEME_SEGMENTS, (key) => i18n.t(key))}
-        selected={mode}
-        onSelect={setMode}
-      />
-    </SegmentRow>
+    <SettingsRow
+      push
+      role="link"
+      label={i18n.t("profile.language")}
+      value={i18n.t(locale === "de" ? "profile.languageDe" : "profile.languageEn")}
+      hint={i18n.t("profile.languageSettingsHint")}
+      onPress={() => void Linking.openSettings()}
+    />
   );
 }
 

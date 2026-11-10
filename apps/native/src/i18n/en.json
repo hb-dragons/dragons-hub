@@ -79,12 +79,9 @@
   },
   "profile": {
     "title": "Profile",
-    "biometricLock": "Biometric Lock",
-    "theme": "Appearance",
-    "themeSystem": "System",
-    "themeLight": "Light",
-    "themeDark": "Dark",
+    "lockWith": "Lock with %{method}",
     "language": "Language",
+    "languageSettingsHint": "Opens the app's settings to change the language",
     "languageSystem": "System",
     "languageDe": "Deutsch",
     "languageEn": "English",
@@ -275,7 +272,8 @@
     "staffSignInPrompt": "Sign in as referee or admin",
     "staffSignInHint": "Fans don't need an account to use the app.",
     "noAccountHint": "No account? Ask your club admin to create one.",
-    "tapToUnlock": "Tap to unlock",
+    "unlockWith": "Unlock with %{method}",
+    "lockedHint": "The app is locked.",
     "close": "Close"
   },
   "common": {
@@ -555,5 +553,13 @@
       "trainer": "Head coach",
       "co_trainer": "Assistant coach"
     }
+  },
+  "lockMethod": {
+    "faceId": "Face ID",
+    "touchId": "Touch ID",
+    "fingerprint": "fingerprint",
+    "face": "face unlock",
+    "iris": "iris scan",
+    "biometrics": "biometrics"
   }
 }

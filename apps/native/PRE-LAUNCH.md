@@ -394,7 +394,7 @@ Still open:
 - [ ] Unit-test pure functions: `partitionGames`, `groupByDate`,
       `claimErrorMessage`, `dropErrorMessage`.
 - [ ] Add a render harness (e.g. `@testing-library/react-native`) so
-      hooks like `useBiometricLock`, `useAppearanceMode`, `useLocale`
+      hooks like `useBiometricLock`, `useLocale`
       and screens can get real test coverage instead of only their pure
       helper functions.
 - [ ] Add one Maestro flow: launch → browse schedule → open a game →

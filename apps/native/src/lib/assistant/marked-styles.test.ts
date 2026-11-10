@@ -18,8 +18,6 @@ const theme = {
   spacing,
   radius,
   isDark: true,
-  mode: "dark" as const,
-  setMode: () => {},
 };
 
 describe("markedStyles", () => {

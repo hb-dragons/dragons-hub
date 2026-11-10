@@ -30,7 +30,9 @@ export function didReturnFromBackground(previous: AppStateStatus, next: AppState
 /**
  * Subscribes to `AppState` and invokes `onRelock` when the app returns to
  * `active` after having genuinely been `background`ed for at least
- * `gracePeriodMs`. Returns an unsubscribe function.
+ * `gracePeriodMs`. With a zero grace period it relocks as the app enters
+ * `background` instead, since there is nothing to wait for. Returns an
+ * unsubscribe function.
  *
  * If the app is observed returning to `active` from `background` without a
  * recorded backgrounding timestamp (e.g. the listener attached mid-flight),
@@ -47,11 +49,26 @@ export function subscribeBackgroundRelock(params: {
 
   let previousState: AppStateStatus = AppState.currentState;
   let backgroundedAt: number | null = null;
+  let lockedOnDeparture = false;
 
   const subscription = AppState.addEventListener("change", (nextState) => {
     if (didEnterBackground(previousState, nextState)) {
-      backgroundedAt = now();
+      if (gracePeriodMs <= 0) {
+        // No grace to wait out: lock now, while the app is hidden, so the
+        // lock screen is already up when the user comes back and no frame of
+        // the screen they left shows first (#399).
+        params.onRelock();
+        backgroundedAt = null;
+        lockedOnDeparture = true;
+      } else {
+        backgroundedAt = now();
+      }
     } else if (didReturnFromBackground(previousState, nextState)) {
+      if (lockedOnDeparture) {
+        lockedOnDeparture = false;
+        previousState = nextState;
+        return;
+      }
       const elapsed = backgroundedAt === null ? Number.POSITIVE_INFINITY : now() - backgroundedAt;
       if (elapsed >= gracePeriodMs) {
         params.onRelock();
