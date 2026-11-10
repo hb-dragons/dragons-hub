@@ -113,3 +113,36 @@ function Avatar({ initial, onPress }: { initial: string; onPress: () => void }) 
     </Pressable>
   );
 }
+
+/**
+ * Profile's Done button (#398): the trailing bar item that closes the sheet,
+ * as on every iOS page sheet. A function for the same reason as
+ * `profileToolbar`: it is placed from the Profile stack's layout. iOS draws a
+ * `UIBarButtonItem` in the done style; Android hosts a plain text button.
+ */
+export function doneToolbar(onPress: () => void) {
+  return BAR_DRAWS_ITEMS ? (
+    <Stack.Toolbar placement="right">
+      <Stack.Toolbar.Button variant="done" onPress={onPress}>
+        {i18n.t("common.done")}
+      </Stack.Toolbar.Button>
+    </Stack.Toolbar>
+  ) : (
+    <Stack.Toolbar placement="right" asChild>
+      <DoneButton onPress={onPress} />
+    </Stack.Toolbar>
+  );
+}
+
+function DoneButton({ onPress }: { onPress: () => void }) {
+  const { colors, textStyles, spacing } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={{ minHeight: FALLBACK_TAP_TARGET, paddingHorizontal: spacing.sm, justifyContent: "center" }}
+    >
+      <Text style={[textStyles.button, { color: colors.primary }]}>{i18n.t("common.done")}</Text>
+    </Pressable>
+  );
+}

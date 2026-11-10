@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildStaffPatch, contactFields, showsStaffContact } from "./my-staff";
+import { APIError } from "@dragons/api-client";
+import { buildStaffPatch, contactFields, contactLoadFailed, showsStaffContact } from "./my-staff";
 import type { MyStaffProfile } from "@dragons/shared";
 
 const profile: MyStaffProfile = {
@@ -77,5 +78,22 @@ describe("buildStaffPatch", () => {
     expect(buildStaffPatch({ phone: "+49 170 1", email: "", licence: "" }, undefined)).toEqual({
       phone: "+49 170 1",
     });
+  });
+});
+
+describe("contactLoadFailed", () => {
+  it("is quiet while there is no error", () => {
+    expect(contactLoadFailed(undefined)).toBe(false);
+  });
+
+  // The staff link went away while the app was open: there is no record, which
+  // is not the club's data being unreachable.
+  it("is quiet for a 404", () => {
+    expect(contactLoadFailed(new APIError(404, "not_found", "not found"))).toBe(false);
+  });
+
+  it("reports any other failure", () => {
+    expect(contactLoadFailed(new APIError(500, "server_error", "boom"))).toBe(true);
+    expect(contactLoadFailed(new Error("offline"))).toBe(true);
   });
 });

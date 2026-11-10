@@ -6,13 +6,11 @@ import { authClient } from "@/lib/auth-client";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { requestPushPermissionAndRegister } from "@/lib/push/registration";
-import { recordPushSheetDismissal } from "@/lib/push/pre-prompt";
-
-const POINTS = ["push.point1", "push.point2", "push.point3", "push.point4"] as const;
+import { PUSH_POINTS, recordPushSheetDismissal } from "@/lib/push/pre-prompt";
 
 /**
  * Push pre-permission sheet (#237). Opens from `usePushRegistration` after
- * sign-in when the OS has not been asked yet, and from Profile. Every way
+ * sign-in when the OS has not been asked yet. Every way
  * out a signed-in user can take — "Aktivieren" completing (grant or deny),
  * "Später", swipe, back — writes the per-device deferral on unmount, and a
  * signed-out bounce writes nothing (#252). The sheet closes on any
@@ -20,8 +18,8 @@ const POINTS = ["push.point1", "push.point2", "push.point3", "push.point4"] as c
  * in it. A deferral written right after a grant is inert: `decidePushFlow`
  * (`lib/push/pre-prompt.ts`) checks the OS status before it ever reads the
  * deferred flag, so a granted status short-circuits to "register" and the
- * deferral is never consulted. Profile's "Mitteilungen" row is the way back
- * in — it clears the deferral before reopening the sheet.
+ * deferral is never consulted. Profile's Mitteilungen screen is the way back
+ * in: it asks the OS itself (#398).
  */
 export default function PushPermissionSheet() {
   const { colors, spacing, radius, textStyles } = useTheme();
@@ -70,7 +68,7 @@ export default function PushPermissionSheet() {
   return (
     <SheetScreen title={i18n.t("push.title")} layout="scroll" testID="push-permission-sheet">
       <View style={{ gap: spacing.md }}>
-        {POINTS.map((key) => (
+        {PUSH_POINTS.map((key) => (
           <Text key={key} style={[textStyles.body, { color: colors.foreground }]}>
             {i18n.t(key)}
           </Text>

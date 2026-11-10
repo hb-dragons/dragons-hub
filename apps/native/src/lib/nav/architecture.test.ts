@@ -249,14 +249,14 @@ describe("navigation architecture", () => {
   // Datenschutzerklärung and a support contact must be reachable signed out.
   // Without a render harness the guarantee is structural: the two screens a
   // Fan meets first — Profile (one tap from Home) and the sign-in form — are
-  // the only importers of the legal section and its link table.
+  // the importers of the legal link table. Profile draws the links as its Info
+  // group (#398), and a fan gets that group (`profileGroups`).
   it("reaches the legal links from Profile and the sign-in screen", () => {
-    expect(importSites("@/components/LegalSection")).toEqual(["src/app/profile.tsx"]);
     const linkSites = SOURCE_FILES.filter((file) =>
       importsOf(file).some((spec) => /(^|\/)legal\/links$/.test(spec)),
     ).map(rel);
     expect(linkSites).toContain("src/app/(auth)/sign-in.tsx");
-    expect(linkSites).toContain("src/components/LegalSection.tsx");
+    expect(linkSites).toContain("src/app/profile/index.tsx");
   });
 
   // Every external open goes through one helper, so the failure mode (a URL
@@ -533,3 +533,39 @@ function declaringComponentPreamble(source: string, tag: string): string | null 
   ];
   return source.slice(declarations.at(-1)?.index ?? 0, tagAt);
 }
+
+/**
+ * Profile is a sheet with its own stack (#398), read like iOS Settings: the
+ * rows that lead somewhere push inside it, so nothing ever opens a second
+ * sheet on top of the first.
+ */
+describe("Profile sheet", () => {
+  const PROFILE_DIR = path.join(APP_DIR, "profile");
+  const read = (file: string) => readFileSync(path.join(APP_DIR, file), "utf8");
+
+  it("has its own stack", () => {
+    expect(read("profile/_layout.tsx")).toMatch(/<Stack\b/);
+  });
+
+  it("is presented from the root as a page sheet", () => {
+    const root = read("_layout.tsx");
+    const declaration = /<Stack\.Screen\s+name="profile"[\s\S]*?\/>/.exec(root)?.[0];
+    expect(declaration, "root stack declares the profile route").toBeDefined();
+    // `modal` is UIKit's page sheet: swipe to dismiss, the screen underneath
+    // stays visible behind it.
+    expect(declaration).toMatch(/presentation:\s*"modal"/);
+  });
+
+  it("pushes contact data and notifications inside the sheet", () => {
+    expect(existsSync(path.join(PROFILE_DIR, "contact.tsx"))).toBe(true);
+    expect(existsSync(path.join(PROFILE_DIR, "notifications.tsx"))).toBe(true);
+    expect(existsSync(path.join(APP_DIR, "profile-contact.tsx"))).toBe(false);
+  });
+
+  it("opens no sheet on top of itself", () => {
+    const sources = readdirSync(PROFILE_DIR).map((file) => read(path.join("profile", file)));
+    for (const source of sources) {
+      expect(source).not.toMatch(/SheetScreen|formSheet|\/push-permission/);
+    }
+  });
+});

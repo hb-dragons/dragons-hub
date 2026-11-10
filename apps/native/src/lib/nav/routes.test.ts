@@ -105,7 +105,7 @@ describe("expo-router route tree", () => {
   });
 
   it("treats every session-gated screen as non-public", () => {
-    for (const link of ["/officiating", "/today", "/referee-game/1", "/profile", "/admin/boards", "/assistant", "/referee-assign", "/push-permission"]) {
+    for (const link of ["/officiating", "/today", "/referee-game/1", "/profile", "/profile/contact", "/profile/notifications", "/admin/boards", "/assistant", "/referee-assign", "/push-permission"]) {
       expect(isPublicDeepLink(link), `${link} must require a session`).toBe(false);
     }
   });
