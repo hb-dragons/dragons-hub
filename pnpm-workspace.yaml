@@ -17,8 +17,8 @@ overrides:
   #     the module.
   react: 19.2.6
   react-native: 0.86.3
-  expo-glass-effect: 57.0.4
-  expo-constants: 57.0.22
+  expo-glass-effect: 57.0.5
+  expo-constants: 57.0.23
   # Pinned exactly, so every copy (including the one `@daveyplate/better-auth-ui`
   # pulls in) matches the version the four workspaces declare. Raised from
   # 1.6.23 to 1.7.15 on 2026-11-02 for GHSA-965c-763c-88jm (critical),
