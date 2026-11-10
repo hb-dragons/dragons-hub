@@ -9,4 +9,7 @@ i18n.locale = deviceLocale === "de" ? "de" : "en";
 i18n.defaultLocale = "de";
 i18n.enableFallback = true;
 
-export { i18n };
+/** `i18n.t` as a plain function, for helpers that take a translator. */
+const translate = (key: string, options?: Record<string, string>): string => i18n.t(key, options);
+
+export { i18n, translate };

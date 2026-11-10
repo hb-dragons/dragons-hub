@@ -580,3 +580,45 @@ describe("Profile sheet", () => {
     }
   });
 });
+
+/**
+ * The app lock (#399). The root used to return `null` while locked, which
+ * unmounted the navigator: after a relock and Face ID, staff landed on `/`
+ * instead of the screen they left. The lock is drawn over a mounted navigator
+ * now (`lib/auth/lock-presentation.ts`).
+ */
+describe("app lock", () => {
+  const root = () => readFileSync(path.join(APP_DIR, "_layout.tsx"), "utf8");
+
+  it("only holds the tree back before the gate first opens", () => {
+    const source = root();
+    const nulls = [...source.matchAll(/return null;/g)];
+    expect(nulls).toHaveLength(1);
+    // The one early return is the gate, and the gate's inputs only ever settle.
+    expect(source).toMatch(/if \(!isGateReady\) return null;/);
+    expect(source).not.toMatch(/if \(isLocked\)/);
+  });
+
+  it("presents the relock as a full-screen route nobody can swipe or animate past", () => {
+    const declaration = /<Stack\.Screen\s+name="lock"[\s\S]*?\/>/.exec(root())?.[0];
+    expect(declaration, "root stack declares the lock route").toBeDefined();
+    expect(declaration).toMatch(/presentation:\s*"fullScreenModal"/);
+    expect(declaration).toMatch(/animation:\s*"none"/);
+    expect(declaration).toMatch(/gestureEnabled:\s*false/);
+  });
+
+  it("has one lock state, provided at the root", () => {
+    const providers = SOURCE_FILES.filter((file) =>
+      readFileSync(file, "utf8").includes("<BiometricLockProvider"),
+    ).map(rel);
+    expect(providers).toEqual(["src/app/_layout.tsx"]);
+  });
+});
+
+/** #399: the app follows the system appearance; nothing pins a scheme. */
+describe("appearance", () => {
+  it("never overrides the system colour scheme", () => {
+    const sites = SOURCE_FILES.filter((file) => /setColorScheme\(/.test(readFileSync(file, "utf8"))).map(rel);
+    expect(sites).toEqual([]);
+  });
+});

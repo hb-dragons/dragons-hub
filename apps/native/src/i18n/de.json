@@ -79,12 +79,9 @@
   },
   "profile": {
     "title": "Profil",
-    "biometricLock": "Biometrische Sperre",
-    "theme": "Darstellung",
-    "themeSystem": "System",
-    "themeLight": "Hell",
-    "themeDark": "Dunkel",
+    "lockWith": "Mit %{method} sperren",
     "language": "Sprache",
+    "languageSettingsHint": "Öffnet die Einstellungen der App, um die Sprache zu ändern",
     "languageSystem": "System",
     "languageDe": "Deutsch",
     "languageEn": "English",
@@ -289,7 +286,8 @@
     "staffSignInPrompt": "Als Schiedsrichter oder Admin anmelden",
     "staffSignInHint": "Als Fan brauchst du kein Konto.",
     "noAccountHint": "Kein Konto? Bitte deinen Vereins-Admin, eines zu erstellen.",
-    "tapToUnlock": "Tippen zum Entsperren",
+    "unlockWith": "Mit %{method} entsperren",
+    "lockedHint": "Die App ist gesperrt.",
     "close": "Schließen"
   },
   "common": {
@@ -569,5 +567,13 @@
       "trainer": "Trainer",
       "co_trainer": "Co-Trainer"
     }
+  },
+  "lockMethod": {
+    "faceId": "Face ID",
+    "touchId": "Touch ID",
+    "fingerprint": "Fingerabdruck",
+    "face": "Gesichtserkennung",
+    "iris": "Iris-Scan",
+    "biometrics": "Biometrie"
   }
 }

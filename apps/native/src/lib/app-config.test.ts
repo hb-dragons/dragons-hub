@@ -44,6 +44,7 @@ const { expo } = JSON.parse(readFileSync(APP_JSON, "utf8")) as {
       }[];
     };
     locales?: Record<string, string>;
+    plugins?: (string | [string, unknown])[];
     name?: string;
   };
 };
@@ -209,6 +210,17 @@ describe("app.json locales", () => {
 
   it("allows mixed localizations so iOS picks the translated strings", () => {
     expect(expo.ios?.infoPlist?.CFBundleAllowMixedLocalizations).toBe(true);
+  });
+
+  // #399: declaring the languages to iOS lists a per-app language under the
+  // app in iOS Settings, which is where Profile's language row sends iOS users.
+  // Android keeps its in-app picker, so it declares nothing.
+  it("declares the runtime's languages to iOS for its per-app language setting", () => {
+    const plugin = (expo.plugins ?? []).find(
+      (entry) => Array.isArray(entry) && entry[0] === "expo-localization",
+    ) as [string, { supportedLocales?: { ios?: string[]; android?: string[] } }] | undefined;
+    expect([...(plugin?.[1].supportedLocales?.ios ?? [])].sort()).toEqual(APP_LANGUAGES);
+    expect(plugin?.[1].supportedLocales?.android).toBeUndefined();
   });
 });
 

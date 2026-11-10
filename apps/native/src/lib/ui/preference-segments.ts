@@ -1,10 +1,11 @@
-import type { Mode } from "@/hooks/useTheme";
 import type { LocalePref } from "@/hooks/useLocale";
 
 /**
- * The two preference switchers in Profile, as data (#224).
+ * Profile's language switcher, as data (#224). Android only since #399: iOS
+ * sets the per-app language in its own Settings, and the appearance switcher
+ * that used to sit next to it is gone (the app follows the system).
  *
- * Both used to be rows of hand-styled `Pressable`s — a tinted rectangle per
+ * It used to be rows of hand-styled `Pressable`s — a tinted rectangle per
  * option, its own `StyleSheet`, and the language row written out twice because
  * the signed-out screen offers it too. They are `<Segmented>` now, the same
  * native `UISegmentedControl` the Schedule and Officiating tabs already use, so
@@ -25,13 +26,6 @@ export interface PreferenceSegmentSpec<K extends string> {
   /** i18n key of the segment's label. */
   labelKey: string;
 }
-
-/** Appearance: follow the system, or pin light/dark. */
-export const THEME_SEGMENTS: readonly PreferenceSegmentSpec<Mode>[] = [
-  { key: "system", labelKey: "profile.themeSystem" },
-  { key: "light", labelKey: "profile.themeLight" },
-  { key: "dark", labelKey: "profile.themeDark" },
-];
 
 /** Language: follow the device, or pin German/English. */
 export const LOCALE_SEGMENTS: readonly PreferenceSegmentSpec<LocalePref>[] = [

@@ -63,6 +63,30 @@ describe("subscribeBackgroundRelock", () => {
     expect(onRelock).toHaveBeenCalledTimes(1);
   });
 
+  it("with zero grace, relocks as the app enters background, so the lock is up before the app is seen again", () => {
+    const onRelock = vi.fn();
+    subscribeBackgroundRelock({ onRelock });
+
+    emit("inactive");
+    expect(onRelock).not.toHaveBeenCalled();
+    emit("background");
+    expect(onRelock).toHaveBeenCalledTimes(1);
+    emit("active");
+    expect(onRelock).toHaveBeenCalledTimes(1);
+  });
+
+  it("with a grace period, waits for the return to decide", () => {
+    const onRelock = vi.fn();
+    let clock = 0;
+    subscribeBackgroundRelock({ onRelock, gracePeriodMs: 10_000, now: () => clock });
+
+    emit("background");
+    expect(onRelock).not.toHaveBeenCalled();
+    clock = 20_000;
+    emit("active");
+    expect(onRelock).toHaveBeenCalledTimes(1);
+  });
+
   it("does NOT relock on an iOS 'inactive' blip (app switcher / control center / incoming call) that never reaches background", () => {
     const onRelock = vi.fn();
     subscribeBackgroundRelock({ onRelock });

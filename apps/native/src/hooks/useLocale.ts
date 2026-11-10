@@ -8,18 +8,16 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { createElement } from "react";
+import { Platform } from "react-native";
 import { localStorage } from "@/lib/local-storage";
 import { getLocales } from "expo-localization";
 import { i18n } from "@/lib/i18n";
+import { effectiveLocalePref, type LocalePref } from "@/lib/locale-pref";
 
-export type LocalePref = "system" | "de" | "en";
+export type { LocalePref };
 export type ResolvedLocale = "de" | "en";
 
 const LOCALE_KEY = "locale_pref";
-
-function isValidPref(value: string | null): value is LocalePref {
-  return value === "system" || value === "de" || value === "en";
-}
 
 function deviceLocale(): ResolvedLocale {
   const code = getLocales()[0]?.languageCode;
@@ -55,7 +53,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void localStorage.getItem(LOCALE_KEY).then((stored) => {
-      apply(isValidPref(stored) ? stored : "system");
+      apply(effectiveLocalePref(stored, Platform.OS));
       setLoaded(true);
     });
   }, [apply]);

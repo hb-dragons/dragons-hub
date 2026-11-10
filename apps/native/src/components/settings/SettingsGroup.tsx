@@ -45,7 +45,8 @@ export function SettingsGroup({ title, children }: { title?: string; children: R
 /**
  * One row. `onPress` makes it tappable; `push` adds the disclosure chevron
  * for a row that opens a screen inside the same stack. `value` is the
- * trailing detail text, `accessory` a trailing control (a switch).
+ * trailing detail text, `accessory` a trailing control (a switch). `hint`
+ * tells VoiceOver where a row leads when its label does not say.
  */
 export function SettingsRow({
   label,
@@ -55,6 +56,7 @@ export function SettingsRow({
   push = false,
   destructive = false,
   role = "button",
+  hint,
 }: {
   label: string;
   value?: string;
@@ -63,6 +65,7 @@ export function SettingsRow({
   push?: boolean;
   destructive?: boolean;
   role?: "button" | "link";
+  hint?: string;
 }) {
   const { colors, spacing, textStyles } = useTheme();
   const content = (
@@ -95,6 +98,7 @@ export function SettingsRow({
   return (
     <Pressable
       accessibilityRole={role}
+      accessibilityHint={hint}
       onPress={onPress}
       style={({ pressed }) => [rowStyle, pressed && { backgroundColor: colors.surfaceHigh }]}
     >

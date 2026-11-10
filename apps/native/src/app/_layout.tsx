@@ -4,10 +4,10 @@ if (Platform.OS !== "web" && typeof globalThis.structuredClone !== "function") {
   (globalThis as { structuredClone?: unknown }).structuredClone = structuredClonePolyfill;
 }
 
-import { useEffect, useState } from "react";
-import { View, Text, Pressable } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { StyleSheet, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { Stack } from "expo-router";
+import { Stack, usePathname, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import { SWRConfig } from "swr";
@@ -16,13 +16,13 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { swrConfig } from "@/lib/swr-config";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { LocaleProvider } from "@/hooks/useLocale";
-import { useBiometricLock } from "@/hooks/useBiometricLock";
+import { BiometricLockProvider, useBiometricLock } from "@/hooks/useBiometricLock";
 import { authClient } from "@/lib/auth-client";
 import { sessionGateSettled } from "@/lib/auth/session-gate";
+import { LOCK_PATH, lockPresentation, lockRoutePush } from "@/lib/auth/lock-presentation";
+import { UnlockScreen } from "@/components/auth/UnlockScreen";
 import { fontAssets } from "@/theme/typography";
 import { i18n } from "@/lib/i18n";
-import { colors as themeColors } from "@/theme/colors";
-import { spacing } from "@/theme/spacing";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { configureNotificationHandler } from "@/lib/push/handler";
 import { detailHeaderOptions, tabRootHeaderOptions } from "@/lib/nav/headers";
@@ -40,8 +40,30 @@ configureNotificationHandler();
 // class of crash release builds hide. A no-op wherever no DSN is compiled in.
 initCrashReporting();
 
-function RootNavigator() {
+/**
+ * Presents the lock route when a relock arrives over a shown app (#399), so
+ * it covers whatever is open, sheets included, and again over anything that
+ * lands on top of it while locked. The route dismisses itself on unlock
+ * (app/lock.tsx).
+ */
+function useLockRoute(present: boolean) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const pushedOver = useRef<string | null>(null);
+  useEffect(() => {
+    if (!present) {
+      pushedOver.current = null;
+      return;
+    }
+    if (!lockRoutePush({ present, pathname, pushedOver: pushedOver.current })) return;
+    pushedOver.current = pathname;
+    router.push(LOCK_PATH);
+  }, [present, pathname, router]);
+}
+
+function RootNavigator({ presentLock }: { presentLock: boolean }) {
   usePushRegistration();
+  useLockRoute(presentLock);
   const { colors, isDark } = useTheme();
   // Every screen's header options are declared here, once, so that none of
   // them is attached (or changed) after a push transition has begun. The
@@ -94,6 +116,13 @@ function RootNavigator() {
         {/* Profile (#398): a page sheet with its own stack (app/profile/_layout.tsx),
             which draws the header and the Done button. */}
         <Stack.Screen name="profile" options={{ presentation: "modal" }} />
+        {/* The app lock after a relock (#399): over everything, sheets
+            included, with nothing to swipe away and no frame of animation
+            showing what is underneath. */}
+        <Stack.Screen
+          name="lock"
+          options={{ presentation: "fullScreenModal", animation: "none", gestureEnabled: false }}
+        />
         <Stack.Screen
           name="assistant"
           options={{
@@ -114,49 +143,17 @@ function RootNavigator() {
   );
 }
 
-function UnlockScreen({ onRetry }: { onRetry: () => void }) {
-  const dark = themeColors.dark;
+export default function RootLayout() {
   return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: dark.background,
-        alignItems: "center",
-        justifyContent: "center",
-        gap: spacing.xl,
-      }}
-    >
-      <Text
-        style={{
-          color: dark.foreground,
-          fontSize: 28,
-          fontWeight: "700",
-          letterSpacing: 2,
-        }}
-      >
-        DRAGONS
-      </Text>
-      <Pressable
-        accessibilityRole="button"
-        onPress={onRetry}
-        style={{
-          backgroundColor: dark.primary,
-          paddingHorizontal: spacing.xl,
-          paddingVertical: spacing.md,
-          borderRadius: 12,
-        }}
-      >
-        <Text style={{ color: dark.primaryForeground, fontSize: 16, fontWeight: "600" }}>
-          {i18n.t("auth.tapToUnlock")}
-        </Text>
-      </Pressable>
-    </View>
+    <BiometricLockProvider>
+      <RootGate />
+    </BiometricLockProvider>
   );
 }
 
-export default function RootLayout() {
+function RootGate() {
   const [fontsLoaded] = useFonts(fontAssets);
-  const { isLocked, isReady: biometricReady, authenticate } = useBiometricLock();
+  const { isLocked, isReady: lockReady, authenticate } = useBiometricLock();
   const { isPending: sessionPending } = authClient.useSession();
   const [authFailed, setAuthFailed] = useState(false);
   // Latched: a signed-out foreground refetch reports pending again, and
@@ -167,70 +164,76 @@ export default function RootLayout() {
 
   useEffect(() => installGlobalErrorHandler(), []);
 
-  // Gating: the authed tree must only render once every independent guard has
-  // settled. Three async sources feed this decision:
-  //   1. `fontsLoaded`     — expo-font has loaded custom faces.
-  //   2. `sessionSettled`  — better-auth has restored (or not) the session
-  //                          once; later refetches do not re-close the gate.
-  //   3. `biometricReady`  — SecureStore has been read so `isLocked` is
-  //                          definitive; before this flag is true, `isLocked`
-  //                          defaults to `false` and would let the authed tree
-  //                          render for a frame when the user actually has the
-  //                          lock enabled.
-  // Once all three are ready, we either show the Unlock screen (when locked
-  // and auth has failed) or render the app. Splash stays up until the first
-  // definitive decision is made.
-  const isGateReady = fontsLoaded && nextSessionSettled && biometricReady;
+  // The gate: three async sources must settle once before the app renders.
+  //   1. `fontsLoaded` — expo-font has loaded the custom faces.
+  //   2. `sessionSettled` — better-auth has restored (or not) the session
+  //      once; later refetches do not re-close the gate.
+  //   3. `lockReady` — the lock preference has been read, so `isLocked` is
+  //      definitive (before that it reads `false` even with the lock on).
+  // All three only ever settle, so once open the gate stays open and the
+  // navigator is never unmounted again. The lock is drawn over it instead
+  // (#399, lib/auth/lock-presentation.ts).
+  const isGateReady = fontsLoaded && nextSessionSettled && lockReady;
+
+  // Latched like the session: the app has been shown unlocked once, so a
+  // later lock is a relock and is presented as a route over what is open.
+  const [revealed, setRevealed] = useState(false);
+  const presentation = lockPresentation({ gateReady: isGateReady, locked: isLocked, authFailed, revealed });
+  if (presentation === "app" && !revealed) setRevealed(true);
+  // A failed cold-start prompt only matters until the first unlock.
+  if (presentation === "app" && authFailed) setAuthFailed(false);
+
+  // Cold start with the lock on: prompt once, under the splash.
+  const coldPrompted = useRef(false);
+  useEffect(() => {
+    if (!isGateReady || !isLocked || revealed || coldPrompted.current) return;
+    coldPrompted.current = true;
+    void authenticate().then((success) => {
+      if (!success) setAuthFailed(true);
+    });
+  }, [isGateReady, isLocked, revealed, authenticate]);
 
   useEffect(() => {
-    if (!isGateReady) return;
+    if (presentation !== "splash") void SplashScreen.hideAsync();
+  }, [presentation]);
 
-    if (isLocked) {
-      void authenticate().then((success) => {
-        if (!success) setAuthFailed(true);
-        void SplashScreen.hideAsync();
-      });
-    } else {
-      void SplashScreen.hideAsync();
-    }
-  }, [isGateReady, isLocked, authenticate]);
+  if (!isGateReady) return null;
 
-  if (!isGateReady) {
-    return null;
-  }
-
-  if (isLocked) {
-    if (!authFailed) return null;
-    return (
-      <UnlockScreen
-        onRetry={() => {
-          void authenticate().then((success) => {
-            if (!success) setAuthFailed(true);
-          });
-        }}
-      />
-    );
-  }
+  // While the splash or the cold-start overlay covers the app, it is also
+  // hidden from VoiceOver. The relock route needs no such flag: a full-screen
+  // presentation takes the screen underneath out of the hierarchy.
+  const covered = presentation === "splash" || presentation === "overlay";
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ErrorBoundary>
-        <KeyboardProvider>
-          <SWRConfig value={swrConfig}>
-            <LocaleProvider>
-              <ThemeProvider>
-                <ToastProvider>
-                  {/* No sheet provider: every sheet in the app is a route with
-                      a native presentation, so the system owns the sheet layer
-                      (#219, #222, #223, #225). */}
-                  <RootNavigator />
-                  <ToastHost />
-                </ToastProvider>
-              </ThemeProvider>
-            </LocaleProvider>
-          </SWRConfig>
-        </KeyboardProvider>
-      </ErrorBoundary>
+      <View
+        style={{ flex: 1 }}
+        accessibilityElementsHidden={covered}
+        importantForAccessibility={covered ? "no-hide-descendants" : "auto"}
+      >
+        <ErrorBoundary>
+          <KeyboardProvider>
+            <SWRConfig value={swrConfig}>
+              <LocaleProvider>
+                <ThemeProvider>
+                  <ToastProvider>
+                    {/* No sheet provider: every sheet in the app is a route with
+                        a native presentation, so the system owns the sheet layer
+                        (#219, #222, #223, #225). */}
+                    <RootNavigator presentLock={presentation === "route"} />
+                    <ToastHost />
+                  </ToastProvider>
+                </ThemeProvider>
+              </LocaleProvider>
+            </SWRConfig>
+          </KeyboardProvider>
+        </ErrorBoundary>
+      </View>
+      {presentation === "overlay" ? (
+        <View style={StyleSheet.absoluteFill}>
+          <UnlockScreen />
+        </View>
+      ) : null}
     </GestureHandlerRootView>
   );
 }

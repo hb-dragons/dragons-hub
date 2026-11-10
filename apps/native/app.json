@@ -129,7 +129,14 @@
       ],
       "@react-native-community/datetimepicker",
       "expo-image",
-      "expo-localization"
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": ["de", "en"]
+          }
+        }
+      ]
     ],
     "runtimeVersion": {
       "policy": "appVersion"

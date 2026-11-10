@@ -1,4 +1,5 @@
 import { isStaff, type GateUser, type TabId } from "@dragons/shared";
+import { systemOwnsLanguage } from "@/lib/locale-pref";
 
 /**
  * What the app's chrome shows a given viewer (#394).
@@ -33,8 +34,8 @@ export type ProfileRow =
   | "contact"
   | "notifications"
   | "lock"
-  | "appearance"
   | "language"
+  | "languageSettings"
   | "privacy"
   | "imprint"
   | "support"
@@ -61,6 +62,11 @@ const INFO: ProfileGroup = { id: "info", rows: ["privacy", "imprint", "support",
  *   `personId`), which is the only account `/me/staff` has data for.
  * - The app lock guards a signed-in session, so only staff get it, and only
  *   on a device that can do biometrics.
+ * - No appearance picker (#399): the app follows the system setting.
+ * - Language (#399): iOS lists the app's languages in its own Settings, so the
+ *   row opens the app's page there (`languageSettings`). Android keeps the
+ *   in-app picker (`language`), since per-app languages are not on every
+ *   version it runs on.
  * - Konto löschen sits with Abmelden and opens the account closure request
  *   (#400); once the account has requested closure, the row states when
  *   instead of offering the action again.
@@ -68,19 +74,17 @@ const INFO: ProfileGroup = { id: "info", rows: ["privacy", "imprint", "support",
 export function profileGroups(opts: {
   user: (GateUser & { personId?: number | null }) | null | undefined;
   lockSupported: boolean;
+  os: string;
   closureRequested: boolean;
 }): ProfileGroup[] {
-  const { user, lockSupported, closureRequested } = opts;
+  const { user, lockSupported, os, closureRequested } = opts;
+  const language: ProfileRow = systemOwnsLanguage(os) ? "languageSettings" : "language";
   if (!user) {
-    return [
-      { id: "signIn", rows: ["signIn"] },
-      { id: "app", rows: ["appearance", "language"] },
-      INFO,
-    ];
+    return [{ id: "signIn", rows: ["signIn"] }, { id: "app", rows: [language] }, INFO];
   }
   return [
     { id: "account", rows: isStaff(user) ? ["contact", "notifications"] : ["notifications"] },
-    { id: "app", rows: lockSupported ? ["lock", "appearance", "language"] : ["appearance", "language"] },
+    { id: "app", rows: lockSupported ? ["lock", language] : [language] },
     INFO,
     { id: "session", rows: ["signOut", closureRequested ? "closureRequested" : "deleteAccount"] },
   ];
