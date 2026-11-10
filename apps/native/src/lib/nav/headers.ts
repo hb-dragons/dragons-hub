@@ -45,21 +45,6 @@ export function tabRootHeaderOptions(title: string): NativeStackNavigationOption
 }
 
 /**
- * Home's tab root (#395): the brand wordmark as a standard title instead of a
- * large text title. The wordmark is an image, which a large title cannot
- * show, so this shape does not collapse.
- */
-export function homeHeaderOptions(
-  headerTitle: NonNullable<NativeStackNavigationOptions["headerTitle"]>,
-): NativeStackNavigationOptions {
-  return {
-    headerShown: true,
-    headerTitle,
-    headerBackButtonDisplayMode: BACK_BUTTON_DISPLAY_MODE,
-  };
-}
-
-/**
  * A pushed detail screen: a header with no title of its own unless the screen
  * sets one from its data.
  *

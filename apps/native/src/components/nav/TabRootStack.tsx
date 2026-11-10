@@ -1,25 +1,11 @@
-import { View } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import type { TabId } from "@dragons/shared";
 import { useLocaleSubscription } from "@/hooks/useLocale";
 import { authClient, useGateUser } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
-import { homeHeaderOptions, tabRootHeaderOptions } from "@/lib/nav/headers";
+import { tabRootHeaderOptions } from "@/lib/nav/headers";
 import { tabRootProfileAffordance } from "@/lib/nav/viewer-chrome";
-import { Wordmark } from "@/components/brand/Wordmark";
 import { profileToolbar } from "@/components/nav/ProfileToolbar";
-
-/** Wide enough to read as the brand, short enough for a standard bar. */
-const HOME_WORDMARK_WIDTH = 108;
-
-function HomeTitle() {
-  // The wordmark is an image; VoiceOver reads the club's name for it.
-  return (
-    <View accessible accessibilityRole="header" accessibilityLabel={i18n.t("common.appName")}>
-      <Wordmark width={HOME_WORDMARK_WIDTH} />
-    </View>
-  );
-}
 
 /**
  * The one-screen stack a tab root sits in.
@@ -30,13 +16,17 @@ function HomeTitle() {
  * and lands on the root stack, which covers the tab bar.
  *
  * Every tab root goes through here, Home included (#395), because this is the
- * one place the viewer's profile affordance is placed. Home's header shows
- * the wordmark instead of a large title, so it takes no title key.
+ * one place the viewer's profile affordance is placed.
+ *
+ * Home takes the same large title as the other tabs, its tab label, not the
+ * brand wordmark. A large title cannot show an image, and a wordmark as a
+ * standard title left Home's bar opaque while every sibling's is clear
+ * (docs/2026-11-10-ios-home-wordmark-header.md). Apple's HIG also advises
+ * against titling a screen with the app's name.
  */
-type Props = { tab: "home" } | { tab: Exclude<TabId, "home">; titleKey: string };
+type Props = { tab: TabId; titleKey: string };
 
-export function TabRootStack(props: Props) {
-  const { tab } = props;
+export function TabRootStack({ tab, titleKey }: Props) {
   // `i18n.t` reads a module singleton, so nothing here re-renders on a
   // language switch unless the component subscribes to the locale itself.
   useLocaleSubscription();
@@ -45,13 +35,8 @@ export function TabRootStack(props: Props) {
   const affordance = tabRootProfileAffordance(useGateUser(), tab);
   const initial = session?.user?.name?.trim().charAt(0).toUpperCase() ?? "";
 
-  const screenOptions =
-    props.tab === "home"
-      ? homeHeaderOptions(HomeTitle)
-      : tabRootHeaderOptions(i18n.t(props.titleKey));
-
   return (
-    <Stack screenOptions={screenOptions}>
+    <Stack screenOptions={tabRootHeaderOptions(i18n.t(titleKey))}>
       <Stack.Screen name="index">
         {affordance
           ? profileToolbar({ affordance, initial, onPress: () => router.push("/profile") })

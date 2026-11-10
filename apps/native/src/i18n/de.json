@@ -1,6 +1,6 @@
 {
   "tabs": {
-    "home": "Start",
+    "home": "Home",
     "schedule": "Spielplan",
     "standings": "Tabelle",
     "teams": "Teams",
@@ -272,7 +272,6 @@
     "close": "Schließen"
   },
   "common": {
-    "appName": "HB Dragons",
     "home": "Heim",
     "away": "Auswärts",
     "details": "Details",
