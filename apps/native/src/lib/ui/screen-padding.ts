@@ -5,7 +5,8 @@
  * A non-scrolling `Screen` (`scroll={false}`) pads nothing, because it draws
  * no view of its own between its safe-area container and its child — see
  * `Screen`. That child is either a list, which brings its own scroll view and
- * puts the side and end padding in its `contentContainerStyle`, or a
+ * puts this same padding in its `contentContainerStyle` (so Spielplan and
+ * Einsätze start their content the same distance below the title), or a
  * full-height centred state (spinner, error, not-found) with padding of its
  * own.
  */

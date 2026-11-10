@@ -14,6 +14,7 @@ import useSWR from "swr";
 import { useTheme } from "@/hooks/useTheme";
 import { useRefresh } from "@/hooks/useRefresh";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
+import { screenContentPadding } from "@/lib/ui/screen-padding";
 import { FilterPill } from "@/components/FilterPill";
 import { MatchCardFull } from "@/components/MatchCardFull";
 import { publicApi } from "@/lib/api";
@@ -75,11 +76,11 @@ function MatchList({
     [router],
   );
 
-  // The native tab bar clears itself (the inset behaviour below on iOS, the
-  // padded tab content on Android); this is only the breathing room `Screen`
-  // gives every scroll view.
+  // The native tab bar clears itself; this is the same padding `Screen` gives
+  // every scroll view it owns, so the content under the large title starts at
+  // the same place on every tab root.
   const listContentStyle = useMemo(
-    () => ({ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl }),
+    () => screenContentPadding({ lg: spacing.lg, xl: spacing.xl }),
     [spacing.lg, spacing.xl],
   );
 
