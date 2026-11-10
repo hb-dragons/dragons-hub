@@ -40,7 +40,8 @@ export type ProfileRow =
   | "support"
   | "version"
   | "signOut"
-  | "deleteAccount";
+  | "deleteAccount"
+  | "closureRequested";
 
 /**
  * A group of rows on Profile: Konto, App, Info and the closing session group
@@ -60,14 +61,16 @@ const INFO: ProfileGroup = { id: "info", rows: ["privacy", "imprint", "support",
  *   `personId`), which is the only account `/me/staff` has data for.
  * - The app lock guards a signed-in session, so only staff get it, and only
  *   on a device that can do biometrics.
- * - Konto löschen sits with Abmelden until the closure request (#400)
- *   replaces it.
+ * - Konto löschen sits with Abmelden and opens the account closure request
+ *   (#400); once the account has requested closure, the row states when
+ *   instead of offering the action again.
  */
 export function profileGroups(opts: {
   user: (GateUser & { personId?: number | null }) | null | undefined;
   lockSupported: boolean;
+  closureRequested: boolean;
 }): ProfileGroup[] {
-  const { user, lockSupported } = opts;
+  const { user, lockSupported, closureRequested } = opts;
   if (!user) {
     return [
       { id: "signIn", rows: ["signIn"] },
@@ -79,6 +82,6 @@ export function profileGroups(opts: {
     { id: "account", rows: isStaff(user) ? ["contact", "notifications"] : ["notifications"] },
     { id: "app", rows: lockSupported ? ["lock", "appearance", "language"] : ["appearance", "language"] },
     INFO,
-    { id: "session", rows: ["signOut", "deleteAccount"] },
+    { id: "session", rows: ["signOut", closureRequested ? "closureRequested" : "deleteAccount"] },
   ];
 }

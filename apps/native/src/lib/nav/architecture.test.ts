@@ -562,6 +562,17 @@ describe("Profile sheet", () => {
     expect(existsSync(path.join(APP_DIR, "profile-contact.tsx"))).toBe(false);
   });
 
+  // Konto löschen is an in-app request the API mails on (#400, ADR-0013): it
+  // pushes inside the sheet, and no `mailto:` path is left that does nothing
+  // on a phone with no Mail account.
+  it("pushes the account closure request inside the sheet, with no mailto", () => {
+    expect(existsSync(path.join(PROFILE_DIR, "account-closure.tsx"))).toBe(true);
+    expect(read("profile/index.tsx")).toMatch(/router\.push\("\/profile\/account-closure"\)/);
+    for (const file of readdirSync(PROFILE_DIR)) {
+      expect(read(path.join("profile", file))).not.toMatch(/DeletionMailto|datenschutz@/i);
+    }
+  });
+
   it("opens no sheet on top of itself", () => {
     const sources = readdirSync(PROFILE_DIR).map((file) => read(path.join("profile", file)));
     for (const source of sources) {

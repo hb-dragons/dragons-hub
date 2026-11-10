@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { meStaffUpdateBodySchema } from "@dragons/contracts";
+import { meAccountClosureCreateBodySchema, meStaffUpdateBodySchema } from "@dragons/contracts";
 import { ApiClient } from "../client";
 import { meEndpoints } from "./me";
 
@@ -49,6 +49,27 @@ describe("self-service staff request bodies satisfy @dragons/contracts schemas",
     const { api, calls } = recordingClient();
     await api.staff();
     expect(calls[0]!.url).toContain("/me/staff");
+    expect(calls[0]!.method).toBe("GET");
+  });
+});
+
+describe("account closure request bodies satisfy @dragons/contracts schemas", () => {
+  it("the request body parses against meAccountClosureCreateBodySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.requestAccountClosure();
+    const parsed = meAccountClosureCreateBodySchema.safeParse(calls[0]!.body);
+    expect(
+      parsed.error?.issues,
+      "meAccountClosureCreateBodySchema rejected the request body",
+    ).toBeUndefined();
+    expect(calls[0]!.url).toContain("/me/account-closure");
+    expect(calls[0]!.method).toBe("POST");
+  });
+
+  it("reads the request with GET", async () => {
+    const { api, calls } = recordingClient();
+    await api.accountClosure();
+    expect(calls[0]!.url).toContain("/me/account-closure");
     expect(calls[0]!.method).toBe("GET");
   });
 });

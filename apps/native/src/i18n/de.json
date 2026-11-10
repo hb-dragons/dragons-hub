@@ -112,6 +112,21 @@
       "licencePlaceholder": "C-Lizenz",
       "loadFailed": "Kontaktdaten konnten nicht geladen werden"
     },
+    "closure": {
+      "row": "Konto löschen",
+      "title": "Konto löschen",
+      "intro": "Dein Konto hat der Verein für dich angelegt und verwaltet es. Hier bittest du den Verein, es zu schließen.",
+      "recordsStay": "Deine Daten als Schiedsrichter und im Trainer- und Betreuerteam bleiben beim Verein bestehen. Geschlossen wird nur dein Zugang zur App.",
+      "process": "Der Antrag geht an das Datenschutz-Postfach des Vereins. Der Verein deaktiviert oder löscht dein Konto anschließend.",
+      "action": "Schließung beantragen",
+      "confirmTitle": "Schließung beantragen?",
+      "confirmMessage": "Der Verein wird benachrichtigt und schließt dein Konto.",
+      "confirmAction": "Beantragen",
+      "requested": "Schließung beantragt am %{date}",
+      "requestedHint": "Der Verein schließt dein Konto. Bis dahin kannst du die App weiter nutzen.",
+      "loadFailed": "Der Status konnte nicht geladen werden.",
+      "sendFailed": "Der Antrag konnte nicht gesendet werden."
+    },
     "version": "Version",
     "groups": {
       "account": "Konto",
@@ -124,7 +139,6 @@
     "privacy": "Datenschutz",
     "imprint": "Impressum",
     "support": "Support kontaktieren",
-    "deleteAccount": "Konto löschen beantragen",
     "version": "Version %{version}",
     "openFailed": "Der Link konnte nicht geöffnet werden."
   },
