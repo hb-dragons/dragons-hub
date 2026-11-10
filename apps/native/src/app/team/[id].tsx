@@ -1,7 +1,10 @@
-import { useCallback, useMemo } from "react";
-import { View, Text, ActivityIndicator, FlatList, RefreshControl } from "react-native";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { View, Text, ActivityIndicator, FlatList, Platform, RefreshControl } from "react-native";
+import type { LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent } from "react-native";
 import type { ListRenderItem } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+// `useHeaderHeight` has no equivalent on expo-router's own surface yet.
+import { useHeaderHeight } from "expo-router/react-navigation";
 import useSWR from "swr";
 import type { MatchListItem } from "@dragons/shared";
 import {
@@ -22,6 +25,8 @@ import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { resolveFetchState } from "@/lib/ui/fetch-state";
 import { fontFamilies } from "@/theme/typography";
+import { isTitleRevealed } from "@/lib/nav/title-reveal";
+import { useFadingHeaderTitle } from "@/components/nav/FadingHeaderTitle";
 
 export default function TeamDetailScreen() {
   const { colors, textStyles, spacing, radius, isDark } = useTheme();
@@ -38,11 +43,43 @@ export default function TeamDetailScreen() {
   } = useSWR("teams:all", () => publicApi.getTeams());
 
   const team = teams?.find((t) => String(t.id) === id) ?? null;
+  // The club-facing name ("Damen 2"), shown beside the crest and, once that
+  // has scrolled away, in the bar.
+  const teamName = team ? team.customName || team.nameShort || team.name : "";
+
+  // The bar title stays empty while the coloured name beside the crest is on
+  // screen, and takes over once that name has scrolled under the bar.
+  const headerHeight = useHeaderHeight();
+  // iOS: the detail header is transparent and floats over the list. Android:
+  // it is opaque and the list starts below it (see `detailHeaderOptions`).
+  const coveredTop = Platform.OS === "ios" ? headerHeight : 0;
+  const [nameBottom, setNameBottom] = useState<number | null>(null);
+  const { headerTitle, setVisible: setTitleVisible } = useFadingHeaderTitle(teamName);
+  // Last value handed to the fade, so a scroll event only animates on a change.
+  const titleRevealed = useRef(false);
+  const onNameLayout = useCallback((e: LayoutChangeEvent) => {
+    const { y, height } = e.nativeEvent.layout;
+    setNameBottom(y + height);
+  }, []);
+  const onListScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const revealed = isTitleRevealed({
+        offsetY: e.nativeEvent.contentOffset.y,
+        coveredTop,
+        nameBottom,
+      });
+      if (revealed === titleRevealed.current) return;
+      titleRevealed.current = revealed;
+      setTitleVisible(revealed);
+    },
+    [coveredTop, nameBottom, setTitleVisible],
+  );
 
   // Built before the loading and error branches, and rendered by all three:
   // attaching header options only once the team list arrives reconfigures the
-  // native header mid push-transition, which flashes a header overlay.
-  const header = <Stack.Screen options={{ headerTitle: team?.name ?? "" }} />;
+  // native header mid push-transition, which flashes a header overlay. The
+  // title component only changes with the name; scrolling fades it in place.
+  const header = <Stack.Screen options={{ headerTitle }} />;
 
   const {
     data: teamStats,
@@ -127,10 +164,6 @@ export default function TeamDetailScreen() {
     data: teams,
   });
   const isLoading = teamsState === "loading" || matchesLoading || statsLoading;
-  const teamName = team
-    ? team.customName || team.nameShort || team.name
-    : "";
-
   // Last completed match id for highlighting in "All Games"
   const lastCompletedId = lastGame?.id ?? null;
 
@@ -179,8 +212,8 @@ export default function TeamDetailScreen() {
   );
 
   const listContentStyle = useMemo(
-    () => ({ paddingBottom: spacing.xl }),
-    [spacing.xl],
+    () => ({ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl }),
+    [spacing.lg, spacing.xl],
   );
 
   // The standings row already carries the permanent api id the h2h route
@@ -248,6 +281,7 @@ export default function TeamDetailScreen() {
     <>
       {/* 1. Team Header */}
         <View
+          onLayout={onNameLayout}
           style={{
             marginBottom: spacing.lg,
             flexDirection: "row",
@@ -465,6 +499,8 @@ export default function TeamDetailScreen() {
             </View>
           }
           refreshControl={listRefreshControl}
+          onScroll={onListScroll}
+          scrollEventThrottle={16}
           contentContainerStyle={listContentStyle}
           showsVerticalScrollIndicator={false}
           initialNumToRender={10}

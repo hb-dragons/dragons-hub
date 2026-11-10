@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { detailHeaderOptions, tabRootHeaderOptions } from "@/lib/nav/headers";
 
 /**
- * The two native header shapes the app declares. Everything these objects do
+ * The native header shapes the app declares. Everything these objects do
  * *not* say is as deliberate as what they do: an option left unset is one the
  * system decides, which is the whole point of moving to native headers.
  */

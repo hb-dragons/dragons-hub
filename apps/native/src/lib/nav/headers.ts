@@ -1,7 +1,7 @@
 import type { NativeStackNavigationOptions } from "expo-router";
 
 /**
- * The app's two native header shapes, declared once each.
+ * The app's native header shapes, declared once each.
  *
  * Screens name a shape here instead of spelling out header options inline, so
  * a header decision is made in one place and a screen's own file carries at
@@ -10,7 +10,7 @@ import type { NativeStackNavigationOptions } from "expo-router";
  * layout mid-animation, which shows up as a flash — see the note in
  * `app/admin/boards/[id].tsx`.
  *
- * Both shapes are deliberately short. On iOS 26 the system draws the header's
+ * Every shape is deliberately short. On iOS 26 the system draws the header's
  * glass and its scroll-edge treatment (`scrollEdgeEffects` defaults to
  * "automatic" on every edge); every option we set on top of that is one the
  * system no longer gets to decide.

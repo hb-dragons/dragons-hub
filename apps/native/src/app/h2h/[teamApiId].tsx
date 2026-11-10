@@ -47,7 +47,7 @@ export default function H2HScreen() {
   );
 
   const listContentStyle = useMemo(
-    () => ({ padding: spacing.lg }),
+    () => ({ padding: spacing.lg, paddingHorizontal: spacing.lg * 2 }),
     [spacing.lg],
   );
 

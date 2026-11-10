@@ -16,6 +16,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { useTheme } from "@/hooks/useTheme";
 import { useRefresh } from "@/hooks/useRefresh";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
+import { screenContentPadding } from "@/lib/ui/screen-padding";
 import { RefereeGameCard } from "@/components/RefereeGameCard";
 import { openAssignRefereeSheet } from "@/lib/nav/referee-sheets";
 import { refereeGameRoute } from "@/lib/referee/einsatz";
@@ -167,11 +168,12 @@ export default function OfficiatingScreen() {
     [refreshing, onRefresh, colors.primary],
   );
 
-  // The native tab bar clears itself; the bottom padding is only the breathing
-  // room `Screen` gives every scroll view.
+  // The native tab bar clears itself; this is the same padding `Screen` gives
+  // every scroll view it owns, so the content under the large title starts at
+  // the same place on every tab root.
   const listContentStyle = useMemo(
-    () => ({ paddingTop: spacing.sm, paddingBottom: spacing.xl }),
-    [spacing.sm, spacing.xl],
+    () => screenContentPadding({ lg: spacing.lg, xl: spacing.xl }),
+    [spacing.lg, spacing.xl],
   );
 
   const {

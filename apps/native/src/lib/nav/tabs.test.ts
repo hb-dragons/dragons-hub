@@ -15,8 +15,10 @@ describe("TAB_CONFIG", () => {
     }
   });
 
-  it("maps home to the index route", () => {
-    expect(TAB_CONFIG.home.name).toBe("index");
+  // #395: Home has a stack of its own like every tab root; the route group
+  // keeps its URL at "/".
+  it("maps home to the (home) group, whose index is the root route", () => {
+    expect(TAB_CONFIG.home.name).toBe("(home)");
   });
 
   // #221: the tab bar was already the app's one SF Symbol surface, and it is

@@ -66,12 +66,15 @@ describe("navigation architecture", () => {
   });
 
   // #216: native tabs draw no chrome of their own, so a tab root only gets a
-  // collapsing large title if it sits in a stack. Home is the deliberate
-  // exception — it keeps its chrome-less wordmark layout.
-  it("gives every tab root but Home a stack to hang a native header on", () => {
+  // native header if it sits in a stack. #395: Home included — its wordmark
+  // is the header title, and the bar is where the profile affordance lives on
+  // every tab root. The shared stack is the one place that affordance is
+  // placed, so every tab root has to go through it.
+  it("puts every tab root, Home included, on the shared tab-root stack", () => {
     for (const { name } of Object.values(TAB_CONFIG)) {
       const layout = path.join(TABS_DIR, name, "_layout.tsx");
-      expect(existsSync(layout), `${rel(layout)} is missing`).toBe(name !== "index");
+      expect(existsSync(layout), `${rel(layout)} is missing`).toBe(true);
+      expect(readFileSync(layout, "utf8"), `${rel(layout)}`).toContain("<TabRootStack");
     }
   });
 
@@ -181,12 +184,20 @@ describe("navigation architecture", () => {
    * `Stack.Toolbar`'s items take an SF Symbol name on iOS and an image source
    * on Android, and render nothing there when handed the former, so exactly
    * one module knows that and hosts plain pressables instead.
+   *
+   * #395 adds the one other site: the tab roots' profile affordance, placed
+   * from a layout, where expo-router only reads `Stack.Toolbar` elements
+   * themselves — a component like `HeaderActions` would be dropped there. It
+   * keeps the same platform split.
    */
-  it("declares the navigation bar's items in one component", () => {
+  it("declares the navigation bar's items in the two toolbar modules only", () => {
     const sites = SOURCE_FILES.filter((file) =>
       /<Stack\.Toolbar\b/.test(readFileSync(file, "utf8")),
     ).map(rel);
-    expect(sites).toEqual(["src/components/nav/HeaderActions.tsx"]);
+    expect(sites.sort()).toEqual([
+      "src/components/nav/HeaderActions.tsx",
+      "src/components/nav/ProfileToolbar.tsx",
+    ]);
   });
 
   // #224: Profile's theme and language switchers were rows of tinted

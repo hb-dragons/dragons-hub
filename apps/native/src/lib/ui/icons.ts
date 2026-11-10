@@ -57,6 +57,8 @@ export const ICONS = {
   column: { ios: "rectangle.split.3x1", android: "view_column" },
   /** Opens the settings of the surface it sits on. */
   settings: { ios: "gearshape", android: "settings" },
+  /** A fan's way into the account sheet: sign in, language, legal (#395). */
+  account: { ios: "person.crop.circle", android: "account_circle" },
 } as const satisfies Record<string, IconSymbol>;
 
 /** A role in the vocabulary above, i.e. what `<Icon name>` accepts. */
