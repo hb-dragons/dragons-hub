@@ -155,7 +155,12 @@ export {
   type StaffPersonUpdateBody,
   type StaffPersonListQuery,
 } from "./staff-people";
-export { meStaffUpdateBodySchema, type MeStaffUpdateBody } from "./me";
+export {
+  meStaffUpdateBodySchema,
+  meAccountClosureCreateBodySchema,
+  type MeStaffUpdateBody,
+  type MeAccountClosureCreateBody,
+} from "./me";
 
 export {
   venueSearchQuerySchema,

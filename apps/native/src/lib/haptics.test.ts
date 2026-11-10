@@ -131,6 +131,8 @@ const HAPTIC_CALL_SITES: Record<string, readonly HapticName[]> = {
   "src/app/referee-assign.tsx": ["success", "error"],
   // The coach's own contact data saved, or rejected (#315).
   "src/app/profile/contact.tsx": ["success", "error"],
+  // The account closure request sent, or rejected (#400).
+  "src/app/profile/account-closure.tsx": ["success", "error"],
 
   // Board mutations. `warning` is reserved for a destructive action that took
   // effect with undo still on screen; a rejected request is `error`.

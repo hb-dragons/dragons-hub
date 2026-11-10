@@ -17,12 +17,9 @@ import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { SettingsGroup, SettingsRow } from "@/components/settings/SettingsGroup";
 import { Segmented } from "@/components/ui/Segmented";
 import { i18n, translate } from "@/lib/i18n";
-import {
-  LEGAL_LINKS,
-  appVersionLabel,
-  buildDeletionMailto,
-  buildSupportMailto,
-} from "@/lib/legal/links";
+import { LEGAL_LINKS, appVersionLabel, buildSupportMailto } from "@/lib/legal/links";
+import { useAccountClosure } from "@/hooks/useAccountClosure";
+import { closureRequestedDate, isClosureRequested } from "@/lib/account/closure";
 import { readAppVersion } from "@/lib/legal/app-version";
 import { openExternal } from "@/lib/legal/open-external";
 import { LOCALE_SEGMENTS, segmentLabels } from "@/lib/ui/preference-segments";
@@ -53,7 +50,13 @@ export default function ProfileScreen() {
   const { spacing } = useTheme();
   const { data: session } = authClient.useSession();
   const { isSupported } = useBiometricLock();
-  const groups = profileGroups({ user: session?.user ?? null, lockSupported: isSupported, os: Platform.OS });
+  const { data: closure } = useAccountClosure();
+  const groups = profileGroups({
+    user: session?.user ?? null,
+    lockSupported: isSupported,
+    os: Platform.OS,
+    closureRequested: isClosureRequested(closure),
+  });
 
   return (
     <Screen edges={UNDER_NATIVE_HEADER}>
@@ -64,7 +67,7 @@ export default function ProfileScreen() {
           return (
             <SettingsGroup key={group.id} title={titleKey ? i18n.t(titleKey) : undefined}>
               {group.rows.map((row) => (
-                <Row key={row} row={row} email={session?.user.email} />
+                <Row key={row} row={row} />
               ))}
             </SettingsGroup>
           );
@@ -74,7 +77,7 @@ export default function ProfileScreen() {
   );
 }
 
-function Row({ row, email }: { row: ProfileRow; email: string | undefined }) {
+function Row({ row }: { row: ProfileRow }) {
   const router = useRouter();
   const version = readAppVersion();
 
@@ -129,14 +132,27 @@ function Row({ row, email }: { row: ProfileRow; email: string | undefined }) {
       return (
         <SettingsRow
           destructive
-          role="link"
-          label={i18n.t("legal.deleteAccount")}
-          onPress={() =>
-            openExternal(buildDeletionMailto({ email: email ?? "", version: appVersionLabel(version) }))
-          }
+          push
+          label={i18n.t("profile.closure.row")}
+          onPress={() => router.push("/profile/account-closure")}
         />
       );
+    case "closureRequested":
+      return <ClosureRequestedRow />;
   }
+}
+
+/** The day the closure request was made, in place of Konto löschen (#400). */
+function ClosureRequestedRow() {
+  const { data } = useAccountClosure();
+  if (!data?.request) return null;
+  return (
+    <SettingsRow
+      label={i18n.t("profile.closure.requested", {
+        date: closureRequestedDate(data.request.requestedAt, i18n.locale),
+      })}
+    />
+  );
 }
 
 /** "Mit Face ID sperren": the toggle names the device's method (#399). */

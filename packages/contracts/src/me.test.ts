@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { meStaffUpdateBodySchema } from "./me";
+import { meAccountClosureCreateBodySchema, meStaffUpdateBodySchema } from "./me";
 
 describe("meStaffUpdateBodySchema", () => {
   it("accepts an empty patch", () => {
@@ -40,5 +40,15 @@ describe("meStaffUpdateBodySchema", () => {
     ]) {
       expect(meStaffUpdateBodySchema.safeParse(body).success).toBe(false);
     }
+  });
+});
+
+describe("meAccountClosureCreateBodySchema", () => {
+  it("accepts the empty body the app sends", () => {
+    expect(meAccountClosureCreateBodySchema.parse({})).toEqual({});
+  });
+
+  it("rejects any field: the account comes from the session, never the body", () => {
+    expect(meAccountClosureCreateBodySchema.safeParse({ userId: "someone-else" }).success).toBe(false);
   });
 });

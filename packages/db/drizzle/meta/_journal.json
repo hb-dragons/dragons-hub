@@ -407,6 +407,13 @@
       "when": 1792956098720,
       "tag": "0057_harsh_grandmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1794345568580,
+      "tag": "0058_account_closure_requests",
+      "breakpoints": true
     }
   ]
 }

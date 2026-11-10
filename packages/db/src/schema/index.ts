@@ -31,3 +31,4 @@ export * from "./referee-games";
 export * from "./scoreboard";
 export * from "./broadcast-configs";
 export * from "./probetraining-submissions";
+export * from "./account-closure-requests";

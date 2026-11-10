@@ -41,7 +41,8 @@ export type ProfileRow =
   | "support"
   | "version"
   | "signOut"
-  | "deleteAccount";
+  | "deleteAccount"
+  | "closureRequested";
 
 /**
  * A group of rows on Profile: Konto, App, Info and the closing session group
@@ -66,15 +67,17 @@ const INFO: ProfileGroup = { id: "info", rows: ["privacy", "imprint", "support",
  *   row opens the app's page there (`languageSettings`). Android keeps the
  *   in-app picker (`language`), since per-app languages are not on every
  *   version it runs on.
- * - Konto löschen sits with Abmelden until the closure request (#400)
- *   replaces it.
+ * - Konto löschen sits with Abmelden and opens the account closure request
+ *   (#400); once the account has requested closure, the row states when
+ *   instead of offering the action again.
  */
 export function profileGroups(opts: {
   user: (GateUser & { personId?: number | null }) | null | undefined;
   lockSupported: boolean;
   os: string;
+  closureRequested: boolean;
 }): ProfileGroup[] {
-  const { user, lockSupported, os } = opts;
+  const { user, lockSupported, os, closureRequested } = opts;
   const language: ProfileRow = systemOwnsLanguage(os) ? "languageSettings" : "language";
   if (!user) {
     return [{ id: "signIn", rows: ["signIn"] }, { id: "app", rows: [language] }, INFO];
@@ -83,6 +86,6 @@ export function profileGroups(opts: {
     { id: "account", rows: isStaff(user) ? ["contact", "notifications"] : ["notifications"] },
     { id: "app", rows: lockSupported ? ["lock", language] : [language] },
     INFO,
-    { id: "session", rows: ["signOut", "deleteAccount"] },
+    { id: "session", rows: ["signOut", closureRequested ? "closureRequested" : "deleteAccount"] },
   ];
 }

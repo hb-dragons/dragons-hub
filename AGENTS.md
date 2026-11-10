@@ -156,6 +156,7 @@ tables (`user`, `session`, `account`, `verification`) use text ids,
 | `session` | `packages/db/src/schema/auth.ts` | id (text PK), userId FK (cascade), token (unique), expiresAt, ipAddress, userAgent, impersonatedBy |
 | `account` | `packages/db/src/schema/auth.ts` | id (text PK), userId FK (cascade), providerId, accountId, password |
 | `verification` | `packages/db/src/schema/auth.ts` | id (text PK), identifier, value, expiresAt |
+| `accountClosureRequests` | `packages/db/src/schema/account-closure-requests.ts` | userId FK (unique, cascade on user delete), requestedAt — one account closure request per account (ADR-0013). No status column: the club closes the account in the web admin, and deleting the user removes the row |
 
 Schema index: `packages/db/src/schema/index.ts` re-exports all tables.
 
@@ -823,6 +824,17 @@ the app hides the "Meine Kontaktdaten" section on.
 |--------|------|-------------|
 | GET | `/me/staff` | The signed-in coach's own staff person plus the teams they are attached to this season. No `photoUrl`: the portrait route is admin-gated |
 | PATCH | `/me/staff` | Update own `phone`, `email`, `licence` — the three fields `meStaffUpdateBodySchema` allows; any other key is the central 400. Writes the person, so every team the coach trains shows the new value |
+
+### Account closure request (any signed-in account)
+
+Mounted at `/me`. Every account is a club-created staff login, so signed in is
+the whole authorisation; the account comes from the session. The club carries
+the request out in the web admin (ADR-0013).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/me/account-closure` | `{ request: { requestedAt } \| null }`: the caller's closure request, or `null` before one exists |
+| POST | `/me/account-closure` | Body `{}` (`meAccountClosureCreateBodySchema`). Creates the request and mails the Datenschutz inbox (201), naming the account's name and e-mail; with SMTP unconfigured the request is stored and the mail is a logged skip. A repeat returns the stored request (200) and sends nothing |
 
 ### Admin Referee Assignment (role: admin)
 

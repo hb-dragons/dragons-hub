@@ -109,6 +109,21 @@
       "licencePlaceholder": "C licence",
       "loadFailed": "Could not load your contact details"
     },
+    "closure": {
+      "row": "Delete account",
+      "title": "Delete account",
+      "intro": "The club created your account and manages it. Here you ask the club to close it.",
+      "recordsStay": "Your records as a referee and as team staff stay with the club. Only your access to the app is closed.",
+      "process": "The request goes to the club's data protection inbox. The club then deactivates or deletes your account.",
+      "action": "Request closure",
+      "confirmTitle": "Request closure?",
+      "confirmMessage": "The club is notified and closes your account.",
+      "confirmAction": "Request",
+      "requested": "Closure requested on %{date}",
+      "requestedHint": "The club will close your account. Until then you can keep using the app.",
+      "loadFailed": "Could not load the status.",
+      "sendFailed": "Could not send the request."
+    },
     "version": "Version",
     "groups": {
       "account": "Account",
@@ -121,7 +136,6 @@
     "privacy": "Privacy policy",
     "imprint": "Imprint",
     "support": "Contact support",
-    "deleteAccount": "Request account deletion",
     "version": "Version %{version}",
     "openFailed": "The link could not be opened."
   },

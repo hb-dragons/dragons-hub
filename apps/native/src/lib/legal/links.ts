@@ -13,7 +13,6 @@ export const LEGAL_LINKS = {
 } as const;
 
 export const SUPPORT_MAILBOX = "app@hbdragons.de";
-export const PRIVACY_MAILBOX = "datenschutz@hbdragons.de";
 
 export interface AppVersionInfo {
   version: string | null;
@@ -44,25 +43,5 @@ export function buildSupportMailto(info: AppVersionInfo & { platform: string }):
   return buildMailto({
     to: SUPPORT_MAILBOX,
     subject: `Dragons App ${appVersionLabel(info)} ${info.platform} — Support`,
-  });
-}
-
-/**
- * Accounts are club-provisioned, so deletion is a request to the club, not a
- * self-service action (audit §1.2 item 4). The mail is German regardless of
- * the UI locale: it is read by the Datenschutz mailbox, and the row label the
- * user sees is localized separately.
- */
-export function buildDeletionMailto({ email, version }: { email: string; version: string }): string {
-  return buildMailto({
-    to: PRIVACY_MAILBOX,
-    subject: `Dragons App: Konto löschen — ${email}`,
-    body: [
-      `Bitte löscht mein Konto in der Dragons App (${email}).`,
-      "",
-      `App-Version: ${version}`,
-      "",
-      "Mir ist bekannt, dass das Konto und die dazugehörigen Geräte-Tokens innerhalb von 30 Tagen gelöscht werden.",
-    ].join("\n"),
   });
 }

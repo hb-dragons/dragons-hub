@@ -229,6 +229,22 @@ eas submit --profile preview --platform android
 First run needs a Google Play service account JSON (create in Play
 Console → Setup → API access). Save it.
 
+### App Review note (every submission)
+
+Every App Store and Play submission carries this paragraph in the review
+notes (ADR-0013, guideline 5.1.1(v)). The full notes, demo accounts
+included, live in `STORE-LISTING.md`; keep the two in step.
+
+> Accounts in this app are created and managed by the club for its own
+> staff (coaches, referees, officials). There is no sign-up in the app or
+> on the web. A signed-in user requests closure of their account in the
+> app: Profile → "Konto löschen" explains that the club manages the
+> account and that the referee and staff records it links to stay, and a
+> confirmation sends the request to the club's server, which mails the
+> club's data protection inbox. No mail client is needed. Profile then
+> shows the date the closure was requested, and the club closes the
+> account in its web admin.
+
 ---
 
 ## Add test users

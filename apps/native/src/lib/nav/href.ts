@@ -53,6 +53,8 @@ export const APP_ROUTES: Record<string, (...params: string[]) => RouteHref> = {
   // notification settings, pushed inside the Profile sheet.
   "/profile/contact": () => "/profile/contact",
   "/profile/notifications": () => "/profile/notifications",
+  // The account closure request (#400), pushed inside the Profile sheet too.
+  "/profile/account-closure": () => "/profile/account-closure",
   "/sign-in": () => "/sign-in",
   "/admin/boards": () => "/admin/boards",
   "/referee-assign": () => "/referee-assign",
