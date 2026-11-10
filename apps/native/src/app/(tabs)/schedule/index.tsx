@@ -20,7 +20,6 @@ import { MatchCardFull } from "@/components/MatchCardFull";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { kickoffLong, kickoffToday } from "@/lib/format/kickoff";
-import { fontFamilies } from "@/theme/typography";
 import { Segmented } from "@/components/ui/Segmented";
 
 type Segment = "upcoming" | "results";
@@ -64,7 +63,7 @@ function MatchList({
    */
   controls: ReactElement;
 }) {
-  const { colors, textStyles, spacing } = useTheme();
+  const { colors, textStyles, spacing, fontFamilies } = useTheme();
   const router = useRouter();
 
   // Stable handler: MatchCard* are memo-wrapped, and an inline arrow per call
@@ -114,6 +113,7 @@ function MatchList({
           }}
         >
           <Text
+            accessibilityRole="header"
             style={{
               fontSize: 13,
               fontFamily: fontFamilies.bodySemiBold,

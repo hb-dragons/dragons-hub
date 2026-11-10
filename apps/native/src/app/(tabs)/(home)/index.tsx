@@ -18,7 +18,6 @@ import { TEXT_LINK_SLOP } from "@/lib/ui/a11y";
 import { kickoffCountdownDays } from "@/lib/format/kickoff";
 import { resolveFetchState } from "@/lib/ui/fetch-state";
 import { ErrorState } from "@/components/ErrorState";
-import { fontFamilies } from "@/theme/typography";
 
 function getCountdown(kickoffDate: string): string {
   const days = kickoffCountdownDays(kickoffDate);
@@ -28,7 +27,7 @@ function getCountdown(kickoffDate: string): string {
 }
 
 export default function HomeScreen() {
-  const { colors, textStyles, spacing, radius } = useTheme();
+  const { colors, textStyles, spacing, radius, fontFamilies } = useTheme();
   const router = useRouter();
   const { data: session } = authClient.useSession();
 

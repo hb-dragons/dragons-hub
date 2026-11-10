@@ -1,7 +1,13 @@
 import { DarkTheme, DefaultTheme, type Theme } from "expo-router";
 import { colors } from "./colors";
-import { fontFamilies } from "./typography";
 
+/**
+ * The router theme. Colours come from the brand tokens; fonts stay the base
+ * theme's system font, because the native stack draws its titles, large
+ * titles, back titles and bar buttons from `theme.fonts`, and navigation
+ * chrome is the system's, not the brand's (DESIGN-SYSTEM.md, "Native app").
+ * Content takes Bricolage from `useTheme()` instead.
+ */
 export function buildNavigationTheme(scheme: "light" | "dark"): Theme {
   const base = scheme === "dark" ? DarkTheme : DefaultTheme;
   const p = colors[scheme];
@@ -17,12 +23,6 @@ export function buildNavigationTheme(scheme: "light" | "dark"): Theme {
       text: p.foreground,
       border: p.border,
       notification: p.destructive,
-    },
-    fonts: {
-      regular: { fontFamily: fontFamilies.body, fontWeight: "400" },
-      medium: { fontFamily: fontFamilies.bodyMedium, fontWeight: "500" },
-      bold: { fontFamily: fontFamilies.bodySemiBold, fontWeight: "600" },
-      heavy: { fontFamily: fontFamilies.display, fontWeight: "700" },
     },
   };
 }

@@ -7,7 +7,6 @@ import {
   type DistanceBracket,
   type RefCandidate,
 } from "@/lib/referee/candidates";
-import { fontFamilies } from "@/theme/typography";
 
 /**
  * One referee in the assignment sheet's candidate list (issue #223).
@@ -62,7 +61,7 @@ export function RefereeCandidateRow({
   isBusy,
   onPress,
 }: RefereeCandidateRowProps) {
-  const { colors, spacing, radius } = useTheme();
+  const { colors, spacing, radius, fontFamilies } = useTheme();
   const pillColor = bracketColor(bracket, colors);
   const palette = avatarPalette(`${candidate.vorname}${candidate.nachName}`, colors);
   const grade = slot === 1 ? candidate.qmaxSr1 : candidate.qmaxSr2;
@@ -86,9 +85,12 @@ export function RefereeCandidateRow({
     >
       <View
         style={{
-          width: 40,
-          height: 40,
-          borderRadius: 20,
+          // Minimums, so the initials grow with the text size instead of
+          // spilling out of a fixed circle.
+          minWidth: 40,
+          minHeight: 40,
+          paddingHorizontal: 4,
+          borderRadius: radius.pill,
           backgroundColor: palette.bg,
           alignItems: "center",
           justifyContent: "center",

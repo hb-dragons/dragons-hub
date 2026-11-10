@@ -13,6 +13,7 @@ import {
   getNativeTeamColor,
 } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
+import { maxFontSizeMultiplierFor } from "@/theme/text-scaling";
 import { useRefresh } from "@/hooks/useRefresh";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { ErrorState } from "@/components/ErrorState";
@@ -24,12 +25,11 @@ import { ClubLogo } from "@/components/brand/ClubLogo";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { resolveFetchState } from "@/lib/ui/fetch-state";
-import { fontFamilies } from "@/theme/typography";
 import { isTitleRevealed } from "@/lib/nav/title-reveal";
 import { useFadingHeaderTitle } from "@/components/nav/FadingHeaderTitle";
 
 export default function TeamDetailScreen() {
-  const { colors, textStyles, spacing, radius, isDark } = useTheme();
+  const { colors, textStyles, spacing, radius, isDark, fontFamilies } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
@@ -330,6 +330,7 @@ export default function TeamDetailScreen() {
             {teamStats.position !== null ? (
               <View style={{ alignItems: "center" }}>
                 <Text
+                  maxFontSizeMultiplier={maxFontSizeMultiplierFor("score")}
                   style={{
                     fontSize: 28,
                     fontFamily: fontFamilies.display,
@@ -525,9 +526,11 @@ function StatCell({
   color: string;
   mutedColor: string;
 }) {
+  const { fontFamilies } = useTheme();
   return (
     <View style={{ flex: 1, alignItems: "center" }}>
       <Text
+        maxFontSizeMultiplier={maxFontSizeMultiplierFor("stat")}
         style={{
           fontSize: 18,
           fontFamily: fontFamilies.display,

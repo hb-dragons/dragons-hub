@@ -1,5 +1,6 @@
 import type { StandingItem } from "@dragons/shared";
 import type { Translate } from "@/lib/ui/match-a11y";
+import { formatPointsDiff } from "@/lib/ui/standing-cells";
 
 /**
  * The sentence a standings row reads to VoiceOver/TalkBack. Left to the
@@ -20,7 +21,7 @@ export function standingA11yLabel(
     played: item.played,
     won: item.won,
     lost: item.lost,
-    diff: item.pointsDiff > 0 ? `+${String(item.pointsDiff)}` : String(item.pointsDiff),
+    diff: formatPointsDiff(item.pointsDiff),
     points: item.leaguePoints,
   });
   return item.verzicht ? `${row}, ${t("a11y.standing.withdrawn")}` : row;

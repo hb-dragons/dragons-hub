@@ -1,7 +1,6 @@
 import SegmentedControl from "@react-native-segmented-control/segmented-control";
 import { useTheme } from "@/hooks/useTheme";
 import { haptics } from "@/lib/haptics";
-import { fontFamilies } from "@/theme/typography";
 
 interface SegmentedProps<K extends string> {
   segments: ReadonlyArray<{ key: K; label: string }>;
@@ -19,7 +18,7 @@ export function Segmented<K extends string>({
   selected,
   onSelect,
 }: SegmentedProps<K>) {
-  const { spacing, isDark } = useTheme();
+  const { spacing, isDark, fontFamilies } = useTheme();
   const selectedIndex = Math.max(
     0,
     segments.findIndex((s) => s.key === selected),

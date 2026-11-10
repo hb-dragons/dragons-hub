@@ -1,5 +1,6 @@
 import { View, Text } from "react-native";
 import { useTheme } from "@/hooks/useTheme";
+import { maxFontSizeMultiplierFor } from "@/theme/text-scaling";
 
 interface StatItem {
   label: string;
@@ -40,7 +41,9 @@ export function StatStrip({ items }: StatStripProps) {
             },
           ]}
         >
-          <Text style={[textStyles.stat, { color: item.valueColor ?? colors.foreground }]}>
+          <Text
+            maxFontSizeMultiplier={maxFontSizeMultiplierFor("stat")}
+            style={[textStyles.stat, { color: item.valueColor ?? colors.foreground }]}>
             {item.value}
           </Text>
           <Text

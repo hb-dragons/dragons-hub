@@ -19,8 +19,10 @@ export function FormStrip({ form, size = 28 }: FormStripProps) {
           <View
             key={`${entry.matchId}-${index}`}
             style={{
-              width: size,
-              height: size,
+              // Minimums: the letter grows with the text size, the tile with it.
+              minWidth: size,
+              minHeight: size,
+              paddingHorizontal: 2,
               borderRadius: radius.md,
               backgroundColor: isWin
                 ? colors.chart1 + "1A"

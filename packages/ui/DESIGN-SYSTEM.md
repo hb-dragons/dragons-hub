@@ -60,6 +60,40 @@ distinction is what lets a future display face slot in without a sweep.
 **Table headers:** `font-display text-xs font-medium uppercase tracking-wide text-muted-foreground`
 **KPI values:** `font-display text-3xl font-bold`
 
+#### Native app (apps/native)
+
+The app splits fonts by who draws the text:
+
+| Text | Font | Why |
+|---|---|---|
+| **Navigation chrome**: tab labels, navigation bar and large titles, toolbar and bar items, alerts, action sheets, context menus | System font (SF Pro on iOS, Roboto on Android) | Drawn by the OS. It follows Dynamic Type and Bold Text on its own and matches every other app's bars. |
+| **Content**: everything a screen renders inside its scroll view | Bricolage Grotesque, from the `useTheme()` tokens | The club's face, same as web and site. |
+
+Do not set `headerTitleStyle` / `headerLargeTitleStyle` fonts to Bricolage;
+the split is deliberate (HIG audit 2026-11-09, §4.1).
+
+Text size and accessibility rules for content (#397):
+
+- **Body stays 15 pt**, against Apple's 17 pt default, to match the web. That
+  is a design decision; change it here first, not in a screen.
+- **Text scales with the system size and is not capped.** Body, captions,
+  labels and badge text never get a `maxFontSizeMultiplier`. The only caps
+  are scoreboard digits (`score`, `stat`: 1.5) and table headers (2), from
+  `maxFontSizeMultiplierFor()` in `src/theme/text-scaling.ts`.
+- **No fixed boxes around text.** Badges, chips, count bubbles, avatars and
+  form tiles use `minWidth` / `minHeight` and padding, so they grow with the
+  text. A slot that must line up with a neighbour (a date column, a team
+  label) uses `scaledSize(base, fontScale)`.
+- **Tables stack at accessibility sizes.** Columns use minimum widths; from a
+  font scale of 1.5 (`tableLayoutFor`) the standings table prints each value
+  with its heading under the team, and the quarter table turns on its side.
+- **Bold Text** (iOS) swaps families in the theme: Regular and Medium become
+  SemiBold, SemiBold becomes Bold. Content therefore takes `fontFamilies` and
+  `textStyles` from `useTheme()`, never from `theme/typography` directly.
+- **Section headings carry `accessibilityRole="header"`**, so VoiceOver's
+  rotor and TalkBack's heading navigation can jump between them.
+  `SectionHeader` does this; a hand-drawn section label must too.
+
 ### 4. Sharp Corners
 
 The design uses tight, athletic radii. Never use `rounded-xl` or `rounded-2xl`.
