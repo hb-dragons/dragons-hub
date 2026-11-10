@@ -6,7 +6,6 @@ import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
 import { kickoffCompact } from "../lib/format/kickoff";
 import { matchA11yLabel } from "../lib/ui/match-a11y";
-import { fontFamilies } from "../theme/typography";
 import { ClubLogo } from "./brand/ClubLogo";
 
 interface MatchCardFullProps {
@@ -38,7 +37,7 @@ function resolveName(
 }
 
 function MatchCardFullImpl({ match, onPress }: MatchCardFullProps) {
-  const { colors, radius, spacing, isDark } = useTheme();
+  const { colors, radius, spacing, isDark, fontFamilies } = useTheme();
 
   const isHomeGame = match.homeIsOwnClub;
   const isCancelled = match.isCancelled ?? false;

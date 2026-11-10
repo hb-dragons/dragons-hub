@@ -1,9 +1,10 @@
-import { View, Text, ActivityIndicator, Pressable } from "react-native";
+import { View, Text, ActivityIndicator, Pressable, useWindowDimensions } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import useSWR from "swr";
 import { getNativeTeamColor } from "@dragons/shared";
 import { APIError } from "@dragons/api-client";
 import { useTheme } from "@/hooks/useTheme";
+import { maxFontSizeMultiplierFor, scaledSize } from "@/theme/text-scaling";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
@@ -14,10 +15,10 @@ import { ClubLogo } from "@/components/brand/ClubLogo";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { kickoffCompact } from "@/lib/format/kickoff";
-import { fontFamilies } from "@/theme/typography";
 
 export default function GameDetailScreen() {
-  const { colors, textStyles, spacing, radius, isDark } = useTheme();
+  const { colors, textStyles, spacing, radius, isDark, fontFamilies } = useTheme();
+  const { fontScale } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
@@ -236,6 +237,7 @@ export default function GameDetailScreen() {
                 {hasScore ? (
                   <View style={{ flexDirection: "row", alignItems: "center" }}>
                     <Text
+                      maxFontSizeMultiplier={maxFontSizeMultiplierFor("score")}
                       style={[
                         textStyles.score,
                         {
@@ -258,6 +260,7 @@ export default function GameDetailScreen() {
                       :
                     </Text>
                     <Text
+                      maxFontSizeMultiplier={maxFontSizeMultiplierFor("score")}
                       style={[
                         textStyles.score,
                         {
@@ -346,7 +349,7 @@ export default function GameDetailScreen() {
             start is the clean slate, not a missing section (ADR 0007). */}
         {context ? (
           <View style={{ marginBottom: spacing.md }}>
-            <Text style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
+            <Text accessibilityRole="header" style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
               {i18n.t("gameDetail.form")}
             </Text>
             <View
@@ -361,7 +364,7 @@ export default function GameDetailScreen() {
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
                 <Text
                   style={{
-                    width: 72,
+                    width: scaledSize(72, fontScale),
                     fontSize: 13,
                     fontFamily: fontFamilies.bodySemiBold,
                     color: match.homeIsOwnClub ? homeColor : guestColor,
@@ -384,7 +387,7 @@ export default function GameDetailScreen() {
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
                 <Text
                   style={{
-                    width: 72,
+                    width: scaledSize(72, fontScale),
                     fontSize: 13,
                     fontFamily: fontFamilies.body,
                     color: colors.mutedForeground,
@@ -409,7 +412,7 @@ export default function GameDetailScreen() {
 
         {/* ── 5. Details ── */}
         <View style={{ marginBottom: spacing.md }}>
-          <Text style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
+          <Text accessibilityRole="header" style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
             {i18n.t("gameDetail.details")}
           </Text>
           <View

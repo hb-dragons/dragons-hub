@@ -6,7 +6,6 @@ import { kickoffCompact } from "../lib/format/kickoff";
 import { refereeGameTeamNames } from "../lib/referee/einsatz";
 import { adminSlotA11yActions, refereeGameA11yLabel } from "../lib/referee/game-card-a11y";
 import { MIN_TAP_TARGET, tapTargetSlop } from "../lib/ui/a11y";
-import { fontFamilies } from "../theme/typography";
 
 interface RefereeGameCardProps {
   game: RefereeGameListItem;
@@ -25,7 +24,7 @@ interface SlotRowProps {
 }
 
 function SlotRow({ label, name, status, isMine, ourClub }: SlotRowProps) {
-  const { colors, spacing, radius } = useTheme();
+  const { colors, spacing, radius, fontFamilies } = useTheme();
 
   const display = name ?? i18n.t("refereeGame.unassigned");
 
@@ -125,7 +124,7 @@ function AdminSlotAction({
   onAssign,
   onUnassign,
 }: AdminSlotActionProps) {
-  const { colors, spacing, radius } = useTheme();
+  const { colors, spacing, radius, fontFamilies } = useTheme();
 
   if (status === "assigned" && name) {
     return (
@@ -205,7 +204,7 @@ export function RefereeGameCard({
   onAdminAssign,
   onAdminUnassign,
 }: RefereeGameCardProps) {
-  const { colors, radius, spacing, isDark } = useTheme();
+  const { colors, radius, spacing, isDark, fontFamilies } = useTheme();
   const teamNames = refereeGameTeamNames(game);
 
   const isAssignedToMe = game.mySlot !== null;

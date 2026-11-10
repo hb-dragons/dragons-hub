@@ -1,11 +1,21 @@
 import { memo, useCallback } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import type { StandingItem } from "@dragons/shared";
 import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
 import { standingA11yLabel } from "../lib/ui/standing-a11y";
-import { fontFamilies } from "../theme/typography";
+import {
+  standingStatCells,
+  standingStatHeadings,
+  type StandingStatKey,
+} from "../lib/ui/standing-cells";
+import {
+  maxFontSizeMultiplierFor,
+  scaledSize,
+  tableLayoutFor,
+  type TableLayout,
+} from "../theme/text-scaling";
 import { ClubLogo } from "./brand/ClubLogo";
 
 interface StandingsTableProps {
@@ -18,6 +28,23 @@ interface StandingsTableProps {
   onOpponentPress?: (teamApiId: number) => void;
 }
 
+/**
+ * Minimum column widths at the default text size, in points. They grow with
+ * the text (`scaledSize`) so header and rows stay aligned, and are minimums,
+ * not widths, so a value wider than its column pushes the team name instead
+ * of clipping.
+ */
+const POSITION_MIN_WIDTH = 28;
+const STAT_MIN_WIDTH: Record<StandingStatKey, number> = {
+  played: 28,
+  won: 24,
+  lost: 24,
+  diff: 36,
+  points: 32,
+};
+
+const TABLE_HEADER_CAP = maxFontSizeMultiplierFor("tableHeader");
+
 export function StandingsTable({
   standings,
   leagueName,
@@ -26,7 +53,9 @@ export function StandingsTable({
   onOwnClubPress,
   onOpponentPress,
 }: StandingsTableProps) {
-  const { colors, spacing, radius } = useTheme();
+  const { colors, spacing, radius, fontFamilies } = useTheme();
+  const { fontScale } = useWindowDimensions();
+  const layout = tableLayoutFor(fontScale);
 
   const sectionLabelStyle = {
     fontSize: 11,
@@ -41,6 +70,8 @@ export function StandingsTable({
     textAlign: "center" as const,
   };
 
+  const statHeadings = standingStatHeadings((key, options) => i18n.t(key, options));
+
   return (
     <View>
       {/* League header card */}
@@ -53,12 +84,12 @@ export function StandingsTable({
         }}
       >
         <Text
+          accessibilityRole="header"
           style={{
             fontSize: 16,
             fontFamily: fontFamilies.display,
             color: colors.foreground,
           }}
-          numberOfLines={1}
         >
           {leagueName}
         </Text>
@@ -84,44 +115,48 @@ export function StandingsTable({
           overflow: "hidden",
         }}
       >
-        {/* Column headers */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            paddingVertical: spacing.sm,
-            paddingHorizontal: spacing.md,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border + "40",
-          }}
-        >
-          <Text style={[headerCellStyle, { width: 28 }]}>
-            {i18n.t("standings.pos")}
-          </Text>
-          <Text
-            style={[
-              sectionLabelStyle,
-              { flex: 1, marginLeft: spacing.sm },
-            ]}
+        {/* Column headers. The stacked layout prints each heading next to
+            its value instead, so it has no header row. */}
+        {layout === "columns" ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              paddingVertical: spacing.sm,
+              paddingHorizontal: spacing.md,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border + "40",
+            }}
           >
-            {i18n.t("standings.team")}
-          </Text>
-          <Text style={[headerCellStyle, { width: 28 }]}>
-            {i18n.t("standings.played")}
-          </Text>
-          <Text style={[headerCellStyle, { width: 24 }]}>
-            {i18n.t("standings.won")}
-          </Text>
-          <Text style={[headerCellStyle, { width: 24 }]}>
-            {i18n.t("standings.lost")}
-          </Text>
-          <Text style={[headerCellStyle, { width: 36 }]}>
-            {i18n.t("standings.diff")}
-          </Text>
-          <Text style={[headerCellStyle, { width: 32, textAlign: "right" }]}>
-            {i18n.t("standings.points")}
-          </Text>
-        </View>
+            <Text
+              maxFontSizeMultiplier={TABLE_HEADER_CAP}
+              style={[headerCellStyle, { minWidth: scaledSize(POSITION_MIN_WIDTH, fontScale) }]}
+            >
+              {i18n.t("standings.pos")}
+            </Text>
+            <Text
+              maxFontSizeMultiplier={TABLE_HEADER_CAP}
+              style={[sectionLabelStyle, { flex: 1, marginLeft: spacing.sm }]}
+            >
+              {i18n.t("standings.team")}
+            </Text>
+            {statHeadings.map((cell) => (
+              <Text
+                key={cell.key}
+                maxFontSizeMultiplier={TABLE_HEADER_CAP}
+                style={[
+                  headerCellStyle,
+                  {
+                    minWidth: scaledSize(STAT_MIN_WIDTH[cell.key], fontScale),
+                    textAlign: cell.key === "points" ? "right" : "center",
+                  },
+                ]}
+              >
+                {cell.label}
+              </Text>
+            ))}
+          </View>
+        ) : null}
 
         {/* Rows */}
         {standings.map((item) => {
@@ -135,6 +170,8 @@ export function StandingsTable({
               isOwn={isOwn}
               badgeColor={badgeColor}
               onPress={onPress}
+              layout={layout}
+              fontScale={fontScale}
             />
           );
         })}
@@ -148,10 +185,12 @@ interface StandingRowProps {
   isOwn: boolean;
   badgeColor: string | null;
   onPress?: (teamApiId: number) => void;
+  layout: TableLayout;
+  fontScale: number;
 }
 
-function StandingRowImpl({ item, isOwn, badgeColor, onPress }: StandingRowProps) {
-  const { colors, spacing, isDark } = useTheme();
+function StandingRowImpl({ item, isOwn, badgeColor, onPress, layout, fontScale }: StandingRowProps) {
+  const { colors, spacing, isDark, fontFamilies } = useTheme();
 
   const rowBg = isOwn ? colors.primary + "0D" : "transparent";
   const leftBorderWidth = isOwn ? 2 : 0;
@@ -165,8 +204,6 @@ function StandingRowImpl({ item, isOwn, badgeColor, onPress }: StandingRowProps)
         ? colors.destructive
         : colors.mutedForeground;
 
-  const diffPrefix = item.pointsDiff > 0 ? "+" : "";
-
   // Team name color: own = badge color (primary), opponent = neutral
   const teamColor = isOwn
     ? getNativeTeamColor(badgeColor, item.teamName, isDark).name
@@ -176,122 +213,118 @@ function StandingRowImpl({ item, isOwn, badgeColor, onPress }: StandingRowProps)
     onPress?.(item.teamApiId);
   }, [onPress, item.teamApiId]);
 
-  const a11yLabel = standingA11yLabel(item, item.teamName, (key, options) => i18n.t(key, options));
+  const translate = (key: string, options?: Record<string, string | number>) =>
+    i18n.t(key, options);
+  const a11yLabel = standingA11yLabel(item, item.teamName, translate);
+  const cells = standingStatCells(item, translate);
 
-  const row = (
-    <View
+  const valueStyle = (key: StandingStatKey) => ({
+    fontSize: 13,
+    fontFamily: key === "points" ? fontFamilies.bodySemiBold : fontFamilies.body,
+    color: key === "diff" ? diffColor : colors.foreground,
+  });
+
+  const position = (
+    <Text
       style={{
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: spacing.sm,
-        paddingHorizontal: spacing.md,
-        backgroundColor: rowBg,
-        borderLeftWidth: leftBorderWidth,
-        borderLeftColor: leftBorderColor,
+        minWidth: scaledSize(POSITION_MIN_WIDTH, fontScale),
+        textAlign: "center",
+        fontSize: 13,
+        fontFamily: fontFamilies.body,
+        color: colors.mutedForeground,
       }}
     >
-      {/* Position */}
-      <Text
-        style={{
-          width: 28,
-          textAlign: "center",
-          fontSize: 13,
-          fontFamily: fontFamilies.body,
-          color: colors.mutedForeground,
-        }}
-      >
-        {item.position}
-      </Text>
+      {item.position}
+    </Text>
+  );
 
-      <View
+  const team = (
+    <View
+      style={{
+        flex: 1,
+        marginLeft: spacing.sm,
+        flexDirection: "row",
+        alignItems: "center",
+      }}
+    >
+      <ClubLogo clubId={item.clubId} size={20} />
+      <Text
         style={{
           flex: 1,
-          marginLeft: spacing.sm,
-          flexDirection: "row",
-          alignItems: "center",
-        }}
-      >
-        <ClubLogo clubId={item.clubId} size={20} />
-        <Text
-          style={{
-            flex: 1,
-            marginLeft: spacing.xs,
-            fontSize: 13,
-            fontFamily: isOwn ? fontFamilies.bodySemiBold : fontFamilies.body,
-            color: teamColor,
-          }}
-          numberOfLines={1}
-        >
-          {item.teamName}
-        </Text>
-      </View>
-
-      {/* Played */}
-      <Text
-        style={{
-          width: 28,
-          textAlign: "center",
+          marginLeft: spacing.xs,
           fontSize: 13,
-          fontFamily: fontFamilies.body,
-          color: colors.foreground,
+          fontFamily: isOwn ? fontFamilies.bodySemiBold : fontFamilies.body,
+          color: teamColor,
         }}
+        // Stacked rows give the name its own line, so it may wrap there.
+        numberOfLines={layout === "columns" ? 1 : undefined}
       >
-        {item.played}
-      </Text>
-
-      {/* Won */}
-      <Text
-        style={{
-          width: 24,
-          textAlign: "center",
-          fontSize: 13,
-          fontFamily: fontFamilies.body,
-          color: colors.foreground,
-        }}
-      >
-        {item.won}
-      </Text>
-
-      {/* Lost */}
-      <Text
-        style={{
-          width: 24,
-          textAlign: "center",
-          fontSize: 13,
-          fontFamily: fontFamilies.body,
-          color: colors.foreground,
-        }}
-      >
-        {item.lost}
-      </Text>
-
-      {/* Diff */}
-      <Text
-        style={{
-          width: 36,
-          textAlign: "center",
-          fontSize: 13,
-          fontFamily: fontFamilies.body,
-          color: diffColor,
-        }}
-      >
-        {diffPrefix}{item.pointsDiff}
-      </Text>
-
-      {/* Points */}
-      <Text
-        style={{
-          width: 32,
-          textAlign: "right",
-          fontSize: 13,
-          fontFamily: fontFamilies.bodySemiBold,
-          color: colors.foreground,
-        }}
-      >
-        {item.leaguePoints}
+        {item.teamName}
       </Text>
     </View>
   );
+
+  const rowFrame = {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: rowBg,
+    borderLeftWidth: leftBorderWidth,
+    borderLeftColor: leftBorderColor,
+  };
+
+  const row =
+    layout === "columns" ? (
+      <View style={[rowFrame, { flexDirection: "row", alignItems: "center" }]}>
+        {position}
+        {team}
+        {cells.map((cell) => (
+          <Text
+            key={cell.key}
+            style={[
+              valueStyle(cell.key),
+              {
+                minWidth: scaledSize(STAT_MIN_WIDTH[cell.key], fontScale),
+                textAlign: cell.key === "points" ? "right" : "center",
+              },
+            ]}
+          >
+            {cell.value}
+          </Text>
+        ))}
+      </View>
+    ) : (
+      <View style={rowFrame}>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {position}
+          {team}
+        </View>
+        {/* One labelled value per column, wrapping onto as many lines as
+            the text size needs. */}
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            columnGap: spacing.md,
+            rowGap: spacing.xs,
+            marginTop: spacing.xs,
+          }}
+        >
+          {cells.map((cell) => (
+            <Text key={cell.key} style={valueStyle(cell.key)}>
+              <Text
+                style={{
+                  fontFamily: fontFamilies.displayMedium,
+                  color: colors.mutedForeground,
+                }}
+              >
+                {`${cell.label} `}
+              </Text>
+              {cell.value}
+            </Text>
+          ))}
+        </View>
+      </View>
+    );
 
   if (onPress) {
     return (

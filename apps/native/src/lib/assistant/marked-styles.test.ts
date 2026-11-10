@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { markedStyles } from "./marked-styles";
 import { colors } from "@/theme/colors";
 import { fontFamilies } from "@/theme/font-families";
+import { resolveFontFamilies } from "@/theme/bold-text";
 import { spacing, radius } from "@/theme/spacing";
 
 // Inline the slice of typography markedStyles reads. Importing
@@ -9,7 +10,17 @@ import { spacing, radius } from "@/theme/spacing";
 // .ttf files can't be parsed by vitest's node transform.
 const textStyles = { body: { fontSize: 15 } } as never;
 
-const theme = { colors: colors.dark, textStyles, spacing, radius, isDark: true, mode: "dark" as const, setMode: () => {} };
+const theme = {
+  colors: colors.dark,
+  textStyles,
+  fontFamilies,
+  boldText: false,
+  spacing,
+  radius,
+  isDark: true,
+  mode: "dark" as const,
+  setMode: () => {},
+};
 
 describe("markedStyles", () => {
   it("maps theme tokens onto markdown elements", () => {
@@ -18,5 +29,13 @@ describe("markedStyles", () => {
     expect(s.link!.color).toBe(colors.dark.primary);
     expect(s.strong!.fontFamily).toBe(fontFamilies.bodySemiBold);
     expect(s.code!.backgroundColor).toBe(colors.dark.surfaceLow);
+  });
+
+  it("follows the theme's families, so Bold Text reaches assistant replies", () => {
+    const bold = resolveFontFamilies(true);
+    const s = markedStyles({ ...theme, fontFamilies: bold, boldText: true });
+    expect(s.text!.fontFamily).toBe(bold.body);
+    expect(s.strong!.fontFamily).toBe(bold.bodySemiBold);
+    expect(s.h1!.fontFamily).toBe(bold.display);
   });
 });

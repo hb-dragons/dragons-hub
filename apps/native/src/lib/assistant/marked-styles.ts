@@ -1,5 +1,4 @@
 import type { TextStyle, ViewStyle } from "react-native";
-import { fontFamilies } from "@/theme/font-families";
 import type { useTheme } from "@/hooks/useTheme";
 
 type Theme = ReturnType<typeof useTheme>;
@@ -34,7 +33,7 @@ type Styles = Partial<
 >;
 
 export function markedStyles(theme: Theme): Styles {
-  const { colors, spacing, radius, textStyles } = theme;
+  const { colors, spacing, radius, textStyles, fontFamilies } = theme;
   const heading = (fontSize: number): TextStyle & ViewStyle => ({
     color: colors.foreground,
     fontFamily: fontFamilies.display,

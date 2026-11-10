@@ -21,7 +21,6 @@ import {
 import { i18n } from "@/lib/i18n";
 import { TEXT_LINK_SLOP } from "@/lib/ui/a11y";
 import { kickoffCompact } from "@/lib/format/kickoff";
-import { fontFamilies } from "@/theme/typography";
 
 function slotStatusVariant(
   status: RefereeGameListItem["sr1Status"],
@@ -32,7 +31,7 @@ function slotStatusVariant(
 }
 
 function OfficialSlot({ slot }: { slot: EinsatzSlot }) {
-  const { colors, textStyles, spacing } = useTheme();
+  const { colors, textStyles, spacing, fontFamilies } = useTheme();
   const displayName = slot.name ?? i18n.t("refereeGame.unassigned");
   const nameColor = slot.name
     ? slot.isMine
@@ -131,7 +130,7 @@ function ContactRow({ contact }: { contact: EinsatzContact }) {
  * fan match screen draws, so a referee sees the fixture the way the club does.
  */
 function TeamSide({ team }: { team: EinsatzTeam }) {
-  const { colors, textStyles, spacing } = useTheme();
+  const { colors, textStyles, spacing, fontFamilies } = useTheme();
 
   return (
     <View style={{ flex: 1, alignItems: "center" }}>
@@ -162,11 +161,12 @@ function TeamSide({ team }: { team: EinsatzTeam }) {
  * radius, padding and gap is a third place to keep them in step.
  */
 function Section({ label, children }: { label: string; children: ReactNode }) {
-  const { colors, spacing, radius } = useTheme();
+  const { colors, spacing, radius, fontFamilies } = useTheme();
 
   return (
     <View style={{ marginBottom: spacing.md }}>
       <Text
+        accessibilityRole="header"
         style={{
           fontSize: 11,
           textTransform: "uppercase",
@@ -193,7 +193,7 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export default function RefereeGameDetailScreen() {
-  const { colors, textStyles, spacing, radius } = useTheme();
+  const { colors, textStyles, spacing, radius, fontFamilies } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const numericId = Number(id);
@@ -395,7 +395,7 @@ export default function RefereeGameDetailScreen() {
 
       {/* ── 2. Officials ── */}
       <View style={{ marginBottom: spacing.md }}>
-        <Text style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
+        <Text accessibilityRole="header" style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
           {i18n.t("refereeGame.officials")}
         </Text>
         <View
@@ -553,7 +553,7 @@ export default function RefereeGameDetailScreen() {
 
       {/* ── 4. Details ── */}
       <View style={{ marginBottom: spacing.md }}>
-        <Text style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
+        <Text accessibilityRole="header" style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
           {i18n.t("gameDetail.details")}
         </Text>
         <View

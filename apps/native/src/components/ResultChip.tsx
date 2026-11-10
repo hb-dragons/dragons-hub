@@ -1,10 +1,10 @@
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import type { MatchListItem } from "@dragons/shared";
 import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
 import { matchA11yLabel } from "../lib/ui/match-a11y";
-import { fontFamilies } from "../theme/typography";
+import { scaledSize } from "../theme/text-scaling";
 
 interface ResultChipProps {
   match: MatchListItem;
@@ -34,7 +34,8 @@ function getResultBadge(match: MatchListItem): { label: string; isWin: boolean |
 }
 
 export function ResultChip({ match, onPress }: ResultChipProps) {
-  const { colors, radius, spacing, isDark } = useTheme();
+  const { colors, radius, spacing, isDark, fontFamilies } = useTheme();
+  const { fontScale } = useWindowDimensions();
 
   // Own-club team info
   const ownName = match.homeIsOwnClub
@@ -58,8 +59,10 @@ export function ResultChip({ match, onPress }: ResultChipProps) {
         paddingHorizontal: spacing.sm,
         paddingVertical: spacing.xs,
         alignItems: "center",
-        minWidth: 60,
-        maxWidth: 80,
+        minWidth: scaledSize(60, fontScale),
+        // Scaled with the text, so a name keeps the room it has at the
+        // default size instead of truncating harder as the text grows.
+        maxWidth: scaledSize(80, fontScale),
       }}
     >
       {/* Own team */}

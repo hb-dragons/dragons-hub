@@ -5,6 +5,7 @@ import useSWR, { useSWRConfig } from "swr";
 import { APIError } from "@dragons/api-client";
 import { bracketColor, RefereeCandidateRow } from "@/components/RefereeCandidateRow";
 import { useTheme } from "@/hooks/useTheme";
+import { maxFontSizeMultiplierFor } from "@/theme/text-scaling";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 import { refereeApi } from "@/lib/api";
 import { kickoffCompact } from "@/lib/format/kickoff";
@@ -19,7 +20,6 @@ import {
   type DistanceBracket,
   type RefCandidate,
 } from "@/lib/referee/candidates";
-import { fontFamilies } from "@/theme/typography";
 
 /**
  * Assigning a referee to one slot of one game (issue #223).
@@ -49,7 +49,7 @@ const SECTION_TITLE_KEY: Record<DistanceBracket, string> = {
 };
 
 export default function RefereeAssignSheetRoute() {
-  const { colors, spacing, textStyles } = useTheme();
+  const { colors, spacing, textStyles, fontFamilies } = useTheme();
   const params = useLocalSearchParams<{ apiMatchId?: string; slot?: string }>();
   const apiMatchId = parseNumericParam(params.apiMatchId);
   const slot = parseSlotParam(params.slot);
@@ -205,7 +205,11 @@ export default function RefereeAssignSheetRoute() {
                   backgroundColor: bracketColor(section.key, colors),
                 }}
               />
-              <Text style={[textStyles.tableHeader, { color: colors.mutedForeground }]}>
+              <Text
+                accessibilityRole="header"
+                maxFontSizeMultiplier={maxFontSizeMultiplierFor("tableHeader")}
+                style={[textStyles.tableHeader, { color: colors.mutedForeground }]}
+              >
                 {i18n.t(SECTION_TITLE_KEY[section.key])}
               </Text>
               <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />

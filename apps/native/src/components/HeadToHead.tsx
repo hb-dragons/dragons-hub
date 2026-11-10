@@ -1,10 +1,10 @@
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import type { HeadToHead as HeadToHeadData } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
 import { kickoffShortNumeric } from "../lib/format/kickoff";
 import { matchA11yLabel } from "../lib/ui/match-a11y";
-import { fontFamilies } from "../theme/typography";
+import { scaledSize } from "../theme/text-scaling";
 import { ClubLogo } from "./brand/ClubLogo";
 
 interface HeadToHeadProps {
@@ -24,7 +24,8 @@ export function HeadToHead({
   ownColor,
   onMatchPress,
 }: HeadToHeadProps) {
-  const { colors, spacing, radius } = useTheme();
+  const { colors, spacing, radius, fontFamilies } = useTheme();
+  const { fontScale } = useWindowDimensions();
 
   const sectionLabelStyle = {
     fontSize: 11,
@@ -50,7 +51,7 @@ export function HeadToHead({
             <ClubLogo clubId={opponentClubId} size={18} />
           </View>
         ) : null}
-        <Text style={sectionLabelStyle}>
+        <Text accessibilityRole="header" style={sectionLabelStyle}>
           {i18n.t("gameDetail.record", { opponent: opponentName })}
         </Text>
       </View>
@@ -158,7 +159,7 @@ export function HeadToHead({
                     fontSize: 12,
                     fontFamily: fontFamilies.body,
                     color: colors.mutedForeground,
-                    width: 58,
+                    width: scaledSize(58, fontScale),
                   }}
                 >
                   {kickoffShortNumeric(meeting.date)}

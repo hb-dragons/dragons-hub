@@ -11,7 +11,10 @@ export function SectionHeader({ title, subtitle }: SectionHeaderProps) {
 
   return (
     <View style={{ marginBottom: spacing.md }}>
-      <Text style={[textStyles.sectionTitle, { color: colors.foreground }]}>
+      <Text
+        accessibilityRole="header"
+        style={[textStyles.sectionTitle, { color: colors.foreground }]}
+      >
         {title}
       </Text>
       {subtitle ? (

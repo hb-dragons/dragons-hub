@@ -12,7 +12,6 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/hooks/useTheme";
-import { fontFamilies } from "@/theme/typography";
 import { authClient } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
 import { TEXT_LINK_SLOP } from "@/lib/ui/a11y";
@@ -22,7 +21,7 @@ import { LEGAL_LINKS } from "@/lib/legal/links";
 import { openExternal } from "@/lib/legal/open-external";
 
 export default function SignInScreen() {
-  const { colors, textStyles, spacing, radius } = useTheme();
+  const { colors, textStyles, spacing, radius, fontFamilies } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const passwordRef = useRef<TextInput>(null);

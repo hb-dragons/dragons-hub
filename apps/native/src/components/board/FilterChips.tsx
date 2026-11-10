@@ -108,9 +108,9 @@ export function FilterChips({
           <View
             style={{
               minWidth: 20,
-              height: 20,
+              minHeight: 20,
               paddingHorizontal: 6,
-              borderRadius: 10,
+              borderRadius: radius.pill,
               backgroundColor: colors.primary,
               alignItems: "center",
               justifyContent: "center",

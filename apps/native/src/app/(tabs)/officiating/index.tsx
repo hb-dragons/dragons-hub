@@ -25,7 +25,6 @@ import { refereeApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { kickoffLong, kickoffToday } from "@/lib/format/kickoff";
 import { haptics } from "@/lib/haptics";
-import { fontFamilies } from "@/theme/typography";
 
 type Segment = "mine" | "open" | "past";
 
@@ -89,7 +88,7 @@ function partitionGames(
 }
 
 export default function OfficiatingScreen() {
-  const { colors, textStyles, spacing, radius } = useTheme();
+  const { colors, textStyles, spacing, radius, fontFamilies } = useTheme();
   const router = useRouter();
 
   const { data: session } = authClient.useSession();
@@ -323,6 +322,7 @@ export default function OfficiatingScreen() {
             }}
           >
             <Text
+              accessibilityRole="header"
               style={{
                 fontSize: 13,
                 fontFamily: fontFamilies.bodySemiBold,

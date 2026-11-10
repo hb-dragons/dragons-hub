@@ -9,8 +9,15 @@ import { colors } from "@/theme/colors";
 import { textStyles } from "@/theme/typography";
 import { spacing, radius } from "@/theme/spacing";
 import { buildNavigationTheme } from "@/theme/navigation-theme";
+import {
+  resolveFontFamilies,
+  resolveTextStyles,
+  type FontFamilies,
+  type ResolvedTextStyles,
+} from "@/theme/bold-text";
 import type { ColorToken } from "@/theme/colors";
 import { useAppearanceMode, type Mode } from "./useAppearanceMode";
+import { useBoldText } from "./useBoldText";
 import { useLocaleSubscription } from "./useLocale";
 
 export type { Mode };
@@ -19,7 +26,12 @@ type ResolvedColors = Record<ColorToken, string>;
 
 interface ThemeContextValue {
   colors: ResolvedColors;
-  textStyles: typeof textStyles;
+  /** Text style tokens, with families resolved for iOS Bold Text. */
+  textStyles: ResolvedTextStyles<typeof textStyles>;
+  /** Semantic font families, resolved for iOS Bold Text. */
+  fontFamilies: FontFamilies;
+  /** iOS "Bold Text" is on. */
+  boldText: boolean;
   spacing: typeof spacing;
   radius: typeof radius;
   isDark: boolean;
@@ -31,20 +43,23 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const { mode, setMode, scheme, loaded } = useAppearanceMode();
+  const boldText = useBoldText();
 
   const navTheme = useMemo(() => buildNavigationTheme(scheme), [scheme]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({
       colors: colors[scheme],
-      textStyles,
+      textStyles: resolveTextStyles(textStyles, boldText),
+      fontFamilies: resolveFontFamilies(boldText),
+      boldText,
       spacing,
       radius,
       isDark: scheme === "dark",
       mode,
       setMode,
     }),
-    [scheme, mode, setMode],
+    [scheme, mode, setMode, boldText],
   );
 
   if (!loaded) return null;
