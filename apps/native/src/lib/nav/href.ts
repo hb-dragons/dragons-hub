@@ -47,8 +47,10 @@ export const APP_ROUTES: Record<string, (...params: string[]) => RouteHref> = {
   "/profile": () => "/profile",
   "/assistant": () => "/assistant",
   "/push-permission": () => "/push-permission",
-  // The coach's own contact-data form (#315), opened from Profile.
-  "/profile-contact": () => "/profile-contact",
+  // Profile's own stack (#398): the coach's contact data (#315) and the
+  // notification settings, pushed inside the Profile sheet.
+  "/profile/contact": () => "/profile/contact",
+  "/profile/notifications": () => "/profile/notifications",
   "/sign-in": () => "/sign-in",
   "/admin/boards": () => "/admin/boards",
   "/referee-assign": () => "/referee-assign",

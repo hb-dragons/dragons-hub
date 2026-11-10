@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { useSWRConfig } from "swr";
-import { SheetScreen } from "@/components/sheets/SheetScreen";
 import { singleLineInput } from "@/components/ui/inputStyles";
 import { useTheme } from "@/hooks/useTheme";
 import { useMyStaff, MY_STAFF_KEY } from "@/hooks/useMyStaff";
@@ -10,25 +9,24 @@ import { useToast } from "@/hooks/useToast";
 import { haptics } from "@/lib/haptics";
 import { STAFF_PERSON_MAX_LENGTHS } from "@dragons/api-client";
 import { meApi } from "@/lib/api";
-import { buildStaffPatch, contactFields, type ContactFields } from "@/lib/staff/my-staff";
+import { buildStaffPatch, contactFields, contactLoadFailed, type ContactFields } from "@/lib/staff/my-staff";
 import { i18n } from "@/lib/i18n";
 
 /**
- * The coach's own contact data, edited (#315).
+ * The coach's own contact data (#315), pushed inside the Profile sheet (#398)
+ * instead of opening a second sheet over it. Three fields, all optional — a
+ * coach who has no licence to name leaves it empty, and an emptied field
+ * clears the stored one. The teams are shown but not editable: who trains
+ * what is the admin's to say.
  *
- * A form sheet like the board's, and for the same reason: the keyboard is up
- * for most of its life and the system owns the presentation. Three fields, all
- * optional — a coach who has no licence to name leaves it empty, and an emptied
- * field clears the stored one.
- *
- * The record is read through the same SWR key the profile section renders from,
- * so the sheet opens on data that is already there and the save writes back
- * into it.
+ * The scroll view lifts the focused field clear of the keyboard itself
+ * (`automaticallyAdjustKeyboardInsets`), and is the screen's first view so
+ * the native header insets it.
  */
-export default function ProfileContactSheetRoute() {
+export default function ProfileContactScreen() {
   const theme = useTheme();
   const { colors, spacing, radius } = theme;
-  const { data } = useMyStaff();
+  const { data, error } = useMyStaff();
   const { mutate } = useSWRConfig();
   const toast = useToast();
   // Edits, once there are any. Until then the inputs read from the record, so a
@@ -51,7 +49,7 @@ export default function ProfileContactSheetRoute() {
       toast.show({ title: i18n.t("toast.saved"), variant: "success" });
       router.back();
     } catch {
-      // The sheet stays open with what was typed — a rejected email is fixed
+      // The screen stays open with what was typed — a rejected email is fixed
       // in place rather than retyped from scratch.
       haptics.error();
       toast.show({ title: i18n.t("toast.saveFailed"), variant: "error" });
@@ -85,10 +83,23 @@ export default function ProfileContactSheetRoute() {
   );
 
   return (
-    <SheetScreen title={i18n.t("profile.contact.editTitle")} layout="scroll" testID="profile-contact-sheet">
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}
+      contentInsetAdjustmentBehavior="automatic"
+      automaticallyAdjustKeyboardInsets
+      keyboardShouldPersistTaps="handled"
+    >
       <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
-        {i18n.t("profile.contact.editHint")}
+        {i18n.t("profile.contact.hint")} {i18n.t("profile.contact.editHint")}
       </Text>
+      {/* The club's data being unreachable, not absent: Save stays disabled
+          until there is a record to compare the edits against. */}
+      {!data && contactLoadFailed(error) ? (
+        <Text style={[theme.textStyles.body, { color: colors.destructive }]}>
+          {i18n.t("profile.contact.loadFailed")}
+        </Text>
+      ) : null}
       {field("phone", { keyboardType: "phone-pad" })}
       {field("email", { keyboardType: "email-address" })}
       {field("licence")}
@@ -121,6 +132,19 @@ export default function ProfileContactSheetRoute() {
           </Text>
         )}
       </Pressable>
-    </SheetScreen>
+
+      {data && data.assignments.length > 0 ? (
+        <View style={{ gap: spacing.xs, marginTop: spacing.lg }}>
+          <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
+            {i18n.t("profile.contact.teams")}
+          </Text>
+          {data.assignments.map((assignment) => (
+            <Text key={assignment.id} style={[theme.textStyles.body, { color: colors.foreground }]}>
+              {assignment.teamName} · {i18n.t(`teamStaff.role.${assignment.role}`)}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+    </ScrollView>
   );
 }

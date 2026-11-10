@@ -89,6 +89,7 @@
     "languageDe": "Deutsch",
     "languageEn": "English",
     "signOut": "Sign Out",
+    "signOutConfirmTitle": "Sign out?",
     "roleAdmin": "Admin",
     "roleSuperadmin": "Superadmin",
     "roleRefereeAdmin": "Referee Admin",
@@ -110,6 +111,12 @@
       "emailPlaceholder": "name@example.de",
       "licencePlaceholder": "C licence",
       "loadFailed": "Could not load your contact details"
+    },
+    "version": "Version",
+    "groups": {
+      "account": "Account",
+      "app": "App",
+      "info": "Info"
     }
   },
   "legal": {
@@ -287,7 +294,8 @@
     "at": "@",
     "loadFailed": "Couldn't load this page",
     "retry": "Retry",
-    "notFound": "Not found"
+    "notFound": "Not found",
+    "done": "Done"
   },
   "admin": {
     "boards": {
@@ -499,7 +507,8 @@
     "settingsRow": "Notifications",
     "statusGranted": "On",
     "statusDenied": "Off – enable in Settings",
-    "statusUndetermined": "Not set up yet"
+    "statusUndetermined": "Not set up yet",
+    "openSettings": "Open Settings"
   },
   "a11y": {
     "doubleTapToEdit": "Double tap to edit",

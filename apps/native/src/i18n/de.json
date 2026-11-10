@@ -89,6 +89,7 @@
     "languageDe": "Deutsch",
     "languageEn": "English",
     "signOut": "Abmelden",
+    "signOutConfirmTitle": "Wirklich abmelden?",
     "roleAdmin": "Admin",
     "roleSuperadmin": "Superadmin",
     "roleRefereeAdmin": "Schiri-Admin",
@@ -110,6 +111,12 @@
       "emailPlaceholder": "name@example.de",
       "licencePlaceholder": "C-Lizenz",
       "loadFailed": "Kontaktdaten konnten nicht geladen werden"
+    },
+    "version": "Version",
+    "groups": {
+      "account": "Konto",
+      "app": "App",
+      "info": "Info"
     }
   },
   "legal": {
@@ -287,7 +294,8 @@
     "at": "@",
     "loadFailed": "Seite konnte nicht geladen werden",
     "retry": "Erneut versuchen",
-    "notFound": "Nicht gefunden"
+    "notFound": "Nicht gefunden",
+    "done": "Fertig"
   },
   "admin": {
     "boards": {
@@ -499,7 +507,8 @@
     "settingsRow": "Mitteilungen",
     "statusGranted": "Aktiv",
     "statusDenied": "Aus – in den Einstellungen aktivieren",
-    "statusUndetermined": "Noch nicht eingerichtet"
+    "statusUndetermined": "Noch nicht eingerichtet",
+    "openSettings": "Einstellungen öffnen"
   },
   "a11y": {
     "doubleTapToEdit": "Doppeltippen zum Bearbeiten",

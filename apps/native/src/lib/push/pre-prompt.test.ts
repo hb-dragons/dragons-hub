@@ -11,9 +11,9 @@ vi.mock("@/lib/local-storage", () => ({
 
 import {
   PUSH_PROMPT_DEFERRED_KEY,
-  clearPushPromptDeferral,
   decidePushFlow,
   pushStatusLabelKey,
+  notificationsAction,
   recordPushSheetDismissal,
   readPushPromptDeferred,
 } from "@/lib/push/pre-prompt";
@@ -59,11 +59,6 @@ describe("deferral storage", () => {
     expect(await readPushPromptDeferred()).toBe(false);
   });
 
-  it("clears the flag", async () => {
-    setItem.mockResolvedValue(undefined);
-    await clearPushPromptDeferral();
-    expect(setItem).toHaveBeenCalledWith(PUSH_PROMPT_DEFERRED_KEY, "0");
-  });
 });
 
 describe("recordPushSheetDismissal", () => {
@@ -89,5 +84,22 @@ describe("pushStatusLabelKey", () => {
     expect(pushStatusLabelKey("granted")).toBe("push.statusGranted");
     expect(pushStatusLabelKey("denied")).toBe("push.statusDenied");
     expect(pushStatusLabelKey("undetermined")).toBe("push.statusUndetermined");
+  });
+});
+
+describe("notificationsAction", () => {
+  // Profile's Mitteilungen screen (#398) asks the OS itself while it may, and
+  // sends the user to the system settings once the OS has answered — iOS only
+  // lets the switch be flipped there.
+  it("asks the OS while it has not been asked", () => {
+    expect(notificationsAction("undetermined")).toBe("request");
+  });
+
+  it.each(["granted", "denied"] as const)("opens the system settings once %s", (status) => {
+    expect(notificationsAction(status)).toBe("openSettings");
+  });
+
+  it("offers nothing while the status is still being read", () => {
+    expect(notificationsAction(null)).toBeNull();
   });
 });

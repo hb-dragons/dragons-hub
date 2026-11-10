@@ -1,5 +1,5 @@
 import { isStaff, type MyStaffProfile } from "@dragons/shared";
-import type { MeStaffUpdateBody } from "@dragons/api-client";
+import { APIError, type MeStaffUpdateBody } from "@dragons/api-client";
 
 /**
  * The coach's own contact data on the profile screen (#315).
@@ -61,4 +61,14 @@ export function buildStaffPatch(
     changed = true;
   }
   return changed ? patch : null;
+}
+
+/**
+ * Whether the contact screen says the club's data could not be loaded. A 404
+ * means the staff link went away while the app was open — there is no record,
+ * which the screen shows as nothing rather than as a failure.
+ */
+export function contactLoadFailed(error: unknown): boolean {
+  if (!error) return false;
+  return !(error instanceof APIError && error.status === 404);
 }

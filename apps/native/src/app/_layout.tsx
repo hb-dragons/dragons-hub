@@ -25,11 +25,7 @@ import { colors as themeColors } from "@/theme/colors";
 import { spacing } from "@/theme/spacing";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { configureNotificationHandler } from "@/lib/push/handler";
-import {
-  BACK_BUTTON_DISPLAY_MODE,
-  detailHeaderOptions,
-  tabRootHeaderOptions,
-} from "@/lib/nav/headers";
+import { detailHeaderOptions, tabRootHeaderOptions } from "@/lib/nav/headers";
 import { formSheetOptions, searchSheetOptions } from "@/lib/nav/sheet-routes";
 import { installGlobalErrorHandler } from "@/lib/error-reporting";
 import { initCrashReporting } from "@/lib/crash-reporting";
@@ -95,15 +91,9 @@ function RootNavigator() {
             animation: "slide_from_bottom",
           }}
         />
-        <Stack.Screen
-          name="profile"
-          options={{
-            headerShown: true,
-            headerTitle: i18n.t("profile.title"),
-            headerTintColor: colors.foreground,
-            headerBackButtonDisplayMode: BACK_BUTTON_DISPLAY_MODE,
-          }}
-        />
+        {/* Profile (#398): a page sheet with its own stack (app/profile/_layout.tsx),
+            which draws the header and the Done button. */}
+        <Stack.Screen name="profile" options={{ presentation: "modal" }} />
         <Stack.Screen
           name="assistant"
           options={{
@@ -114,13 +104,7 @@ function RootNavigator() {
           }}
         />
         {/* Push pre-permission (#237): a form sheet the sign-in flow opens once
-            when the OS has not been asked yet; Profile can reopen it. */}
-        {/* Coach self-edit (#315): the profile section's form, a sheet for the
-            same reason as quick-create — the keyboard is up throughout. */}
-        <Stack.Screen
-          name="profile-contact"
-          options={formSheetOptions({ name: "profile-contact", detents: [1] })}
-        />
+            when the OS has not been asked yet. */}
         <Stack.Screen
           name="push-permission"
           options={formSheetOptions({ name: "push-permission", detents: [0.5, 1] })}
