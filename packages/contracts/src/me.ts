@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 import { staffPersonCreateBodySchema } from "./staff-people";
 
 /**
@@ -18,3 +18,12 @@ export const meStaffUpdateBodySchema = staffPersonCreateBodySchema.pick({
 });
 
 export type MeStaffUpdateBody = z.infer<typeof meStaffUpdateBodySchema>;
+
+/**
+ * Body of `POST /me/account-closure` (#400): nothing. The account is the
+ * session's, so there is no id to send and none to tamper with; strict so a
+ * client that starts sending one fails loudly instead of being ignored.
+ */
+export const meAccountClosureCreateBodySchema = z.strictObject({});
+
+export type MeAccountClosureCreateBody = z.infer<typeof meAccountClosureCreateBodySchema>;

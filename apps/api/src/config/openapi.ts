@@ -24,6 +24,7 @@ export const openApiSpec: GenerateSpecOptions["documentation"] = {
     { name: "Hall occupancy", description: "Home games against the hall times the club holds" },
     { name: "Notifications", description: "User notifications" },
     { name: "Devices", description: "Push notification device registration" },
+    { name: "Account", description: "The signed-in account's own requests, such as closure" },
     { name: "Public", description: "Public endpoints (no auth required)" },
   ],
   security: [{ cookieAuth: [] }],

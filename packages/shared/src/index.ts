@@ -63,6 +63,8 @@ export type {
 } from "./teams";
 export { TEAM_STAFF_ROLES, teamDisplayName } from "./teams";
 
+export type { AccountClosureRequest, AccountClosureStatus } from "./account";
+
 export type {
   TaskAssignee,
   TaskCardData,

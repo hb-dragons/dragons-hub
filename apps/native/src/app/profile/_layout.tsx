@@ -43,6 +43,7 @@ export default function ProfileLayout() {
       </Stack.Screen>
       <Stack.Screen name="contact" options={{ title: i18n.t("profile.contact.title") }} />
       <Stack.Screen name="notifications" options={{ title: i18n.t("push.settingsRow") }} />
+      <Stack.Screen name="account-closure" options={{ title: i18n.t("profile.closure.title") }} />
     </Stack>
   );
 }

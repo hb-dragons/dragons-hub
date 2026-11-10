@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   LEGAL_LINKS,
-  PRIVACY_MAILBOX,
   SUPPORT_MAILBOX,
   appVersionLabel,
-  buildDeletionMailto,
   buildMailto,
   buildSupportMailto,
 } from "@/lib/legal/links";
@@ -15,9 +13,8 @@ describe("LEGAL_LINKS", () => {
     expect(LEGAL_LINKS.imprint).toBe("https://hbdragons.de/impressum");
   });
 
-  it("names role mailboxes, never a person", () => {
+  it("names a role mailbox, never a person", () => {
     expect(SUPPORT_MAILBOX).toBe("app@hbdragons.de");
-    expect(PRIVACY_MAILBOX).toBe("datenschutz@hbdragons.de");
   });
 });
 
@@ -51,17 +48,5 @@ describe("buildSupportMailto", () => {
     const url = buildSupportMailto({ version: "1.0.0", build: "5", platform: "ios" });
     expect(url.startsWith(`mailto:${SUPPORT_MAILBOX}?subject=`)).toBe(true);
     expect(decodeURIComponent(url.split("subject=")[1]!)).toBe("Dragons App 1.0.0 (5) ios — Support");
-  });
-});
-
-describe("buildDeletionMailto", () => {
-  it("addresses the Datenschutz mailbox, names the account, and states the 30-day window", () => {
-    const url = buildDeletionMailto({ email: "max@example.de", version: "1.0.0 (5)" });
-    expect(url.startsWith(`mailto:${PRIVACY_MAILBOX}?subject=`)).toBe(true);
-    const query = new URLSearchParams(url.slice(url.indexOf("?") + 1));
-    expect(query.get("subject")).toBe("Dragons App: Konto löschen — max@example.de");
-    expect(query.get("body")).toContain("max@example.de");
-    expect(query.get("body")).toContain("1.0.0 (5)");
-    expect(query.get("body")).toContain("30 Tagen");
   });
 });
