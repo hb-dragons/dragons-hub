@@ -1,4 +1,4 @@
-import type { SWRConfiguration } from "swr";
+import type { ScopedMutator, SWRConfiguration } from "swr";
 import { APIError } from "@dragons/api-client";
 import { initFocusRN, initReconnectRN, isOnlineRN, isVisibleRN } from "@/lib/swr-native-adapters";
 
@@ -17,6 +17,40 @@ function isClientError(err: unknown): boolean {
 // clear a cache nobody reads while this one — the one every screen actually
 // renders from — keeps the previous user's data live.
 export const swrCache = new Map();
+
+// `swrCache`'s own `mutate`, handed over by the root layout from inside
+// `<SWRConfig>` (`useSWRConfig().mutate`). Null until that has mounted.
+let cacheMutate: ScopedMutator | null = null;
+
+export function bindSWRCacheMutate(mutate: ScopedMutator | null): void {
+  cacheMutate = mutate;
+}
+
+/**
+ * Empty the app cache and refetch what is on screen (sign-out).
+ *
+ * Not `swrCache.clear()` once SWR is mounted: emptying the Map behind SWR's
+ * back tells no hook. A mounted screen started no request, and on its next
+ * render read an empty entry as loading — a spinner with nothing in flight
+ * that only a restart cleared. The cache-bound `mutate` empties every entry
+ * *and* notifies its hooks.
+ *
+ * Resolves once every entry is empty, so the previous user's data is gone
+ * before anything navigates. The refetch of the screens on display is
+ * started, not awaited: sign-out does not wait on the network.
+ */
+export async function resetSWRCache(): Promise<void> {
+  if (!cacheMutate) {
+    // Nothing has subscribed to the cache yet, so there is no one to tell.
+    swrCache.clear();
+    return;
+  }
+  const everyKey = () => true;
+  await cacheMutate(everyKey, undefined, { revalidate: false });
+  // Two arguments: SWR revalidates the mounted keys with no data change, and
+  // drops any in-flight request for them rather than reusing it.
+  void cacheMutate(everyKey).catch(() => {});
+}
 
 // SWR's defaults hook `revalidateOnFocus`/`revalidateOnReconnect` into
 // `document.visibilitychange` and `window.online`, neither of which exist in

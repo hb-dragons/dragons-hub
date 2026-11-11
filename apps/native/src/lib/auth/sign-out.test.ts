@@ -25,17 +25,33 @@ vi.mock("expo-network", () => ({ addNetworkStateListener: vi.fn() }));
 import { router } from "expo-router";
 import { authClient } from "@/lib/auth-client";
 import { unregisterForPush } from "@/lib/push/registration";
-import { swrCache } from "@/lib/swr-config";
+import { SWRGlobalState, initCache } from "swr/_internal";
+import { bindSWRCacheMutate, swrCache, swrConfig } from "@/lib/swr-config";
 import { performSignOut } from "@/lib/auth/sign-out";
+
+// SWR's own state for the app cache, as `<SWRConfig value={swrConfig}>` sets
+// it up: the cache-bound mutate the root layout hands to `swr-config.ts`, and
+// the table of revalidators that mounted `useSWR` hooks register in.
+const [, cacheMutate] = initCache(swrCache, swrConfig)!;
+const revalidators = SWRGlobalState.get(swrCache)![0] as Record<string, ((event: number) => Promise<boolean>)[]>;
 
 /** Seed the real app cache the way a live screen would have populated it. */
 function seed(key: string, data: unknown) {
-  swrCache.set(key, { data });
+  swrCache.set(key, { data, _k: key });
+}
+
+/** A screen that is on display, reading `key`: its hook's revalidator. */
+function mountScreen(key: string) {
+  const revalidate = vi.fn().mockResolvedValue(true);
+  revalidators[key] = [revalidate];
+  return revalidate;
 }
 
 describe("performSignOut", () => {
   beforeEach(() => {
     swrCache.clear();
+    for (const key of Object.keys(revalidators)) delete revalidators[key];
+    bindSWRCacheMutate(cacheMutate);
     vi.clearAllMocks();
     vi.mocked(authClient.signOut).mockResolvedValue(undefined as never);
     vi.mocked(unregisterForPush).mockResolvedValue(undefined);
@@ -59,7 +75,6 @@ describe("performSignOut", () => {
       "admin/boards/3/tasks",
       "admin/tasks/4",
     ]) {
-      expect(swrCache.has(key)).toBe(false);
       expect(swrCache.get(key)?.data).toBeUndefined();
     }
   });
@@ -69,7 +84,39 @@ describe("performSignOut", () => {
 
     await performSignOut();
 
-    expect(swrCache.has("some/future/endpoint/not/yet/invented")).toBe(false);
+    expect(swrCache.get("some/future/endpoint/not/yet/invented")?.data).toBeUndefined();
+  });
+
+  // The bug behind the endless spinner on Home, Tabelle and Teams after a
+  // sign-out: `swrCache.clear()` emptied the Map behind SWR's back. Mounted
+  // hooks were not told, started no request, and on their next render read an
+  // empty entry — `isLoading` with nothing in flight, until the app restarted.
+  it("tells every screen on display to fetch again", async () => {
+    seed("teams:all", { items: [{ id: 1 }] });
+    const teams = mountScreen("teams:all");
+
+    await performSignOut();
+
+    expect(teams).toHaveBeenCalled();
+    expect(swrCache.get("teams:all")?.data).toBeUndefined();
+  });
+
+  it("does not wait for those fetches before navigating home", async () => {
+    seed("teams:all", { items: [{ id: 1 }] });
+    revalidators["teams:all"] = [() => new Promise<boolean>(() => {})];
+
+    await performSignOut();
+
+    expect(router.replace).toHaveBeenCalledWith("/");
+  });
+
+  it("still wipes the cache before the tree has mounted SWR", async () => {
+    bindSWRCacheMutate(null);
+    seed("referee:games", { items: [{ id: 1 }] });
+
+    await performSignOut();
+
+    expect(swrCache.has("referee:games")).toBe(false);
   });
 
   it("deregisters the push token before clearing the auth session", async () => {
@@ -98,7 +145,7 @@ describe("performSignOut", () => {
 
     await performSignOut();
 
-    expect(swrCache.has("referee:games")).toBe(false);
+    expect(swrCache.get("referee:games")?.data).toBeUndefined();
     expect(router.replace).toHaveBeenCalledWith("/");
   });
 });

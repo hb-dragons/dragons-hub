@@ -14,6 +14,7 @@ import { SWRConfig } from "swr";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { swrConfig } from "@/lib/swr-config";
+import { SWRCacheBinding } from "@/components/SWRCacheBinding";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { LocaleProvider } from "@/hooks/useLocale";
 import { BiometricLockProvider, useBiometricLock } from "@/hooks/useBiometricLock";
@@ -212,6 +213,7 @@ function RootGate() {
         <ErrorBoundary>
           <KeyboardProvider>
             <SWRConfig value={swrConfig}>
+              <SWRCacheBinding />
               <LocaleProvider>
                 <ThemeProvider>
                   <ToastProvider>
