@@ -13,7 +13,9 @@ vi.mock("@dragons/api-client", () => ({
   adminBoardEndpoints: vi.fn(() => ({})),
   meEndpoints: vi.fn(() => ({})),
 }));
-vi.mock("expo-router", () => ({ router: { replace: vi.fn() } }));
+vi.mock("expo-router", () => ({
+  router: { replace: vi.fn(), canDismiss: vi.fn(() => false), dismissAll: vi.fn() },
+}));
 vi.mock("@/lib/auth-client", () => ({
   authClient: {
     signOut: vi.fn().mockResolvedValue(undefined),

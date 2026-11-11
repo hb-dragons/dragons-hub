@@ -10,7 +10,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // would show the next user. `react-native`/`expo-network` are mocked only
 // because `swr-config.ts` transitively imports `swr-native-adapters.ts`,
 // which references them — neither is ever invoked here.
-vi.mock("expo-router", () => ({ router: { replace: vi.fn() } }));
+vi.mock("expo-router", () => ({
+  router: { replace: vi.fn(), canDismiss: vi.fn(() => false), dismissAll: vi.fn() },
+}));
 vi.mock("@/lib/auth-client", () => ({
   authClient: { signOut: vi.fn().mockResolvedValue(undefined) },
 }));
@@ -137,6 +139,17 @@ describe("performSignOut", () => {
   it("navigates home", async () => {
     await performSignOut();
     expect(router.replace).toHaveBeenCalledWith("/");
+  });
+
+  // Sign-out runs from the Profile sheet. Replacing from there swapped the
+  // sheet for a second tab bar stacked over the first.
+  it("closes the sheet it was started from before navigating home", async () => {
+    vi.mocked(router.canDismiss).mockReturnValueOnce(true);
+    await performSignOut();
+    expect(router.dismissAll).toHaveBeenCalledOnce();
+    expect(vi.mocked(router.dismissAll).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(router.replace).mock.invocationCallOrder[0]!,
+    );
   });
 
   it("still clears the cache and navigates even if the sign-out network call rejects", async () => {

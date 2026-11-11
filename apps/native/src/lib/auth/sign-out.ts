@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { authClient } from "@/lib/auth-client";
 import { unregisterForPush } from "@/lib/push/registration";
 import { resetSWRCache } from "@/lib/swr-config";
+import { returnHome } from "@/lib/nav/dismiss-modal";
 
 /**
  * The single sign-out routine, shared by the manual "Sign Out" action
@@ -23,12 +24,14 @@ import { resetSWRCache } from "@/lib/swr-config";
  *    own default cache, a separate Map nobody in this app reads from. And not
  *    `swrCache.clear()` either: that hides the data from SWR's hooks without
  *    telling them, which left the public tabs spinning (see `resetSWRCache`).
- * 4. Navigate home. `router` is a stable singleton from expo-router; safe to
- *    call outside the React tree (e.g. from the 401 response interceptor).
+ * 4. Close whatever is stacked above the tabs (the Profile sheet, for the
+ *    manual path) and navigate home (`returnHome`). `router` is a stable
+ *    singleton from expo-router; safe to call outside the React tree (e.g.
+ *    from the 401 response interceptor).
  */
 export async function performSignOut(): Promise<void> {
   await unregisterForPush();
   await authClient.signOut().catch(() => {});
   await resetSWRCache();
-  router.replace("/");
+  returnHome(router);
 }
