@@ -3,6 +3,7 @@ import { useLocaleSubscription } from "@/hooks/useLocale";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { BACK_BUTTON_DISPLAY_MODE } from "@/lib/nav/headers";
+import { dismissModal } from "@/lib/nav/dismiss-modal";
 import { doneToolbar } from "@/components/nav/ProfileToolbar";
 
 /**
@@ -35,11 +36,7 @@ export default function ProfileLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: i18n.t("profile.title") }}>
-        {/* `router.back()` would go to this one-screen inner stack and fail
-            instead of closing the sheet — the trap `(auth)/sign-in.tsx`
-            documents. `dismiss` targets the modal itself; a cold deep link
-            has nothing under it and lands on Home. */}
-        {doneToolbar(() => (router.canDismiss() ? router.dismiss() : router.replace("/")))}
+        {doneToolbar(() => dismissModal(router))}
       </Stack.Screen>
       <Stack.Screen name="contact" options={{ title: i18n.t("profile.contact.title") }} />
       <Stack.Screen name="notifications" options={{ title: i18n.t("push.settingsRow") }} />

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import type { LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
-import { Redirect } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { fetch as expoFetch } from "expo/fetch";
@@ -28,6 +28,8 @@ import { AssistantMarkdown } from "@/components/assistant/AssistantMarkdown";
 import { ActivityChip } from "@/components/assistant/ActivityChip";
 import { ChatComposer } from "@/components/assistant/ChatComposer";
 import { AiNoticeCard } from "@/components/assistant/AiNoticeCard";
+import { closeToolbar } from "@/components/nav/ProfileToolbar";
+import { dismissModal } from "@/lib/nav/dismiss-modal";
 
 /** Throttle streamed text to ~100ms so react-native-marked doesn't re-parse on every token. */
 function useThrottledText(full: string, isStreaming: boolean): string {
@@ -111,6 +113,7 @@ function EmptyState({ onPick }: { onPick: (q: string) => void }) {
 
 export default function AssistantScreen() {
   const { colors, spacing, textStyles } = useTheme();
+  const router = useRouter();
   const [input, setInput] = useState("");
   const [composerH, setComposerH] = useState(0);
   const listRef = useRef<FlatList>(null);
@@ -195,6 +198,8 @@ export default function AssistantScreen() {
     // padding (its SafeAreaView is a no-op with edges={[]}); the top is handled
     // by the native Stack header.
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* A page sheet's Close button (#396); swiping down does the same. */}
+      {closeToolbar(() => dismissModal(router))}
       <FlatList
         ref={listRef}
         style={{ flex: 1 }}

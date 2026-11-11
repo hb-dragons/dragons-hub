@@ -106,19 +106,16 @@ function RootNavigator({ presentLock }: { presentLock: boolean }) {
           name="league-tables"
           options={tabRootHeaderOptions(i18n.t("standings.title"))}
         />
-        <Stack.Screen
-          name="(auth)"
-          options={{
-            presentation: "fullScreenModal",
-            animation: "slide_from_bottom",
-          }}
-        />
+        {/* Sign-in (#396): a page sheet like Profile, with its own stack
+            (app/(auth)/_layout.tsx) drawing the header and the Close button. */}
+        <Stack.Screen name="(auth)" options={{ presentation: "modal" }} />
         {/* Profile (#398): a page sheet with its own stack (app/profile/_layout.tsx),
             which draws the header and the Done button. */}
         <Stack.Screen name="profile" options={{ presentation: "modal" }} />
         {/* The app lock after a relock (#399): over everything, sheets
             included, with nothing to swipe away and no frame of animation
-            showing what is underneath. */}
+            showing what is underneath. The one full-screen modal, and the one
+            modal with no way to close it (#396). */}
         <Stack.Screen
           name="lock"
           options={{ presentation: "fullScreenModal", animation: "none", gestureEnabled: false }}
@@ -130,6 +127,7 @@ function RootNavigator({ presentLock }: { presentLock: boolean }) {
             headerShown: true,
             headerTitle: i18n.t("assistant.title"),
             headerTintColor: colors.foreground,
+            // The Close button is the screen's (assistant.tsx, #396).
           }}
         />
         {/* Push pre-permission (#237): a form sheet the sign-in flow opens once
