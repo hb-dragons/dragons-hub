@@ -17,6 +17,7 @@ const NATIVE_APP_DIR = path.join(__dirname, "../../native/src/app");
 
 interface Aasa {
   applinks: { details: { appIDs: string[]; components: { "/": string; exclude?: boolean }[] }[] };
+  webcredentials?: { apps: string[] };
 }
 
 const aasa = JSON.parse(fs.readFileSync(AASA_PATH, "utf8")) as Aasa;
@@ -82,6 +83,13 @@ const ACTUAL_CLAIMS = [
 describe("apple-app-site-association", () => {
   it("names the team and bundle id the native binary is built with", () => {
     expect(detail.appIDs).toEqual([`${ios.appleTeamId}.${ios.bundleIdentifier}`]);
+  });
+
+  // Password AutoFill (#396): with the app's `webcredentials:` entitlement,
+  // this block is what lets iOS offer a password saved on the web admin in
+  // the native sign-in sheet. Same app id as the links.
+  it("names the same app id for shared web credentials", () => {
+    expect(aasa.webcredentials?.apps).toEqual([`${ios.appleTeamId}.${ios.bundleIdentifier}`]);
   });
 
   it("read the native route tree", () => {

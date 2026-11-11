@@ -110,6 +110,7 @@ describe("app.json iOS build config", () => {
  * and the mistake is invisible until someone taps a link on a device build.
  */
 const APPLINKS_PREFIX = "applinks:";
+const WEBCREDENTIALS_PREFIX = "webcredentials:";
 
 /** Hosts the Android manifest claims for `https` links, in declaration order. */
 const androidHttpsHosts = (expo.android?.intentFilters ?? []).flatMap((filter) =>
@@ -131,6 +132,17 @@ describe("app.json universal links", () => {
     // differently. A host added to one and not the other is a link that opens
     // the app on one phone and the browser on the other.
     expect([...iosHosts].sort()).toEqual([...androidHttpsHosts].sort());
+  });
+
+  // Password AutoFill (#396): iOS offers a password saved on the web admin
+  // only when the app claims the host as a `webcredentials` domain and the
+  // host's AASA file names the app back (`apps/web/src/aasa.test.ts`). The
+  // admin lives on the same origin the links open, so the hosts match.
+  it("claims the link host for Password AutoFill too", () => {
+    const credentialHosts = (expo.ios?.associatedDomains ?? [])
+      .filter((domain) => domain.startsWith(WEBCREDENTIALS_PREFIX))
+      .map((domain) => domain.slice(WEBCREDENTIALS_PREFIX.length));
+    expect(credentialHosts).toEqual(["app.hbdragons.de"]);
   });
 });
 

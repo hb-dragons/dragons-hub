@@ -146,3 +146,39 @@ function DoneButton({ onPress }: { onPress: () => void }) {
     </Pressable>
   );
 }
+
+/**
+ * The Close button of a page sheet that has nothing to confirm (#396):
+ * sign-in and the assistant. Leading, as an `xmark` bar item on iOS, the way
+ * system sheets place it; Done stays the trailing item of a sheet that is a
+ * finished place, like Profile. Android hosts a plain icon button.
+ */
+export function closeToolbar(onPress: () => void) {
+  return BAR_DRAWS_ITEMS ? (
+    <Stack.Toolbar placement="left">
+      <Stack.Toolbar.Button
+        icon={symbolFor("close")}
+        accessibilityLabel={i18n.t("common.close")}
+        onPress={onPress}
+      />
+    </Stack.Toolbar>
+  ) : (
+    <Stack.Toolbar placement="left" asChild>
+      <CloseButton onPress={onPress} />
+    </Stack.Toolbar>
+  );
+}
+
+function CloseButton({ onPress }: { onPress: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={i18n.t("common.close")}
+      style={{ width: FALLBACK_TAP_TARGET, height: FALLBACK_TAP_TARGET, alignItems: "center", justifyContent: "center" }}
+    >
+      <Icon name="close" size={22} color={colors.foreground} />
+    </Pressable>
+  );
+}

@@ -16,5 +16,8 @@
         ]
       }
     ]
+  },
+  "webcredentials": {
+    "apps": ["Z28P2F9QQR.de.hbdragons.club"]
   }
 }

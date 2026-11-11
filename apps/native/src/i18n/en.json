@@ -287,8 +287,7 @@
     "staffSignInHint": "Fans don't need an account to use the app.",
     "noAccountHint": "No account? Ask your club admin to create one.",
     "unlockWith": "Unlock with %{method}",
-    "lockedHint": "The app is locked.",
-    "close": "Close"
+    "lockedHint": "The app is locked."
   },
   "common": {
     "home": "Home",
@@ -307,7 +306,8 @@
     "loadFailed": "Couldn't load this page",
     "retry": "Retry",
     "notFound": "Not found",
-    "done": "Done"
+    "done": "Done",
+    "close": "Close"
   },
   "admin": {
     "boards": {

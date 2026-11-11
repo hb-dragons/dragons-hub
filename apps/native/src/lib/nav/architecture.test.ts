@@ -188,7 +188,8 @@ describe("navigation architecture", () => {
    * #395 adds the one other site: the tab roots' profile affordance, placed
    * from a layout, where expo-router only reads `Stack.Toolbar` elements
    * themselves — a component like `HeaderActions` would be dropped there. It
-   * keeps the same platform split.
+   * keeps the same platform split. The page sheets' Done and Close buttons
+   * (#398, #396) live there too, for the same reason.
    */
   it("declares the navigation bar's items in the two toolbar modules only", () => {
     const sites = SOURCE_FILES.filter((file) =>
@@ -620,5 +621,123 @@ describe("appearance", () => {
   it("never overrides the system colour scheme", () => {
     const sites = SOURCE_FILES.filter((file) => /setColorScheme\(/.test(readFileSync(file, "utf8"))).map(rel);
     expect(sites).toEqual([]);
+  });
+});
+
+/**
+ * Modal routes (#396). Every modal is a page sheet or a form sheet the user
+ * can close: page sheets carry a header button (Done or Close) next to the
+ * swipe, form sheets the grabber. Sign-in was the last full-screen modal, with
+ * a hand-drawn close button over it.
+ *
+ * The one exception is the relock (#399): it must cover everything and must
+ * not be dismissable, so it is full screen on purpose and has no control.
+ */
+describe("modal routes", () => {
+  const root = () => readFileSync(path.join(APP_DIR, "_layout.tsx"), "utf8");
+  const declarations = () =>
+    [...root().matchAll(/<Stack\.Screen\s+name="([^"]+)"[\s\S]*?\/>/g)].map((match) => ({
+      name: match[1]!,
+      source: match[0],
+    }));
+  /** The file that draws a root route's header: its layout, or the screen itself. */
+  const routeSource = (name: string) => {
+    const layout = path.join(APP_DIR, name, "_layout.tsx");
+    return readFileSync(existsSync(layout) ? layout : path.join(APP_DIR, `${name}.tsx`), "utf8");
+  };
+
+  it("read the root stack's declarations", () => {
+    expect(declarations().map((d) => d.name)).toEqual(
+      expect.arrayContaining(["(auth)", "profile", "assistant", "lock", "push-permission"]),
+    );
+  });
+
+  it("presents no route full screen except the relock", () => {
+    const fullScreen = declarations()
+      .filter((d) => /presentation:\s*"fullScreenModal"/.test(d.source))
+      .map((d) => d.name);
+    expect(fullScreen).toEqual(["lock"]);
+    // Nested layouts too: a full-screen modal declared anywhere else fails.
+    const sites = SOURCE_FILES.filter(
+      (file) => !/\.test\.tsx?$/.test(file) && /"fullScreenModal"/.test(readFileSync(file, "utf8")),
+    ).map(rel);
+    expect(sites).toEqual(["src/app/_layout.tsx"]);
+  });
+
+  it("presents sign-in as a page sheet", () => {
+    const declaration = declarations().find((d) => d.name === "(auth)");
+    expect(declaration?.source).toMatch(/presentation:\s*"modal"/);
+  });
+
+  it("gives every page sheet a header button that closes it", () => {
+    const pageSheets = declarations().filter((d) => /presentation:\s*"modal"/.test(d.source));
+    expect(pageSheets.map((d) => d.name).sort()).toEqual(["(auth)", "assistant", "profile"]);
+    for (const { name } of pageSheets) {
+      const source = routeSource(name);
+      expect(source, `${name} draws a Done or Close bar button`).toMatch(/\b(doneToolbar|closeToolbar)\(/);
+      expect(source, `${name} closes through dismissModal`).toMatch(/\bdismissModal\(/);
+    }
+  });
+
+  it("gives every other modal route the sheet grabber", () => {
+    const rest = declarations().filter(
+      (d) => /presentation:|SheetOptions\(/.test(d.source) && !/presentation:\s*"modal"/.test(d.source) && d.name !== "lock",
+    );
+    expect(rest.length).toBeGreaterThan(0);
+    for (const { name, source } of rest) {
+      expect(source, `${name} uses a sheet-routes preset`).toMatch(/\b(formSheetOptions|searchSheetOptions)\(/);
+    }
+  });
+
+  it("leaves sign-in no close button or dismiss logic of its own", () => {
+    const source = readFileSync(path.join(APP_DIR, "(auth)", "sign-in.tsx"), "utf8");
+    expect(source).not.toMatch(/auth\.close|"close"/);
+    // Closing goes through lib/nav/dismiss-modal, never a hand-rolled branch.
+    expect(source).not.toMatch(/canDismiss|router\.dismiss\(/);
+  });
+});
+
+/**
+ * The sign-in form (#396): visible labels, a scroll view that keeps the
+ * button above the keyboard, and one AutoFill hint per field. React Native
+ * maps `autoComplete` to iOS's content type, so it is the one hint that
+ * reaches both platforms; setting `textContentType` as well is two hints that
+ * can disagree.
+ */
+describe("sign-in form", () => {
+  const source = () => readFileSync(path.join(APP_DIR, "(auth)", "sign-in.tsx"), "utf8");
+  const inputs = () => [...source().matchAll(/<TextInput\s[\s\S]*?\/>/g)].map((m) => m[0]);
+
+  it("has the two fields", () => {
+    expect(inputs()).toHaveLength(2);
+  });
+
+  it("sets one AutoFill hint per field", () => {
+    for (const input of inputs()) {
+      expect(input).not.toMatch(/textContentType=/);
+      expect(input).toMatch(/autoComplete=/);
+    }
+  });
+
+  it("offers the e-mail field as the username, on the e-mail keyboard", () => {
+    const [email, password] = inputs();
+    expect(email).toMatch(/autoComplete="username"/);
+    expect(email).toMatch(/keyboardType="email-address"/);
+    expect(password).toMatch(/autoComplete="current-password"/);
+  });
+
+  it("labels both fields with visible text", () => {
+    expect(source()).toMatch(/<Text\b[^>]*>\s*\{i18n\.t\("auth\.email"\)\}\s*<\/Text>/);
+    expect(source()).toMatch(/<Text\b[^>]*>\s*\{i18n\.t\("auth\.password"\)\}\s*<\/Text>/);
+  });
+
+  // Today is focused under the sheet before it closes, so nothing mounts in
+  // view during the dismiss animation (lib/auth/sign-in-exit.ts).
+  it("leaves through the sign-in exit, landing on Today before the sheet closes", () => {
+    expect(source()).toMatch(/\bsignInExit\(/);
+  });
+
+  it("scrolls the form clear of the keyboard", () => {
+    expect(source()).toMatch(/<KeyboardAwareScrollView\b/);
   });
 });

@@ -223,8 +223,8 @@ function SignInBlock() {
       </Text>
       <Pressable
         accessibilityRole="button"
-        // Replaces the Profile sheet rather than stacking the full-screen
-        // sign-in on top of it; sign-in closes itself and lands on Today.
+        // Replaces the Profile sheet rather than stacking the sign-in sheet
+        // on top of it; sign-in closes itself and lands on Today.
         onPress={() => router.replace("/(auth)/sign-in")}
         style={{
           marginTop: spacing.sm,
