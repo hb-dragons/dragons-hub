@@ -4,6 +4,7 @@ import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
 import { kickoffShortNumeric } from "../lib/format/kickoff";
 import { matchA11yLabel } from "../lib/ui/match-a11y";
+import { headToHeadAverages } from "../lib/ui/game-detail";
 import { scaledSize } from "../theme/text-scaling";
 import { ClubLogo } from "./brand/ClubLogo";
 
@@ -36,6 +37,8 @@ export function HeadToHead({
   };
 
   const meetings = data.previousMeetings.slice(0, 5);
+  // Points per game rather than season totals (#408).
+  const { avgFor, avgAgainst } = headToHeadAverages(data);
 
   return (
     <View>
@@ -77,7 +80,7 @@ export function HeadToHead({
             {data.wins}
           </Text>
           <Text style={[sectionLabelStyle, { marginTop: spacing.xs }]}>
-            {i18n.t("standings.won")}
+            {i18n.t("match.win")}
           </Text>
         </View>
 
@@ -92,7 +95,7 @@ export function HeadToHead({
             {data.losses}
           </Text>
           <Text style={[sectionLabelStyle, { marginTop: spacing.xs }]}>
-            {i18n.t("standings.lost")}
+            {i18n.t("match.loss")}
           </Text>
         </View>
 
@@ -104,10 +107,10 @@ export function HeadToHead({
               color: colors.foreground,
             }}
           >
-            {data.pointsFor}
+            {avgFor ?? "–"}
           </Text>
           <Text style={[sectionLabelStyle, { marginTop: spacing.xs }]}>
-            {i18n.t("gameDetail.pointsFor")}
+            {i18n.t("gameDetail.avgFor")}
           </Text>
         </View>
 
@@ -119,10 +122,10 @@ export function HeadToHead({
               color: colors.foreground,
             }}
           >
-            {data.pointsAgainst}
+            {avgAgainst ?? "–"}
           </Text>
           <Text style={[sectionLabelStyle, { marginTop: spacing.xs }]}>
-            {i18n.t("gameDetail.pointsAgainst")}
+            {i18n.t("gameDetail.avgAgainst")}
           </Text>
         </View>
       </View>
@@ -227,21 +230,21 @@ export function HeadToHead({
                   {!meeting.homeIsOwnClub ? ownLabel : opponentName}
                 </Text>
 
-                {/* S/N badge */}
+                {/* W/L badge */}
                 <View
                   style={{
                     backgroundColor: isWinner
                       ? colors.chart1 + "1A"
                       : colors.destructive + "1A",
                     borderRadius: radius.md,
-                    paddingHorizontal: 4,
+                    paddingHorizontal: 6,
                     paddingVertical: 1,
                     marginLeft: spacing.xs,
                   }}
                 >
                   <Text
                     style={{
-                      fontSize: 9,
+                      fontSize: 11,
                       fontWeight: "700",
                       color: isWinner ? colors.chart1 : colors.destructive,
                       textTransform: "uppercase",

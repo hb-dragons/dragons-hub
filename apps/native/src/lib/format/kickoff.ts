@@ -12,10 +12,12 @@ import {
   daysUntilKickoff,
   formatKickoffCompact,
   formatKickoffLong,
+  formatKickoffParts,
   formatKickoffShortNumeric,
   resolveDateLocale,
   todayInClubZone,
 } from "@dragons/shared";
+import type { KickoffParts } from "@dragons/shared";
 import { i18n } from "@/lib/i18n";
 
 function currentDateLocale(): string {
@@ -25,6 +27,14 @@ function currentDateLocale(): string {
 /** `"Sat 25.04. 18:30"` — match/referee cards and detail headers. */
 export function kickoffCompact(date: string, time?: string | null): string {
   return formatKickoffCompact(date, time, currentDateLocale());
+}
+
+/**
+ * Day, weekday and time as separate strings — the Spielplan card sets the day
+ * large and the weekday + time small next to it. Null for an unparseable date.
+ */
+export function kickoffParts(date: string, time?: string | null): KickoffParts | null {
+  return formatKickoffParts(date, time, currentDateLocale());
 }
 
 /** `"Saturday, 25.04.2026"` — schedule and officiating section headers. */

@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 import {
   View,
   Text,
-  SectionList,
+  FlatList,
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
@@ -16,54 +16,33 @@ import { useRefresh } from "@/hooks/useRefresh";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { screenContentPadding } from "@/lib/ui/screen-padding";
 import { FilterPill } from "@/components/FilterPill";
-import { MatchCardFull } from "@/components/MatchCardFull";
+import { MatchCardSchedule } from "@/components/MatchCardSchedule";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
-import { kickoffLong, kickoffToday } from "@/lib/format/kickoff";
+import { kickoffToday } from "@/lib/format/kickoff";
+import { filterByLocation, type LocationFilter } from "@/lib/ui/match-card";
 import { Segmented } from "@/components/ui/Segmented";
 
 type Segment = "upcoming" | "results";
-type LocationFilter = "all" | "home" | "away";
-
-interface Section {
-  title: string;
-  formattedTitle: string;
-  data: MatchListItem[];
-}
-
-function groupByDate(matches: MatchListItem[]): Section[] {
-  const grouped = new Map<string, MatchListItem[]>();
-  for (const match of matches) {
-    const key = match.kickoffDate;
-    const list = grouped.get(key);
-    if (list) list.push(match);
-    else grouped.set(key, [match]);
-  }
-  return Array.from(grouped.entries()).map(([date, items]): Section => ({
-    title: date,
-    formattedTitle: kickoffLong(date),
-    data: items,
-  }));
-}
 
 /* ── Match List (reusable for both segments) ── */
 function MatchList({
-  sections,
+  matches,
   isLoading,
   refreshControl,
   controls,
 }: {
-  sections: Section[];
+  matches: MatchListItem[];
   isLoading: boolean;
   refreshControl?: ReactElement<RefreshControlProps>;
   /**
    * Segment switcher and filters. They ride inside the list rather than
-   * sitting above it so the SectionList is the screen's first scroll view —
+   * sitting above it so the list is the screen's first scroll view —
    * which is the one the native large title tracks and insets.
    */
   controls: ReactElement;
 }) {
-  const { colors, textStyles, spacing, fontFamilies } = useTheme();
+  const { colors, textStyles, spacing } = useTheme();
   const router = useRouter();
 
   // Stable handler: MatchCard* are memo-wrapped, and an inline arrow per call
@@ -84,8 +63,10 @@ function MatchList({
   );
 
   return (
-    <SectionList
-      sections={sections}
+    // No day headers (#408): every card carries its own date, and a header per
+    // day was a row of its own for what is often a single game.
+    <FlatList
+      data={matches}
       // This list is the screen's scroll view, so it is the one the native
       // header insets and the large title collapses against.
       contentInsetAdjustmentBehavior="automatic"
@@ -104,35 +85,14 @@ function MatchList({
         )
       }
       keyExtractor={(item) => String(item.id)}
-      renderSectionHeader={({ section }) => (
-        <View
-          style={{
-            backgroundColor: colors.background,
-            paddingVertical: spacing.xs,
-            paddingTop: spacing.md,
-          }}
-        >
-          <Text
-            accessibilityRole="header"
-            style={{
-              fontSize: 13,
-              fontFamily: fontFamilies.bodySemiBold,
-              color: colors.mutedForeground,
-            }}
-          >
-            {section.formattedTitle}
-          </Text>
-        </View>
-      )}
       renderItem={({ item }) => (
         <View style={{ marginBottom: spacing.sm }}>
-          <MatchCardFull match={item} onPress={openMatch} />
+          <MatchCardSchedule match={item} onPress={openMatch} />
         </View>
       )}
       refreshControl={refreshControl}
       contentContainerStyle={listContentStyle}
       showsVerticalScrollIndicator={false}
-      stickySectionHeadersEnabled={false}
     />
   );
 }
@@ -198,24 +158,14 @@ export default function ScheduleScreen() {
   const upcoming = upcomingData?.items ?? [];
   const results = resultsData?.items ?? [];
 
-  // Apply location filter
-  const applyFilter = useCallback(
-    (matches: MatchListItem[]) => {
-      if (locationFilter === "home") return matches.filter((m) => m.homeIsOwnClub);
-      if (locationFilter === "away") return matches.filter((m) => m.guestIsOwnClub);
-      return matches;
-    },
-    [locationFilter],
+  const upcomingMatches = useMemo(
+    () => filterByLocation(upcoming, locationFilter),
+    [upcoming, locationFilter],
   );
 
-  const upcomingSections = useMemo(
-    () => groupByDate(applyFilter(upcoming)),
-    [upcoming, applyFilter],
-  );
-
-  const resultsSections = useMemo(
-    () => groupByDate(applyFilter(results)),
-    [results, applyFilter],
+  const resultMatches = useMemo(
+    () => filterByLocation(results, locationFilter),
+    [results, locationFilter],
   );
 
   const segments: { key: Segment; label: string }[] = [
@@ -223,7 +173,13 @@ export default function ScheduleScreen() {
     { key: "results", label: i18n.t("schedule.results") },
   ];
 
-  // Rendered inside the list, not above it — see `MatchList`. Two pills fit on
+  const locationFilters: { key: LocationFilter; label: string }[] = [
+    { key: "all", label: i18n.t("schedule.all") },
+    { key: "home", label: i18n.t("schedule.homeOnly") },
+    { key: "away", label: i18n.t("schedule.away") },
+  ];
+
+  // Rendered inside the list, not above it — see `MatchList`. Three pills fit on
   // any phone width, so they sit in a plain row: a horizontal ScrollView here
   // would be the first scroll view the native header finds, and the large
   // title would track the pills instead of the matches.
@@ -233,16 +189,14 @@ export default function ScheduleScreen() {
       <View
         style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.md }}
       >
-        <FilterPill
-          label={i18n.t("schedule.homeOnly")}
-          active={locationFilter === "home"}
-          onPress={() => setLocationFilter(locationFilter === "home" ? "all" : "home")}
-        />
-        <FilterPill
-          label={i18n.t("schedule.away")}
-          active={locationFilter === "away"}
-          onPress={() => setLocationFilter(locationFilter === "away" ? "all" : "away")}
-        />
+        {locationFilters.map((filter) => (
+          <FilterPill
+            key={filter.key}
+            label={filter.label}
+            active={locationFilter === filter.key}
+            onPress={() => setLocationFilter(filter.key)}
+          />
+        ))}
       </View>
     </>
   );
@@ -251,14 +205,14 @@ export default function ScheduleScreen() {
     <Screen edges={UNDER_NATIVE_HEADER} scroll={false}>
       {segment === "upcoming" ? (
         <MatchList
-          sections={upcomingSections}
+          matches={upcomingMatches}
           isLoading={upcomingLoading}
           refreshControl={upcomingRefreshControl}
           controls={controls}
         />
       ) : (
         <MatchList
-          sections={resultsSections}
+          matches={resultMatches}
           isLoading={resultsLoading}
           refreshControl={resultsRefreshControl}
           controls={controls}

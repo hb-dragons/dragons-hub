@@ -9,6 +9,7 @@ import {
   formatKickoffCompact,
   formatKickoffDayShort,
   formatKickoffLong,
+  formatKickoffParts,
   formatKickoffShortNumeric,
   clubWeekendDay,
   clubWeekdayName,
@@ -268,6 +269,35 @@ describe("clubTimeAnchor", () => {
   it("returns an invalid date for junk input", () => {
     vi.stubEnv("TZ", "UTC");
     expect(Number.isNaN(clubTimeAnchor("nope").getTime())).toBe(true);
+  });
+});
+
+describe("formatKickoffParts", () => {
+  it("splits a kickoff into day, weekday and time", () => {
+    vi.stubEnv("TZ", "Europe/Berlin");
+    expect(formatKickoffParts("2026-04-25", "18:30:00", "en-US")).toEqual({
+      day: "25.04.",
+      weekday: "Sat",
+      time: "18:30",
+    });
+  });
+
+  it("drops the trailing dot of the German short weekday", () => {
+    vi.stubEnv("TZ", "Europe/Berlin");
+    expect(formatKickoffParts("2026-04-25", "18:30", "de-DE")?.weekday).toBe("Sa");
+  });
+
+  it.each(ZONES)("names the same day regardless of device timezone (TZ=%s)", (tz) => {
+    vi.stubEnv("TZ", tz);
+    expect(formatKickoffParts("2026-04-25", null, "en-US")).toEqual({
+      day: "25.04.",
+      weekday: "Sat",
+      time: null,
+    });
+  });
+
+  it("returns null for an unparseable date", () => {
+    expect(formatKickoffParts("garbage", "18:30", "en-US")).toBeNull();
   });
 });
 
