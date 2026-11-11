@@ -47,8 +47,8 @@
     }
   },
   "match": {
-    "win": "S",
-    "loss": "N",
+    "win": "W",
+    "loss": "L",
     "upcoming": "Anst.",
     "cancelled": "Abg.",
     "forfeited": "Wert."
@@ -57,6 +57,7 @@
     "title": "Spielplan",
     "upcoming": "Anstehend",
     "results": "Ergebnisse",
+    "all": "Alle",
     "homeOnly": "Heim",
     "away": "Auswärts",
     "noMatches": "Keine Spiele gefunden"
@@ -66,8 +67,8 @@
     "pos": "Pl.",
     "team": "Team",
     "played": "Sp",
-    "won": "S",
-    "lost": "N",
+    "won": "W",
+    "lost": "L",
     "diff": "Diff",
     "points": "Pkt"
   },
@@ -169,12 +170,13 @@
     "scorer": "Anschreiber",
     "timekeeper": "Zeitnehmer",
     "status": "Status",
-    "confirmed": "Bestätigt",
     "cancelled": "Abgesagt",
     "forfeited": "Kampflos",
     "previousMeetings": "Letzte Begegnungen",
-    "pointsFor": "Punkte für",
-    "pointsAgainst": "Punkte gegen",
+    "avgFor": "Ø Für",
+    "avgAgainst": "Ø Gegen",
+    "officials": "Kampfgericht",
+    "route": "Route",
     "home": "Heim",
     "error": "Spiel konnte nicht geladen werden",
     "notFound": "Spiel nicht gefunden",

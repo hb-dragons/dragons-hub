@@ -68,7 +68,7 @@ export function ResultChip({ match, onPress }: ResultChipProps) {
       {/* Own team */}
       <Text
         style={{
-          fontSize: 10,
+          fontSize: 11,
           fontFamily: fontFamilies.bodySemiBold,
           color: ownColor,
         }}
@@ -80,7 +80,7 @@ export function ResultChip({ match, onPress }: ResultChipProps) {
       {/* Opponent name */}
       <Text
         style={{
-          fontSize: 10,
+          fontSize: 11,
           fontFamily: fontFamilies.body,
           color: colors.mutedForeground,
         }}
@@ -93,7 +93,7 @@ export function ResultChip({ match, onPress }: ResultChipProps) {
       {hasScore ? (
         <Text
           style={{
-            fontSize: 16,
+            fontSize: 18,
             fontFamily: isWin ? fontFamilies.display : fontFamilies.body,
             color: isWin ? colors.foreground : colors.mutedForeground,
             fontWeight: isWin ? "700" : "400",
@@ -102,14 +102,14 @@ export function ResultChip({ match, onPress }: ResultChipProps) {
           {ownScore}
         </Text>
       ) : (
-        <Text style={{ fontSize: 16, color: colors.mutedForeground }}>—</Text>
+        <Text style={{ fontSize: 18, color: colors.mutedForeground }}>—</Text>
       )}
 
       {/* Opponent score */}
       {hasScore ? (
         <Text
           style={{
-            fontSize: 13,
+            fontSize: 15,
             fontFamily: !isWin ? fontFamilies.display : fontFamilies.body,
             color: !isWin ? colors.foreground : colors.mutedForeground,
             fontWeight: !isWin ? "700" : "400",
@@ -119,7 +119,7 @@ export function ResultChip({ match, onPress }: ResultChipProps) {
         </Text>
       ) : null}
 
-      {/* S/N badge */}
+      {/* W/L badge */}
       <View
         style={{
           marginTop: spacing.xs,
@@ -130,13 +130,13 @@ export function ResultChip({ match, onPress }: ResultChipProps) {
                 ? colors.destructive + "1A"
                 : colors.muted,
           borderRadius: radius.md,
-          paddingHorizontal: 4,
+          paddingHorizontal: 6,
           paddingVertical: 1,
         }}
       >
         <Text
           style={{
-            fontSize: 9,
+            fontSize: 11,
             fontWeight: "700",
             color:
               isWin === true

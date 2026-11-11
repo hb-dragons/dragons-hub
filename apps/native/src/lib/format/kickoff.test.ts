@@ -8,6 +8,7 @@ vi.mock("@/lib/i18n", () => ({ i18n: i18nStub }));
 import {
   kickoffCompact,
   kickoffLong,
+  kickoffParts,
   kickoffShortNumeric,
   kickoffToday,
   kickoffCountdownDays,
@@ -30,6 +31,18 @@ describe("native kickoff formatters", () => {
 
     i18nStub.locale = "de";
     expect(kickoffCompact("2026-04-25", "18:30:00")).toMatch(/^Sa\.? 25\.04\. 18:30$/);
+  });
+
+  it("splits a kickoff into the parts a card sets in different sizes", () => {
+    vi.stubEnv("TZ", "Europe/Berlin");
+    expect(kickoffParts("2026-04-25", "18:30:00")).toEqual({
+      day: "25.04.",
+      weekday: "Sa",
+      time: "18:30",
+    });
+    i18nStub.locale = "en";
+    expect(kickoffParts("2026-04-25")).toEqual({ day: "25.04.", weekday: "Sat", time: null });
+    expect(kickoffParts("garbage")).toBeNull();
   });
 
   it("reads the locale per call, so a locale switch is picked up without a reload", () => {

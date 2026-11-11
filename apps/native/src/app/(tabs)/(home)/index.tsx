@@ -7,7 +7,7 @@ import { needsStandingsShortcut } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { StatStrip } from "@/components/StatStrip";
-import { MatchCardFull } from "@/components/MatchCardFull";
+import { MatchCardSchedule } from "@/components/MatchCardSchedule";
 import { MatchCardCompact } from "@/components/MatchCardCompact";
 import { ResultChip } from "@/components/ResultChip";
 import { authClient, useGateUser } from "@/lib/auth-client";
@@ -150,7 +150,7 @@ export default function HomeScreen() {
         </View>
 
         {nextGame ? (
-          <MatchCardFull match={nextGame} onPress={openMatch} />
+          <MatchCardSchedule match={nextGame} onPress={openMatch} emphasis="time" />
         ) : (
           <View
             style={{

@@ -4,7 +4,7 @@ import type { MatchListItem } from "@dragons/shared";
 import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
-import { kickoffCompact } from "../lib/format/kickoff";
+import { kickoffCompact, kickoffParts } from "../lib/format/kickoff";
 import { matchA11yLabel } from "../lib/ui/match-a11y";
 import { ClubLogo } from "./brand/ClubLogo";
 
@@ -69,6 +69,7 @@ function MatchCardCompactImpl({ match, onPress, highlighted }: MatchCardCompactP
   const isWin = hasScore && ownScore! > oppScore!;
 
   const badge = getResultBadge(match);
+  const kickoff = kickoffParts(match.kickoffDate, match.kickoffTime);
 
   // vs / @
   const separator = isHomeGame ? i18n.t("common.vs") : i18n.t("common.at");
@@ -83,17 +84,39 @@ function MatchCardCompactImpl({ match, onPress, highlighted }: MatchCardCompactP
         borderColor: highlighted ? colors.primary + "60" : "transparent",
       }}
     >
-      {/* Date header */}
-      <Text
+      {/* Date header: the day leads, the time follows smaller (#408) */}
+      <View
         style={{
-          fontSize: 11,
-          fontFamily: fontFamilies.body,
-          color: colors.mutedForeground,
+          flexDirection: "row",
+          flexWrap: "wrap",
+          alignItems: "baseline",
+          columnGap: spacing.sm,
           marginBottom: spacing.xs,
         }}
       >
-        {kickoffCompact(match.kickoffDate, match.kickoffTime)}
-      </Text>
+        <Text
+          style={{
+            fontSize: 14,
+            fontFamily: fontFamilies.bodySemiBold,
+            color: colors.foreground,
+          }}
+        >
+          {kickoff
+            ? `${kickoff.weekday} ${kickoff.day}`
+            : kickoffCompact(match.kickoffDate, match.kickoffTime)}
+        </Text>
+        {kickoff?.time ? (
+          <Text
+            style={{
+              fontSize: 13,
+              fontFamily: fontFamilies.body,
+              color: colors.mutedForeground,
+            }}
+          >
+            {kickoff.time}
+          </Text>
+        ) : null}
+      </View>
 
       {/* Main row: teams + score + badge */}
       <View
@@ -105,7 +128,7 @@ function MatchCardCompactImpl({ match, onPress, highlighted }: MatchCardCompactP
         <View style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
           <Text
             style={{
-              fontSize: 14,
+              fontSize: 15,
               fontFamily: fontFamilies.bodySemiBold,
               color: ownColor.name,
             }}
@@ -128,7 +151,7 @@ function MatchCardCompactImpl({ match, onPress, highlighted }: MatchCardCompactP
           />
           <Text
             style={{
-              fontSize: 14,
+              fontSize: 15,
               fontFamily: fontFamilies.body,
               color: colors.mutedForeground,
               flex: 1,
@@ -185,7 +208,7 @@ function MatchCardCompactImpl({ match, onPress, highlighted }: MatchCardCompactP
           >
             <Text
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: "700",
                 color:
                   badge.variant === "win"

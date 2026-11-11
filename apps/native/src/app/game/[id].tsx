@@ -1,4 +1,4 @@
-import { View, Text, ActivityIndicator, Pressable, useWindowDimensions } from "react-native";
+import { View, Text, ActivityIndicator, Platform, Pressable, useWindowDimensions } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import useSWR from "swr";
 import { getNativeTeamColor } from "@dragons/shared";
@@ -14,7 +14,10 @@ import { FormStrip } from "@/components/FormStrip";
 import { ClubLogo } from "@/components/brand/ClubLogo";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
-import { kickoffCompact } from "@/lib/format/kickoff";
+import { kickoffCompact, kickoffParts } from "@/lib/format/kickoff";
+import { venueBlock } from "@/lib/ui/game-detail";
+import { mapsUrl } from "@/lib/referee/einsatz";
+import { openExternal } from "@/lib/legal/open-external";
 
 export default function GameDetailScreen() {
   const { colors, textStyles, spacing, radius, isDark, fontFamilies } = useTheme();
@@ -147,14 +150,14 @@ export default function GameDetailScreen() {
   const homeWon = hasScore && match.homeScore! > match.guestScore!;
   const guestWon = hasScore && match.guestScore! > match.homeScore!;
 
-  const venueName = match.venueNameOverride || match.venueName;
+  const venue = venueBlock(match);
+  const venueMapsQuery = venue?.mapsQuery ?? null;
 
-  // Build address string from parts
-  const addressParts = [
-    match.venueStreet,
-    [match.venuePostalCode, match.venueCity].filter(Boolean).join(" "),
-  ].filter(Boolean);
-  const address = addressParts.length > 0 ? addressParts.join(", ") : null;
+  // Date and time on one line, large: the hall has its own group below.
+  const kickoff = kickoffParts(match.kickoffDate, match.kickoffTime);
+  const kickoffLine = kickoff
+    ? [`${kickoff.weekday} ${kickoff.day}`, kickoff.time].filter(Boolean).join(" · ")
+    : kickoffCompact(match.kickoffDate, match.kickoffTime);
 
   // Opponent name for H2H section label
   const opponentName = match.homeIsOwnClub ? guestName : homeName;
@@ -192,16 +195,32 @@ export default function GameDetailScreen() {
           }}
         >
           <View style={{ alignItems: "center" }}>
-            {/* Date / time / venue meta */}
+            {/* Date and time */}
             <Text
-              style={[
-                textStyles.caption,
-                { color: colors.mutedForeground, textAlign: "center", marginBottom: spacing.sm },
-              ]}
+              style={{
+                fontSize: 20,
+                fontFamily: fontFamilies.display,
+                fontWeight: "700",
+                color: colors.foreground,
+                textAlign: "center",
+                marginBottom: spacing.sm,
+              }}
             >
-              {kickoffCompact(match.kickoffDate, match.kickoffTime)}
-              {venueName ? ` · ${venueName}` : ""}
+              {kickoffLine}
             </Text>
+
+            {/* Shown only when it applies; a confirmed game is the normal case
+                and says nothing (#408). */}
+            {match.isCancelled || match.isForfeited ? (
+              <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm }}>
+                {match.isCancelled ? (
+                  <Badge label={i18n.t("gameDetail.cancelled")} variant="destructive" />
+                ) : null}
+                {match.isForfeited ? (
+                  <Badge label={i18n.t("gameDetail.forfeited")} variant="heat" />
+                ) : null}
+              </View>
+            ) : null}
 
             {/* Teams and score */}
             <View
@@ -410,122 +429,95 @@ export default function GameDetailScreen() {
           </View>
         ) : null}
 
-        {/* ── 5. Details ── */}
-        <View style={{ marginBottom: spacing.md }}>
-          <Text accessibilityRole="header" style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
-            {i18n.t("gameDetail.details")}
-          </Text>
-          <View
-            style={{
-              backgroundColor: colors.surfaceLowest,
-              borderRadius: radius.md,
-              padding: spacing.lg,
-              gap: spacing.sm,
-            }}
-          >
-            {/* Venue */}
-            {venueName ? (
+        {/* ── 5. Halle ── */}
+        {venue ? (
+          <View style={{ marginBottom: spacing.md }}>
+            <Text accessibilityRole="header" style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
+              {i18n.t("gameDetail.venue")}
+            </Text>
+            <Card
+              onPress={
+                venueMapsQuery
+                  ? () => openExternal(mapsUrl(venueMapsQuery, Platform.OS))
+                  : undefined
+              }
+            >
               <View style={detailRowStyle}>
-                <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
-                  {i18n.t("gameDetail.venue")}
-                </Text>
-                <Text
-                  style={[
-                    textStyles.body,
-                    { color: colors.foreground, flex: 1, textAlign: "right", marginLeft: spacing.md },
-                  ]}
-                  numberOfLines={2}
-                >
-                  {venueName}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Address */}
-            {address ? (
-              <View style={detailRowStyle}>
-                <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
-                  {i18n.t("gameDetail.address")}
-                </Text>
-                <Text
-                  style={[
-                    textStyles.body,
-                    { color: colors.foreground, flex: 1, textAlign: "right", marginLeft: spacing.md },
-                  ]}
-                  numberOfLines={2}
-                >
-                  {address}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Divider — between venue/address and officials */}
-            {(venueName || address) && (match.anschreiber || match.zeitnehmer) ? (
-              <View
-                style={{
-                  height: 1,
-                  backgroundColor: colors.border,
-                  opacity: 0.25,
-                  marginVertical: spacing.xs,
-                }}
-              />
-            ) : null}
-
-            {/* Scorer */}
-            {match.anschreiber ? (
-              <View style={detailRowStyle}>
-                <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
-                  {i18n.t("gameDetail.scorer")}
-                </Text>
-                <Text style={[textStyles.body, { color: colors.foreground }]}>
-                  {match.anschreiber}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Timekeeper */}
-            {match.zeitnehmer ? (
-              <View style={detailRowStyle}>
-                <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
-                  {i18n.t("gameDetail.timekeeper")}
-                </Text>
-                <Text style={[textStyles.body, { color: colors.foreground }]}>
-                  {match.zeitnehmer}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Divider — before status */}
-            {(match.anschreiber || match.zeitnehmer || venueName || address) ? (
-              <View
-                style={{
-                  height: 1,
-                  backgroundColor: colors.border,
-                  opacity: 0.25,
-                  marginVertical: spacing.xs,
-                }}
-              />
-            ) : null}
-
-            {/* Status */}
-            <View style={[detailRowStyle, { alignItems: "center" }]}>
-              <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
-                {i18n.t("gameDetail.status")}
-              </Text>
-              <View style={{ flexDirection: "row", gap: spacing.sm }}>
-                {match.isConfirmed === true ? (
-                  <Badge label={i18n.t("gameDetail.confirmed")} variant="default" />
-                ) : null}
-                {match.isCancelled === true ? (
-                  <Badge label={i18n.t("gameDetail.cancelled")} variant="destructive" />
-                ) : null}
-                {match.isForfeited === true ? (
-                  <Badge label={i18n.t("gameDetail.forfeited")} variant="heat" />
+                <View style={{ flex: 1, gap: spacing.xs }}>
+                  {venue.name ? (
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontFamily: fontFamilies.bodySemiBold,
+                        color: colors.foreground,
+                      }}
+                    >
+                      {venue.name}
+                    </Text>
+                  ) : null}
+                  {venue.address ? (
+                    <Text style={[textStyles.body, { color: colors.mutedForeground }]}>
+                      {venue.address}
+                    </Text>
+                  ) : null}
+                </View>
+                {venueMapsQuery ? (
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontFamily: fontFamilies.bodySemiBold,
+                      color: colors.primary,
+                      marginLeft: spacing.md,
+                    }}
+                  >
+                    {i18n.t("gameDetail.route")}
+                  </Text>
                 ) : null}
               </View>
-            </View>
+            </Card>
           </View>
-        </View>
+        ) : null}
+
+        {/* ── 6. Kampfgericht ── */}
+        {match.anschreiber || match.zeitnehmer ? (
+          <View style={{ marginBottom: spacing.md }}>
+            <Text accessibilityRole="header" style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
+              {i18n.t("gameDetail.officials")}
+            </Text>
+            <Card style={{ gap: spacing.sm }}>
+              {match.anschreiber ? (
+                <View style={detailRowStyle}>
+                  <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
+                    {i18n.t("gameDetail.scorer")}
+                  </Text>
+                  <Text
+                    style={[
+                      textStyles.body,
+                      { color: colors.foreground, flex: 1, textAlign: "right", marginLeft: spacing.md },
+                    ]}
+                  >
+                    {match.anschreiber}
+                  </Text>
+                </View>
+              ) : null}
+              {match.zeitnehmer ? (
+                <View style={detailRowStyle}>
+                  <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
+                    {i18n.t("gameDetail.timekeeper")}
+                  </Text>
+                  <Text
+                    style={[
+                      textStyles.body,
+                      { color: colors.foreground, flex: 1, textAlign: "right", marginLeft: spacing.md },
+                    ]}
+                  >
+                    {match.zeitnehmer}
+                  </Text>
+                </View>
+              ) : null}
+            </Card>
+          </View>
+        ) : null}
       </Screen>
     </>
   );

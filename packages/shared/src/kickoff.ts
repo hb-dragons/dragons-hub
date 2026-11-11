@@ -283,6 +283,37 @@ export function formatKickoffDayShort(date: string, locale: string): string {
   return `${clubWeekday(f.at, locale, "short")}, ${f.day}.${f.month}.${f.year}`;
 }
 
+/** The pieces of a kickoff a card lays out on its own: see {@link formatKickoffParts}. */
+export interface KickoffParts {
+  /** `"25.04."` */
+  day: string;
+  /** `"Sa"` (de) / `"Sat"` (en) — the short weekday without a trailing dot. */
+  weekday: string;
+  /** `"18:30"`, or null when the kickoff has no time yet. */
+  time: string | null;
+}
+
+/**
+ * A kickoff split into day, weekday and time, for cards that set the three in
+ * different sizes instead of on one line (`formatKickoffCompact`). Returns null
+ * for a date that is not a real calendar day, so the caller decides what an
+ * unparseable kickoff looks like.
+ */
+export function formatKickoffParts(
+  date: string,
+  time: string | null | undefined,
+  locale: string,
+): KickoffParts | null {
+  const f = clubDayFields(date);
+  if (!f) return null;
+  return {
+    day: `${f.day}.${f.month}.`,
+    // de-DE renders "Sa." on some ICU versions and "Sa" on others.
+    weekday: clubWeekday(f.at, locale, "short").replace(/\.$/, ""),
+    time: shortTime(time),
+  };
+}
+
 /** Dense numeric kickoff label: `"25.04.26"`. Used in head-to-head rows. */
 export function formatKickoffShortNumeric(date: string): string {
   const f = clubDayFields(date);
