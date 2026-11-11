@@ -731,6 +731,12 @@ describe("sign-in form", () => {
     expect(source()).toMatch(/<Text\b[^>]*>\s*\{i18n\.t\("auth\.password"\)\}\s*<\/Text>/);
   });
 
+  // Today is focused under the sheet before it closes, so nothing mounts in
+  // view during the dismiss animation (lib/auth/sign-in-exit.ts).
+  it("leaves through the sign-in exit, landing on Today before the sheet closes", () => {
+    expect(source()).toMatch(/\bsignInExit\(/);
+  });
+
   it("scrolls the form clear of the keyboard", () => {
     expect(source()).toMatch(/<KeyboardAwareScrollView\b/);
   });

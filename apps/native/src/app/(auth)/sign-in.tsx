@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
-import { useRouter } from "expo-router";
+import { useNavigationContainerRef, useRootNavigationState, useRouter } from "expo-router";
 import { useTheme } from "@/hooks/useTheme";
 import { authClient } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
@@ -16,7 +16,8 @@ import { TEXT_LINK_SLOP } from "@/lib/ui/a11y";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { LEGAL_LINKS } from "@/lib/legal/links";
 import { openExternal } from "@/lib/legal/open-external";
-import { dismissModalTo } from "@/lib/nav/dismiss-modal";
+import { dismissModal, dismissModalTo } from "@/lib/nav/dismiss-modal";
+import { signInExit } from "@/lib/auth/sign-in-exit";
 import { submitClearance } from "@/lib/auth/submit-clearance";
 
 /** Height of the two fields and the button. */
@@ -25,6 +26,9 @@ const CONTROL_HEIGHT = 48;
 type Field = "email" | "password";
 /** Bottom edges inside the scroll content, from `onLayout`; 0 until measured. */
 type Bottoms = Record<Field | "button", number>;
+
+/** How long sign-in waits for Today under the sheet before closing anyway. */
+const EXIT_FALLBACK_MS = 1500;
 
 const bottomOf = (event: LayoutChangeEvent) => event.nativeEvent.layout.y + event.nativeEvent.layout.height;
 
@@ -61,6 +65,40 @@ export default function SignInScreen() {
     };
   }, []);
 
+  // After a successful sign-in, Today is focused under the sheet first and the
+  // sheet closes once it is there, so nothing mounts in view as the sheet
+  // slides away (lib/auth/sign-in-exit.ts). Re-evaluated on every navigation
+  // state change: the tab navigator remounts with the signed-in tab set.
+  const [signedIn, setSignedIn] = useState(false);
+  const leaving = useRef(false);
+  const rootState = useRootNavigationState();
+  const navigation = useNavigationContainerRef();
+  useEffect(() => {
+    if (!signedIn || leaving.current) return;
+    const exit = signInExit(rootState);
+    if (exit.kind === "jump") navigation.dispatch(exit.action);
+    if (exit.kind !== "dismiss") return;
+    leaving.current = true;
+    // Two frames: one to commit Today, one for its native layout to settle.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (mounted.current) dismissModal(router);
+      }),
+    );
+  }, [signedIn, rootState, navigation, router]);
+
+  // No tabs under the sheet to land on (a cold deep link to sign-in), or they
+  // never switch to the signed-in set: close and replace, as before.
+  useEffect(() => {
+    if (!signedIn) return;
+    const fallback = setTimeout(() => {
+      if (leaving.current) return;
+      leaving.current = true;
+      dismissModalTo(router, "/today");
+    }, EXIT_FALLBACK_MS);
+    return () => clearTimeout(fallback);
+  }, [signedIn, router]);
+
   const canSubmit = useMemo(
     () => email.trim() !== "" && password !== "" && !loading,
     [email, password, loading],
@@ -69,7 +107,7 @@ export default function SignInScreen() {
   async function handleSignIn() {
     if (!canSubmit) return;
     setErrorText(null);
-    setLoading(true);
+    setLoading(true); let succeeded = false;
     try {
       const { error } = await authClient.signIn.email({ email, password });
       if (!mounted.current) return;
@@ -83,14 +121,16 @@ export default function SignInScreen() {
         return;
       }
 
-      dismissModalTo(router, "/today");
+      // Stays busy until the sheet closes; nothing to press twice.
+      succeeded = true;
+      setSignedIn(true);
     } catch (err) {
       if (!mounted.current) return;
       setErrorText(
         err instanceof Error ? err.message : i18n.t("auth.unexpectedError"),
       );
     } finally {
-      if (mounted.current) setLoading(false);
+      if (mounted.current && !succeeded) setLoading(false);
     }
   }
 
